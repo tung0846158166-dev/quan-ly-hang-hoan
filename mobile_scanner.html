@@ -523,6 +523,11 @@
 
     <div class="camera-box">
       <div id="reader"></div>
+      <!-- Nút Làm Mới Camera nổi ở góc khung camera để bấm khởi động lại ngay nếu bị đen/mờ -->
+      <button onclick="forceRestartCamera()" title="Khởi động lại Camera" style="position:absolute;top:10px;right:10px;z-index:20;background:rgba(15,23,42,0.82);color:#38bdf8;border:1.5px solid #38bdf8;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(0,0,0,0.45);">
+        <span>🔄</span>
+        <span>Làm mới Cam</span>
+      </button>
       <div id="cameraStartOverlay" class="camera-overlay">
         <label class="btn-secondary-cam">
           <span>📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN</span>
@@ -1444,16 +1449,55 @@
     }
 
     let html5QrCode = null;
-    async function startCameraScanner() {
+    let isCameraStarting = false;
+    let wasCameraActive = false;
+    let wakeLockSentinel = null;
+
+    // Giữ màn hình điện thoại sáng khi đang mở camera quét (Screen Wake Lock API)
+    async function requestScreenWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          if (wakeLockSentinel) {
+            try { await wakeLockSentinel.release(); } catch (e) {}
+          }
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+        } catch (err) {}
+      }
+    }
+
+    async function safelyStopAndClearScanner() {
+      if (!html5QrCode) return;
+      try {
+        // Ngắt toàn bộ MediaStream track đang bị hệ điều hành khóa
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && videoEl.srcObject) {
+          const tracks = videoEl.srcObject.getTracks();
+          tracks.forEach(t => { try { t.stop(); } catch (e) {} });
+          videoEl.srcObject = null;
+        }
+      } catch (e) {}
+      try {
+        await html5QrCode.stop();
+      } catch (e) {}
+      try {
+        await html5QrCode.clear();
+      } catch (e) {}
+      html5QrCode = null;
+      const readerEl = document.getElementById('reader');
+      if (readerEl) readerEl.innerHTML = '';
+    }
+
+    async function startCameraScanner(isAutoResume = false) {
       if (typeof Html5Qrcode === 'undefined') {
-        alert('Đang tải bộ quét Camera, vui lòng thử lại sau 2 giây...');
+        if (!isAutoResume) alert('Đang tải bộ quét Camera, vui lòng thử lại sau 2 giây...');
         return;
       }
+      if (isCameraStarting) return;
+      isCameraStarting = true;
       try {
         document.getElementById('cameraStartOverlay').classList.add('hidden');
-        if (html5QrCode) {
-          try { await html5QrCode.stop(); } catch (e) {}
-        }
+        await safelyStopAndClearScanner();
+
         html5QrCode = new Html5Qrcode('reader');
         await html5QrCode.start(
           { facingMode: 'environment' },
@@ -1463,11 +1507,128 @@
           },
           () => {}
         );
+        wasCameraActive = true;
+        requestScreenWakeLock();
+
+        // Lắng nghe nếu hệ điều hành ngắt luồng camera (khi khóa màn hình hoặc chuyển app)
+        setTimeout(() => {
+          const videoEl = document.querySelector('#reader video');
+          if (videoEl) {
+            videoEl.setAttribute('playsinline', 'true');
+            videoEl.setAttribute('autoplay', 'true');
+            videoEl.setAttribute('muted', 'true');
+            if (videoEl.srcObject) {
+              const tracks = videoEl.srcObject.getVideoTracks();
+              if (tracks && tracks[0]) {
+                tracks[0].onended = () => {
+                  if (document.visibilityState === 'visible') {
+                    setTimeout(() => checkAndRecoverCamera(), 300);
+                  }
+                };
+              }
+            }
+          }
+        }, 400);
       } catch (err) {
-        alert('Trình duyệt chặn Camera trực tiếp. Bạn hãy bấm nút màu xanh lá [📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN] ngay trên cùng nhé!');
+        if (!isAutoResume) {
+          alert('Trình duyệt chặn Camera trực tiếp hoặc Camera đang bận. Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam] nhé!');
+        }
         document.getElementById('cameraStartOverlay').classList.remove('hidden');
+      } finally {
+        isCameraStarting = false;
       }
     }
+
+    async function forceRestartCamera() {
+      wasCameraActive = true;
+      await safelyStopAndClearScanner();
+      await new Promise(r => setTimeout(r, 200));
+      await startCameraScanner(true);
+    }
+
+    // Kiểm tra xem luồng video camera có bị đen / bị ngắt sau khi tắt màn hình bật lại không
+    async function checkAndRecoverCamera() {
+      if (document.visibilityState !== 'visible') return;
+      if (!wasCameraActive || isCameraStarting) return;
+
+      const overlay = document.getElementById('cameraStartOverlay');
+      if (overlay && !overlay.classList.contains('hidden')) return;
+
+      const videoEl = document.querySelector('#reader video');
+      let isDead = false;
+
+      if (!videoEl || !videoEl.srcObject) {
+        isDead = true;
+      } else {
+        const tracks = videoEl.srcObject.getVideoTracks();
+        if (!tracks || tracks.length === 0) {
+          isDead = true;
+        } else {
+          const track = tracks[0];
+          if (track.readyState === 'ended' || !track.enabled || track.muted) {
+            isDead = true;
+          }
+        }
+        if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) {
+          try {
+            await videoEl.play();
+          } catch (e) {
+            isDead = true;
+          }
+        }
+      }
+
+      if (isDead) {
+        console.log('Phát hiện Camera bị ngắt sau khi bật lại màn hình -> Tự động khởi động lại Camera...');
+        await safelyStopAndClearScanner();
+        await new Promise(r => setTimeout(r, 250));
+        await startCameraScanner(true);
+      } else {
+        requestScreenWakeLock();
+      }
+    }
+
+    // Khi tắt màn hình điện thoại (hidden) -> Giải phóng camera gọn gàng; Khi bật lại màn hình (visible) -> Tự động bật lại camera + nối lại máy tính!
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'hidden') {
+        if (wasCameraActive && html5QrCode) {
+          await safelyStopAndClearScanner();
+        }
+      } else if (document.visibilityState === 'visible') {
+        initPhoneSync();
+        if (wasCameraActive) {
+          setTimeout(() => {
+            startCameraScanner(true);
+          }, 300);
+        }
+      }
+    });
+
+    window.addEventListener('pageshow', (event) => {
+      if (document.visibilityState === 'visible' && wasCameraActive) {
+        initPhoneSync();
+        setTimeout(() => checkAndRecoverCamera(), 350);
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (document.visibilityState === 'visible' && wasCameraActive) {
+        setTimeout(() => checkAndRecoverCamera(), 350);
+      }
+    });
+
+    // Bộ tuần tra tự động mỗi 2.5 giây: Nếu màn hình đang mở mà luồng camera bị đơ/đen thì tự phục hồi ngay
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && wasCameraActive && !isCameraStarting) {
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && videoEl.srcObject) {
+          const tracks = videoEl.srcObject.getVideoTracks();
+          if (!tracks.length || tracks[0].readyState === 'ended') {
+            checkAndRecoverCamera();
+          }
+        }
+      }
+    }, 2500);
 
     function loadImageElement(file) {
       return new Promise((resolve, reject) => {

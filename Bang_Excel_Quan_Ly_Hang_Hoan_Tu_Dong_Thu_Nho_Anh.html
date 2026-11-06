@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
@@ -292,7 +292,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </label>
 
               <button
-                onclick="closeAllHeaderMenus(); if (requireUnlocked('In Báo Cáo / Lưu PDF')) window.print();"
+                onclick="closeAllHeaderMenus(); requireUnlocked('In Báo Cáo / Lưu PDF').then(ok => { if (ok) window.print(); });"
                 class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
                 <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-200 font-bold text-sm">
@@ -810,6 +810,62 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Nhập Mật Khẩu / Xác Nhận Thao Tác (Hoạt động 100% trên cả Desktop App và Web) -->
+  <div id="customPromptModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-4">
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
+      <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="customPromptIcon" class="text-xl">🔒</span>
+          <div>
+            <h3 id="customPromptTitle" class="text-sm font-bold text-white">Xác Nhận Mật Khẩu Chủ Shop</h3>
+            <p id="customPromptSubtitle" class="text-[11px] text-slate-300 mt-0.5">Vui lòng nhập mật khẩu để tiếp tục</p>
+          </div>
+        </div>
+        <button type="button" onclick="cancelCustomPrompt()" class="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer">✕</button>
+      </div>
+
+      <form id="customPromptForm" onsubmit="submitCustomPrompt(event)" class="p-5">
+        <label id="customPromptLabel" class="block text-xs font-bold text-slate-700 mb-1.5">Mật khẩu Chủ Shop:</label>
+        <div class="relative">
+          <input
+            type="password"
+            id="customPromptInput"
+            autocomplete="current-password"
+            placeholder="Nhập mật khẩu..."
+            class="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"
+          />
+          <button
+            type="button"
+            onclick="togglePromptPasswordVisibility()"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm p-1 cursor-pointer"
+            title="Hiện / Ẩn mật khẩu"
+          >
+            👁️
+          </button>
+        </div>
+        <p id="customPromptHint" class="text-[11px] text-slate-400 mt-1.5">Mật khẩu mặc định: <span class="font-bold text-indigo-600">123456</span></p>
+
+        <div class="flex items-center justify-end gap-2.5 mt-5">
+          <button
+            type="button"
+            onclick="cancelCustomPrompt()"
+            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+          >
+            Hủy Bỏ
+          </button>
+          <button
+            type="submit"
+            id="customPromptSubmitBtn"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl shadow-md shadow-indigo-600/30 transition cursor-pointer flex items-center gap-1.5"
+          >
+            <span>Xác Nhận</span>
+            <span>➔</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -1368,7 +1424,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // SAO LƯU DỰ PHÒNG & PHỤC HỒI DỮ LIỆU (BACKUP & RESTORE JSON)
     // =========================================================================
     async function exportBackupJson() {
-      if (!requireUnlocked('Sao Lưu Dữ Liệu (.json)')) return;
+      if (!(await requireUnlocked('Sao Lưu Dữ Liệu (.json)'))) return;
       try {
         await loadAllPhotosIntoMemory();
         const now = new Date();
@@ -1405,8 +1461,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    function restoreBackupJson(e) {
-      if (!requireUnlocked('Phục Hồi Dữ Liệu (.json)')) {
+    async function restoreBackupJson(e) {
+      if (!(await requireUnlocked('Phục Hồi Dữ Liệu (.json)'))) {
         if (e && e.target) e.target.value = '';
         return;
       }
@@ -1579,15 +1635,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         navigator.clipboard.writeText(tracks).then(() => {
           alert(`✅ ĐÃ SAO CHÉP ${overdueList.length} MÃ VẬN ĐƠN!\n\n` + tracks);
         }).catch(() => {
-          prompt('Copy danh sách mã vận đơn tại đây:', tracks);
+          alert('Danh sách mã vận đơn:\n\n' + tracks);
         });
       } else {
-        prompt('Copy danh sách mã vận đơn tại đây:', tracks);
+        alert('Danh sách mã vận đơn:\n\n' + tracks);
       }
     }
 
-    function exportClaimExcel() {
-      if (!requireUnlocked('Xuất File Khiếu Nại Sàn')) return;
+    async function exportClaimExcel() {
+      if (!(await requireUnlocked('Xuất File Khiếu Nại Sàn'))) return;
       const overdueList = getOverdueOrdersList(7);
       if (!overdueList.length) {
         alert('Không có đơn quá hạn nào để xuất!');
@@ -2001,15 +2057,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       handleShopeeExcelFileUpload(e);
     }
 
-    function handleShopeeExcelFileUpload(e) {
-      if (!requireUnlocked('Nạp File Đơn Shopee / TikTok')) {
+    async function handleShopeeExcelFileUpload(e) {
+      if (!(await requireUnlocked('Nạp File Đơn Shopee / TikTok'))) {
         if (e && e.target) e.target.value = '';
         return;
       }
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(evt) {
+      reader.onload = async function(evt) {
         try {
           const data = new Uint8Array(evt.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
@@ -2020,7 +2076,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             alert('⚠️ File Excel không có dữ liệu dòng nào!');
             return;
           }
-          ingestShopeeRecords(rawRows);
+          await ingestShopeeRecords(rawRows);
         } catch (err) {
           alert('❌ Lỗi khi đọc file Excel: ' + (err.message || err));
         }
@@ -2029,8 +2085,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       e.target.value = '';
     }
 
-    function ingestShopeeRecords(rawRows) {
-      if (!requireUnlocked('Nhập Dữ Liệu Đơn Hàng')) return;
+    async function ingestShopeeRecords(rawRows) {
+      if (!(await requireUnlocked('Nhập Dữ Liệu Đơn Hàng'))) return;
       if (!rawRows || !rawRows.length) return;
       const sampleRow = rawRows[0];
       const keys = Object.keys(sampleRow);
@@ -2304,8 +2360,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             `Khi kiện hàng về kho, bạn chỉ việc dùng điện thoại hoặc máy tính quét mã vận đơn ➔ Đơn đó sẽ tự động đổi sang [🟢 Hàng đã trả]!`);
     }
 
-    function pushAllDbOrdersToMainTable() {
-      if (!requireUnlocked('Đẩy Đơn Ra Bảng Chính')) return;
+    async function pushAllDbOrdersToMainTable() {
+      if (!(await requireUnlocked('Đẩy Đơn Ra Bảng Chính'))) return;
       const keys = Object.keys(shopeeOrderDb || {});
       if (!keys.length) {
         alert('⚠️ Bộ nhớ tra cứu đang trống! Vui lòng nạp file Excel trước.');
@@ -2376,8 +2432,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(`🎉 ĐÃ ĐẨY XONG RA BẢNG CHÍNH!\n\n• Thêm mới ra bảng: ${addedCount} đơn hoàn (Trạng thái: 🟡 Chưa trả - Đang chờ)\n• Cập nhật thông tin cho: ${enrichedCount} đơn đã có\n\nToàn bộ số liệu thống kê sản phẩm, màu sắc, size ở bảng bên dưới đã được cập nhật ngay lập tức!`);
     }
 
-    function processShopeeDbPaste() {
-      if (!requireUnlocked('Dán Đơn Vào Bảng')) return;
+    async function processShopeeDbPaste() {
+      if (!(await requireUnlocked('Dán Đơn Vào Bảng'))) return;
       const ta = document.getElementById('shopeeDbPasteInput');
       if (!ta || !ta.value.trim()) {
         alert('⚠️ Vui lòng dán dữ liệu các cột từ Excel vào ô trước khi bấm nạp!');
@@ -2454,8 +2510,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('');
     }
 
-    function openShopeeDbModal() {
-      if (!requireUnlocked('Nạp File Shopee / TikTok')) return;
+    async function openShopeeDbModal() {
+      if (!(await requireUnlocked('Nạp File Shopee / TikTok'))) return;
       renderShopeeDbTable();
       updateShopeeDbBadge();
       document.getElementById('shopeeDbModal').classList.remove('hidden');
@@ -2465,7 +2521,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('shopeeDbModal').classList.add('hidden');
     }
 
-    function clearShopeeOrderDb() {
+    async function clearShopeeOrderDb() {
+      if (!(await requireUnlocked('Xóa Bộ Nhớ Tra Cứu'))) return;
       if (!confirm('Bạn có chắc muốn xóa toàn bộ bộ nhớ tra cứu đơn Shopee?')) return;
       shopeeOrderDb = {};
       saveShopeeOrderDb();
@@ -2563,7 +2620,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function triggerPcOcrForMissingOrders() {
-      if (!requireUnlocked('Đọc Tem OCR Tự Động')) return;
+      if (!(await requireUnlocked('Đọc Tem OCR Tự Động'))) return;
       const missingIndices = [];
       (orders || []).forEach((o, idx) => {
         if (o.photo && (!o.orderId || !o.items[0] || !o.items[0].product)) {
@@ -3220,13 +3277,79 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {}
     }
 
-    function openAuditLogModal() {
-      const entered = prompt('🛡️ NHẬT KÝ BẢO MẬT CHỦ SHOP\nVui lòng nhập mật khẩu Chủ Shop để xem lịch sử chỉnh sửa & bảo mật:');
+    let promptResolver = null;
+
+    function appPrompt({ title = 'Xác Nhận Mật Khẩu Chủ Shop', subtitle = 'Vui lòng nhập mật khẩu để tiếp tục', label = 'Mật khẩu Chủ Shop:', placeholder = 'Nhập mật khẩu...', isPassword = true, defaultValue = '', hint = 'Mật khẩu mặc định: <span class="font-bold text-indigo-600">123456</span>', icon = '🔒' } = {}) {
+      return new Promise((resolve) => {
+        promptResolver = resolve;
+        const modal = document.getElementById('customPromptModal');
+        const titleEl = document.getElementById('customPromptTitle');
+        const subEl = document.getElementById('customPromptSubtitle');
+        const labelEl = document.getElementById('customPromptLabel');
+        const inputEl = document.getElementById('customPromptInput');
+        const hintEl = document.getElementById('customPromptHint');
+        const iconEl = document.getElementById('customPromptIcon');
+
+        if (titleEl) titleEl.textContent = title;
+        if (subEl) subEl.textContent = subtitle;
+        if (labelEl) labelEl.textContent = label;
+        if (iconEl) iconEl.textContent = icon;
+        if (inputEl) {
+          inputEl.type = isPassword ? 'password' : 'text';
+          inputEl.value = defaultValue || '';
+          inputEl.placeholder = placeholder;
+        }
+        if (hintEl) {
+          hintEl.innerHTML = hint;
+          hintEl.style.display = hint ? 'block' : 'none';
+        }
+
+        if (modal) modal.classList.remove('hidden');
+        setTimeout(() => { if (inputEl) { inputEl.focus(); inputEl.select(); } }, 60);
+      });
+    }
+
+    function submitCustomPrompt(e) {
+      if (e) e.preventDefault();
+      const inputEl = document.getElementById('customPromptInput');
+      const val = inputEl ? inputEl.value : '';
+      const modal = document.getElementById('customPromptModal');
+      if (modal) modal.classList.add('hidden');
+      if (promptResolver) {
+        const fn = promptResolver;
+        promptResolver = null;
+        fn(val);
+      }
+    }
+
+    function cancelCustomPrompt() {
+      const modal = document.getElementById('customPromptModal');
+      if (modal) modal.classList.add('hidden');
+      if (promptResolver) {
+        const fn = promptResolver;
+        promptResolver = null;
+        fn(null);
+      }
+    }
+
+    function togglePromptPasswordVisibility() {
+      const inputEl = document.getElementById('customPromptInput');
+      if (!inputEl) return;
+      inputEl.type = inputEl.type === 'password' ? 'text' : 'password';
+    }
+
+    async function openAuditLogModal() {
+      const entered = await appPrompt({
+        title: 'Nhật Ký Bảo Mật Chủ Shop',
+        subtitle: 'Vui lòng nhập mật khẩu Chủ Shop để xem lịch sử chỉnh sửa & bảo mật',
+        icon: '🛡️'
+      });
       if (entered === null) return;
       if (!verifyPassword(entered)) {
         addAuditLog('⚠️ CẢNH BÁO', 'Có người nhập sai mật khẩu khi cố mở Nhật Ký Bảo Mật');
-        alert('❌ Mật khẩu không đúng!');
+        alert('❌ Mật khẩu không đúng! Mật khẩu mặc định là 123456.');
         return;
+      }
       }
       const tbody = document.getElementById('auditLogTableBody');
       if (tbody) {
@@ -3331,10 +3454,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {}
     }
 
-    function handleCellContextMenu(e, cellKey, labelName) {
+    async function handleCellContextMenu(e, cellKey, labelName) {
       e.preventDefault();
       if (cellLocks[cellKey]) {
-        const entered = prompt(`🔒 Ô [${labelName}] đang được KHÓA bảo vệ.\nNhập mật khẩu để MỞ KHÓA cho phép chỉnh sửa:`);
+        const entered = await appPrompt({
+          title: `Mở Khóa Ô: ${labelName}`,
+          subtitle: 'Nhập mật khẩu để mở khóa cho phép chỉnh sửa ô này',
+          icon: '🔓'
+        });
         if (entered === null) return;
         if (verifyPassword(entered, cellLocks[cellKey])) {
           delete cellLocks[cellKey];
@@ -3344,30 +3471,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           alert(`🔓 Đã mở khóa ô [${labelName}]! Bây giờ bạn có thể chỉnh sửa ô này.`);
         } else {
           addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu khi cố mở khóa ô [${labelName}]`);
-          alert('❌ Mật khẩu không đúng! Ô này vẫn chỉ được xem.');
+          alert('❌ Mật khẩu không đúng! Mật khẩu mặc định là 123456.');
         }
       } else {
-        const pwd = prompt(`🔑 Nhập mật khẩu Chủ Shop để KHÓA riêng ô [${labelName}]:`);
+        const pwd = await appPrompt({
+          title: `Khóa Riêng Ô: ${labelName}`,
+          subtitle: 'Nhập mật khẩu để khóa riêng ô này (bỏ trống dùng mật khẩu mặc định 123456)',
+          defaultValue: '123456'
+        });
         if (pwd === null) return;
-        if (!pwd.trim()) {
-          alert('⚠️ Vui lòng nhập mật khẩu để khóa ô!');
-          return;
-        }
-        if (!verifyPassword(pwd)) {
+        const finalPwd = pwd.trim() || '123456';
+        if (!verifyPassword(finalPwd)) {
           addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu Chủ Shop khi cố khóa ô [${labelName}]`);
           alert('❌ Mật khẩu Chủ Shop không đúng!');
           return;
         }
-        cellLocks[cellKey] = computePasswordHash(pwd.trim());
+        cellLocks[cellKey] = computePasswordHash(finalPwd);
         saveCellLocks();
         addAuditLog('🔒 KHÓA Ô', `Đã khóa bảo vệ ô [${labelName}]`);
         renderAll();
       }
     }
 
-    function promptUnlockSingleCell(cellKey, labelName) {
+    async function promptUnlockSingleCell(cellKey, labelName) {
       if (!cellLocks[cellKey]) return;
-      const entered = prompt(`🔒 Ô [${labelName}] đã cài mật khẩu (Không có mật khẩu chỉ được xem).\nNhập mật khẩu để chỉnh sửa ô này:`);
+      const entered = await appPrompt({
+        title: `Mở Khóa Ô: ${labelName}`,
+        subtitle: 'Nhập mật khẩu để chỉnh sửa ô này',
+        icon: '🔓'
+      });
       if (entered === null) return;
       if (verifyPassword(entered, cellLocks[cellKey])) {
         delete cellLocks[cellKey];
@@ -3376,57 +3508,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         renderAll();
       } else {
         addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu khi bấm vào ô khóa [${labelName}]`);
-        alert('❌ Sai mật khẩu! Bạn chỉ có quyền xem ô này.');
+        alert('❌ Sai mật khẩu! Mật khẩu mặc định là 123456.');
       }
     }
 
-    function requireUnlocked(actionName = 'thao tác này') {
+    async function requireUnlocked(actionName = 'thao tác này') {
       if (!isLocked) return true;
-      const entered = prompt(`🔒 Bảng đang ở chế độ KHÓA BẢO VỆ.\nNhập mật khẩu Chủ Shop để mở khóa thực hiện [${actionName}]:`);
+      const entered = await appPrompt({
+        title: 'Bảng Đang Khóa Bảo Vệ',
+        subtitle: `Nhập mật khẩu Chủ Shop để mở khóa thực hiện [${actionName}]`,
+        icon: '🔒'
+      });
       if (entered === null) return false;
       if (verifyPassword(entered)) {
         isLocked = false;
         try { localStorage.setItem(LOCK_STATE_KEY, 'false'); } catch (e) {}
         addAuditLog('🔓 MỞ KHÓA BẢNG', `Đã mở khóa thành công để thực hiện [${actionName}]`);
+        applyLockUI();
         renderAll();
         return true;
       } else {
         addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu khi cố thực hiện [${actionName}]`);
-        alert(`❌ Mật khẩu không đúng! Bạn phải mở khóa trước khi thực hiện [${actionName}].`);
+        alert(`❌ Mật khẩu không đúng! Mật khẩu mặc định là 123456.`);
         return false;
       }
     }
 
-    function togglePasswordLock() {
+    async function togglePasswordLock() {
       if (!isLocked) {
         isLocked = true;
         localStorage.setItem(LOCK_STATE_KEY, 'true');
         addAuditLog('🔒 KHÓA TOÀN BẢNG', 'Đã bật chế độ Khóa Chỉ Xem toàn bộ bảng đơn hàng');
+        applyLockUI();
         renderAll();
       } else {
-        const entered = prompt('🔒 Bảng đang ở chế độ CHỈ XEM.\nNhập mật khẩu Chủ Shop để mở khóa chỉnh sửa:');
+        const entered = await appPrompt({
+          title: 'Mở Khóa Chỉnh Sửa Toàn Bảng',
+          subtitle: 'Nhập mật khẩu Chủ Shop để mở khóa tất cả các tính năng thêm, sửa, xóa',
+          icon: '🔓'
+        });
         if (entered === null) return;
         if (verifyPassword(entered)) {
           isLocked = false;
           localStorage.setItem(LOCK_STATE_KEY, 'false');
           addAuditLog('🔓 MỞ KHÓA BẢNG', 'Đã mở khóa toàn bộ bảng đơn hàng');
+          applyLockUI();
           renderAll();
+          alert('✅ ĐÃ MỞ KHÓA THÀNH CÔNG!\nBây giờ bạn có thể chỉnh sửa, thêm đơn, xóa đơn hoặc khôi phục mẫu thoải mái.');
         } else {
           addAuditLog('⚠️ CẢNH BÁO', 'Nhập sai mật khẩu khi cố mở khóa toàn bảng');
-          alert('❌ Mật khẩu không đúng! Bạn chỉ có quyền xem và tìm kiếm.');
+          alert('❌ Mật khẩu không đúng! Mật khẩu mặc định là 123456.');
         }
       }
     }
 
-    function changeAppPassword() {
-      const current = prompt('🔑 Nhập mật khẩu Chủ Shop hiện tại:');
+    async function changeAppPassword() {
+      const current = await appPrompt({
+        title: 'Đổi Mật Khẩu Quản Trị',
+        subtitle: 'Nhập mật khẩu Chủ Shop hiện tại để xác thực',
+        icon: '🔑'
+      });
       if (current === null) return;
       if (!verifyPassword(current)) {
         addAuditLog('⚠️ CẢNH BÁO', 'Nhập sai mật khẩu hiện tại khi cố đổi mật khẩu');
-        alert('❌ Mật khẩu hiện tại không đúng!');
+        alert('❌ Mật khẩu hiện tại không đúng! Mật khẩu mặc định là 123456.');
         return;
       }
-      const newPwd = prompt('🔑 Nhập mật khẩu mới bạn muốn đặt (Ít nhất 4 ký tự):');
+      const newPwd = await appPrompt({
+        title: 'Đặt Mật Khẩu Mới',
+        subtitle: 'Nhập mật khẩu mới bạn muốn đặt (Ít nhất 4 ký tự)',
+        icon: '✨',
+        hint: ''
+      });
       if (!newPwd || newPwd.trim().length < 4) {
         alert('⚠️ Mật khẩu mới cần có ít nhất 4 ký tự!');
         return;
@@ -3446,13 +3599,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // =========================================================================
     // TOP-BAR CATEGORIZED DROPDOWN MENUS (Gọn gàng hoá giao diện thanh công cụ)
     // =========================================================================
-    function toggleHeaderMenu(event, menuId) {
+    async function toggleHeaderMenu(event, menuId) {
       if (event) {
         event.stopPropagation();
       }
       if (isLocked && (menuId === 'headerMenuImport' || menuId === 'headerMenuExport')) {
         const actionLabel = menuId === 'headerMenuImport' ? 'Nhập Đơn Hàng' : 'Xuất Báo Cáo';
-        if (!requireUnlocked(actionLabel)) {
+        const ok = await requireUnlocked(actionLabel);
+        if (!ok) {
           return;
         }
       }
@@ -3493,7 +3647,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         btn.className = 'px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg shadow-xs transition ring-2 ring-white';
         btn.innerHTML = '🔒 ĐANG KHÓA CHỈ XEM (Bấm nhập MK để sửa)';
         if (btnAdd) btnAdd.classList.add('hidden');
-        if (btnReset) btnReset.classList.add('hidden');
+        if (btnReset) btnReset.classList.remove('hidden'); // Giữ nút khôi phục mẫu luôn hiện, khi bấm sẽ xác thực mật khẩu
         if (btnImport) {
           btnImport.classList.remove('bg-orange-900/60');
           btnImport.classList.add('bg-rose-950/70', 'ring-1', 'ring-rose-400/40');
@@ -3532,7 +3686,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           btnPhone.title = 'Dùng Camera Điện Thoại quét mã vạch trên bọc hàng hoàn -> Tự động nhảy thẳng vào bảng máy tính này!';
         }
       }
-      document.querySelectorAll('#orderTableBody input, #orderTableBody select, #orderTableBody button').forEach(el => {
+      document.querySelectorAll('#orderTableBody input, #orderTableBody select').forEach(el => {
         el.disabled = isLocked;
       });
     }
@@ -4165,7 +4319,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       recalcTotalsAndSummary();
     }
 
-    function addProductToOrder(orderIdx) {
+    async function addProductToOrder(orderIdx) {
+      if (!(await requireUnlocked('Thêm sản phẩm vào đơn'))) return;
       if (!orders[orderIdx]) return;
       orders[orderIdx].items.push({
         product: '',
@@ -4182,7 +4337,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return Object.keys(cellLocks).some(k => k.startsWith(prefix) && cellLocks[k]);
     }
 
-    function removeProductFromOrder(orderIdx, itemIdx) {
+    async function removeProductFromOrder(orderIdx, itemIdx) {
       if (!orders[orderIdx]) return;
       if (orders[orderIdx].items.length <= 1) {
         alert('Mỗi đơn hàng cần có ít nhất 1 sản phẩm. Nếu muốn xóa cả đơn hàng, hãy bấm nút Xóa ở cột cuối!');
@@ -4191,11 +4346,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const itemLockPrefix = `${orderIdx}:${itemIdx}:`;
       const isItemLocked = Object.keys(cellLocks).some(k => k.startsWith(itemLockPrefix) && cellLocks[k]);
       if (isLocked || isItemLocked) {
-        const entered = prompt(`🔒 Dòng sản phẩm này đang được KHÓA bảo vệ.\nNhập mật khẩu Chủ Shop để xóa dòng sản phẩm này:`);
+        const entered = await appPrompt({
+          title: 'Xác Nhận Xóa Dòng Sản Phẩm',
+          subtitle: `Dòng sản phẩm thứ ${itemIdx + 1} của Đơn #${orderIdx + 1} đang được KHÓA bảo vệ.\nNhập mật khẩu Chủ Shop để xóa dòng sản phẩm này:`,
+          icon: '🗑️'
+        });
         if (entered === null) return;
         if (!verifyPassword(entered)) {
           addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu khi cố xóa SP ${itemIdx + 1} đang khóa của Đơn #${orderIdx + 1}`);
-          alert('❌ Sai mật khẩu Chủ Shop! Không thể xóa sản phẩm đang khóa.');
+          alert('❌ Sai mật khẩu Chủ Shop! Mật khẩu mặc định là 123456.');
           return;
         }
       }
@@ -4206,8 +4365,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll();
     }
 
-    function addOrder() {
-      if (!requireUnlocked('Thêm Đơn Mới')) return;
+    async function addOrder() {
+      if (!(await requireUnlocked('Thêm Đơn Mới'))) return;
       const today = new Date().toLocaleDateString('vi-VN');
       const defaultPlat = currentPlatformFilter !== 'all' ? currentPlatformFilter : 'Shopee';
       orders.push({
@@ -4230,8 +4389,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll();
     }
 
-    function duplicateOrder(orderIdx) {
-      if (isLocked || !orders[orderIdx]) return;
+    async function duplicateOrder(orderIdx) {
+      if (!(await requireUnlocked('Nhân bản đơn hàng'))) return;
+      if (!orders[orderIdx]) return;
       const src = orders[orderIdx];
       const today = new Date().toLocaleDateString('vi-VN');
       const cloned = {
@@ -4290,15 +4450,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       saveCellLocks();
     }
 
-    function deleteOrder(orderIdx) {
+    async function deleteOrder(orderIdx) {
       const o = orders[orderIdx];
       const orderHasLockedCell = hasLockedCellsInOrder(orderIdx);
       if (isLocked || orderHasLockedCell) {
-        const entered = prompt(`🔒 Đơn hàng #${orderIdx + 1} (${o?.orderId || ''}) đang có ô bị KHÓA bảo vệ.\nNhập mật khẩu Chủ Shop để xác nhận xóa đơn hàng này:`);
+        const entered = await appPrompt({
+          title: `Xác Nhận Xóa Đơn Hàng #${orderIdx + 1}`,
+          subtitle: `Đơn hàng ${o?.orderId ? 'mã [' + o.orderId + ']' : ''} đang được KHÓA bảo vệ.\nNhập mật khẩu Chủ Shop để xác nhận xóa:`,
+          icon: '🗑️'
+        });
         if (entered === null) return;
         if (!verifyPassword(entered)) {
           addAuditLog('⚠️ CẢNH BÁO', `Nhập sai mật khẩu khi cố xóa Đơn hàng đang khóa #${orderIdx + 1} (${o?.orderId || ''})`);
-          alert('❌ Mật khẩu Chủ Shop không đúng! Không thể xóa đơn hàng đang có ô khóa.');
+          alert('❌ Mật khẩu Chủ Shop không đúng! Mật khẩu mặc định là 123456.');
           return;
         }
       } else {
@@ -4314,18 +4478,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll();
     }
 
-    function resetSampleData() {
-      const entered = prompt('🔒 KHÔI PHỤC DỮ LIỆU MẪU BAN ĐẦU\nThao tác này sẽ xóa toàn bộ các đơn hàng bạn đã nhập.\nNhập mật khẩu Chủ Shop để xác nhận:');
+    async function resetSampleData() {
+      const entered = await appPrompt({
+        title: 'Khôi Phục Dữ Liệu Mẫu Ban Đầu',
+        subtitle: 'Thao tác này sẽ đặt lại danh sách về 5 đơn hàng mẫu ban đầu.\nNhập mật khẩu Chủ Shop để xác nhận:',
+        icon: '🔄'
+      });
       if (entered === null) return;
       if (!verifyPassword(entered)) {
         addAuditLog('⚠️ CẢNH BÁO', 'Nhập sai mật khẩu khi cố bấm nút Khôi phục mẫu');
-        alert('❌ Mật khẩu Chủ Shop không đúng!');
+        alert('❌ Mật khẩu Chủ Shop không đúng! Mật khẩu mặc định là 123456.');
         return;
       }
+      isLocked = false;
+      localStorage.setItem(LOCK_STATE_KEY, 'false');
+      cellLocks = {};
+      saveCellLocks();
       addAuditLog('🔄 KHÔI PHỤC MẪU', 'Chủ Shop đã khôi phục dữ liệu mẫu ban đầu');
       orders = JSON.parse(JSON.stringify(defaultSampleOrders));
       saveOrders();
+      applyLockUI();
       renderAll();
+      alert('✅ ĐÃ KHÔI PHỤC DỮ LIỆU MẪU THÀNH CÔNG!\nBảng đã được mở khóa để bạn dễ dàng trải nghiệm và chỉnh sửa.');
     }
 
     function compressAndSaveImage(file, orderIdx) {
@@ -5026,8 +5200,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('sumFootLostVal').textContent = formatMoney(sLostVal);
     }
 
-    function exportToExcel() {
-      if (!requireUnlocked('Xuất File Excel (.xlsx)')) return;
+    async function exportToExcel() {
+      if (!(await requireUnlocked('Xuất File Excel (.xlsx)'))) return;
       const wb = XLSX.utils.book_new();
       const flatRows = [];
       const merges = [];
@@ -5336,8 +5510,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     });
 
-    function openBulkImportModal() {
-      if (!requireUnlocked('Dán Nhanh Nhiều Đơn')) return;
+    async function openBulkImportModal() {
+      if (!(await requireUnlocked('Dán Nhanh Nhiều Đơn'))) return;
       const ta = document.getElementById('bulkImportTextarea');
       if (ta) ta.value = '';
       document.getElementById('bulkImportModal').classList.remove('hidden');
@@ -5348,8 +5522,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('bulkImportModal').classList.add('hidden');
     }
 
-    function processBulkImportOrders() {
-      if (!requireUnlocked('Dán Nhanh Nhiều Đơn')) return;
+    async function processBulkImportOrders() {
+      if (!(await requireUnlocked('Dán Nhanh Nhiều Đơn'))) return;
       const ta = document.getElementById('bulkImportTextarea');
       if (!ta) return;
       const lines = ta.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -6238,10 +6412,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         navigator.clipboard.writeText(link).then(() => {
           alert('âœ… ÄÃ£ sao chÃ©p link mÃ¡y quÃ©t:\n' + link + '\n\nBáº¡n cÃ³ thá»ƒ dÃ¡n vÃ o Zalo/Tin nháº¯n Ä‘á»ƒ má»Ÿ trÃªn Ä‘iá»‡n thoáº¡i!');
         }).catch(() => {
-          prompt('Copy link nÃ y Ä‘á»ƒ má»Ÿ trÃªn Ä‘iá»‡n thoáº¡i:', link);
+          alert('Link mÃ¡y quÃ©t: ' + link);
         });
       } else {
-        prompt('Copy link nÃ y Ä‘á»ƒ má»Ÿ trÃªn Ä‘iá»‡n thoáº¡i:', link);
+        alert('Link mÃ¡y quÃ©t: ' + link);
       }
     }
     const GLOBAL_SYNC_TOPIC = 'agy_shopee_return_scanner_2026/GLOBAL_SYNC';
@@ -6794,8 +6968,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    function openPhoneScannerModal() {
-      if (!requireUnlocked('Quét Mã Bằng Điện Thoại')) return;
+    async function openPhoneScannerModal() {
+      if (!(await requireUnlocked('Quét Mã Bằng Điện Thoại'))) return;
       document.getElementById('phoneRoomCodeText').textContent = phoneRoomId;
       renderPhoneScannerQr(phoneRoomId);
       document.getElementById('phoneScannerModal').classList.remove('hidden');

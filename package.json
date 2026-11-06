@@ -1,0 +1,43 @@
+{
+  "name": "shopee-return-manager",
+  "version": "1.0.0",
+  "description": "Phần mềm quản lý và đối soát hàng hoàn Shopee, TikTok Shop, Lazada chuyên nghiệp",
+  "main": "main.js",
+  "author": "Shop Owner",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.shop.shopeereturnmanager",
+    "productName": "Quản Lý Hàng Hoàn Shopee - TikTok",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "app_icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Quản Lý Hàng Hoàn"
+    }
+  }
+}

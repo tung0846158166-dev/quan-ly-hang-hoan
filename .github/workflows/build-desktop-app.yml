@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.0
+          name: QuanLyHangHoan-Windows-Installer-v1.2.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,18 +66,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.0 (Siêu Mượt, Sửa Lỗi Nút Bấm & Chụp Ảnh Tự Động 100%)"
+          tag_name: v1.2.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.1 (Sửa Lỗi Đơ Con Trỏ Nhập Liệu & Bộ Lọc Bảng Tổng Kết)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.0
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.1
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.0`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.0.exe`)
-            - **Điểm nâng cấp & sửa lỗi toàn diện trong v1.2.0**:
-              1. 🔓 **Khắc phục 100% lỗi bấm các nút không hoạt động ở bản v1.1.1**: Đã sửa lỗi cú pháp JavaScript khiến toàn bộ nút bấm (Mở khóa, Xóa đơn, Khôi phục mẫu, Nhập đơn, Quét ĐT...) hoạt động nhạy bén trở lại, tích hợp kiểm tra cú pháp tự động trước khi đóng gói.
-              2. 🏷️ **Hiển thị rõ Phiên Bản `🚀 Phiên bản v1.2.0`**: Hiển thị trực tiếp ngay trên thanh tiêu đề màu cam trên cùng, trên thanh cửa sổ Windows và trong menu `⚙️ Tiện Ích`.
-              3. ⚡ **Tối ưu giao diện Siêu Mượt (60fps)**:
-                 - Bổ sung thanh **Phân Trang Thông Minh (100 đơn / trang)** giúp bảng hiển thị tức thì dưới `8ms` kể cả khi có **500 – 2.000+ đơn hàng**.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.1`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.1.exe`)
+            - **Điểm nâng cấp & sửa lỗi trong v1.2.1**:
+              1. ⌨️ **Khắc phục triệt để 100% lỗi nhấp con trỏ vào ô nhập văn bản bị đơ / khóa bàn phím trên Windows**:
+                 - Thay thế toàn bộ hộp thoại `window.alert` và `window.confirm` mặc định của Windows bằng **Hộp thoại In-App thông minh** (tránh lỗi hệ điều hành Windows khóa focus bàn phím sau khi đóng thông báo Mở khóa / Xóa đơn / Nhập Excel).
+                 - Tự động kích hoạt `webContents.focus()` và giữ nguyên con trỏ trong ô đang gõ, không bao giờ làm mất con trỏ khi đang nhập liệu.
+              2. 🔍 **Khắc phục hoàn toàn Bộ Lọc Bảng Tổng Kết 300+ Phân Loại bên dưới**:
+                 - Hoạt động nhạy bén tức thì khi gõ lọc **Tên sản phẩm**, **Màu sắc**, **Size** (hỗ trợ tìm cả có dấu lẫn không dấu, ví dụ gõ `quan` hoặc `quần` đều ra `Quần jeans`, `Quần kaki`) và lọc theo trạng thái (`Đã có hàng về`, `Có chênh lệch`, `Đang chờ về`, `Bị mất`).
+                 - Hiển thị chính xác bộ đếm `Hiển thị X / Y phân loại` và nút `✕ Xóa bộ lọc`.
                  - Chống giật lag khi gõ vào **Ô Tìm Kiếm Nhanh** và khi gõ sửa thông tin từng ô.
               4. 📸 **Sửa triệt để lỗi Quét Mã Điện Thoại Tự Chụp Đơn "Cái Được Cái Không"**:
                  - Tự động chia nhỏ ảnh chụp thành các gói `< 2.5KB` khi truyền qua `ntfy.sh` kết hợp `MQTT`, vượt qua giới hạn `4KB` của máy chủ để **100% lần quét đều nhận đủ cả mã vạch lẫn ảnh chụp kiện hàng**.

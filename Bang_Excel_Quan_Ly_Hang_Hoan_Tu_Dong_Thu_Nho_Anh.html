@@ -141,7 +141,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
           </h1>
           <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-2 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-            🚀 Phiên bản v1.2.0
+            🚀 Phiên bản v1.2.1
           </span>
         </div>
         <p class="text-xs text-orange-100 mt-0.5">
@@ -426,7 +426,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-2 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.0</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.1</span>
               </div>
             </div>
           </div>
@@ -908,6 +908,40 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Thông Báo & Xác Nhận In-App (Thay thế hoàn toàn alert/confirm để chống đơ con trỏ nhập liệu trên Windows Electron) -->
+  <div id="customDialogModal" class="fixed inset-0 bg-slate-900/75 z-[60] hidden flex items-center justify-center p-4" onclick="closeCustomDialog(false)">
+    <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
+      <div id="customDialogHeader" class="bg-gradient-to-r from-indigo-900 to-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="customDialogIcon" class="text-xl">🔔</span>
+          <h3 id="customDialogTitle" class="text-sm font-bold text-white">Thông Báo Hệ Thống</h3>
+        </div>
+        <button type="button" onclick="closeCustomDialog(false)" class="w-7 h-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer">✕</button>
+      </div>
+      <div class="p-5">
+        <div id="customDialogMessage" class="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed font-medium max-h-[60vh] overflow-y-auto"></div>
+        <div class="flex items-center justify-end gap-2.5 mt-5 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            id="customDialogCancelBtn"
+            onclick="closeCustomDialog(false)"
+            class="hidden px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
+          >
+            Hủy Bỏ
+          </button>
+          <button
+            type="button"
+            id="customDialogOkBtn"
+            onclick="closeCustomDialog(true)"
+            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl shadow-md shadow-indigo-600/30 transition cursor-pointer"
+          >
+            Đã Hiểu (OK)
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1519,7 +1553,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             alert('❌ File không đúng định dạng sao lưu đơn hàng!');
             return;
           }
-          if (!confirm(`Bạn có chắc muốn phục hồi ${data.orders.length} đơn hàng từ bản sao lưu ngày ${new Date(data.exportTime || Date.now()).toLocaleDateString('vi-VN')} không?\n(Dữ liệu hiện tại sẽ được cập nhật đồng bộ)`)) {
+          const ok = await appConfirm(`Bạn có chắc muốn phục hồi ${data.orders.length} đơn hàng từ bản sao lưu ngày ${new Date(data.exportTime || Date.now()).toLocaleDateString('vi-VN')} không?\n(Dữ liệu hiện tại sẽ được cập nhật đồng bộ)`, 'Xác Nhận Phục Hồi Dữ Liệu');
+          if (!ok) {
             e.target.value = '';
             return;
           }
@@ -2566,7 +2601,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function clearShopeeOrderDb() {
       if (!(await requireUnlocked('Xóa Bộ Nhớ Tra Cứu'))) return;
-      if (!confirm('Bạn có chắc muốn xóa toàn bộ bộ nhớ tra cứu đơn Shopee?')) return;
+      const ok = await appConfirm('Bạn có chắc muốn xóa toàn bộ bộ nhớ tra cứu đơn Shopee?', 'Xác Nhận Xóa Bộ Nhớ Tra Cứu');
+      if (!ok) return;
       shopeeOrderDb = {};
       saveShopeeOrderDb();
       renderShopeeDbTable();
@@ -2918,14 +2954,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let totalFilteredPages = 1;
     let searchDebounceTimer = null;
     let cellEditSaveTimer = null;
-    const APP_VERSION_NUMBER = '1.2.0';
+    const APP_VERSION_NUMBER = '1.2.1';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
         currentPage = 1;
         renderAll();
-      }, 120);
+      }, 150);
     }
 
     function scheduleSaveAndRecalc() {
@@ -2933,7 +2969,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       cellEditSaveTimer = setTimeout(() => {
         saveOrders();
         recalcTotalsAndSummary(true);
-      }, 250);
+      }, 500);
     }
 
     function changePageSize(newVal) {
@@ -2957,10 +2993,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới trong phiên bản ${curVer}:\n` +
-        `1. Khắc phục triệt để lỗi bấm nút Khóa / Mở khóa / Xóa đơn / Khôi phục mẫu không phản hồi.\n` +
-        `2. Chế độ Phân Trang Siêu Mượt (100 đơn/trang) & chống giật lag khi gõ tìm kiếm hoặc sửa ô trên danh sách 500 - 2.000+ đơn.\n` +
-        `3. Hiển thị rõ phiên bản phần mềm ngay trên thanh tiêu đề & menu Tiện Ích.\n` +
-        `4. Nâng cấp truyền ảnh chụp tự động từ Điện Thoại (chia gói nhỏ vượt giới hạn 4KB + lưu thẳng ảnh vào ổ cứng máy tính) đảm bảo quét đơn nào cũng có ảnh 100%.`
+        `1. Khắc phục triệt để 100% lỗi nhấp con trỏ vào ô nhập văn bản bị đơ / khóa bàn phím trên Windows (loại bỏ hoàn toàn hộp thoại chặn focus Win32 và giữ nguyên con trỏ khi đang gõ).\n` +
+        `2. Khắc phục hoàn toàn Bộ lọc Bảng Tổng Kết 300+ Phân Loại bên dưới (Lọc theo Tên SP, Màu sắc, Size hỗ trợ cả có dấu & không dấu, hiển thị chính xác số phân loại).\n` +
+        `3. Chế độ Phân Trang Siêu Mượt (100 đơn/trang) & chống giật lag trên danh sách 500 - 2.000+ đơn.\n` +
+        `4. Truyền ảnh chụp tự động từ Điện Thoại (chia gói nhỏ vượt giới hạn 4KB + lưu thẳng vào ổ cứng máy tính).`
       );
     }
 
@@ -3451,6 +3487,106 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       inputEl.type = inputEl.type === 'password' ? 'text' : 'password';
     }
 
+    let dialogResolver = null;
+    let lastFocusedBeforeDialog = null;
+
+    function showCustomDialog({ title = 'Thông Báo Hệ Thống', message = '', icon = '🔔', isConfirm = false, okText = 'Đã Hiểu (OK)', cancelText = 'Hủy Bỏ' } = {}) {
+      return new Promise((resolve) => {
+        if (document.activeElement && document.activeElement !== document.body) {
+          lastFocusedBeforeDialog = document.activeElement;
+        }
+        dialogResolver = resolve;
+        const modal = document.getElementById('customDialogModal');
+        const titleEl = document.getElementById('customDialogTitle');
+        const msgEl = document.getElementById('customDialogMessage');
+        const iconEl = document.getElementById('customDialogIcon');
+        const cancelBtn = document.getElementById('customDialogCancelBtn');
+        const okBtn = document.getElementById('customDialogOkBtn');
+
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = String(message || '');
+        if (iconEl) iconEl.textContent = icon;
+        if (cancelBtn) {
+          cancelBtn.textContent = cancelText;
+          if (isConfirm) cancelBtn.classList.remove('hidden');
+          else cancelBtn.classList.add('hidden');
+        }
+        if (okBtn) {
+          okBtn.textContent = okText;
+        }
+        if (modal) modal.classList.remove('hidden');
+        setTimeout(() => {
+          if (okBtn) okBtn.focus();
+        }, 30);
+      });
+    }
+
+    function closeCustomDialog(result) {
+      const modal = document.getElementById('customDialogModal');
+      if (modal) modal.classList.add('hidden');
+      if (dialogResolver) {
+        const fn = dialogResolver;
+        dialogResolver = null;
+        fn(Boolean(result));
+      }
+      setTimeout(() => {
+        try {
+          window.focus();
+          if (lastFocusedBeforeDialog && document.body.contains(lastFocusedBeforeDialog) && typeof lastFocusedBeforeDialog.focus === 'function') {
+            lastFocusedBeforeDialog.focus();
+          }
+        } catch (e) {}
+      }, 20);
+    }
+
+    function appAlert(msg, title = 'Thông Báo Hệ Thống') {
+      const s = String(msg || '');
+      let icon = '🔔';
+      if (s.includes('✅') || s.includes('🎉') || s.includes('✨')) icon = '✅';
+      else if (s.includes('❌') || s.includes('🚨')) icon = '❌';
+      else if (s.includes('⚠️') || s.includes('🔒')) icon = '⚠️';
+      else if (s.includes('🚀')) icon = '🚀';
+      return showCustomDialog({ title, message: s, icon, isConfirm: false, okText: 'Đã Hiểu (Enter)' });
+    }
+
+    function appConfirm(msg, title = 'Xác Nhận Thao Tác') {
+      return showCustomDialog({ title, message: String(msg || ''), icon: '❓', isConfirm: true, okText: 'Đồng Ý Xác Nhận', cancelText: 'Hủy Bỏ' });
+    }
+
+    // Ghi đè hoàn toàn window.alert để KHÔNG BAO GIỜ gọi hộp thoại Win32 của Windows (nguyên nhân gây đơ con trỏ nhập văn bản trong Electron)
+    window.alert = function(msg) {
+      appAlert(msg);
+    };
+
+    window.addEventListener('keydown', function(e) {
+      const dlg = document.getElementById('customDialogModal');
+      if (dlg && !dlg.classList.contains('hidden')) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeCustomDialog(false);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          closeCustomDialog(true);
+        }
+        return;
+      }
+      const prm = document.getElementById('customPromptModal');
+      if (prm && !prm.classList.contains('hidden') && e.key === 'Escape') {
+        e.preventDefault();
+        cancelCustomPrompt();
+      }
+    });
+
+    // Tự động khôi phục focus bàn phím cho các ô <input>/<textarea> trên Windows Electron mỗi khi nhấp chuột
+    document.addEventListener('mousedown', function(e) {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        if (!target.disabled && !target.readOnly) {
+          try { window.focus(); } catch (err) {}
+        }
+      }
+    }, true);
+
     async function openAuditLogModal() {
       const entered = await appPrompt({
         title: 'Nhật Ký Bảo Mật Chủ Shop',
@@ -3551,12 +3687,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       recalcTotalsAndSummary();
     }
 
+    let catSummaryFilterTimer = null;
+
+    function renderCategorySummaryTable() {
+      if (catSummaryFilterTimer) clearTimeout(catSummaryFilterTimer);
+      catSummaryFilterTimer = setTimeout(() => {
+        recalcTotalsAndSummary(false);
+      }, 60);
+    }
+
+    function clearCatSummaryFilters() {
+      const p = document.getElementById('catSummarySearchProd') || document.getElementById('sumFilterProd');
+      const c = document.getElementById('catSummarySearchColor') || document.getElementById('sumFilterColor');
+      const s = document.getElementById('catSummarySearchSize') || document.getElementById('sumFilterSize');
+      const d = document.getElementById('catSummaryFilterSelect') || document.getElementById('sumFilterDiff');
+      if (p) p.value = '';
+      if (c) c.value = '';
+      if (s) s.value = '';
+      if (d) d.value = 'all';
+      recalcTotalsAndSummary(false);
+    }
+
     function clearSummaryFilters() {
-      document.getElementById('sumFilterProd').value = '';
-      document.getElementById('sumFilterColor').value = '';
-      document.getElementById('sumFilterSize').value = '';
-      document.getElementById('sumFilterDiff').value = 'all';
-      recalcTotalsAndSummary();
+      clearCatSummaryFilters();
     }
 
     function saveCellLocks() {
@@ -4386,45 +4539,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (field === 'qty') {
         const cleaned = String(val).replace(/[^\d]/g, '');
         orders[orderIdx].items[itemIdx].qty = cleaned ? parseInt(cleaned, 10) : 0;
-      } else if (field === 'size' && isReturnReasonText(val)) {
-        // Tự động bảo vệ: Nếu người dùng dán hoặc nhập lý do hoàn hàng vào ô Size, chuyển sang cột Ghi chú / Lý do hoàn!
-        const reason = String(val).trim();
-        if (!orders[orderIdx].note || !orders[orderIdx].note.trim()) {
-          orders[orderIdx].note = reason;
-        } else if (!orders[orderIdx].note.includes(reason)) {
-          orders[orderIdx].note += ' | ' + reason;
-        }
-        orders[orderIdx].items[itemIdx].size = '';
-        saveOrders();
-        renderAll();
-        return;
-      } else if (field === 'color' && isReturnReasonText(val)) {
-        const reason = String(val).trim();
-        if (!orders[orderIdx].note || !orders[orderIdx].note.trim()) {
-          orders[orderIdx].note = reason;
-        } else if (!orders[orderIdx].note.includes(reason)) {
-          orders[orderIdx].note += ' | ' + reason;
-        }
-        orders[orderIdx].items[itemIdx].color = '';
-        saveOrders();
-        renderAll();
-        return;
-      } else if (field === 'size' && isKnownColorName(val) && !orders[orderIdx].items[itemIdx].color) {
-        orders[orderIdx].items[itemIdx].color = val;
-        orders[orderIdx].items[itemIdx].size = '';
-        saveOrders();
-        renderAll();
-        return;
-      } else if (field === 'color' && isValidSizeString(val) && !isKnownColorName(val) && !orders[orderIdx].items[itemIdx].size) {
-        orders[orderIdx].items[itemIdx].size = val;
-        orders[orderIdx].items[itemIdx].color = '';
-        saveOrders();
-        renderAll();
-        return;
       } else {
         orders[orderIdx].items[itemIdx][field] = val;
       }
       scheduleSaveAndRecalc();
+    }
+
+    function handleItemFieldBlur(orderIdx, itemIdx, field, inputEl) {
+      if (!orders[orderIdx] || !orders[orderIdx].items[itemIdx]) return;
+      const val = String(inputEl ? inputEl.value : orders[orderIdx].items[itemIdx][field] || '').trim();
+      if (!val) return;
+      if ((field === 'size' || field === 'color') && isReturnReasonText(val)) {
+        if (!orders[orderIdx].note || !orders[orderIdx].note.trim()) {
+          orders[orderIdx].note = val;
+        } else if (!orders[orderIdx].note.includes(val)) {
+          orders[orderIdx].note += ' | ' + val;
+        }
+        orders[orderIdx].items[itemIdx][field] = '';
+        if (inputEl) inputEl.value = '';
+        const noteInput = document.querySelector(`input[data-cell-key="${orderIdx}:note"]`);
+        if (noteInput) noteInput.value = orders[orderIdx].note;
+        scheduleSaveAndRecalc();
+      }
     }
 
     function updateStatus(orderIdx, selectEl) {
@@ -4590,7 +4726,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return;
         }
       } else {
-        if (!confirm(`Bạn có chắc muốn xóa Đơn hàng #${orderIdx + 1} ${o?.orderId ? '(' + o.orderId + ')' : ''} không?`)) return;
+        const ok = await appConfirm(`Bạn có chắc muốn xóa Đơn hàng #${orderIdx + 1} ${o?.orderId ? '(' + o.orderId + ')' : ''} không?`, `Xác Nhận Xóa Đơn Hàng #${orderIdx + 1}`);
+        if (!ok) return;
       }
       addAuditLog('🗑 XÓA ĐƠN HÀNG', `Đã xóa Đơn #${orderIdx + 1} (Mã đơn: ${o?.orderId || 'Trống'}, MVĐ: ${o?.track || 'Trống'}, Giá trị: ${o?.price || 0} đ)`);
       if (o && o.photoId) {
@@ -4984,8 +5121,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <div class="flex-1">${renderCellInput(`${orderIdx}:${itemIdx}:product`, `Tên SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.product, 'font-medium text-slate-900', 'Gõ hoặc bấm để chọn SP...', `updateItemField(${orderIdx},${itemIdx},'product',this.value);showSmartSuggest(this,'product',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'product',${orderIdx},${itemIdx})`)}</div>
               </div>
             </td>
-            <td>${renderCellInput(`${orderIdx}:${itemIdx}:color`, `Màu SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.color, 'text-center', 'Màu...', `updateItemField(${orderIdx},${itemIdx},'color',this.value);showSmartSuggest(this,'color',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'color',${orderIdx},${itemIdx})`)}</td>
-            <td>${renderCellInput(`${orderIdx}:${itemIdx}:size`, `Size SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.size, 'text-center font-semibold', 'Size...', `updateItemField(${orderIdx},${itemIdx},'size',this.value);showSmartSuggest(this,'size',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'size',${orderIdx},${itemIdx})`)}</td>
+            <td>${renderCellInput(`${orderIdx}:${itemIdx}:color`, `Màu SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.color, 'text-center', 'Màu...', `updateItemField(${orderIdx},${itemIdx},'color',this.value);showSmartSuggest(this,'color',${orderIdx},${itemIdx})`, 'text', '', `handleItemFieldBlur(${orderIdx},${itemIdx},'color',this)`, `showSmartSuggest(this,'color',${orderIdx},${itemIdx})`)}</td>
+            <td>${renderCellInput(`${orderIdx}:${itemIdx}:size`, `Size SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.size, 'text-center font-semibold', 'Size...', `updateItemField(${orderIdx},${itemIdx},'size',this.value);showSmartSuggest(this,'size',${orderIdx},${itemIdx})`, 'text', '', `handleItemFieldBlur(${orderIdx},${itemIdx},'size',this)`, `showSmartSuggest(this,'size',${orderIdx},${itemIdx})`)}</td>
             <td>${renderCellInput(`${orderIdx}:${itemIdx}:qty`, `Số lượng SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.qty, 'text-center font-bold text-slate-900', '1', `updateItemField(${orderIdx},${itemIdx},'qty',this.value)`, 'number')}</td>
             <td class="text-center no-print whitespace-nowrap">
               <div class="flex items-center justify-center gap-1">
@@ -5207,10 +5344,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       // Filter criteria for the 300+ SKU Summary Table
-      const fProd = (document.getElementById('sumFilterProd')?.value || '').trim().toLowerCase();
-      const fColor = (document.getElementById('sumFilterColor')?.value || '').trim().toLowerCase();
-      const fSize = (document.getElementById('sumFilterSize')?.value || '').trim().toLowerCase();
-      const fDiff = document.getElementById('sumFilterDiff')?.value || 'all';
+      const rawFProd = (document.getElementById('catSummarySearchProd')?.value ?? document.getElementById('sumFilterProd')?.value ?? '').trim();
+      const rawFColor = (document.getElementById('catSummarySearchColor')?.value ?? document.getElementById('sumFilterColor')?.value ?? '').trim();
+      const rawFSize = (document.getElementById('catSummarySearchSize')?.value ?? document.getElementById('sumFilterSize')?.value ?? '').trim();
+      const fProd = rawFProd.toLowerCase();
+      const fProdNorm = removeVietnameseTones(rawFProd);
+      const fColor = rawFColor.toLowerCase();
+      const fColorNorm = removeVietnameseTones(rawFColor);
+      const fSize = rawFSize.toLowerCase();
+      const fSizeNorm = removeVietnameseTones(rawFSize);
+      const fDiff = document.getElementById('catSummaryFilterSelect')?.value || document.getElementById('sumFilterDiff')?.value || 'all';
 
       const sumBody = document.getElementById('summaryTableBody');
       let sumHtml = '';
@@ -5222,14 +5365,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const accQty = Number(accountantStock[st.skuKey]) || 0;
         const diffQty = st.returnedQty - accQty; // > 0 means returned to warehouse but accountant hasn't entered all yet
 
-        // Apply filters for 300+ SKU table
-        if (fProd && !st.name.toLowerCase().includes(fProd)) return;
-        if (fColor && !st.color.toLowerCase().includes(fColor)) return;
-        if (fSize && !st.size.toLowerCase().includes(fSize)) return;
-        if (fDiff === 'need_restock' && diffQty <= 0) return;
+        // Apply filters for 300+ SKU table (hỗ trợ cả có dấu & không dấu!)
+        if (fProd && !st.name.toLowerCase().includes(fProd) && !removeVietnameseTones(st.name).includes(fProdNorm)) return;
+        if (fColor && !st.color.toLowerCase().includes(fColor) && !removeVietnameseTones(st.color).includes(fColorNorm)) return;
+        if (fSize && !st.size.toLowerCase().includes(fSize) && !removeVietnameseTones(st.size).includes(fSizeNorm)) return;
+        if (fDiff === 'has_returned' && st.returnedQty <= 0) return;
+        if ((fDiff === 'diff_only' || fDiff === 'need_restock') && diffQty === 0) return;
         if (fDiff === 'done_restock' && !(st.returnedQty > 0 && diffQty === 0)) return;
-        if (fDiff === 'has_lost' && st.lostQty <= 0) return;
-        if (fDiff === 'has_waiting' && st.unreturnedQty <= 0) return;
+        if ((fDiff === 'lost' || fDiff === 'has_lost') && st.lostQty <= 0) return;
+        if ((fDiff === 'unreturned' || fDiff === 'has_waiting') && st.unreturnedQty <= 0) return;
 
         visibleCount++;
         sOrders += st.orders;
@@ -5288,7 +5432,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   </button>
                 ` : ''}
               </div>
-  </div>
             </td>
             <td class="text-center text-xs bg-indigo-50/40" id="diffCell_${safeKeyAttr}">${diffBadge}</td>
             <td class="text-center font-bold bg-[#fef3c7] text-[#b45309]">${st.unreturnedQty}</td>
@@ -5299,7 +5442,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         `;
       });
 
-      const badgeEl = document.getElementById('sumFilterCountBadge');
+      const badgeEl = document.getElementById('catSummaryFilterBadge') || document.getElementById('sumFilterCountBadge');
       if (badgeEl) {
         badgeEl.textContent = `Hiển thị ${visibleCount} / ${totalSkuCount} phân loại`;
       }
@@ -5564,7 +5707,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>${headerTitle}</span>
           <span class="text-[10px] font-normal text-indigo-200">↑↓ Chọn • Enter Lấy luôn</span>
         </div>
-  </div>
       `;
 
       filtered.forEach((item, idx) => {
@@ -5586,7 +5728,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <span>${safeItem}</span>
             ${subBadge}
           </div>
-  </div>
         `;
       });
 

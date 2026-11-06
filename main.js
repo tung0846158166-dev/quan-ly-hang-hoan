@@ -154,6 +154,23 @@ function createWindow() {
   mainWindow.loadFile('Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html');
   mainWindow.setMenuBarVisibility(false);
 
+  // Dam bao webContents luon nhan focus ban phim ngay khi cua so duoc kich hoat hoac hien thi tren Windows
+  mainWindow.on('focus', () => {
+    try {
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.focus();
+      }
+    } catch (e) {}
+  });
+
+  mainWindow.on('show', () => {
+    try {
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.focus();
+      }
+    } catch (e) {}
+  });
+
   // Bam nut dau X: An xuong khay he thong thay vi tat han
   mainWindow.on('close', (event) => {
     if (!isQuitting) {

@@ -1,7 +1,7 @@
 {
-  "name": "shopee-return-manager",
+  "name": "quan-ly-hang-hoan",
   "version": "1.0.0",
-  "description": "Phần mềm quản lý và đối soát hàng hoàn Shopee, TikTok Shop, Lazada chuyên nghiệp",
+  "description": "Phan mem Quan Ly va Doi Soat Hang Hoan Shopee - TikTok Shop",
   "main": "main.js",
   "author": "Shop Owner",
   "license": "MIT",
@@ -14,20 +14,25 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.shop.shopeereturnmanager",
-    "productName": "Quản Lý Hàng Hoàn Shopee - TikTok",
+    "appId": "com.shop.quanlyhanghoan",
+    "productName": "Quan Ly Hang Hoan",
     "directories": {
       "output": "dist"
     },
+    "files": [
+      "main.js",
+      "preload.js",
+      "Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html",
+      "app_icon.ico",
+      "app_icon.png"
+    ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "app_icon.ico"
@@ -37,7 +42,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Quản Lý Hàng Hoàn"
+      "shortcutName": "Quan Ly Hang Hoan",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
     }
   }
 }

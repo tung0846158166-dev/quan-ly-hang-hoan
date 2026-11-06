@@ -5,7 +5,10 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch: # Cho phép bấm nút "Run workflow" bất kỳ lúc nào trên web GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -19,7 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
@@ -27,20 +29,36 @@ jobs:
       - name: Build Windows Executable (.exe)
         run: npm run build:win
 
-      - name: Upload Artifacts (.exe & portable)
+      - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-App
+          name: QuanLyHangHoan-Windows-Installer
           path: |
             dist/*.exe
-            dist/*.zip
+            dist/*.blockmap
 
-      - name: Create GitHub Release (khi gắn tag phiên bản)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
         with:
+          tag_name: v1.0.0
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.0.0 (Windows Installer Setup)"
+          body: |
+            ### 🎉 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok Cho Máy Tính
+
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (.exe setup wizard)
+            - **Tính năng nổi bật**:
+              - Trình cài đặt tự động tạo biểu tượng ngoài màn hình Desktop và Start Menu.
+              - **Lưu trữ dữ liệu an toàn trên ổ cứng máy tính**: Tự động lưu và đồng bộ toàn bộ đơn hàng vào file `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`.
+              - Không bao giờ bị mất đơn khi đóng ứng dụng hay dọn dẹp trình duyệt.
+              - Tích hợp nút mở trực tiếp thư mục dữ liệu trên ổ cứng để xem và sao lưu sang USB hoặc ổ D, E.
+            
+            **Hướng dẫn cài đặt**:
+            1. Tải file `Quan Ly Hang Hoan Setup 1.0.0.exe` bên dưới.
+            2. Nhấp đúp chuột để mở bộ cài và bấm **Next** để hoàn tất.
+            3. Mở ứng dụng từ biểu tượng ngoài màn hình Desktop để sử dụng!
           files: |
             dist/*.exe
-            dist/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

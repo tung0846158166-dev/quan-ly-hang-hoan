@@ -34,7 +34,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.1.0
+          name: QuanLyHangHoan-Windows-Installer-v1.1.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -43,24 +43,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.1.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.1.0 (Chạy Nền & Tự Khởi Động)"
+          tag_name: v1.1.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.1.1 (Sửa Lỗi Mở Khóa, Xóa Đơn & Khôi Phục Mẫu)"
           body: |
-            ### 🎉 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.1.0
+            ### 🎉 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.1.1
 
             - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok
             - **Định dạng**: Bộ cài đặt chuẩn Windows (.exe setup wizard)
-            - **Tính năng mới trong v1.1.0**:
-              - 🚀 **Tự khởi động cùng máy tính**: Khi bật máy tính, phần mềm tự động chạy ngầm sẵn sàng.
-              - 🔄 **Chạy nền khay hệ thống (System Tray)**: Khi bấm nút dấu X, ứng dụng không bị tắt mà tự thu nhỏ xuống khay hệ thống góc phải màn hình.
-              - 📱 **Quét điện thoại liên tục**: Bạn có thể đóng cửa sổ làm việc khác, cầm điện thoại đi quét mã đơn hoàn trong kho, bảng máy tính vẫn tự động nhận dữ liệu, cập nhật trạng thái và lưu thẳng vào ổ cứng.
-              - 🔔 **Thông báo Windows Notification**: Mỗi khi điện thoại quét trúng đơn hoàn, góc phải màn hình máy tính sẽ hiện thông báo nổi chúc mừng.
-              - 💾 **Lưu trữ ổ cứng vĩnh viễn**: Toàn bộ dữ liệu nằm an toàn tại `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`.
+            - **Điểm nâng cấp & sửa lỗi trong v1.1.1**:
+              - 🔓 **Sửa lỗi không mở khóa được**: Thay thế toàn bộ hộp thoại `window.prompt()` mặc định bằng Hộp Thoại Nhập Mật Khẩu Chuyên Nghiệp in-app. Giờ đây khi bấm vào nút Khóa Chỉ Xem hoặc bất kỳ nút nào, hộp thoại sẽ hiện lên ngay lập tức, hỗ trợ phím Enter, phím Esc và nút Hiện/Ẩn mật khẩu (mắt xem mật khẩu).
+              - 🔑 **Mật khẩu Chủ Shop mặc định**: `123456` (có thể đổi tùy ý trong menu Tiện ích).
+              - 🗑️ **Sửa lỗi không bấm xóa được đơn hàng**: Giờ đây khi bảng đang khóa, bấm vào nút Xóa (thùng rác) ở cột Thao tác sẽ hiển thị ngay hộp thoại xác nhận nhập mật khẩu Chủ Shop để xóa đơn an toàn.
+              - 🔄 **Sửa lỗi nút Khôi phục mẫu 5 đơn ban đầu**: Nút khôi phục mẫu luôn sẵn sàng trong menu Tiện ích, nhập mật khẩu `123456` là đưa bảng về trạng thái mẫu ban đầu ngay tức khắc.
+              - 💾 **An toàn dữ liệu 100%**: Khi cài đè bản v1.1.1 lên v1.1.0, toàn bộ dữ liệu trên ổ cứng tại `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json` được giữ nguyên nguyên vẹn.
+              - 🚀 **Đầy đủ tính năng chạy nền và khởi động cùng Windows**.
 
             **Hướng dẫn cài đặt**:
-            1. Tải file `Quan.Ly.Hang.Hoan.Setup.1.1.0.exe` bên dưới.
-            2. Cài đè trực tiếp lên phiên bản cũ (toàn bộ dữ liệu cũ được giữ nguyên 100%).
-            3. Trải nghiệm tính năng chạy nền và quét đơn từ điện thoại!
+            1. Tải file `Quan.Ly.Hang.Hoan.Setup.1.1.1.exe` bên dưới.
+            2. Mở file và bấm **Next** để cài đè trực tiếp lên phiên bản hiện có (không cần gỡ bản cũ).
+            3. Mở phần mềm và tận hưởng sự mượt mà!
           files: |
             dist/*.exe
         env:

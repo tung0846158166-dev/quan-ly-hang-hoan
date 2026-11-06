@@ -1,8 +1,26 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Lay duong dan thu muc luu tru vinh vien tren o cung may tinh: Documents/QuanLyHangHoan
+let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+let hasShownTrayBalloon = false;
+
+// Dam bao chi chay 1 phien ban duy nhat (Single Instance Lock)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 function getDataDir() {
   const documentsDir = app.getPath('documents');
   const appDataDir = path.join(documentsDir, 'QuanLyHangHoan');
@@ -16,12 +34,109 @@ function getDataFilePath() {
   return path.join(getDataDir(), 'du_lieu_hang_hoan.json');
 }
 
+function setAutoStart(enabled) {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: enabled,
+      openAsHidden: true,
+      args: ['--hidden']
+    });
+    return true;
+  } catch (e) {
+    console.error('Loi cau hinh khoi dong cung Windows:', e);
+    return false;
+  }
+}
+
+function getAutoStart() {
+  try {
+    const settings = app.getLoginItemSettings();
+    return settings.openAtLogin;
+  } catch (e) {
+    return false;
+  }
+}
+
+function createTray() {
+  if (tray) return;
+  const iconPath = path.join(__dirname, 'app_icon.ico');
+  tray = new Tray(iconPath);
+
+  function updateTrayMenu() {
+    const isAuto = getAutoStart();
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '📦 Mở Quản Lý Hàng Hoàn',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }
+      },
+      { type: 'separator' },
+      {
+        label: '📱 Quét ĐT: Đang chạy nền sẵn sàng',
+        enabled: false
+      },
+      {
+        label: '📁 Thư Mục Dữ Liệu Ổ Cứng',
+        click: () => {
+          shell.openPath(getDataDir());
+        }
+      },
+      {
+        label: '🚀 Tự khởi động cùng Windows',
+        type: 'checkbox',
+        checked: isAuto,
+        click: (menuItem) => {
+          setAutoStart(menuItem.checked);
+          updateTrayMenu();
+        }
+      },
+      { type: 'separator' },
+      {
+        label: '❌ Thoát hoàn toàn ứng dụng',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        }
+      }
+    ]);
+    tray.setContextMenu(contextMenu);
+  }
+
+  tray.setToolTip('Quản Lý Hàng Hoàn Shopee - TikTok (Đang chạy nền)');
+  updateTrayMenu();
+
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  });
+}
+
+const isHiddenStartup = process.argv.includes('--hidden');
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1450,
     height: 920,
     minWidth: 1024,
     minHeight: 700,
+    show: !isHiddenStartup,
     title: 'Quản Lý & Đối Soát Hàng Hoàn Shopee / TikTok Shop',
     icon: path.join(__dirname, 'app_icon.ico'),
     autoHideMenuBar: true,
@@ -33,11 +148,33 @@ function createWindow() {
     }
   });
 
-  win.loadFile('Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html');
-  win.setMenuBarVisibility(false);
+  mainWindow.loadFile('Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html');
+  mainWindow.setMenuBarVisibility(false);
+
+  // Bam nut dau X: An xuong khay he thong thay vi tat han
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+
+      if (!hasShownTrayBalloon) {
+        hasShownTrayBalloon = true;
+        try {
+          if (Notification.isSupported()) {
+            new Notification({
+              title: 'Quản Lý Hàng Hoàn đang chạy nền',
+              body: 'Ứng dụng đã thu nhỏ xuống khay hệ thống. Điện thoại vẫn tiếp tục quét và lưu bình thường!',
+              icon: path.join(__dirname, 'app_icon.ico')
+            }).show();
+          }
+        } catch (notifErr) {}
+      }
+      return false;
+    }
+  });
 }
 
-// 1. Doc du lieu tu file vat ly tren o cung
+// IPC Handlers
 ipcMain.handle('read-hard-drive-data', async () => {
   try {
     const dataFilePath = getDataFilePath();
@@ -52,7 +189,6 @@ ipcMain.handle('read-hard-drive-data', async () => {
   }
 });
 
-// 2. Ghi du lieu truc tiep xuong file vat ly tren o cung may tinh
 ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   try {
     const dataFilePath = getDataFilePath();
@@ -63,7 +199,6 @@ ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   }
 });
 
-// 3. Mo thu muc chua file du lieu tren o cung trong Windows File Explorer
 ipcMain.handle('open-data-folder', async () => {
   try {
     const dataFilePath = getDataFilePath();
@@ -78,7 +213,6 @@ ipcMain.handle('open-data-folder', async () => {
   }
 });
 
-// 4. Cho phep nguoi dung chon o dia / thu muc bat ky de xuat ban sao luu (USB, o D, E...)
 ipcMain.handle('backup-to-custom-folder', async (event, dataToSave) => {
   try {
     const now = new Date();
@@ -99,16 +233,54 @@ ipcMain.handle('backup-to-custom-folder', async (event, dataToSave) => {
   }
 });
 
+ipcMain.handle('send-desktop-notification', (event, { title, body }) => {
+  try {
+    if (Notification.isSupported()) {
+      new Notification({
+        title: title || 'Quản Lý Hàng Hoàn',
+        body: body || '',
+        icon: path.join(__dirname, 'app_icon.ico')
+      }).show();
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('get-autostart-status', () => {
+  return { openAtLogin: getAutoStart() };
+});
+
+ipcMain.handle('set-autostart-status', (event, enabled) => {
+  setAutoStart(enabled);
+  return { openAtLogin: getAutoStart() };
+});
+
 app.whenReady().then(() => {
-  // Khoi tao thu muc luu tru truoc
   getDataDir();
   createWindow();
+  createTray();
+
+  // Mac dinh bat tu khoi dong cung may tinh
+  if (!getAutoStart()) {
+    setAutoStart(true);
+  }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  // Khong thoat app tren Windows khi dong cua so, giu app chay nen
 });

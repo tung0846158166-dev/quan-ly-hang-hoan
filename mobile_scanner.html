@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>📱 Máy Quét Mã Vận Đơn Shopee / TikTok</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      position: relative;
+    }
+
+    /* Screen Flash Overlay (Nháy Xanh khi Đúng, Nháy Đỏ khi Trùng) */
+    .screen-flash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease-out;
+    }
+    .screen-flash.flash-green {
+      background: radial-gradient(circle, rgba(34, 197, 94, 0.45) 0%, rgba(34, 197, 94, 0.8) 100%);
+      box-shadow: inset 0 0 60px rgba(34, 197, 94, 0.95);
+      opacity: 1;
+    }
+    .screen-flash.flash-red {
+      background: radial-gradient(circle, rgba(239, 68, 68, 0.5) 0%, rgba(220, 38, 38, 0.85) 100%);
+      box-shadow: inset 0 0 70px rgba(239, 68, 68, 0.95);
+      opacity: 1;
+      animation: pulseRedFlash 0.6s ease-in-out;
+    }
+    @keyframes pulseRedFlash {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      40% { opacity: 0.25; }
+      60% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .screen-flash.flash-yellow {
+      background: radial-gradient(circle, rgba(234, 179, 8, 0.55) 0%, rgba(202, 138, 4, 0.88) 100%);
+      box-shadow: inset 0 0 70px rgba(234, 179, 8, 0.95);
+      opacity: 1;
+      animation: pulseYellowFlash 0.6s ease-in-out;
+    }
+    @keyframes pulseYellowFlash {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      40% { opacity: 0.25; }
+      60% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    .app-header {
+      background: linear-gradient(135deg, #ee4d2d 0%, #d73211 100%);
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 15px rgba(238, 77, 45, 0.35);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .header-title {
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: #ffffff;
+    }
+    .header-sub {
+      font-size: 11px;
+      color: #ffedd5;
+      margin-top: 2px;
+    }
+    .conn-pill {
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    .conn-waiting { background-color: #fbbf24; color: #0f172a; }
+    .conn-ok { background-color: #34d399; color: #022c22; }
+    .conn-err { background-color: #f43f5e; color: #ffffff; }
+
+    .container {
+      padding: 13px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .room-card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .room-label {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+    .room-input {
+      background-color: #0f172a;
+      border: 1.5px solid #38bdf8;
+      border-radius: 8px;
+      color: #38bdf8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 4px 10px;
+      width: 125px;
+      text-align: center;
+      outline: none;
+    }
+
+    .camera-box {
+      position: relative;
+      background-color: #000000;
+      border: 2px solid #0ea5e9;
+      border-radius: 18px;
+      overflow: hidden;
+      min-height: 255px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 25px rgba(14, 165, 233, 0.2);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .camera-box[data-flash="success"] {
+      border: 5px solid #22c55e !important;
+      box-shadow: 0 0 35px rgba(34, 197, 94, 0.85) !important;
+    }
+    .camera-box[data-flash="duplicate"],
+    .camera-box[data-flash="error"] {
+      border: 5px solid #ef4444 !important;
+      box-shadow: 0 0 40px rgba(239, 68, 68, 0.95) !important;
+      animation: cameraShake 0.4s ease-in-out;
+    }
+    @keyframes cameraShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    #reader {
+      width: 100%;
+    }
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      text-align: center;
+      z-index: 10;
+      gap: 10px;
+    }
+    .hidden {
+      display: none !important;
+    }
+    .btn-primary-cam {
+      width: 100%;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 14px;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-primary-cam:active { transform: scale(0.98); }
+    .btn-secondary-cam {
+      width: 100%;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border-radius: 14px;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      display: block;
+    }
+    .hint-text {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    .status-toast {
+      background: rgba(30, 41, 59, 0.95);
+      border: 1.5px solid #38bdf8;
+      border-radius: 14px;
+      padding: 11px;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #e0f2fe;
+    }
+
+    /* Result Banner */
+    .scan-alert {
+      border-radius: 14px;
+      padding: 13px;
+      text-align: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    }
+    .scan-alert.scan-success {
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.95) 0%, rgba(4, 120, 87, 0.95) 100%);
+      border: 2px solid #34d399;
+    }
+    .scan-alert.scan-duplicate {
+      background: linear-gradient(135deg, rgba(153, 27, 27, 0.96) 0%, rgba(185, 28, 28, 0.96) 100%);
+      border: 2.5px solid #f87171;
+      animation: pulseBanner 0.4s ease-in-out;
+    }
+    .scan-alert.scan-not_found {
+      background: linear-gradient(135deg, rgba(161, 98, 7, 0.96) 0%, rgba(202, 138, 4, 0.96) 100%);
+      border: 2.5px solid #fde047;
+      animation: pulseBanner 0.4s ease-in-out;
+    }
+    .scan-alert.scan-pending {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.96) 0%, rgba(51, 65, 85, 0.96) 100%);
+      border: 2px solid #38bdf8;
+    }
+    @keyframes pulseBanner {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    .scan-alert-label {
+      font-size: 11.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .scan-success .scan-alert-label { color: #a7f3d0; }
+    .scan-duplicate .scan-alert-label { color: #fecaca; }
+    .scan-not_found .scan-alert-label { color: #fef08a; }
+    .scan-pending .scan-alert-label { color: #bae6fd; }
+
+    .scan-alert-code {
+      font-size: 17px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 900;
+      color: #ffffff;
+      margin-top: 5px;
+      word-break: break-all;
+      letter-spacing: 0.5px;
+    }
+    .scan-alert-sub {
+      font-size: 12px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    .scan-success .scan-alert-sub { color: #d1fae5; }
+    .scan-duplicate .scan-alert-sub { color: #fca5a5; }
+    .scan-not_found .scan-alert-sub { color: #ffffff; }
+    .scan-pending .scan-alert-sub { color: #e2e8f0; }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .action-card {
+      padding: 12px 10px;
+      border-radius: 14px;
+      text-align: center;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    .action-card:active { transform: scale(0.97); }
+    .action-amber {
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      color: #ffffff;
+    }
+    .action-indigo {
+      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+      color: #ffffff;
+    }
+    .action-title { font-size: 12.5px; font-weight: 800; }
+    .action-sub { font-size: 10px; opacity: 0.9; }
+
+    .manual-box {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 9px;
+      display: flex;
+      gap: 8px;
+    }
+    .manual-input {
+      flex: 1;
+      background-color: #0f172a;
+      border: 1.5px solid #475569;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      color: #ffffff;
+      outline: none;
+    }
+    .manual-input:focus { border-color: #38bdf8; }
+    .btn-send {
+      background: #0ea5e9;
+      color: #0f172a;
+      border: none;
+      border-radius: 10px;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* History Card & Tabs */
+    .history-card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .history-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: #e2e8f0;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .btn-clear-hist {
+      background-color: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-clear-hist:active { background-color: rgba(239, 68, 68, 0.3); }
+
+    .history-summary {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .stat-pill {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .stat-total { background: #334155; color: #f1f5f9; border: 1px solid #475569; }
+    .stat-ok { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .stat-dup { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .stat-not_found { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.4); }
+    .stat-pill.active {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .history-list {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding-right: 2px;
+    }
+    .history-item {
+      padding: 8px 10px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: transform 0.15s ease;
+    }
+    .history-item:hover { transform: translateX(2px); }
+    .history-item.item-success {
+      background-color: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+    }
+    .history-item.item-duplicate {
+      background-color: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+    .history-item.item-not_found {
+      background-color: rgba(234, 179, 8, 0.12);
+      border: 1px solid rgba(234, 179, 8, 0.35);
+    }
+    .history-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .history-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+    }
+    .item-success .history-code { color: #34d399; }
+    .item-duplicate .history-code { color: #f87171; text-decoration: underline; }
+    .item-not_found .history-code { color: #fde047; }
+
+    .history-badge {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .badge-ok {
+      background-color: #22c55e;
+      color: #022c22;
+    }
+    .badge-dup {
+      background-color: #ef4444;
+      color: #ffffff;
+      animation: pulseDup 0.5s ease-in-out;
+    }
+    .badge-not_found {
+      background-color: #eab308;
+      color: #713f12;
+      font-weight: 900;
+    }
+    @keyframes pulseDup {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .history-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10.5px;
+      color: #94a3b8;
+    }
+    .history-detail {
+      font-size: 10.5px;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 250px;
+    }
+    .history-time {
+      font-family: ui-monospace, monospace;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    input[type="file"] { display: none !important; }
+  </style>
+</head>
+<body>
+  <!-- Full Screen Flash Overlay (Nháy Xanh / Nháy Đỏ) -->
+  <div id="screenFlashOverlay" class="screen-flash"></div>
+
+  <div class="app-header">
+    <div>
+      <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
+      <div class="header-sub">Tự Động Báo Xanh (Đúng) & Đỏ (Trùng) + Lịch Sử</div>
+    </div>
+    <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
+  </div>
+
+  <div class="container">
+    <div class="room-card">
+      <span class="room-label">🔗 Kênh kết nối:</span>
+      <input id="roomCodeInput" class="room-input" value="SHP-2026" onchange="changeRoomCode(this.value)" />
+    </div>
+
+    <div class="camera-box">
+      <div id="reader"></div>
+      <div id="cameraStartOverlay" class="camera-overlay">
+        <label class="btn-secondary-cam">
+          <span>📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN</span>
+          <input type="file" accept="image/*" onchange="scanSmartLabelImage(event)" />
+        </label>
+        <button onclick="startCameraScanner()" class="btn-primary-cam">
+          <span>📷 BẬT CAMERA QUÉT TRỰC TIẾP</span>
+        </button>
+        <p class="hint-text">
+          ✨ <b>Nháy XANH khi mã đúng / mới • Nháy ĐỎ khi mã bị trùng</b> • Tự nhập thẳng vào bảng Máy Tính!
+        </p>
+      </div>
+    </div>
+
+    <div id="processingToast" class="status-toast hidden">
+      ⏳ Đang đọc Mã vận đơn & Mã đơn hàng trên phiếu...
+    </div>
+
+    <!-- Scan Alert Result Banner -->
+    <div id="lastScanBanner" class="scan-alert hidden">
+      <div class="scan-alert-label" id="lastScanLabel">---</div>
+      <div id="lastScanCode" class="scan-alert-code">---</div>
+      <div id="lastScanSub" class="scan-alert-sub">---</div>
+    </div>
+
+    <div class="action-grid">
+      <label class="action-card action-amber">
+        <span class="action-title">🔍 Quét Ảnh Phiếu Gửi</span>
+        <span class="action-sub">Đọc MVĐ + Mã đơn + Ảnh</span>
+        <input type="file" accept="image/*" onchange="scanSmartLabelImage(event)" />
+      </label>
+
+      <label class="action-card action-indigo">
+        <span class="action-title">🖼 Chỉ Gửi Ảnh Bọc Hàng</span>
+        <span class="action-sub">Lưu vào cột Ảnh đơn</span>
+        <input type="file" accept="image/*" onchange="handleMobilePhoto(event)" />
+      </label>
+    </div>
+
+    <div class="manual-box">
+      <input
+        id="manualTrackInput"
+        class="manual-input"
+        type="text"
+        placeholder="Hoặc gõ / dán mã vận đơn vào đây..."
+        onkeydown="if(event.key==='Enter') sendManualTrack()"
+      />
+      <button onclick="sendManualTrack()" class="btn-send">GỬI ➔</button>
+    </div>
+
+    <!-- Scan History Section -->
+    <div class="history-card">
+      <div class="history-head">
+        <span>📋 LỊCH SỬ QUÉT TRÊN ĐIỆN THOẠI</span>
+        <button onclick="clearScanHistory()" class="btn-clear-hist" title="Xóa lịch sử quét của kênh này">🗑️ Xóa Lịch Sử</button>
+      </div>
+
+      <!-- Stat Summary & Filter Pills -->
+      <div class="history-summary">
+        <div id="filterAll" onclick="setHistoryFilter('all')" class="stat-pill stat-total active">
+          <span>Tất cả:</span>
+          <span id="histCountTotal">0</span>
+        </div>
+        <div id="filterOk" onclick="setHistoryFilter('success')" class="stat-pill stat-ok">
+          <span>🟢 Hợp lệ:</span>
+          <span id="histCountOk">0</span>
+        </div>
+        <div id="filterDup" onclick="setHistoryFilter('duplicate')" class="stat-pill stat-dup">
+          <span>🔴 Quét trùng:</span>
+          <span id="histCountDup">0</span>
+        </div>
+        <div id="filterNotFound" onclick="setHistoryFilter('not_found')" class="stat-pill stat-not_found">
+          <span>🟡 Không có:</span>
+          <span id="histCountNotFound">0</span>
+        </div>
+      </div>
+
+      <div id="mobileHistoryList" class="history-list">
+        <div style="color:#64748b;font-style:italic;font-size:12px;padding:8px 0;text-align:center;">
+          Chưa có đơn nào được quét. Hãy bật camera hoặc chụp ảnh phiếu!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    function extractRoomCode() {
+      const hash = String(window.location.hash || '').replace(/^#/, '');
+      if (hash.startsWith('room=')) return decodeURIComponent(hash.substring(5)).trim().toUpperCase();
+      if (hash.length >= 3) return decodeURIComponent(hash).trim().toUpperCase();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('room')) return params.get('room').trim().toUpperCase();
+      const rawSearch = String(window.location.search || '');
+      const m = rawSearch.match(/[?&]room=([^&#]+)/i);
+      if (m) return decodeURIComponent(m[1]).trim().toUpperCase();
+      return 'SHP-2026';
+    }
+
+    let room = extractRoomCode();
+    document.getElementById('roomCodeInput').value = room;
+
+    const GLOBAL_TOPIC = 'agy_shopee_return_scanner_2026/GLOBAL_SYNC';
+    let client = null;
+    const pendingScans = new Map();
+    let scanHistory = [];
+    let currentHistoryFilter = 'all';
+    let flashTimer = null;
+    let scanSequence = 0;
+    const scanSession = Math.random().toString(36).slice(2);
+    let lastScannedRawCode = '';
+    let lastScannedRawTime = 0;
+
+    function historyKey() {
+      return 'mobile-return-history-v2:' + room;
+    }
+
+    /* Sound Effects (Web Audio API) */
+    function beepSuccess() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Melodic two-tone (1320Hz -> 1760Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(1320, now);
+        gain1.gain.setValueAtTime(0.22, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.09);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1760, now + 0.08);
+        gain2.gain.setValueAtTime(0.28, now + 0.08);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.22);
+
+        setTimeout(() => ctx.close(), 300);
+      } catch (e) {}
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate(85); } catch(e) {}
+      }
+    }
+
+    function beepDuplicate() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Harsh double-tone low buzz (330Hz, 280Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(330, now);
+        gain1.gain.setValueAtTime(0.35, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.13);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.13);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(280, now + 0.16);
+        gain2.gain.setValueAtTime(0.4, now + 0.16);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.34);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.16);
+        osc2.stop(now + 0.34);
+
+        setTimeout(() => ctx.close(), 400);
+      } catch (e) {}
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate([180, 80, 220]); } catch(e) {}
+      }
+    }
+
+    function beepWarning() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(560, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.32);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.32);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.32);
+        setTimeout(() => ctx.close(), 400);
+      } catch (e) {}
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate([140, 60, 140]); } catch(e) {}
+      }
+    }
+
+    /* Visual Flash Feedback: 'success' (Green) | 'duplicate' (Red) | 'not_found' (Yellow) */
+    function triggerScanFeedback(type, code, title, detail, orderNum = null) {
+      const overlay = document.getElementById('screenFlashOverlay');
+      const camera = document.querySelector('.camera-box');
+      const banner = document.getElementById('lastScanBanner');
+      const label = document.getElementById('lastScanLabel');
+      const codeEl = document.getElementById('lastScanCode');
+      const subEl = document.getElementById('lastScanSub');
+
+      clearTimeout(flashTimer);
+
+      if (type === 'success') {
+        // NHÁY XANH
+        if (overlay) {
+          overlay.className = 'screen-flash flash-green';
+        }
+        if (camera) {
+          camera.dataset.flash = 'success';
+        }
+        beepSuccess();
+
+        if (banner) {
+          banner.className = 'scan-alert scan-success';
+          banner.classList.remove('hidden');
+          label.textContent = title || (orderNum ? `🟢 ĐÃ XÁC NHẬN ĐƠN #${orderNum}` : '🟢 MÃ ĐÚNG / HỢP LỆ');
+          codeEl.textContent = code;
+          subEl.textContent = detail || '✅ Đã lưu thành công vào bảng máy tính';
+        }
+      } else if (type === 'duplicate') {
+        // NHÁY ĐỎ
+        if (overlay) {
+          overlay.className = 'screen-flash flash-red';
+        }
+        if (camera) {
+          camera.dataset.flash = 'duplicate';
+        }
+        beepDuplicate();
+
+        if (banner) {
+          banner.className = 'scan-alert scan-duplicate';
+          banner.classList.remove('hidden');
+          label.textContent = title || '🚨 CẢNH BÁO: MÃ ĐÃ BỊ TRÙNG!';
+          codeEl.textContent = code;
+          subEl.textContent = detail || '⚠️ Mã này đã được quét nhận trả trước đó!';
+        }
+      } else if (type === 'not_found' || type === 'yellow') {
+        // NHÁY VÀNG: ĐƠN KHÔNG TỒN TẠI TRÊN HỆ THỐNG
+        if (overlay) {
+          overlay.className = 'screen-flash flash-yellow';
+        }
+        if (camera) {
+          camera.dataset.flash = 'not_found';
+        }
+        beepWarning();
+
+        if (banner) {
+          banner.className = 'scan-alert scan-not_found';
+          banner.classList.remove('hidden');
+          label.textContent = title || '🟡 KHÔNG CÓ TRÊN HỆ THỐNG!';
+          codeEl.textContent = code;
+          subEl.textContent = detail || '⚠️ Mã này không tồn tại trong danh sách đơn hàng máy tính!';
+        }
+      }
+
+      flashTimer = setTimeout(() => {
+        if (overlay) overlay.className = 'screen-flash';
+        if (camera) delete camera.dataset.flash;
+      }, 750);
+    }
+
+    /* History Management */
+    function saveScanHistory() {
+      try {
+        localStorage.setItem(historyKey(), JSON.stringify(scanHistory.slice(0, 300)));
+      } catch (e) {}
+    }
+
+    function loadScanHistory() {
+      scanHistory = [];
+      try {
+        const stored = JSON.parse(localStorage.getItem(historyKey()) || '[]');
+        if (Array.isArray(stored)) {
+          scanHistory = stored.filter(e => e && typeof e.code === 'string').map(e => {
+            if (e.status === 'pending') e.status = 'success';
+            return e;
+          });
+        }
+      } catch (e) {}
+      renderScanHistory();
+    }
+
+    function clearScanHistory() {
+      if (!scanHistory.length) return;
+      if (confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử quét của kênh này không?')) {
+        scanHistory = [];
+        saveScanHistory();
+        renderScanHistory();
+        document.getElementById('lastScanBanner').classList.add('hidden');
+      }
+    }
+
+    function setHistoryFilter(filter) {
+      currentHistoryFilter = filter;
+      document.querySelectorAll('.stat-pill').forEach(el => el.classList.remove('active'));
+      if (filter === 'all') document.getElementById('filterAll').classList.add('active');
+      else if (filter === 'success') document.getElementById('filterOk').classList.add('active');
+      else if (filter === 'duplicate') document.getElementById('filterDup').classList.add('active');
+      else if (filter === 'not_found') {
+        const nfPill = document.getElementById('filterNotFound');
+        if (nfPill) nfPill.classList.add('active');
+      }
+      renderScanHistory();
+    }
+
+    function renderScanHistory() {
+      const list = document.getElementById('mobileHistoryList');
+      if (!list) return;
+
+      const totalCount = scanHistory.length;
+      const okCount = scanHistory.filter(e => e.status === 'success' || !e.status || e.status === 'pending').length;
+      const dupCount = scanHistory.filter(e => e.status === 'duplicate').length;
+      const notFoundCount = scanHistory.filter(e => e.status === 'not_found').length;
+
+      document.getElementById('histCountTotal').textContent = totalCount;
+      document.getElementById('histCountOk').textContent = okCount;
+      document.getElementById('histCountDup').textContent = dupCount;
+      const nfEl = document.getElementById('histCountNotFound');
+      if (nfEl) nfEl.textContent = notFoundCount;
+
+      let filtered = scanHistory;
+      if (currentHistoryFilter === 'success') {
+        filtered = scanHistory.filter(e => e.status === 'success' || !e.status || e.status === 'pending');
+      } else if (currentHistoryFilter === 'duplicate') {
+        filtered = scanHistory.filter(e => e.status === 'duplicate');
+      } else if (currentHistoryFilter === 'not_found') {
+        filtered = scanHistory.filter(e => e.status === 'not_found');
+      }
+
+      list.innerHTML = '';
+
+      if (!filtered.length) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'color:#64748b;font-style:italic;font-size:12px;padding:12px 0;text-align:center;';
+        emptyMsg.textContent = totalCount === 0
+          ? 'Chưa có đơn nào được quét. Hãy bật camera hoặc chụp ảnh phiếu!'
+          : 'Không có đơn nào trong bộ lọc này.';
+        list.appendChild(emptyMsg);
+        return;
+      }
+
+      filtered.forEach((entry, idx) => {
+        const item = document.createElement('div');
+        const isDup = entry.status === 'duplicate';
+        const isNotFound = entry.status === 'not_found';
+        item.className = 'history-item ' + (isDup ? 'item-duplicate' : (isNotFound ? 'item-not_found' : 'item-success'));
+
+        const topRow = document.createElement('div');
+        topRow.className = 'history-top-row';
+
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'history-code';
+        codeSpan.textContent = `#${totalCount - idx}. ${entry.code}`;
+
+        const badgeSpan = document.createElement('span');
+        badgeSpan.className = 'history-badge ' + (isDup ? 'badge-dup' : (isNotFound ? 'badge-not_found' : 'badge-ok'));
+        if (isDup) {
+          badgeSpan.textContent = `🔴 TRÙNG (x${entry.dupCount || 1})`;
+        } else if (isNotFound) {
+          badgeSpan.textContent = `🟡 KHÔNG CÓ TRÊN HT`;
+        } else {
+          badgeSpan.textContent = entry.orderNum ? `🟢 ĐƠN #${entry.orderNum}` : '🟢 HỢP LỆ';
+        }
+
+        topRow.appendChild(codeSpan);
+        topRow.appendChild(badgeSpan);
+
+        const botRow = document.createElement('div');
+        botRow.className = 'history-bottom-row';
+
+        const detailSpan = document.createElement('span');
+        detailSpan.className = 'history-detail';
+        detailSpan.textContent = entry.detail || (isDup ? 'Đã quét nhận trước đó' : (isNotFound ? 'Không có trên hệ thống' : 'Đã lưu vào bảng'));
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'history-time';
+        timeSpan.textContent = new Date(entry.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        botRow.appendChild(detailSpan);
+        botRow.appendChild(timeSpan);
+
+        item.appendChild(topRow);
+        item.appendChild(botRow);
+        list.appendChild(item);
+      });
+    }
+
+    /* Clean tracking code helper */
+    function extractCleanTrackingCode(raw) {
+      if (!raw) return '';
+      let str = String(raw).trim();
+
+      if (str.includes('http://') || str.includes('https://') || str.includes('spx.vn') || str.includes('ghn.vn')) {
+        const mParam = str.match(/(?:spx|track|code|c|id|bill|order_code|s)=([A-Za-z0-9\.\-_]+)/i);
+        if (mParam && mParam[1]) str = mParam[1];
+      }
+
+      const mSpx = str.match(/(SPXVN[0-9A-Za-z]{6,18})/i);
+      if (mSpx) return mSpx[1].toUpperCase();
+
+      const mSoc = str.match(/(SOC[0-9A-Za-z]{6,16})/i);
+      if (mSoc) return mSoc[1].toUpperCase();
+
+      const mNinja = str.match(/((?:NIVN|NLVN|SHPVN)[0-9A-Za-z]{6,16})/i);
+      if (mNinja) return mNinja[1].toUpperCase();
+
+      const mVtp = str.match(/(VTP?[0-9A-Za-z]{6,15})/i);
+      if (mVtp) return mVtp[1].toUpperCase();
+
+      const mGhn = str.match(/(GHN[0-9A-Za-z]{6,14}|G8[0-9A-Za-z]{6,14})/i);
+      if (mGhn) return mGhn[1].toUpperCase();
+
+      const mGhtk = str.match(/(S\d+[\.\-][0-9A-Za-z\.\-]{6,24})/i);
+      if (mGhtk) return mGhtk[1].toUpperCase();
+
+      const mJt = str.match(/(8[024][0-9]{10,13})/);
+      if (mJt) return mJt[1];
+
+      let cleaned = str.replace(/^[\*\"\'\<\>\#\s\[\]\(\)]+|[\*\"\'\<\>\#\s\[\]\(\)]+$/g, '').trim();
+      if (cleaned.includes('/') || cleaned.includes('|') || cleaned.includes(';')) {
+        const parts = cleaned.split(/[\/\|;]/);
+        for (const p of parts) {
+          const partClean = extractCleanTrackingCode(p);
+          if (partClean) return partClean;
+        }
+      }
+
+      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned)) {
+        return cleaned.toUpperCase();
+      }
+
+      return cleaned.toUpperCase();
+    }
+
+    /* Receiving PC Acknowledgement */
+    let knownSystemCodes = new Set();
+
+    function handleScanAck(data) {
+      if (!data) return;
+      if (data.type === 'manifest_sync') {
+        if (Array.isArray(data.knownCodes)) {
+          knownSystemCodes = new Set(data.knownCodes.map(c => extractCleanTrackingCode(c)).filter(Boolean));
+          console.log('Manifest sync received: ', knownSystemCodes.size, 'codes');
+        }
+        return;
+      }
+      if (data.type !== 'pc_ack' || !data.code) return;
+      const cleanCode = extractCleanTrackingCode(data.code);
+      const isDup = data.outcome === 'duplicate' || data.isDuplicate === true;
+      const isNotFound = data.outcome === 'not_found' || data.status === 'not_found';
+
+      // Clear pending scan timer
+      const id = data.requestId || Array.from(pendingScans).find(([, s]) =>
+        extractCleanTrackingCode(s.code) === cleanCode)?.[0];
+      if (id && pendingScans.has(id)) {
+        clearTimeout(pendingScans.get(id).timer);
+        pendingScans.delete(id);
+      }
+
+      const existing = scanHistory.find(e => extractCleanTrackingCode(e.code) === cleanCode);
+
+      if (isNotFound) {
+        // PC XÁC NHẬN: ĐƠN KHÔNG TỒN TẠI TRÊN HỆ THỐNG ➔ TỨC THÌ NHÁY VÀNG!
+        triggerScanFeedback('not_found', cleanCode, '🟡 KHÔNG CÓ TRÊN HỆ THỐNG!', data.extra || '⚠️ Mã này không tồn tại trong danh sách đơn hàng máy tính!', null);
+        
+        if (existing) {
+          existing.status = 'not_found';
+          existing.orderNum = null;
+          existing.detail = data.extra || 'Không có trên hệ thống';
+        } else {
+          scanHistory.unshift({
+            code: cleanCode,
+            time: Date.now(),
+            status: 'not_found',
+            orderNum: null,
+            dupCount: 0,
+            photo: '',
+            detail: data.extra || 'Không có trên hệ thống'
+          });
+        }
+        saveScanHistory();
+        renderScanHistory();
+        return;
+      }
+
+      if (isDup) {
+        // PC XÁC NHẬN: ĐƠN TRÙNG ➔ TỨC THÌ NHÁY ĐỎ
+        triggerScanFeedback('duplicate', cleanCode, '🚨 MÁY TÍNH BÁO: ĐƠN TRÙNG!', data.extra || '⚠️ Đơn này đã được quét nhận trả trước đó!', data.orderNum);
+        
+        if (existing) {
+          existing.status = 'duplicate';
+          existing.orderNum = data.orderNum || existing.orderNum;
+          existing.dupCount = (existing.dupCount || 1) + 1;
+          existing.detail = data.extra || 'Quét trùng';
+        } else {
+          scanHistory.unshift({
+            code: cleanCode,
+            time: Date.now(),
+            status: 'duplicate',
+            orderNum: data.orderNum,
+            dupCount: 1,
+            detail: data.extra || 'Quét trùng'
+          });
+        }
+        saveScanHistory();
+        renderScanHistory();
+        return;
+      }
+
+      // PC XÁC NHẬN: ĐƠN ĐÚNG / HỢP LỆ (KHỚP THÀNH CÔNG ĐỐI SOÁT) ➔ TỨC THÌ NHÁY XANH!
+      const orderNum = Number(data.orderNum) || null;
+      triggerScanFeedback('success', cleanCode, orderNum ? `🟢 ĐÃ KHỚP ĐƠN #${orderNum}` : '🟢 MÃ ĐÚNG HỢP LỆ', data.extra || '✅ Đã đối soát & khớp hàng đã trả', orderNum);
+
+      if (existing) {
+        existing.status = 'success';
+        existing.orderNum = orderNum || existing.orderNum;
+        existing.detail = data.extra || 'Đã khớp hàng đã trả';
+      } else {
+        scanHistory.unshift({
+          code: cleanCode,
+          time: Date.now(),
+          status: 'success',
+          orderNum: orderNum,
+          dupCount: 0,
+          detail: data.extra || 'Đã khớp hàng đã trả'
+        });
+      }
+      saveScanHistory();
+      renderScanHistory();
+    }
+
+    function captureCurrentVideoFrame() {
+      try {
+        const video = document.querySelector('#reader video') || document.querySelector('video');
+        if (!video || !video.videoWidth || !video.videoHeight) return null;
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 420;
+        let w = video.videoWidth;
+        let h = video.videoHeight;
+        if (w > h) {
+          if (w > MAX_DIM) {
+            h = Math.round((h * MAX_DIM) / w);
+            w = MAX_DIM;
+          }
+        } else {
+          if (h > MAX_DIM) {
+            w = Math.round((w * MAX_DIM) / h);
+            h = MAX_DIM;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, w, h);
+        return canvas.toDataURL('image/jpeg', 0.50);
+      } catch (err) {
+        console.warn('Auto video capture error:', err);
+        return null;
+      }
+    }
+
+    async function sendPhotoPacket(dataUrl, trackCode) {
+      if (!dataUrl || typeof dataUrl !== 'string') return;
+      const cleanCode = extractCleanTrackingCode(trackCode) || String(trackCode || '').trim().toUpperCase();
+      const now = Date.now();
+
+      // 1. Gửi trọn gói qua MQTT (hỗ trợ payload lớn, tốc độ tức thì khi có kết nối WebSocket)
+      const fullPhotoMsg = JSON.stringify({
+        type: 'photo',
+        photo: dataUrl,
+        lastCode: cleanCode,
+        code: cleanCode,
+        room: room,
+        time: now
+      });
+      if (client && client.connected) {
+        try {
+          client.publish('agy_shopee_return_scanner_2026/' + room, fullPhotoMsg);
+          client.publish(GLOBAL_TOPIC, fullPhotoMsg);
+        } catch (e) {}
+      }
+
+      // 2. Chia ảnh thành các mảnh nhỏ < 2.6KB (2500 ký tự) để gửi qua ntfy.sh SSE
+      // Vì ntfy.sh giới hạn mỗi bản tin SSE tối đa 4.096 bytes (4KB)! Chia mảnh giúp 100% ảnh luôn tới PC không bao giờ rớt!
+      const CHUNK_SIZE = 2400;
+      const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE);
+      const photoId = 'ph_' + now + '_' + Math.random().toString(36).slice(2, 6);
+      const topic = getNtfyTopic();
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunkStr = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+        const chunkPayload = JSON.stringify({
+          type: 'photo_chunk',
+          photoId: photoId,
+          code: cleanCode,
+          idx: i,
+          total: totalChunks,
+          chunk: chunkStr,
+          room: room,
+          time: now + i
+        });
+        try {
+          await fetch('https://ntfy.sh/' + topic, {
+            method: 'POST',
+            body: chunkPayload,
+            headers: { 'Title': 'Shopee Photo Chunk' }
+          });
+        } catch (err) {
+          console.warn('Photo chunk send warn:', err);
+        }
+        if (i + 1 < totalChunks) {
+          await new Promise(r => setTimeout(r, 45));
+        }
+      }
+    }
+
+    /* Core Scan Processing */
+    function sendCodeToPc(codeText) {
+      const clean = extractCleanTrackingCode(codeText);
+      if (!clean) return false;
+      const now = Date.now();
+
+      // Debounce exact camera trigger within 1.2s to prevent rapid multi-triggers on the exact same frame
+      if (clean === lastScannedRawCode && now - lastScannedRawTime < 1200) return false;
+      lastScannedRawCode = clean;
+      lastScannedRawTime = now;
+
+      // LUÔN LUÔN TỰ ĐỘNG BẮT ẢNH TỪ CAMERA NGAY KHI QUÉT ĐƯỢC MÃ
+      const capturedPhoto = captureCurrentVideoFrame();
+
+      // LỚP 1: KIỂM TRA LỊCH SỬ ĐÃ QUÉT TRÊN ĐIỆN THOẠI
+      const existingIdx = scanHistory.findIndex(entry => extractCleanTrackingCode(entry.code) === clean);
+      if (existingIdx !== -1) {
+        const existing = scanHistory[existingIdx];
+        if (existing.status === 'not_found') {
+          // Mã này trước đó máy tính báo KHÔNG CÓ TRÊN HỆ THỐNG
+          existing.dupCount = (existing.dupCount || 1) + 1;
+          existing.lastDupTime = now;
+          scanHistory.splice(existingIdx, 1);
+          scanHistory.unshift(existing);
+          saveScanHistory();
+          renderScanHistory();
+
+          triggerScanFeedback('not_found', clean, '🟡 VẪN KHÔNG CÓ TRÊN HT!', `⚠️ Quét lần ${existing.dupCount}: Không có trong danh sách`, null);
+
+          sendPayloadToPc({
+            type: 'barcode',
+            code: clean,
+            photo: '',
+            time: now,
+            isLocalDuplicate: true
+          }, clean, '⚠️ Mã không có trên hệ thống');
+          return true;
+        }
+
+        // ĐÃ QUÉT TRƯỚC ĐÓ ➔ TỨC THÌ NHÁY ĐỎ CẢNH BÁO!
+        // Nhưng vẫn gửi kèm ảnh chụp nếu trước đó đơn trên máy tính chưa nhận được ảnh!
+        existing.status = 'duplicate';
+        existing.dupCount = (existing.dupCount || 1) + 1;
+        existing.lastDupTime = now;
+        if (capturedPhoto && !existing.photo) existing.photo = capturedPhoto;
+        
+        // Đẩy lên đầu danh sách lịch sử
+        scanHistory.splice(existingIdx, 1);
+        scanHistory.unshift(existing);
+        saveScanHistory();
+        renderScanHistory();
+
+        const timeStr = new Date(existing.time).toLocaleTimeString('vi-VN');
+        triggerScanFeedback('duplicate', clean, '🚨 MÃ ĐÃ BỊ TRÙNG!', `⚠️ Đã quét lúc ${timeStr} (Trùng lần ${existing.dupCount})`, existing.orderNum);
+
+        sendPayloadToPc({
+          type: 'barcode',
+          code: clean,
+          photo: capturedPhoto || '',
+          time: now,
+          isLocalDuplicate: true
+        }, clean, '⚠️ Mã quét trùng');
+
+        if (capturedPhoto) {
+          setTimeout(() => {
+            sendPhotoPacket(capturedPhoto, clean);
+          }, 90);
+        }
+
+        return true;
+      }
+
+      // LỚP 2: NẾU ĐÃ CÓ BẢN SYNC DANH SÁCH MÃ TỪ MÁY TÍNH & MÃ KHÔNG TỒN TẠI ➔ NHÁY VÀNG NGAY 0ms!
+      if (knownSystemCodes.size > 0 && !knownSystemCodes.has(clean)) {
+        triggerScanFeedback('not_found', clean, '🟡 KHÔNG CÓ TRÊN HỆ THỐNG!', '⚠️ Mã này không tồn tại trong danh sách đơn hàng máy tính!', null);
+        
+        scanHistory.unshift({
+          code: clean,
+          time: now,
+          status: 'not_found',
+          orderNum: null,
+          dupCount: 0,
+          photo: '',
+          detail: '⚠️ Không có trên hệ thống'
+        });
+        saveScanHistory();
+        renderScanHistory();
+
+        sendPayloadToPc({
+          type: 'barcode',
+          code: clean,
+          photo: '',
+          time: now
+        }, clean, '🟡 Không có trên HT');
+        return true;
+      }
+
+      // LỚP 3: ĐƠN MỚI CHƯA QUÉT ➔ TỰ ĐỘNG BẮT ẢNH, NHÁY XANH HỢP LỆ & GỬI SANG PC ĐỐI SOÁT
+      triggerScanFeedback('success', clean, '🟢 MÃ HỢP LỆ (ĐÃ GỬI PC)', capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn máy tính', null);
+      
+      scanHistory.unshift({
+        code: clean,
+        time: now,
+        status: 'success',
+        orderNum: null,
+        dupCount: 0,
+        photo: capturedPhoto || '',
+        detail: capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn'
+      });
+      saveScanHistory();
+      renderScanHistory();
+
+      sendPayloadToPc({
+        type: 'barcode',
+        code: clean,
+        photo: capturedPhoto || '',
+        time: now
+      }, clean);
+
+      // Luôn gửi gói ảnh chia mảnh chuyên dụng để đảm bảo 100% ảnh tới PC
+      if (capturedPhoto) {
+        setTimeout(() => {
+          sendPhotoPacket(capturedPhoto, clean);
+        }, 80);
+      }
+      return true;
+    }
+
+    function sendManualTrack() {
+      const inp = document.getElementById('manualTrackInput');
+      if (!inp || !inp.value.trim()) return;
+      sendCodeToPc(inp.value.trim());
+      inp.value = '';
+    }
+
+    function sendPayloadToPc(payload, displayCode, subInfo = '') {
+      const now = Date.now();
+      payload.room = room;
+      payload.time = now;
+
+      if (payload.type === 'barcode' || payload.type === 'smart_label') {
+        const id = scanSession + '-' + (++scanSequence);
+        payload.requestId = id;
+        const timer = setTimeout(() => {
+          pendingScans.delete(id);
+          const banner = document.getElementById('lastScanBanner');
+          if (banner && !banner.classList.contains('hidden') && document.getElementById('lastScanCode').textContent === displayCode) {
+            document.getElementById('lastScanSub').textContent = '⚠️ Chưa nhận được phản hồi từ PC (Kiểm tra lại WiFi / MQTT)';
+          }
+        }, 10000);
+        pendingScans.set(id, { code: displayCode, timer });
+      }
+
+      const topic = getNtfyTopic();
+
+      // 1. Gửi mã vạch siêu nhẹ (< 300 bytes, tách riêng trường photo nặng) qua ntfy.sh để đảm bảo không bao giờ vượt ngưỡng 4KB của ntfy.sh!
+      const lightPayload = Object.assign({}, payload);
+      if (lightPayload.type === 'barcode' || lightPayload.type === 'smart_label') {
+        delete lightPayload.photo;
+      }
+      const lightJsonStr = JSON.stringify(lightPayload);
+
+      try {
+        fetch('https://ntfy.sh/' + topic, {
+          method: 'POST',
+          body: lightJsonStr,
+          headers: { 'Title': 'Shopee Scan' }
+        }).catch(e => console.warn('Ntfy post warn:', e));
+      } catch (e) {}
+
+      // 2. Đồng thời gửi trọn gói (bao gồm cả ảnh chụp nếu có) qua MQTT WebSocket
+      const fullJsonStr = JSON.stringify(payload);
+      if (client && client.connected) {
+        try {
+          client.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr);
+          client.publish(GLOBAL_TOPIC, fullJsonStr);
+        } catch (e) {}
+      }
+    }
+
+    function getNtfyTopic() {
+      const clean = String(room || 'SHP-2026').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      return 'agy_shopee_' + clean;
+    }
+
+    let phoneEventSource = null;
+    function initPhoneSync() {
+      const topic = getNtfyTopic();
+      const badge = document.getElementById('connBadge');
+
+      // 1. Primary: EventSource to ntfy.sh (Standard HTTPS port 443, instant & zero CORS block)
+      try {
+        if (phoneEventSource) {
+          try { phoneEventSource.close(); } catch(e) {}
+        }
+        phoneEventSource = new EventSource('https://ntfy.sh/' + topic + '/sse');
+
+        phoneEventSource.onopen = () => {
+          if (badge) {
+            badge.className = 'conn-pill conn-ok';
+            badge.textContent = '🟢 Đã nối Máy Tính';
+          }
+          const hello = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
+          fetch('https://ntfy.sh/' + topic, { method: 'POST', body: hello, headers: { 'Title': 'Shopee Connect' } }).catch(() => {});
+        };
+
+        phoneEventSource.onmessage = (event) => {
+          try {
+            const wrapper = JSON.parse(event.data);
+            if (!wrapper || !wrapper.message) return;
+            let data = null;
+            try { data = JSON.parse(wrapper.message); } catch (e) { return; }
+            if (!data) return;
+
+            handleScanAck(data);
+          } catch (e) {}
+        };
+      } catch (err) {
+        console.warn('SSE err:', err);
+      }
+
+      // 2. Secondary fallback: MQTT
+      connectMqtt();
+    }
+
+    function connectMqtt() {
+      if (typeof mqtt === 'undefined') return;
+      if (client) {
+        try { client.end(true); } catch (e) {}
+      }
+      try {
+        client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
+        const badge = document.getElementById('connBadge');
+
+        client.on('connect', () => {
+          if (badge && !phoneEventSource) {
+            badge.className = 'conn-pill conn-ok';
+            badge.textContent = '🟢 Đã nối Máy Tính';
+          }
+          try {
+            client.subscribe('agy_shopee_return_scanner_2026/' + room);
+            const helloMsg = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
+            client.publish('agy_shopee_return_scanner_2026/' + room, helloMsg);
+            client.publish(GLOBAL_TOPIC, helloMsg);
+          } catch (e) {}
+        });
+
+        client.on('message', (t, msgBuf) => {
+          try {
+            const data = JSON.parse(msgBuf.toString());
+            if (t === 'agy_shopee_return_scanner_2026/' + room) handleScanAck(data);
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+
+    function changeRoomCode(newRoom) {
+      room = String(newRoom || 'SHP-2026').trim().toUpperCase();
+      for (const scan of pendingScans.values()) clearTimeout(scan.timer);
+      pendingScans.clear();
+      lastScannedRawCode = '';
+      lastScannedRawTime = 0;
+      document.getElementById('lastScanBanner').classList.add('hidden');
+      loadScanHistory();
+      initPhoneSync();
+    }
+
+    let html5QrCode = null;
+    async function startCameraScanner() {
+      if (typeof Html5Qrcode === 'undefined') {
+        alert('Đang tải bộ quét Camera, vui lòng thử lại sau 2 giây...');
+        return;
+      }
+      try {
+        document.getElementById('cameraStartOverlay').classList.add('hidden');
+        if (html5QrCode) {
+          try { await html5QrCode.stop(); } catch (e) {}
+        }
+        html5QrCode = new Html5Qrcode('reader');
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 14, qrbox: { width: 260, height: 160 } },
+          (decodedText) => {
+            sendCodeToPc(decodedText);
+          },
+          () => {}
+        );
+      } catch (err) {
+        alert('Trình duyệt chặn Camera trực tiếp. Bạn hãy bấm nút màu xanh lá [📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN] ngay trên cùng nhé!');
+        document.getElementById('cameraStartOverlay').classList.remove('hidden');
+      }
+    }
+
+    function loadImageElement(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => resolve({ img, dataUrl: e.target.result });
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function cropImageToBlob(img, sxRatio, syRatio, swRatio, shRatio, maxW = 600, highContrast = false, quality = 0.62) {
+      return new Promise(resolve => {
+        const sx = Math.floor(img.width * sxRatio);
+        const sy = Math.floor(img.height * syRatio);
+        const sw = Math.floor(img.width * swRatio);
+        const sh = Math.floor(img.height * shRatio);
+        let targetW = sw;
+        let targetH = sh;
+        if (targetW > maxW) {
+          targetH = Math.round((targetH * maxW) / targetW);
+          targetW = maxW;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (highContrast) {
+          ctx.filter = 'contrast(150%) grayscale(100%)';
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
+        canvas.toBlob(blob => {
+          resolve({
+            file: new File([blob], 'crop.jpg', { type: 'image/jpeg' }),
+            dataUrl: canvas.toDataURL('image/jpeg', quality),
+            canvas: canvas
+          });
+        }, 'image/jpeg', quality);
+      });
+    }
+
+    function parseShippingLabelText(rawText) {
+      const cleaned = String(rawText || '').replace(/\r/g, '\n');
+      const noSpaceUpper = cleaned.replace(/[ \t]+/g, '').toUpperCase();
+      let track = '';
+      let orderId = '';
+      let shipDate = '';
+      let qty = 1;
+
+      const spxMatch = noSpaceUpper.match(/SPXVN[0-9A-Z]{9,15}/i) || cleaned.match(/SPX\s*VN\s*[0-9A-Z]{9,15}/i);
+      const ghtkMatch = cleaned.match(/S\d+[\.\-]\w+[\.\-]\w+[\.\-]\d{6,12}/i);
+      const ghnMatch = noSpaceUpper.match(/GHN[0-9A-Z]{6,12}/i);
+      const vtpMatch = noSpaceUpper.match(/VTP[0-9A-Z]{6,14}/i);
+      const trackLineMatch = cleaned.match(/v[aậ]n\s*[đd][oơ]n\s*[:\-\.]?\s*([A-Z0-9\.]{7,22})/i);
+
+      if (spxMatch) track = spxMatch[0].replace(/\s+/g, '').toUpperCase();
+      else if (ghtkMatch) track = ghtkMatch[0].toUpperCase();
+      else if (ghnMatch) track = ghnMatch[0].toUpperCase();
+      else if (vtpMatch) track = vtpMatch[0].toUpperCase();
+      else if (trackLineMatch) track = trackLineMatch[1].toUpperCase();
+
+      if (track.startsWith('SPXVN') && track.length >= 14) {
+        const body = track.substring(5, track.length - 1)
+          .replace(/O/g, '0')
+          .replace(/I/g, '1')
+          .replace(/S/g, '5')
+          .replace(/B/g, '8');
+        track = 'SPXVN' + body + track.charAt(track.length - 1);
+      }
+
+      const orderLineMatch = cleaned.match(/[đd][oơ]n\s*h[aà]ng\s*[:\-\.]?\s*([2][0-9A-Z]{11,16})/i);
+      if (orderLineMatch) {
+        orderId = orderLineMatch[1].toUpperCase();
+      } else {
+        const shopeeIdMatch = cleaned.match(/\b(2[4-9]\d{4}[0-9A-Z]{7,10})\b/);
+        if (shopeeIdMatch && shopeeIdMatch[1] !== track) {
+          orderId = shopeeIdMatch[1].toUpperCase();
+        }
+      }
+
+      const dateMatch = cleaned.match(/\b(\d{2})[\-\/](\d{2})[\-\/](202\d)\b/);
+      if (dateMatch) {
+        shipDate = `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}`;
+      }
+
+      const qtyMatch = cleaned.match(/SL\s*[:\-]?\s*(\d+)/i);
+      if (qtyMatch) {
+        qty = parseInt(qtyMatch[1], 10) || 1;
+      }
+
+      let product = '';
+      let color = '';
+      let size = '';
+
+      let start = cleaned.search(/nội\s*dung\s*hàng|noi\s*dung\s*hang|tổng\s*sl\s*sản\s*phẩm/i);
+      if (start < 0) start = 0;
+      const contentText = cleaned.slice(start, start + 450);
+
+      const pm = contentText.match(/1\s*[\.\)]\s*([^\n\r]+)/);
+      if (pm) {
+        product = pm[1].split(/\s\/\s|\/|\n/)[0].replace(/^1\s*[\.\)]\s*/, '').trim().slice(0, 80);
+      } else {
+        const lineMatch = contentText.match(/(?:Áo|Quần|Váy|Đầm|Sơ mi|Set|Bộ|Tee|Polo|Jean|Khoác)[^\n\r\/,]+/i);
+        if (lineMatch) product = lineMatch[0].trim().slice(0, 80);
+      }
+
+      const varCombo = contentText.match(/,\s*([A-Za-zÀ-ỹĐđ\s]{2,16}?)\s*[,|\/|\-]\s*(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|[SML])\b/i) ||
+                       contentText.match(/(?:màu|mau|color)?\s*[:\-\s]*([A-Za-zÀ-ỹĐđ\s]{2,14}?)\s*[,|\/|\-]\s*(?:size|kích cỡ)?\s*[:\-\s]*(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|[SML])\b/i);
+      if (varCombo) {
+        if (!color) color = varCombo[1].trim();
+        if (!size) size = varCombo[2].toUpperCase();
+      }
+
+      if (!size) {
+        const smMulti = contentText.match(/\b(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|Free\s*size)\b/i);
+        if (smMulti) {
+          size = smMulti[1].toUpperCase().replace(/\s+/g, '');
+        } else {
+          const smSingle = contentText.match(/\b([SML])\b/i);
+          if (smSingle) size = smSingle[1].toUpperCase();
+        }
+      }
+
+      if (!color) {
+        const vm = contentText.match(/,\s*([A-Za-zÀ-ỹĐđ\s]{2,18}?)\s*,\s*(?:XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\b\d{2}\b)/i) ||
+                   contentText.match(/[\/,\-]\s*([A-Za-zÀ-ỹĐđ\s]{2,18}?)\s*,\s*(?:XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\b\d{2}\b)/i);
+        if (vm) color = vm[1].trim();
+      }
+
+      return { track, orderId, shipDate, qty, product, color, size };
+    }
+
+    async function scanSmartLabelImage(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const toast = document.getElementById('processingToast');
+      toast.classList.remove('hidden');
+      toast.textContent = '⏳ Bước 1/2: Đang quét mã QR / Mã vạch trên phiếu...';
+
+      try {
+        const { img } = await loadImageElement(file);
+        const compressedPhoto = await cropImageToBlob(img, 0, 0, 1, 1, 480, false, 0.55);
+
+        let decodedCode = '';
+        if ('BarcodeDetector' in window) {
+          try {
+            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+            const barcodes = await detector.detect(img);
+            if (barcodes && barcodes.length > 0) {
+              const spx = barcodes.find(b => /SPX|GHN|GHTK|VTP/i.test(b.rawValue));
+              decodedCode = spx ? spx.rawValue : barcodes[0].rawValue;
+            }
+          } catch (bdErr) {}
+        }
+
+        if (!decodedCode && typeof Html5Qrcode !== 'undefined') {
+          const scanner = html5QrCode || new Html5Qrcode('reader');
+          const crops = [
+            await cropImageToBlob(img, 0.45, 0.32, 0.48, 0.42, 800, false, 0.8),
+            await cropImageToBlob(img, 0.32, 0.06, 0.62, 0.22, 950, false, 0.8),
+            await cropImageToBlob(img, 0, 0, 1, 1, 1000, false, 0.8)
+          ];
+          for (let i = 0; i < crops.length; i++) {
+            try {
+              const res = await scanner.scanFile(crops[i].file, false);
+              if (res && String(res).trim()) {
+                decodedCode = String(res).trim();
+                break;
+              }
+            } catch (err) {}
+          }
+        }
+
+        toast.textContent = '⏳ Bước 2/2: Đang đọc chữ Mã vận đơn & Mã đơn hàng trên phiếu...';
+        let ocrParsed = { track: '', orderId: '', shipDate: '', qty: 1 };
+        let rawOcrText = '';
+        try {
+          if (typeof Tesseract === 'undefined') {
+            await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+          }
+          const labelCrop = await cropImageToBlob(img, 0.03, 0.03, 0.94, 0.94, 1400, true, 0.85);
+          const result = await Tesseract.recognize(labelCrop.dataUrl, 'vie+eng');
+          const text = result?.data?.text || '';
+          rawOcrText = text;
+          if (text) {
+            ocrParsed = parseShippingLabelText(text);
+          }
+        } catch (ocrErr) {
+          console.warn('Tesseract OCR error:', ocrErr);
+        }
+
+        const finalTrack = ocrParsed.track || decodedCode;
+        const finalOrderId = ocrParsed.orderId || '';
+
+        toast.classList.add('hidden');
+
+        if (finalTrack || finalOrderId) {
+          const codeToSend = finalTrack || finalOrderId;
+          
+          // Check local duplicate
+          const existingIdx = scanHistory.findIndex(entry => extractCleanTrackingCode(entry.code) === codeToSend);
+          if (existingIdx !== -1) {
+            const existing = scanHistory[existingIdx];
+            existing.status = 'duplicate';
+            existing.dupCount = (existing.dupCount || 1) + 1;
+            scanHistory.splice(existingIdx, 1);
+            scanHistory.unshift(existing);
+            saveScanHistory();
+            renderScanHistory();
+
+            triggerScanFeedback('duplicate', codeToSend, '🚨 MÃ ĐÃ BỊ TRÙNG!', `⚠️ Phiếu này đã quét trước đó (Trùng lần ${existing.dupCount})`, existing.orderNum);
+          } else {
+            triggerScanFeedback('success', codeToSend, '🟢 MÃ HỢP LỆ (ẢNH PHIẾU)', '📸 Đã gửi ảnh phiếu & đối soát', null);
+            scanHistory.unshift({
+              code: codeToSend,
+              time: Date.now(),
+              status: 'success',
+              orderNum: null,
+              dupCount: 0,
+              detail: '📸 Quét từ ảnh phiếu'
+            });
+            saveScanHistory();
+            renderScanHistory();
+          }
+
+          const subText = [
+            finalOrderId ? `Mã đơn: ${finalOrderId}` : '',
+            ocrParsed.shipDate ? `Ngày gửi: ${ocrParsed.shipDate}` : '',
+            '📸 Đã gửi kèm ảnh'
+          ].filter(Boolean).join(' • ');
+
+          sendPayloadToPc({
+            type: 'smart_label',
+            track: finalTrack,
+            orderId: finalOrderId,
+            product: ocrParsed.product || '',
+            color: ocrParsed.color || '',
+            size: ocrParsed.size || '',
+            shipDate: ocrParsed.shipDate || '',
+            qty: ocrParsed.qty || 1,
+            rawText: rawOcrText.slice(0, 1800),
+            photo: compressedPhoto.dataUrl,
+            time: Date.now()
+          }, codeToSend, subText);
+
+          setTimeout(() => {
+            sendPhotoPacket(compressedPhoto.dataUrl, codeToSend);
+          }, 80);
+        } else {
+          alert('⚠️ Không nhận diện được mã vạch trên ảnh, nhưng ĐÃ GỬI ẢNH CHỤP sang bảng Máy Tính!');
+          sendPhotoPacket(compressedPhoto.dataUrl, lastScannedRawCode);
+        }
+      } catch (err) {
+        toast.classList.add('hidden');
+        alert('Lỗi xử lý ảnh: ' + err);
+      }
+      e.target.value = '';
+    }
+
+    function handleMobilePhoto(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const MAX_W = 420;
+          let w = img.width, h = img.height;
+          if (w > MAX_W) { h = Math.round((h * MAX_W) / w); w = MAX_W; }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.50);
+          sendPhotoPacket(dataUrl, lastScannedRawCode);
+          triggerScanFeedback('success', lastScannedRawCode || 'ẢNH KIỆN HÀNG', '📸 ĐÃ GỬI ẢNH SANG MÁY TÍNH!', '✅ Đã đính kèm ảnh vào đơn trên máy tính');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+
+    async function loadWithFallback(primary, fallback) {
+      try {
+        await loadScript(primary);
+      } catch (e) {
+        if (fallback) await loadScript(fallback);
+      }
+    }
+
+    // Initialize application
+    loadScanHistory();
+    Promise.all([
+      loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js', 'https://unpkg.com/mqtt/dist/mqtt.min.js'),
+      loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js')
+    ]).then(() => {
+      initPhoneSync();
+      setTimeout(() => {
+        if (typeof Html5Qrcode !== 'undefined') {
+          startCameraScanner().catch(() => {});
+        }
+      }, 350);
+    }).catch(err => {
+      console.warn('Lib load warning:', err);
+      initPhoneSync();
+    });
+  </script>
+</body>
+</html>

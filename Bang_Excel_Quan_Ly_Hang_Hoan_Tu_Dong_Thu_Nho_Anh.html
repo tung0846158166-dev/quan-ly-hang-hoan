@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
@@ -136,9 +136,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <!-- Row 1: Shopee Orange Title Banner -->
     <div class="bg-[#ee4d2d] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 relative z-30">
       <div>
-        <h1 class="text-base sm:text-lg font-bold tracking-wide uppercase">
-          BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK (KHÓA MẬT KHẨU THEO TỪNG Ô)
-        </h1>
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-base sm:text-lg font-bold tracking-wide uppercase">
+            BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
+          </h1>
+          <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-2 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
+            🚀 Phiên bản v1.2.0
+          </span>
+        </div>
         <p class="text-xs text-orange-100 mt-0.5">
           🔒 <b>Khóa mật khẩu theo từng ô:</b> Nhấp <b>Chuột phải vào bất kỳ ô nào</b> để khóa/mở khóa riêng ô đó bằng mật khẩu! Các ô khác vẫn nhập bình thường.
         </p>
@@ -418,6 +423,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">Khôi phục về 5 đơn hàng mẫu ban đầu</p>
                 </div>
               </button>
+
+              <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-2 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
+                <span>ℹ️ Phiên bản ứng dụng:</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.0</span>
+              </div>
             </div>
           </div>
         </div>
@@ -435,12 +445,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <input
             id="searchInput"
             type="text"
-            oninput="renderAll()"
+            oninput="handleSearchInputDebounced()"
             placeholder="Nhập Mã đơn hàng, Mã vận đơn, Tên SP, Màu sắc hoặc Size..."
             class="flex-1 bg-[#fef9c3] border-2 border-[#ee4d2d] px-3 py-2 text-sm font-bold text-orange-900 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg"
           />
           <label class="ml-3 inline-flex items-center text-xs font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
-            <input id="chkFilterOnly" type="checkbox" onchange="renderAll()" class="w-4 h-4 mr-1.5 rounded text-orange-600 focus:ring-orange-500" />
+            <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-4 h-4 mr-1.5 rounded text-orange-600 focus:ring-orange-500" />
             Chỉ hiện đơn khớp
           </label>
         </div>
@@ -568,6 +578,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="yesterday">Hôm qua</option>
               <option value="7days">7 ngày gần nhất</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 6: Smooth Performance Pagination Bar (Tối ưu mượt mà khi có 500 - 2,000+ đơn hàng) -->
+      <div id="tablePaginationBar" class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
+        <div class="flex items-center gap-2 text-slate-600">
+          <span class="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+            <span>⚡ Chế độ Siêu Mượt</span>
+          </span>
+          <span id="paginationSummaryText" class="font-semibold text-slate-700">Đang hiển thị 0 - 0 / 0 đơn</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-slate-300">
+            <span class="text-[11px] font-semibold text-slate-600">Số đơn / trang:</span>
+            <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer py-0.5">
+              <option value="50">50 đơn (Nhanh nhất)</option>
+              <option value="100" selected>100 đơn (Mượt - Khuyên dùng)</option>
+              <option value="200">200 đơn / trang</option>
+              <option value="0">Tất cả đơn trên 1 trang</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition">
+              ◀ Trang trước
+            </button>
+            <span id="pageIndicatorText" class="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-bold text-[11px]">
+              Trang 1 / 1
+            </span>
+            <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition">
+              Trang sau ▶
+            </button>
           </div>
         </div>
       </div>
@@ -1050,8 +1092,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <div class="flex items-center justify-center gap-1.5 text-xs text-slate-600">
             <span class="font-bold text-[11px]">Máy chủ:</span>
             <select id="mobileServerSelect" onchange="changeMobileServer(this.value)" class="text-xs border border-sky-300 rounded px-1.5 py-0.5 bg-sky-50 font-bold text-sky-800 outline-none">
-              <option value="brewpage" selected>Máy chủ 1 (Nhanh)</option>
-              <option value="beacon">Máy chủ 2 (Dự phòng)</option>
+              <option value="github" selected>Máy chủ 1 (GitHub v1.2 - Mới nhất)</option>
+              <option value="brewpage">Máy chủ 2 (Brewpage)</option>
+              <option value="beacon">Máy chủ 3 (Beacon)</option>
             </select>
           </div>
           <div class="text-[11px] text-slate-600">
@@ -2870,6 +2913,71 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let currentRecvDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | '7days'
     let currentPlatformFilter = 'all'; // 'all' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'Khác'
     let currentDateSort = 'default'; // 'default' | 'shipDate_desc' | 'shipDate_asc' | 'returnDate_desc' | 'returnDate_asc' | 'recvDate_desc' | 'recvDate_asc'
+    let currentPage = 1;
+    let pageSize = 100; // 100 đơn / trang giúp bảng siêu mượt kể cả khi có hàng nghìn đơn
+    let totalFilteredPages = 1;
+    let searchDebounceTimer = null;
+    let cellEditSaveTimer = null;
+    const APP_VERSION_NUMBER = '1.2.0';
+
+    function handleSearchInputDebounced() {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        currentPage = 1;
+        renderAll();
+      }, 120);
+    }
+
+    function scheduleSaveAndRecalc() {
+      if (cellEditSaveTimer) clearTimeout(cellEditSaveTimer);
+      cellEditSaveTimer = setTimeout(() => {
+        saveOrders();
+        recalcTotalsAndSummary(true);
+      }, 250);
+    }
+
+    function changePageSize(newVal) {
+      pageSize = parseInt(newVal, 10) || 0;
+      currentPage = 1;
+      renderAll();
+    }
+
+    function changeTablePage(delta) {
+      const next = currentPage + delta;
+      if (next < 1 || next > totalFilteredPages) return;
+      currentPage = next;
+      renderAll();
+      const scrollBox = document.getElementById('mainTableScrollContainer');
+      if (scrollBox) scrollBox.scrollTop = 0;
+    }
+
+    function showVersionInfoToast() {
+      const verBadge = document.getElementById('appVersionBadge');
+      const curVer = verBadge ? verBadge.textContent.replace('🚀 Phiên bản ', '').trim() : ('v' + APP_VERSION_NUMBER);
+      alert(
+        `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
+        `✨ Điểm mới trong phiên bản ${curVer}:\n` +
+        `1. Khắc phục triệt để lỗi bấm nút Khóa / Mở khóa / Xóa đơn / Khôi phục mẫu không phản hồi.\n` +
+        `2. Chế độ Phân Trang Siêu Mượt (100 đơn/trang) & chống giật lag khi gõ tìm kiếm hoặc sửa ô trên danh sách 500 - 2.000+ đơn.\n` +
+        `3. Hiển thị rõ phiên bản phần mềm ngay trên thanh tiêu đề & menu Tiện Ích.\n` +
+        `4. Nâng cấp truyền ảnh chụp tự động từ Điện Thoại (chia gói nhỏ vượt giới hạn 4KB + lưu thẳng ảnh vào ổ cứng máy tính) đảm bảo quét đơn nào cũng có ảnh 100%.`
+      );
+    }
+
+    async function syncAppVersionUI() {
+      let ver = APP_VERSION_NUMBER;
+      try {
+        if (window.desktopDiskAPI && typeof window.desktopDiskAPI.getAppVersion === 'function') {
+          const v = await window.desktopDiskAPI.getAppVersion();
+          if (v) ver = v;
+        }
+      } catch (e) {}
+      const badge = document.getElementById('appVersionBadge');
+      if (badge) badge.textContent = '🚀 Phiên bản v' + ver;
+      const menuVer = document.getElementById('menuVersionText');
+      if (menuVer) menuVer.textContent = 'v' + ver;
+      document.title = `Bảng Quản Lý & Đối Soát Hàng Hoàn Shopee / TikTok (v${ver})`;
+    }
 
     function getOrderPlatform(order) {
       if (!order) return 'Shopee';
@@ -2896,6 +3004,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setPlatformFilter(filterVal) {
       currentPlatformFilter = filterVal;
+      currentPage = 1;
       renderAll();
       recalcTotalsAndSummary();
     }
@@ -2983,6 +3092,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setPipelineFilter(tab) {
       currentFilterTab = tab;
+      currentPage = 1;
       document.querySelectorAll('#pipelineTabs button').forEach(b => {
         b.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 border ' +
           'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100';
@@ -3000,6 +3110,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setRecvDateFilter(filterVal) {
       currentRecvDateFilter = filterVal;
+      currentPage = 1;
       renderAll();
     }
 
@@ -3011,11 +3122,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         currentDateSort = `${field}_desc`;
       }
+      currentPage = 1;
       renderAll();
     }
 
     function resetDateSort() {
       currentDateSort = 'default';
+      currentPage = 1;
       const chk = document.getElementById('chkOnlyWithDate');
       if (chk) chk.checked = false;
       renderAll();
@@ -3349,7 +3462,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         addAuditLog('⚠️ CẢNH BÁO', 'Có người nhập sai mật khẩu khi cố mở Nhật Ký Bảo Mật');
         alert('❌ Mật khẩu không đúng! Mật khẩu mặc định là 123456.');
         return;
-      }
       }
       const tbody = document.getElementById('auditLogTableBody');
       if (tbody) {
@@ -4089,7 +4201,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function saveOrders() {
       try {
-        // Tách ảnh nặng (Base64) lưu vào IndexedDB, chỉ lưu dữ liệu nhẹ vào localStorage để chống tràn 5MB
+        // 1. Tách ảnh nặng (Base64) lưu vào IndexedDB, chỉ lưu dữ liệu nhẹ vào localStorage để chống tràn 5MB
         const leanOrders = orders.map(o => {
           if (o.photo && o.photo.length > 200) {
             if (!o.photoId) {
@@ -4104,9 +4216,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(leanOrders));
 
-        // Lưu trực tiếp vào file vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan\du_lieu_hang_hoan.json)
+        // 2. Lưu trực tiếp vào file vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan\du_lieu_hang_hoan.json)
+        // Kèm đầy đủ hình ảnh chụp từ điện thoại để lưu trữ vĩnh viễn trên ổ cứng!
         if (window.desktopDiskAPI && typeof window.desktopDiskAPI.saveToDisk === 'function') {
-          window.desktopDiskAPI.saveToDisk(leanOrders).then(res => {
+          const diskOrders = orders.map(o => {
+            const fullPhoto = o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '';
+            if (fullPhoto && fullPhoto !== o.photo) {
+              return Object.assign({}, o, { photo: fullPhoto });
+            }
+            return o;
+          });
+          window.desktopDiskAPI.saveToDisk(diskOrders).then(res => {
             if (res && res.success) {
               updateDiskNoticeStatus(true, res.time);
             }
@@ -4169,7 +4289,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
           orders = res.data;
           orders.forEach(o => {
-            if (!o.photo && o.photoId && photoMemoryCache.has(o.photoId)) {
+            if (o.photo && o.photo.length > 200) {
+              if (!o.photoId) {
+                o.photoId = 'p_' + (o.track || o.orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+              }
+              photoMemoryCache.set(o.photoId, o.photo);
+              savePhotoToDb(o.photoId, o.photo);
+            } else if (!o.photo && o.photoId && photoMemoryCache.has(o.photoId)) {
               o.photo = photoMemoryCache.get(o.photoId);
             }
           });
@@ -4252,8 +4378,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         orders[orderIdx][field] = val;
       }
-      saveOrders();
-      recalcTotalsAndSummary();
+      scheduleSaveAndRecalc();
     }
 
     function updateItemField(orderIdx, itemIdx, field, val) {
@@ -4299,8 +4424,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         orders[orderIdx].items[itemIdx][field] = val;
       }
-      saveOrders();
-      recalcTotalsAndSummary();
+      scheduleSaveAndRecalc();
     }
 
     function updateStatus(orderIdx, selectEl) {
@@ -4694,7 +4818,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return true;
       });
 
-      // 2. Sort entries if currentDateSort is active
+        // 2. Sort entries if currentDateSort is active
       if (currentDateSort !== 'default') {
         const parts = currentDateSort.split('_');
         const sortField = parts[0];
@@ -4717,8 +4841,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
       }
 
+      // 3. Pagination slice for smooth 60fps rendering on 500 - 2,000+ orders
+      const totalFiltered = filteredEntries.length;
+      const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalFiltered, 1);
+      totalFilteredPages = Math.max(1, Math.ceil(totalFiltered / effectivePageSize));
+      if (currentPage > totalFilteredPages) currentPage = totalFilteredPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const startIdx = pageSize > 0 ? (currentPage - 1) * pageSize : 0;
+      const endIdx = pageSize > 0 ? Math.min(startIdx + pageSize, totalFiltered) : totalFiltered;
+      const pageEntries = filteredEntries.slice(startIdx, endIdx);
+
+      // Update pagination bar UI
+      const sumEl = document.getElementById('paginationSummaryText');
+      if (sumEl) {
+        if (totalFiltered === 0) {
+          sumEl.textContent = 'Không có đơn hàng nào khớp bộ lọc';
+        } else {
+          sumEl.textContent = `Đang hiển thị đơn ${startIdx + 1} - ${endIdx} / Tổng ${totalFiltered} đơn`;
+        }
+      }
+      const pageIndEl = document.getElementById('pageIndicatorText');
+      if (pageIndEl) pageIndEl.textContent = `Trang ${currentPage} / ${totalFilteredPages}`;
+      const prevBtn = document.getElementById('btnPrevPage');
+      if (prevBtn) prevBtn.disabled = (currentPage <= 1);
+      const nextBtn = document.getElementById('btnNextPage');
+      if (nextBtn) nextBtn.disabled = (currentPage >= totalFilteredPages);
+
       let html = '';
-      filteredEntries.forEach(({ order, originalIndex: orderIdx }, displayIdx) => {
+      pageEntries.forEach(({ order, originalIndex: orderIdx }, pageLocalIdx) => {
+        const displayIdx = startIdx + pageLocalIdx;
         const matched = isOrderMatch(order, kw);
         const span = order.items.length;
         const rowBgClass = matched ? 'row-match' : 'hover:bg-slate-50/70';
@@ -4757,8 +4909,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                       class="flex items-center justify-center gap-1 px-1.5 py-1 bg-slate-100 rounded cursor-pointer font-semibold text-slate-800">
                    <span>${escapeAttr(curCarrier)}</span>
                    <span class="text-[11px] text-rose-600">🔒</span>
-                 </div>
-  </div>`
+                 </div>`
               : `<select id="carrierSelect_${orderIdx}"
                          class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded px-1 py-0.5 text-[11px] font-semibold text-slate-800 text-center cursor-pointer outline-none focus:ring-1 focus:ring-blue-500 transition h-6.5"
                          title="Tự động nhận diện theo Mã vận đơn — Hoặc bấm vào mũi tên để đổi ĐVVC theo ý muốn"
@@ -4832,7 +4983,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 ${itemBadge}
                 <div class="flex-1">${renderCellInput(`${orderIdx}:${itemIdx}:product`, `Tên SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.product, 'font-medium text-slate-900', 'Gõ hoặc bấm để chọn SP...', `updateItemField(${orderIdx},${itemIdx},'product',this.value);showSmartSuggest(this,'product',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'product',${orderIdx},${itemIdx})`)}</div>
               </div>
-  </div>
             </td>
             <td>${renderCellInput(`${orderIdx}:${itemIdx}:color`, `Màu SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.color, 'text-center', 'Màu...', `updateItemField(${orderIdx},${itemIdx},'color',this.value);showSmartSuggest(this,'color',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'color',${orderIdx},${itemIdx})`)}</td>
             <td>${renderCellInput(`${orderIdx}:${itemIdx}:size`, `Size SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.size, 'text-center font-semibold', 'Size...', `updateItemField(${orderIdx},${itemIdx},'size',this.value);showSmartSuggest(this,'size',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'size',${orderIdx},${itemIdx})`)}</td>
@@ -4850,7 +5000,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   </button>
                 ` : ''}
               </div>
-  </div>
             </td>
           `;
 
@@ -4863,8 +5012,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                       class="status-select ${statusClass} flex items-center justify-center gap-1 cursor-pointer">
                    <span>${order.status === 'Hàng đã trả' ? '🟢 Hàng đã trả' : order.status === 'Bị mất' ? '🔴 Bị mất' : '🟡 Chưa trả'}</span>
                    <span class="text-xs">🔒</span>
-                 </div>
-  </div>`
+                 </div>`
               : `<select class="status-select ${statusClass}"
                          title="Nhấp Chuột phải vào ô này để khóa mật khẩu riêng ô Trạng thái này"
                          oncontextmenu="handleCellContextMenu(event,'${orderIdx}:status','Trạng thái Đơn #${orderIdx+1}')"
@@ -4879,13 +5027,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <td rowspan="${span}">${statusHtml}</td>
               <td rowspan="${span}" class="text-center">
                 <div tabindex="0"
+                  id="photoBoxOrder_${orderIdx}"
                   class="photo-box"
                   onclick="handlePhotoBoxClick(${orderIdx})"
                   ondblclick="handlePhotoBoxDblClick(${orderIdx})"
                   onfocus="activePhotoOrderIndex=${orderIdx}">
                   ${photoInner}
                 </div>
-  </div>
               </td>
               <td rowspan="${span}">${renderCellInput(`${orderIdx}:note`, `Ghi chú Đơn #${orderIdx+1}`, order.note, 'text-slate-700', 'Ghi chú kiểm hàng...', `updateOrderField(${orderIdx},'note',this.value)`)}</td>
               <td rowspan="${span}" class="text-center no-print">
@@ -4893,7 +5041,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   <button onclick="duplicateOrder(${orderIdx})" class="text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 font-bold px-1 py-0.5 rounded text-xs" title="Nhân bản nhanh đơn này (Giữ nguyên Sản phẩm, Màu, Size, Giá trị)">📋</button>
                   <button onclick="deleteOrder(${orderIdx})" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 font-bold px-1 py-0.5 rounded text-xs" title="Xóa toàn bộ đơn hàng này">🗑</button>
                 </div>
-  </div>
               </td>
             `;
           }
@@ -6352,15 +6499,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {}
     }
 
-    let selectedMobileServer = 'brewpage';
+    let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
+      github: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html',
       brewpage: 'https://my-uywwt16q64.brewpage.app/',
       beacon: 'https://hinged-butte-86.beacon.host/',
       short: 'https://is.gd/vOTcdJ'
     };
 
     function buildPhoneScannerLink(roomCode) {
-      const base = MOBILE_SERVERS[selectedMobileServer] || MOBILE_SERVERS.brewpage;
+      const base = MOBILE_SERVERS[selectedMobileServer] || MOBILE_SERVERS.github;
       return base + '#' + encodeURIComponent(roomCode);
     }
 
@@ -6374,7 +6522,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const linkTag = document.getElementById('phoneShortLinkTag');
       if (linkTag) {
         linkTag.href = link;
-        linkTag.textContent = selectedMobileServer === 'beacon' ? 'hinged-butte-86.beacon.host' : 'is.gd/vOTcdJ';
+        linkTag.textContent = selectedMobileServer === 'github' ? 'Mở Máy Quét v1.2 (Bấm vào đây)' : (selectedMobileServer === 'beacon' ? 'hinged-butte-86.beacon.host' : 'is.gd/vOTcdJ');
       }
 
       // 1. Uu tien tao ma QR Vector SVG Offline noi bo (100% offline, chay muot tren Cloud/Sandbox/Chan anh mang)
@@ -6566,10 +6714,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           updatePhoneConnectionUI(false, 'Kênh ' + phoneRoomId + ' đã sẵn sàng! Đang đợi ĐT quét...');
         };
 
-        phoneEventSource.onmessage = (event) => {
+        phoneEventSource.onmessage = async (event) => {
           try {
             const wrapper = JSON.parse(event.data);
-            if (!wrapper || !wrapper.message) return;
+            if (!wrapper) return;
+
+            // Trường hợp gói tin > 4KB bị ntfy.sh chuyển thành file attachment (fallback tự động tải về)
+            if (wrapper.attachment && wrapper.attachment.url) {
+              try {
+                const attRes = await fetch(wrapper.attachment.url);
+                if (attRes.ok) {
+                  const attText = await attRes.text();
+                  const attData = JSON.parse(attText);
+                  if (attData && attData.type !== 'pc_ack') {
+                    processIncomingPhonePayload(attData);
+                    return;
+                  }
+                }
+              } catch (attErr) {
+                console.warn('Attachment fetch fallback error:', attErr);
+              }
+            }
+
+            if (!wrapper.message) return;
             let rawMsg = String(wrapper.message).trim();
             if (!rawMsg) return;
 
@@ -6627,9 +6794,96 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     let lastMsgTimestamp = 0;
+    const incomingPhotoChunks = new Map();
+    const pendingPhotosByCode = new Map();
+
+    function attachPhotoToOrderByCode(rawCode, photoDataUrl) {
+      if (!photoDataUrl || typeof photoDataUrl !== 'string' || !photoDataUrl.startsWith('data:image')) return false;
+      const cleanCode = rawCode ? (extractCleanTrackingCode(rawCode) || String(rawCode).trim().toUpperCase()) : '';
+      if (cleanCode) {
+        pendingPhotosByCode.set(cleanCode, photoDataUrl);
+      }
+
+      let targetIdx = -1;
+      if (cleanCode) {
+        targetIdx = orders.findIndex(o => {
+          const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
+          const oid = String(o.orderId || '').trim().toUpperCase();
+          return (tr && tr === cleanCode) || (oid && oid === cleanCode);
+        });
+      }
+      if (targetIdx === -1 && activePhotoOrderIndex !== null && orders[activePhotoOrderIndex]) {
+        // Chỉ fallback sang dòng đang chọn nếu không có mã hoặc dòng đang chọn vừa mới quét mã này
+        if (!cleanCode || extractCleanTrackingCode(orders[activePhotoOrderIndex].track) === cleanCode) {
+          targetIdx = activePhotoOrderIndex;
+        }
+      }
+
+      if (targetIdx >= 0 && orders[targetIdx]) {
+        orders[targetIdx].photo = photoDataUrl;
+        if (!orders[targetIdx].photoId) {
+          orders[targetIdx].photoId = 'p_' + (orders[targetIdx].track || orders[targetIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+        }
+        savePhotoToDb(orders[targetIdx].photoId, photoDataUrl);
+        saveOrders();
+
+        // Cập nhật trực tiếp ô ảnh trên bảng ngay lập tức (không cần đợi render lại toàn bộ)
+        const photoBox = document.getElementById('photoBoxOrder_' + targetIdx);
+        if (photoBox) {
+          photoBox.innerHTML = `<img src="${photoDataUrl}" alt="Ảnh đơn" title="Bấm để phóng to / Ctrl+V để thay ảnh" class="w-full h-full object-cover" />
+             <div class="photo-overlay absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+               <span class="text-white text-[10px]" title="Phóng to">🔍</span>
+               <button type="button" onclick="event.stopPropagation(); triggerPcOcrForOrder(${targetIdx})" class="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow" title="Đọc chữ từ ảnh tem này">⚡</button>
+             </div>`;
+        } else {
+          renderAll();
+        }
+        appendPhoneLiveLog(`📸 Đã lưu ảnh tự chụp kiện hàng vào Đơn #${targetIdx + 1} (${cleanCode || orders[targetIdx].track || ''})`);
+        return true;
+      }
+      return false;
+    }
+
+    function handleIncomingPhotoChunk(data) {
+      if (!data || !data.photoId || typeof data.idx !== 'number' || !data.total) return;
+      let entry = incomingPhotoChunks.get(data.photoId);
+      if (!entry) {
+        entry = {
+          code: data.code || '',
+          total: Number(data.total) || 1,
+          parts: new Array(Number(data.total) || 1).fill(null),
+          received: 0,
+          createdAt: Date.now()
+        };
+        incomingPhotoChunks.set(data.photoId, entry);
+      }
+      if (data.code && !entry.code) entry.code = data.code;
+      if (data.idx >= 0 && data.idx < entry.total && entry.parts[data.idx] === null) {
+        entry.parts[data.idx] = data.chunk || '';
+        entry.received++;
+      }
+      if (entry.received >= entry.total) {
+        const fullDataUrl = entry.parts.join('');
+        incomingPhotoChunks.delete(data.photoId);
+        if (fullDataUrl.startsWith('data:image')) {
+          attachPhotoToOrderByCode(entry.code, fullDataUrl);
+        }
+      }
+      // Dọn dẹp các mảnh quá 60 giây
+      const now = Date.now();
+      incomingPhotoChunks.forEach((val, key) => {
+        if (now - val.createdAt > 60000) incomingPhotoChunks.delete(key);
+      });
+    }
+
     function processIncomingPhonePayload(data) {
       if (!data) return;
-      if (data.time && data.time === lastMsgTimestamp && data.type !== 'photo') return;
+      if (data.type === 'photo_chunk') {
+        handleIncomingPhotoChunk(data);
+        return;
+      }
+      // Không chặn gói tin có mang theo ảnh nếu gói trước đó chưa có ảnh!
+      if (data.time && data.time === lastMsgTimestamp && data.type !== 'photo' && !data.photo) return;
       if (data.time) lastMsgTimestamp = data.time;
 
       if (data.room && data.room !== phoneRoomId) {
@@ -6648,7 +6902,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else if (data.type === 'smart_label') {
         handleIncomingSmartLabel(data);
       } else if (data.type === 'photo' && data.photo) {
-        handleIncomingPhonePhoto(data.photo, data.lastCode);
+        handleIncomingPhonePhoto(data.photo, data.lastCode || data.code || '');
       }
     }
 
@@ -6666,8 +6920,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!rawCode) return;
       const cleanCode = extractCleanTrackingCode(rawCode);
       if (!cleanCode) return;
+
+      // Nếu chưa có photoDataUrl trong gói barcode này nhưng gói ảnh của mã này đã tới trước đó vài mili-giây:
+      if (!photoDataUrl && pendingPhotosByCode.has(cleanCode)) {
+        photoDataUrl = pendingPhotosByCode.get(cleanCode);
+      } else if (photoDataUrl) {
+        pendingPhotosByCode.set(cleanCode, photoDataUrl);
+      }
+
       const now = Date.now();
-      if (cleanCode === lastScannedCode && now - lastScannedTime < 2000) return;
+      if (cleanCode === lastScannedCode && now - lastScannedTime < 2000) {
+        // Quan trọng: Nếu gói đầu tiên đến qua ntfy.sh (không kèm ảnh để siêu nhanh), và gói thứ 2 đến qua MQTT (có kèm ảnh chụp),
+        // thì VẪN PHẢI gắn ảnh chụp vào đơn hàng trước khi return!
+        if (photoDataUrl) {
+          attachPhotoToOrderByCode(cleanCode, photoDataUrl);
+        }
+        return;
+      }
       lastScannedCode = cleanCode;
       lastScannedTime = now;
 
@@ -6681,17 +6950,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const autoCarrier = detectCarrierByTrackingCode(cleanCode) || 'SPX Express';
 
       // Check if order with this tracking code or orderId already exists in table
-      const existingIdx = orders.findIndex(
-        o => (o.track && String(o.track).trim().toUpperCase() === cleanCode) ||
-             (o.orderId && String(o.orderId).trim().toUpperCase() === cleanCode)
-      );
+      const existingIdx = orders.findIndex(o => {
+        const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
+        const oid = String(o.orderId || '').trim().toUpperCase();
+        return (tr && tr === cleanCode) || (oid && oid === cleanCode);
+      });
 
       if (mode === 'smart_auto' && existingIdx !== -1) {
         const order = orders[existingIdx];
         const wasAlreadyReturned = (order.status === 'Hàng đã trả');
 
+        // Dù đơn đã quét trả trước đó hay mới quét lần đầu, nếu điện thoại gửi ảnh chụp lên mà đơn chưa có ảnh (hoặc vừa chụp lại) thì vẫn lưu ảnh!
+        if (photoDataUrl) {
+          orders[existingIdx].photo = photoDataUrl;
+          if (!orders[existingIdx].photoId) {
+            orders[existingIdx].photoId = 'p_' + (orders[existingIdx].track || orders[existingIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+          }
+          savePhotoToDb(orders[existingIdx].photoId, photoDataUrl);
+        }
+
         if (wasAlreadyReturned) {
           // ALREADY RETURNED! Duplicate scan
+          if (photoDataUrl) {
+            saveOrders();
+            renderAll();
+          }
           addAuditLog('⚠️ QUÉT ĐT TRÙNG LẶP', `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} ĐÃ TRẢ từ trước!`);
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
           playBeepSound(350, 260);
@@ -6712,13 +6995,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           orders[existingIdx].carrier = autoCarrier;
         }
         activePhotoOrderIndex = existingIdx;
-        if (photoDataUrl && !orders[existingIdx].photo) {
-          orders[existingIdx].photo = photoDataUrl;
-          if (!orders[existingIdx].photoId) {
-            orders[existingIdx].photoId = 'p_' + (orders[existingIdx].track || orders[existingIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
-          }
-          savePhotoToDb(orders[existingIdx].photoId, photoDataUrl);
-        }
         addAuditLog('📱 QUÉT ĐT ĐỐI SOÁT', `Quét mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} tự động khớp thông tin & chuyển sang [🟢 Hàng đã trả]`);
         appendPhoneLiveLog(`✅ Khớp Đơn #${existingIdx + 1} (${cleanCode}) ➔ [🟢 Hàng đã trả]`);
         playBeepSound(1480, 160);
@@ -6734,7 +7010,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (autoCarrier) orders[targetIdx].carrier = autoCarrier;
         orders[targetIdx].status = 'Hàng đã trả';
         if (!orders[targetIdx].recvDate) orders[targetIdx].recvDate = getNowDateTimeString();
-        if (photoDataUrl && !orders[targetIdx].photo) {
+        if (photoDataUrl) {
           orders[targetIdx].photo = photoDataUrl;
           if (!orders[targetIdx].photoId) {
             orders[targetIdx].photoId = 'p_' + (orders[targetIdx].track || orders[targetIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
@@ -6923,7 +7199,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (rawTrack && !orders[existingIdx].track) orders[existingIdx].track = rawTrack;
         if (rawOrderId && !orders[existingIdx].orderId) orders[existingIdx].orderId = rawOrderId;
         if (data.shipDate && !orders[existingIdx].shipDate) orders[existingIdx].shipDate = data.shipDate;
-        if (data.photo) orders[existingIdx].photo = data.photo;
+        const labelPhoto = data.photo || (rawTrack && pendingPhotosByCode.get(rawTrack)) || (rawOrderId && pendingPhotosByCode.get(rawOrderId)) || '';
+        if (labelPhoto) {
+          orders[existingIdx].photo = labelPhoto;
+          if (!orders[existingIdx].photoId) {
+            orders[existingIdx].photoId = 'p_' + (orders[existingIdx].track || orders[existingIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+          }
+          savePhotoToDb(orders[existingIdx].photoId, labelPhoto);
+        }
         activePhotoOrderIndex = existingIdx;
         applyLabelInfoToOrder(orders[existingIdx], info);
         addAuditLog('📱 QUÉT PHIẾU ĐỐI SOÁT', `Quét phiếu [${rawTrack || rawOrderId}] ➔ Đơn #${existingIdx + 1} chuyển sang [🟢 Hàng đã trả] kèm ảnh`);
@@ -6942,30 +7225,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function handleIncomingPhonePhoto(photoDataUrl, relatedCode) {
-      playBeepSound(980, 150);
-      let targetIdx = activePhotoOrderIndex;
-      if (relatedCode) {
-        const foundIdx = orders.findIndex(o => String(o.track || '').trim().toUpperCase() === String(relatedCode).trim().toUpperCase());
-        if (foundIdx !== -1) targetIdx = foundIdx;
-      }
-      if (targetIdx === null || !orders[targetIdx]) {
-        targetIdx = orders.length - 1;
-      }
-      if (targetIdx >= 0 && orders[targetIdx]) {
-        if (!orders[targetIdx].photo) {
-          orders[targetIdx].photo = photoDataUrl;
-          if (!orders[targetIdx].photoId) {
-            orders[targetIdx].photoId = 'p_' + (orders[targetIdx].track || orders[targetIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
-          }
-          savePhotoToDb(orders[targetIdx].photoId, photoDataUrl);
-          addAuditLog('📸 ẢNH TỪ ĐIỆN THOẠI', `Đã nhận ảnh chụp kiện hàng cho Đơn #${targetIdx + 1}`);
-          appendPhoneLiveLog(`📸 Đã gắn ảnh chụp kiện hàng vào Đơn #${targetIdx + 1}`);
-          saveOrders();
-          renderAll();
-        } else {
-          console.log(`Đơn #${targetIdx + 1} đã có ảnh chụp từ trước, bỏ qua không ghi đè.`);
-        }
-      }
+      if (!photoDataUrl) return;
+      playBeepSound(980, 120);
+      attachPhotoToOrderByCode(relatedCode, photoDataUrl);
     }
 
     async function openPhoneScannerModal() {
@@ -7027,6 +7289,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     } finally {
       renderAll();
       try {
+        syncAppVersionUI();
         checkAndSyncHardDriveOnBoot();
         updateAutoStartUI();
       } catch (diskErr) {

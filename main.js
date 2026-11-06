@@ -64,9 +64,10 @@ function createTray() {
 
   function updateTrayMenu() {
     const isAuto = getAutoStart();
+    const appVer = app.getVersion();
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: '📦 Mở Quản Lý Hàng Hoàn',
+        label: `📦 Mở Quản Lý Hàng Hoàn (v${appVer})`,
         click: () => {
           if (mainWindow) {
             mainWindow.show();
@@ -131,20 +132,22 @@ function createTray() {
 const isHiddenStartup = process.argv.includes('--hidden');
 
 function createWindow() {
+  const appVer = app.getVersion();
   mainWindow = new BrowserWindow({
     width: 1450,
     height: 920,
     minWidth: 1024,
     minHeight: 700,
     show: !isHiddenStartup,
-    title: 'Quản Lý & Đối Soát Hàng Hoàn Shopee / TikTok Shop',
+    title: `Quản Lý & Đối Soát Hàng Hoàn Shopee / TikTok Shop (v${appVer})`,
     icon: path.join(__dirname, 'app_icon.ico'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false
     }
   });
 
@@ -255,6 +258,10 @@ ipcMain.handle('get-autostart-status', () => {
 ipcMain.handle('set-autostart-status', (event, enabled) => {
   setAutoStart(enabled);
   return { openAtLogin: getAutoStart() };
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 app.whenReady().then(() => {

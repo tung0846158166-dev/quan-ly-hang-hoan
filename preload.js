@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   backupToCustomFolder: (data) => ipcRenderer.invoke('backup-to-custom-folder', data),
   sendNotification: (title, body) => ipcRenderer.invoke('send-desktop-notification', { title, body }),
   getAutoStart: () => ipcRenderer.invoke('get-autostart-status'),
-  setAutoStart: (enabled) => ipcRenderer.invoke('set-autostart-status', enabled)
+  setAutoStart: (enabled) => ipcRenderer.invoke('set-autostart-status', enabled),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

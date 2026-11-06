@@ -161,6 +161,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>Quét Bằng ĐT</span>
         </button>
 
+        <!-- Badge thông báo lưu trữ ổ cứng máy tính (Hiện khi chạy trong App Desktop) -->
+        <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
+              class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1.5 rounded-lg cursor-pointer transition shadow-2xs"
+              title="Bấm để mở thư mục chứa file dữ liệu vật lý trên ổ cứng máy tính của bạn">
+          <span>💾 Lưu ổ cứng: Documents\QuanLyHangHoan</span>
+          <span class="text-xs">📁</span>
+        </span>
+
         <!-- Menu Dropdown 1: Nhập Dữ Liệu -->
         <div class="relative inline-block text-left header-dropdown-container">
           <button
@@ -352,6 +360,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Đổi Mật Khẩu Quản Trị</div>
                   <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Đổi mật khẩu bảo vệ bảng của Chủ Shop</p>
+                </div>
+              </button>
+
+              <button
+                onclick="closeAllHeaderMenus(); openHardDriveDataFolder();"
+                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+              >
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 font-bold text-sm">
+                  📁
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Thư Mục Dữ Liệu Ổ Cứng</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Mở vị trí lưu file dữ liệu vật lý (Documents\QuanLyHangHoan)</p>
+                </div>
+              </button>
+
+              <button
+                onclick="closeAllHeaderMenus(); backupHardDriveData();"
+                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-sky-50 transition group cursor-pointer"
+              >
+                <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-200 font-bold text-sm">
+                  💾
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-sky-600">Sao Lưu Ra Ổ Cứng Khác</div>
+                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Lưu bản sao lưu dự phòng vào USB hoặc ổ D, E</p>
                 </div>
               </button>
 
@@ -3899,10 +3933,87 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return o;
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(leanOrders));
+
+        // Lưu trực tiếp vào file vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan\du_lieu_hang_hoan.json)
+        if (window.desktopDiskAPI && typeof window.desktopDiskAPI.saveToDisk === 'function') {
+          window.desktopDiskAPI.saveToDisk(leanOrders).then(res => {
+            if (res && res.success) {
+              updateDiskNoticeStatus(true, res.time);
+            }
+          }).catch(err => {
+            console.warn('Lỗi ghi file ổ cứng:', err);
+          });
+        }
       } catch (e) {
         console.warn('Storage warning:', e);
       }
       markUnsavedToFile();
+    }
+
+    function openHardDriveDataFolder() {
+      if (window.desktopDiskAPI && typeof window.desktopDiskAPI.openDataFolder === 'function') {
+        window.desktopDiskAPI.openDataFolder();
+      } else {
+        alert("Bạn đang mở file qua trình duyệt web.\nKhi sử dụng bản ứng dụng máy tính (.exe), tính năng này sẽ tự động mở thư mục dữ liệu trên ổ cứng tại:\nDocuments\\QuanLyHangHoan\\du_lieu_hang_hoan.json");
+      }
+    }
+
+    function backupHardDriveData() {
+      if (window.desktopDiskAPI && typeof window.desktopDiskAPI.backupToCustomFolder === 'function') {
+        window.desktopDiskAPI.backupToCustomFolder(orders).then(res => {
+          if (res && res.success) {
+            alert("Đã lưu bản sao lưu thành công vào ổ cứng tại:\n" + res.path);
+          }
+        }).catch(err => {
+          console.error("Lỗi sao lưu:", err);
+        });
+      } else {
+        exportJsonFile();
+      }
+    }
+
+    function updateDiskNoticeStatus(saved, timeStr) {
+      const badge = document.getElementById('diskSaveNotice');
+      if (!badge) return;
+      if (window.desktopDiskAPI && window.desktopDiskAPI.isDesktopApp) {
+        badge.classList.remove('hidden');
+        badge.classList.add('inline-flex');
+        const count = (orders && orders.length) ? orders.length : 0;
+        badge.innerHTML = `<span>💾 Đã lưu ổ cứng (${count} đơn${timeStr ? ' lúc ' + timeStr : ''}): Documents\\QuanLyHangHoan</span> <span class="text-xs">📁</span>`;
+        badge.className = "inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2.5 py-1.5 rounded-lg cursor-pointer transition shadow-2xs";
+      } else {
+        badge.classList.remove('hidden');
+        badge.classList.add('inline-flex');
+        const count = (orders && orders.length) ? orders.length : 0;
+        badge.innerHTML = `<span>💾 Trình duyệt (${count} đơn): Lưu tự động</span>`;
+      }
+    }
+
+    async function checkAndSyncHardDriveOnBoot() {
+      if (!window.desktopDiskAPI || typeof window.desktopDiskAPI.loadFromDisk !== 'function') {
+        updateDiskNoticeStatus(false);
+        return;
+      }
+      try {
+        const res = await window.desktopDiskAPI.loadFromDisk();
+        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+          orders = res.data;
+          orders.forEach(o => {
+            if (!o.photo && o.photoId && photoMemoryCache.has(o.photoId)) {
+              o.photo = photoMemoryCache.get(o.photoId);
+            }
+          });
+          sanitizeNumericColorCodes();
+          renderAll();
+          updateDiskNoticeStatus(true);
+          console.log("Đã nạp thành công dữ liệu từ ổ cứng máy tính:", res.path, "Số đơn:", orders.length);
+        } else {
+          saveOrders();
+          updateDiskNoticeStatus(true);
+        }
+      } catch (err) {
+        console.warn("Lỗi đồng bộ ổ cứng khi khởi động:", err);
+      }
     }
 
     function formatMoney(n) {
@@ -6672,6 +6783,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       console.warn('Initialization warning:', bootErr);
     } finally {
       renderAll();
+      try {
+        checkAndSyncHardDriveOnBoot();
+      } catch (diskErr) {
+        console.warn('Hard drive boot sync warning:', diskErr);
+      }
       loadAllPhotosIntoMemory().then(() => {
         let reRenderNeeded = false;
         orders.forEach(o => {

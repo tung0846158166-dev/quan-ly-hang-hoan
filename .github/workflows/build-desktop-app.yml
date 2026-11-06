@@ -34,7 +34,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer
+          name: QuanLyHangHoan-Windows-Installer-v1.1.0
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -43,23 +43,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.0.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.0.0 (Windows Installer Setup)"
+          tag_name: v1.1.0
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.1.0 (Chạy Nền & Tự Khởi Động)"
           body: |
-            ### 🎉 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok Cho Máy Tính
+            ### 🎉 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.1.0
 
             - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok
             - **Định dạng**: Bộ cài đặt chuẩn Windows (.exe setup wizard)
-            - **Tính năng nổi bật**:
-              - Trình cài đặt tự động tạo biểu tượng ngoài màn hình Desktop và Start Menu.
-              - **Lưu trữ dữ liệu an toàn trên ổ cứng máy tính**: Tự động lưu và đồng bộ toàn bộ đơn hàng vào file `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`.
-              - Không bao giờ bị mất đơn khi đóng ứng dụng hay dọn dẹp trình duyệt.
-              - Tích hợp nút mở trực tiếp thư mục dữ liệu trên ổ cứng để xem và sao lưu sang USB hoặc ổ D, E.
-            
+            - **Tính năng mới trong v1.1.0**:
+              - 🚀 **Tự khởi động cùng máy tính**: Khi bật máy tính, phần mềm tự động chạy ngầm sẵn sàng.
+              - 🔄 **Chạy nền khay hệ thống (System Tray)**: Khi bấm nút dấu X, ứng dụng không bị tắt mà tự thu nhỏ xuống khay hệ thống góc phải màn hình.
+              - 📱 **Quét điện thoại liên tục**: Bạn có thể đóng cửa sổ làm việc khác, cầm điện thoại đi quét mã đơn hoàn trong kho, bảng máy tính vẫn tự động nhận dữ liệu, cập nhật trạng thái và lưu thẳng vào ổ cứng.
+              - 🔔 **Thông báo Windows Notification**: Mỗi khi điện thoại quét trúng đơn hoàn, góc phải màn hình máy tính sẽ hiện thông báo nổi chúc mừng.
+              - 💾 **Lưu trữ ổ cứng vĩnh viễn**: Toàn bộ dữ liệu nằm an toàn tại `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`.
+
             **Hướng dẫn cài đặt**:
-            1. Tải file `Quan Ly Hang Hoan Setup 1.0.0.exe` bên dưới.
-            2. Nhấp đúp chuột để mở bộ cài và bấm **Next** để hoàn tất.
-            3. Mở ứng dụng từ biểu tượng ngoài màn hình Desktop để sử dụng!
+            1. Tải file `Quan.Ly.Hang.Hoan.Setup.1.1.0.exe` bên dưới.
+            2. Cài đè trực tiếp lên phiên bản cũ (toàn bộ dữ liệu cũ được giữ nguyên 100%).
+            3. Trải nghiệm tính năng chạy nền và quét đơn từ điện thoại!
           files: |
             dist/*.exe
         env:

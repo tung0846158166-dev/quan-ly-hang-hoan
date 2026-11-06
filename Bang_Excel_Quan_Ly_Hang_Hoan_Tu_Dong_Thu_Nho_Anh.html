@@ -390,6 +390,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </button>
 
               <button
+                onclick="closeAllHeaderMenus(); toggleAutoStartSetting();"
+                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-violet-50 transition group cursor-pointer"
+              >
+                <div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 group-hover:bg-violet-200 font-bold text-sm">
+                  🚀
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-violet-600 flex items-center justify-between">
+                    <span>Khởi Động Cùng Windows</span>
+                    <span id="autoStartStatusBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">ĐANG BẬT</span>
+                  </div>
+                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Tự chạy ngầm khi bật máy tính, ấn X thu nhỏ khay hệ thống</p>
+                </div>
+              </button>
+
+              <button
                 id="btnResetSample"
                 onclick="closeAllHeaderMenus(); resetSampleData();"
                 class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-rose-50 transition group cursor-pointer border-t border-slate-100 mt-1 pt-2"
@@ -4016,6 +4032,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
+    async function updateAutoStartUI() {
+      const badge = document.getElementById('autoStartStatusBadge');
+      if (!badge) return;
+      if (window.desktopDiskAPI && typeof window.desktopDiskAPI.getAutoStart === 'function') {
+        try {
+          const res = await window.desktopDiskAPI.getAutoStart();
+          if (res && res.openAtLogin) {
+            badge.innerText = 'ĐANG BẬT';
+            badge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800';
+          } else {
+            badge.innerText = 'TẮT';
+            badge.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600';
+          }
+        } catch (e) {}
+      } else {
+        badge.innerText = 'BẢN APP';
+        badge.className = 'text-[9px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500';
+      }
+    }
+
+    async function toggleAutoStartSetting() {
+      if (!window.desktopDiskAPI || typeof window.desktopDiskAPI.setAutoStart !== 'function') {
+        alert("Tính năng Khởi động cùng Windows hoạt động khi bạn cài đặt ứng dụng máy tính (.exe).");
+        return;
+      }
+      try {
+        const cur = await window.desktopDiskAPI.getAutoStart();
+        const newState = !(cur && cur.openAtLogin);
+        await window.desktopDiskAPI.setAutoStart(newState);
+        await updateAutoStartUI();
+        if (newState) {
+          alert("✅ Đã BẬT tự khởi động cùng Windows!\nỨng dụng sẽ tự động chạy ngầm mỗi khi bạn bật máy tính, sẵn sàng nhận tín hiệu quét từ điện thoại.");
+        } else {
+          alert("Đã TẮT tự khởi động cùng Windows.");
+        }
+      } catch (e) {
+        console.error("Lỗi đổi cài đặt khởi động:", e);
+      }
+    }
+
     function formatMoney(n) {
       return new Intl.NumberFormat('vi-VN').format(Math.round(Number(n) || 0)) + ' đ';
     }
@@ -6229,6 +6285,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         time: Date.now()
       });
 
+      // Thông báo Windows Desktop Notification khi đang chạy nền
+      try {
+        if (window.desktopDiskAPI && typeof window.desktopDiskAPI.sendNotification === 'function') {
+          if (orderNum > 0) {
+            const notifTitle = isDuplicate ? '⚠️ Quét ĐT Trùng Lặp' : '📱 Đã Quét Đơn Từ ĐT';
+            const notifBody = `Đơn #${orderNum} (${codeText}): ${extraInfo || 'Đã cập nhật hàng đã trả'}`;
+            window.desktopDiskAPI.sendNotification(notifTitle, notifBody);
+          } else if (codeText && outcome === 'not_found') {
+            window.desktopDiskAPI.sendNotification('⚠️ Quét ĐT: Không Tìm Thấy', `Mã [${codeText}] không có trong danh sách đơn!`);
+          }
+        }
+      } catch (notifErr) {}
+
       // 1. Primary: Post to ntfy.sh (HTTPS port 443)
       try {
         fetch('https://ntfy.sh/' + topic, {
@@ -6785,6 +6854,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll();
       try {
         checkAndSyncHardDriveOnBoot();
+        updateAutoStartUI();
       } catch (diskErr) {
         console.warn('Hard drive boot sync warning:', diskErr);
       }

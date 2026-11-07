@@ -127,77 +127,73 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       .no-print { display: none !important; }
       body { background: white; }
     }
+    #orderTableBody tr, #summaryTableBody tr {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 34px;
+    }
   </style>
 </head>
-<body class="p-3 sm:p-5">
+<body class="p-1.5 sm:p-2.5">
 
-  <div class="max-w-[1720px] mx-auto bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+  <div class="max-w-[1780px] mx-auto bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
 
-    <!-- Row 1: Shopee Orange Title Banner -->
-    <div class="bg-[#ee4d2d] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 relative z-30">
-      <div>
-        <div class="flex flex-wrap items-center gap-2">
-          <h1 class="text-base sm:text-lg font-bold tracking-wide uppercase">
-            BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
-          </h1>
-          <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-2 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-            🚀 Phiên bản v1.2.1
-          </span>
-        </div>
-        <p class="text-xs text-orange-100 mt-0.5">
-          🔒 <b>Khóa mật khẩu theo từng ô:</b> Nhấp <b>Chuột phải vào bất kỳ ô nào</b> để khóa/mở khóa riêng ô đó bằng mật khẩu! Các ô khác vẫn nhập bình thường.
-        </p>
+    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions -->
+    <div class="bg-[#ee4d2d] text-white px-4 py-2 flex flex-wrap items-center justify-between gap-2 relative z-30">
+      <div class="flex flex-wrap items-center gap-2">
+        <h1 class="text-sm sm:text-base font-extrabold tracking-wide uppercase">
+          📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
+        </h1>
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
+          🚀 Phiên bản v1.2.2
+        </span>
+        <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
+        <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
+              class="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded-full cursor-pointer transition shadow-2xs"
+              title="Bấm để mở thư mục chứa file dữ liệu vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan)">
+          <span>💾 Tự lưu ổ cứng</span>
+          <span class="text-[10px]">📁</span>
+        </span>
       </div>
-      <div class="flex flex-wrap items-center gap-2 no-print">
-        <!-- 4 Nút hành động chính thường dùng -->
-        <button id="btnSaveDirectToFile" onclick="saveDirectlyToHtmlFile()" class="px-3.5 py-1.5 bg-yellow-300 hover:bg-yellow-200 text-slate-950 font-extrabold text-xs rounded-lg shadow-sm transition ring-2 ring-white flex items-center gap-1.5" title="Lưu toàn bộ đơn hàng, hình ảnh, danh mục SP và khóa mật khẩu THẲNG VÀO FILE NÀY (Phím tắt: Ctrl + S)">
-          <span>💾</span>
-          <span>Lưu Thẳng File (Ctrl+S)</span>
-        </button>
-        <button id="btnLockToggle" onclick="togglePasswordLock()" class="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-xs transition" title="Khóa / Mở khóa bảng chỉ xem">
-          🔓 Đang Mở Khóa (Bấm để Khóa Chỉ Xem)
-        </button>
-        <button id="btnAddOrder" onclick="addOrder()" class="px-3.5 py-1.5 bg-white text-[#ee4d2d] hover:bg-orange-50 font-black text-xs rounded-lg shadow-xs transition flex items-center gap-1" title="Thêm 1 dòng đơn hàng mới (Phím tắt: Alt + N)">
-          <span>➕</span>
-          <span>Thêm Đơn Mới (Alt+N)</span>
-        </button>
-        <button id="btnPhoneScanner" onclick="openPhoneScannerModal()" class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-lg shadow-sm transition ring-2 ring-sky-200 flex items-center gap-1.5" title="Dùng Camera Điện Thoại quét mã vạch trên bọc hàng hoàn -> Tự động nhảy thẳng vào bảng máy tính này!">
+
+      <div class="flex flex-wrap items-center gap-1.5 no-print">
+        <!-- Chỉ giữ 3 nút thao tác trực tiếp quan trọng nhất ở ngoài -->
+        <button id="btnPhoneScanner" onclick="openPhoneScannerModal()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-sky-200 flex items-center gap-1 cursor-pointer" title="Dùng Camera Điện Thoại quét mã vạch trên bọc hàng hoàn -> Tự động nhảy thẳng vào bảng máy tính này!">
           <span>📱</span>
           <span>Quét Bằng ĐT</span>
         </button>
+        <button id="btnAddOrder" onclick="addOrder()" class="px-3 py-1 bg-white text-[#ee4d2d] hover:bg-orange-50 font-black text-xs rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer" title="Thêm 1 dòng đơn hàng mới (Phím tắt: Alt + N)">
+          <span>➕</span>
+          <span>Thêm Đơn (Alt+N)</span>
+        </button>
+        <button id="btnLockToggle" onclick="togglePasswordLock()" class="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-xs transition cursor-pointer" title="Khóa / Mở khóa bảng chỉ xem (Mẹo: Nhấp Chuột phải vào bất kỳ ô nào để khóa riêng ô đó)">
+          🔓 Đang Mở Khóa
+        </button>
 
-        <!-- Badge thông báo lưu trữ ổ cứng máy tính (Hiện khi chạy trong App Desktop) -->
-        <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
-              class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1.5 rounded-lg cursor-pointer transition shadow-2xs"
-              title="Bấm để mở thư mục chứa file dữ liệu vật lý trên ổ cứng máy tính của bạn">
-          <span>💾 Lưu ổ cứng: Documents\QuanLyHangHoan</span>
-          <span class="text-xs">📁</span>
-        </span>
-
-        <!-- Menu Dropdown 1: Nhập Dữ Liệu -->
+        <!-- Menu Gộp 1: Nhập & Xuất Dữ Liệu (Gom toàn bộ Nhập đơn, Xuất Excel, Sao lưu, Khiếu nại, Lưu HTML vào 1 menu gọn gàng) -->
         <div class="relative inline-block text-left header-dropdown-container">
           <button
             type="button"
             id="btnMenuImport"
             onclick="toggleHeaderMenu(event, 'headerMenuImport')"
-            class="px-3 py-1.5 bg-orange-900/60 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/30 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            title="Các công cụ nạp file Shopee/TikTok, dán danh sách và OCR"
+            class="px-3 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Nạp file Shopee/TikTok, Dán nhanh nhiều đơn, Xuất Excel, Sao lưu & Khiếu nại sàn"
           >
-            <span>📥 Nhập Đơn</span>
+            <span>📂 Nhập / Xuất Dữ Liệu</span>
             <span id="headerImportDot" class="hidden w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse"></span>
             <span class="text-[10px] opacity-80">▾</span>
           </button>
           <div
             id="headerMenuImport"
-            class="header-menu-dropdown hidden absolute top-full left-0 mt-2 w-72 sm:w-80 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100"
+            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-76 sm:w-84 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100 max-h-[82vh] overflow-y-auto"
           >
+            <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📥 Nhập Đơn Hàng & Đối Soát</div>
             <div class="p-1">
               <button
                 id="btnShopeeDb"
                 onclick="closeAllHeaderMenus(); openShopeeDbModal();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:bg-purple-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:bg-purple-200 font-bold text-xs">
                   📥
                 </div>
                 <div class="flex-1 min-w-0">
@@ -205,200 +201,213 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <span class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Nạp File Shopee / TikTok</span>
                     <span id="shopeeDbCountBadge" class="hidden px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded-full text-[10px] font-black">0 đơn</span>
                   </div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">File đơn Kênh Người Bán để tự khớp Tên SP, Size, Giá khi quét</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Nạp file Excel Kênh Người Bán để tự khớp Tên SP, Size, Giá</p>
                 </div>
               </button>
 
               <button
                 id="btnBulkPaste"
                 onclick="closeAllHeaderMenus(); openBulkImportModal();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center shrink-0 group-hover:bg-teal-200 font-bold text-xs">
                   ⚡
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Dán Nhanh Nhiều Đơn</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Dán 10 - 100 mã đơn / mã vận đơn cùng lúc từ Excel</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Dán 10 - 500 mã đơn / mã vận đơn cùng lúc từ Excel</p>
                 </div>
               </button>
 
               <button
                 id="btnAutoOcrMissing"
                 onclick="closeAllHeaderMenus(); triggerPcOcrForMissingOrders();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-200 font-bold text-xs">
                   🔍
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Đọc Chữ Từ Ảnh Tem (OCR)</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Tự nhận diện chữ trên ảnh tem cho đơn chưa có thông tin</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Tự nhận diện chữ trên ảnh tem cho đơn chưa có thông tin</p>
+                </div>
+              </button>
+
+              <button
+                onclick="closeAllHeaderMenus(); openClaimModal();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-rose-50 transition group cursor-pointer"
+              >
+                <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-200 font-bold text-xs">
+                  ⚡
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-rose-700 group-hover:text-rose-800">Khiếu Nại Sàn (1-Click)</div>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Lọc & sao chép nhanh mẫu khiếu nại đơn quá 7 ngày / bị mất</p>
                 </div>
               </button>
             </div>
-          </div>
-        </div>
 
-        <!-- Menu Dropdown 2: Xuất & Báo Cáo -->
-        <div class="relative inline-block text-left header-dropdown-container">
-          <button
-            type="button"
-            id="btnMenuExport"
-            onclick="toggleHeaderMenu(event, 'headerMenuExport')"
-            class="px-3 py-1.5 bg-orange-900/60 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/30 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            title="Xuất file Excel, sao lưu và in ấn"
-          >
-            <span>📤 Xuất & Báo Cáo</span>
-            <span class="text-[10px] opacity-80">▾</span>
-          </button>
-          <div
-            id="headerMenuExport"
-            class="header-menu-dropdown hidden absolute top-full left-0 mt-2 w-72 sm:w-80 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100"
-          >
+            <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📤 Xuất Báo Cáo & Sao Lưu</div>
             <div class="p-1">
               <button
                 onclick="closeAllHeaderMenus(); exportToExcel();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 font-bold text-xs">
                   📊
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Xuất File Excel (.xlsx)</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Xuất toàn bộ đơn hàng & bảng đối soát chuẩn Excel</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Xuất toàn bộ đơn hàng & bảng đối soát chuẩn Excel</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); exportBackupJson();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-hover:bg-blue-200 font-bold text-xs">
                   💾
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Sao Lưu Dữ Liệu (.json)</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Tải file backup chứa đơn & toàn bộ hình ảnh về máy</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Tải file backup chứa toàn bộ đơn & hình ảnh về máy</p>
                 </div>
               </button>
 
               <label
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-200 font-bold text-xs">
                   📂
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Phục Hồi Dữ Liệu (.json)</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Khôi phục lại dữ liệu và hình ảnh từ file đã sao lưu</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Khôi phục lại dữ liệu và hình ảnh từ file đã sao lưu</p>
                   <input type="file" accept=".json" onchange="closeAllHeaderMenus(); restoreBackupJson(event);" class="hidden" />
                 </div>
               </label>
 
               <button
-                onclick="closeAllHeaderMenus(); requireUnlocked('In Báo Cáo / Lưu PDF').then(ok => { if (ok) window.print(); });"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                id="btnSaveDirectToFile"
+                onclick="closeAllHeaderMenus(); saveDirectlyToHtmlFile();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-yellow-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-yellow-100 text-yellow-800 flex items-center justify-center shrink-0 group-hover:bg-yellow-200 font-bold text-xs">
+                  📄
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Lưu Thẳng Ra File HTML (Ctrl+S)</div>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Đóng gói toàn bộ dữ liệu vào 1 file HTML độc lập</p>
+                </div>
+              </button>
+
+              <button
+                onclick="closeAllHeaderMenus(); requireUnlocked('In Báo Cáo / Lưu PDF').then(ok => { if (ok) window.print(); });"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+              >
+                <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-slate-200 font-bold text-xs">
                   🖨️
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">In Báo Cáo / Lưu PDF</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Xem trang in hoặc xuất nhanh ra file PDF tài liệu</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Xem trang in hoặc xuất nhanh ra file PDF tài liệu</p>
                 </div>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Menu Dropdown 3: Tiện Ích & Cài Đặt -->
+        <!-- Menu Gộp 2: Hệ Thống & Cài Đặt -->
         <div class="relative inline-block text-left header-dropdown-container">
           <button
             type="button"
             id="btnMenuTools"
             onclick="toggleHeaderMenu(event, 'headerMenuTools')"
-            class="px-3 py-1.5 bg-orange-900/60 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/30 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            title="Cài đặt danh mục SP, mật khẩu và nhật ký bảo mật"
+            class="px-3 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            title="Cài đặt danh mục SP, mật khẩu, ổ cứng và nhật ký bảo mật"
           >
-            <span>⚙️ Tiện Ích</span>
+            <span>⚙️ Hệ Thống</span>
             <span class="text-[10px] opacity-80">▾</span>
           </button>
           <div
             id="headerMenuTools"
-            class="header-menu-dropdown hidden absolute top-full right-0 mt-2 w-72 sm:w-80 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100"
+            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100 max-h-[82vh] overflow-y-auto"
           >
             <div class="p-1">
+              <div class="px-2.5 py-1.5 mb-1 bg-orange-50 rounded-lg border border-orange-200 text-[11px] text-orange-900">
+                💡 <b>Mẹo khóa từng ô:</b> Nhấp <b>Chuột phải</b> vào bất kỳ ô nào trên bảng để khóa/mở khóa riêng ô đó bằng mật khẩu.
+              </div>
               <button
                 onclick="closeAllHeaderMenus(); openCatalogModal();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-200 font-bold text-xs">
                   📦
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Danh Mục SP & Size Của Shop</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Cài đặt sẵn Tên SP, Màu, Size shop đang bán để gợi ý nhanh</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Cài đặt sẵn Tên SP, Màu, Size shop đang bán để gợi ý nhanh</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); openAuditLogModal();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-slate-900 text-amber-300 flex items-center justify-center shrink-0 rounded-lg font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-slate-900 text-amber-300 flex items-center justify-center shrink-0 rounded-lg font-bold text-xs">
                   🛡️
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Nhật Ký Bảo Mật</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Xem lịch sử ai đã mở khóa, sửa số liệu hoặc xóa đơn</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Xem lịch sử ai đã mở khóa, sửa số liệu hoặc xóa đơn</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); changeAppPassword();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0 group-hover:bg-orange-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0 group-hover:bg-orange-200 font-bold text-xs">
                   🔑
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Đổi Mật Khẩu Quản Trị</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Đổi mật khẩu bảo vệ bảng của Chủ Shop</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Đổi mật khẩu bảo vệ bảng của Chủ Shop</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); openHardDriveDataFolder();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 font-bold text-xs">
                   📁
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Thư Mục Dữ Liệu Ổ Cứng</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Mở vị trí lưu file dữ liệu vật lý (Documents\QuanLyHangHoan)</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Mở vị trí lưu file dữ liệu vật lý (Documents\QuanLyHangHoan)</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); backupHardDriveData();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-sky-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-sky-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:bg-sky-200 font-bold text-xs">
                   💾
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-sky-600">Sao Lưu Ra Ổ Cứng Khác</div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Lưu bản sao lưu dự phòng vào USB hoặc ổ D, E</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Lưu bản sao lưu dự phòng vào USB hoặc ổ D, E</p>
                 </div>
               </button>
 
               <button
                 onclick="closeAllHeaderMenus(); toggleAutoStartSetting();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-violet-50 transition group cursor-pointer"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-violet-50 transition group cursor-pointer"
               >
-                <div class="w-8 h-8 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 group-hover:bg-violet-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 group-hover:bg-violet-200 font-bold text-xs">
                   🚀
                 </div>
                 <div class="flex-1 min-w-0">
@@ -406,27 +415,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <span>Khởi Động Cùng Windows</span>
                     <span id="autoStartStatusBadge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">ĐANG BẬT</span>
                   </div>
-                  <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Tự chạy ngầm khi bật máy tính, ấn X thu nhỏ khay hệ thống</p>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Tự chạy ngầm khi bật máy tính, ấn X thu nhỏ khay hệ thống</p>
                 </div>
               </button>
 
               <button
                 id="btnResetSample"
                 onclick="closeAllHeaderMenus(); resetSampleData();"
-                class="w-full flex items-start gap-3 p-2.5 rounded-lg text-left hover:bg-rose-50 transition group cursor-pointer border-t border-slate-100 mt-1 pt-2"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-rose-50 transition group cursor-pointer border-t border-slate-100 mt-1 pt-2"
               >
-                <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-200 font-bold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-200 font-bold text-xs">
                   🔄
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-rose-600 group-hover:text-rose-700">Khôi Phục Dữ Liệu Mẫu</div>
-                  <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">Khôi phục về 5 đơn hàng mẫu ban đầu</p>
+                  <p class="text-[10.5px] text-slate-400 leading-snug">Khôi phục về 5 đơn hàng mẫu ban đầu</p>
                 </div>
               </button>
 
-              <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-2 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
+              <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.2</span>
               </div>
             </div>
           </div>
@@ -434,189 +443,153 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
     </div>
 
-    <!-- Row 3: Search Bar & Quick Summary KPI -->
-    <div class="p-4 bg-slate-50 border-b border-slate-200 space-y-2.5">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+    <!-- Row 2: Slim Search Bar, Inline KPI Pills & Unified Toolbar -->
+    <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 space-y-1.5">
+      <!-- Slim Line 1: Search Input + 4 Inline KPI Pills -->
+      <div class="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2">
         <!-- Search Input Box -->
-        <div class="lg:col-span-6 flex items-stretch">
-          <div class="bg-slate-800 text-white font-bold text-xs px-3.5 flex items-center rounded-l-lg whitespace-nowrap">
-            🔍 Ô TÌM KIẾM NHANH:
+        <div class="flex items-stretch flex-1 min-w-[280px]">
+          <div class="bg-slate-800 text-white font-bold text-[11px] px-2.5 flex items-center rounded-l-lg whitespace-nowrap">
+            🔍 TÌM NHANH:
           </div>
           <input
             id="searchInput"
             type="text"
             oninput="handleSearchInputDebounced()"
-            placeholder="Nhập Mã đơn hàng, Mã vận đơn, Tên SP, Màu sắc hoặc Size..."
-            class="flex-1 bg-[#fef9c3] border-2 border-[#ee4d2d] px-3 py-2 text-sm font-bold text-orange-900 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg"
+            placeholder="Nhập Mã đơn, Mã vận đơn, Tên SP, Màu sắc, Size..."
+            class="flex-1 bg-[#fef9c3] border border-[#ee4d2d] px-2.5 py-1 text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg h-7"
           />
-          <label class="ml-3 inline-flex items-center text-xs font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
-            <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-4 h-4 mr-1.5 rounded text-orange-600 focus:ring-orange-500" />
+          <label class="ml-2 inline-flex items-center text-[11px] font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
+            <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-orange-600 focus:ring-orange-500" />
             Chỉ hiện đơn khớp
           </label>
         </div>
 
-        <!-- Quick KPI Boxes -->
-        <div class="lg:col-span-6 grid grid-cols-4 gap-2 text-center text-xs">
-          <div class="bg-slate-800 text-white p-2 rounded-lg">
-            <div class="text-[11px] text-slate-300">Tổng SL Hàng Hoàn</div>
-            <div id="kpiTotalQty" class="text-base font-bold">0 SP</div>
+        <!-- Inline Compact KPI Pills (Chiều cao chỉ 28px thay vì 56px như trước) -->
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <div class="bg-slate-800 text-white px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7 shadow-2xs">
+            <span class="text-[11px] text-slate-300">Tổng hoàn:</span>
+            <span id="kpiTotalQty" class="font-extrabold text-xs">0 SP</span>
           </div>
-          <div class="bg-[#dcfce7] text-[#15803d] border border-green-300 p-2 rounded-lg">
-            <div class="text-[11px] font-semibold">Đã Trả (Về Kho)</div>
-            <div id="kpiReturnedQty" class="text-base font-bold">0 SP</div>
+          <div class="bg-[#dcfce7] text-[#15803d] border border-green-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
+            <span class="text-[11px] font-semibold">Đã về:</span>
+            <span id="kpiReturnedQty" class="font-extrabold text-xs">0 SP</span>
           </div>
-          <div class="bg-[#fef3c7] text-[#b45309] border border-amber-300 p-2 rounded-lg">
-            <div class="text-[11px] font-semibold">Chưa Trả (Đang Chờ)</div>
-            <div id="kpiUnreturnedQty" class="text-base font-bold">0 SP</div>
+          <div class="bg-[#fef3c7] text-[#b45309] border border-amber-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
+            <span class="text-[11px] font-semibold">Chờ về:</span>
+            <span id="kpiUnreturnedQty" class="font-extrabold text-xs">0 SP</span>
           </div>
-          <div class="bg-[#fee2e2] text-[#b91c1c] border border-red-300 p-2 rounded-lg">
-            <div class="text-[11px] font-semibold">Bị Mất (Khiếu Nại)</div>
-            <div id="kpiLostInfo" class="text-sm font-bold">0 SP (0 đ)</div>
+          <div class="bg-[#fee2e2] text-[#b91c1c] border border-red-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
+            <span class="text-[11px] font-semibold">Bị mất:</span>
+            <span id="kpiLostInfo" class="font-extrabold text-xs">0 SP (0 đ)</span>
           </div>
         </div>
       </div>
 
-      <!-- Row 4: Instant Search Preview Bar -->
-      <div id="searchPreviewBar" class="text-xs px-3 py-1.5 rounded bg-slate-200/70 text-slate-700"></div>
+      <!-- Instant Search Preview Bar (Ẩn hoàn toàn khi không gõ tìm kiếm để tiết kiệm diện tích dọc!) -->
+      <div id="searchPreviewBar" class="hidden text-xs px-2.5 py-1 rounded bg-amber-100 text-amber-900"></div>
 
-      <!-- Row 5: Interactive Pipeline Tabs & Arrival Time Filter for 1,000+ Orders -->
-      <div class="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 text-xs no-print">
+      <!-- Slim Line 2: Unified Status Tabs + Compact Filters + Pagination on ONE single bar -->
+      <div class="pt-1.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-1.5 text-[11px] no-print">
         <!-- Pipeline Status Tabs -->
-        <div class="flex flex-wrap items-center gap-1.5" id="pipelineTabs">
+        <div class="flex flex-wrap items-center gap-1" id="pipelineTabs">
           <button type="button" onclick="setPipelineFilter('all')" id="tabBtn_all"
-                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-slate-900 text-white shadow-xs">
-            <span>📋 Tất cả đơn</span>
-            <span id="tabCountAll" class="bg-white/20 text-white text-[11px] px-1.5 py-0.2 rounded-full">0</span>
+                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-900 text-white shadow-2xs cursor-pointer">
+            <span>📋 Tất cả</span>
+            <span id="tabCountAll" class="bg-white/20 text-white text-[10px] px-1.5 rounded-full">0</span>
           </button>
           <button type="button" onclick="setPipelineFilter('waiting')" id="tabBtn_waiting"
-                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100">
-            <span>🟡 Chờ hàng về</span>
-            <span id="tabCountWaiting" class="bg-amber-200 text-amber-900 text-[11px] px-1.5 py-0.2 rounded-full">0</span>
+                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer">
+            <span>🟡 Chờ về</span>
+            <span id="tabCountWaiting" class="bg-amber-200 text-amber-900 text-[10px] px-1.5 rounded-full">0</span>
           </button>
           <button type="button" onclick="setPipelineFilter('returned')" id="tabBtn_returned"
-                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100">
-            <span>🟢 Đã về kho (Đã quét)</span>
-            <span id="tabCountReturned" class="bg-emerald-200 text-emerald-900 text-[11px] px-1.5 py-0.2 rounded-full">0</span>
+                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 cursor-pointer">
+            <span>🟢 Đã về kho</span>
+            <span id="tabCountReturned" class="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 rounded-full">0</span>
           </button>
           <button type="button" onclick="setPipelineFilter('overdue')" id="tabBtn_overdue"
-                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100"
-                  title="Các đơn sàn báo hoàn đã quá 7 ngày mà chưa về kho (Cần khiếu nại sàn đòi bồi thường!)">
-            <span>🚨 Quá 7 ngày chưa về</span>
-            <span id="tabCountOverdue" class="bg-rose-200 text-rose-900 text-[11px] px-1.5 py-0.2 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="openClaimModal()" class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-rose-700 hover:bg-rose-800 text-white shadow-xs" title="Mở danh sách và sao chép mẫu tin nhắn khiếu nại sàn Shopee / TikTok đòi tiền đền bù">
-            <span>⚡ Khiếu Nại Sàn (1-Click)</span>
+                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 cursor-pointer"
+                  title="Các đơn sàn báo hoàn đã quá 7 ngày mà chưa về kho">
+            <span>🚨 Quá 7 ngày</span>
+            <span id="tabCountOverdue" class="bg-rose-200 text-rose-900 text-[10px] px-1.5 rounded-full">0</span>
           </button>
           <button type="button" onclick="setPipelineFilter('lost')" id="tabBtn_lost"
-                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200">
-            <span>🔴 Bị mất / Đền bù</span>
-            <span id="tabCountLost" class="bg-slate-200 text-slate-800 text-[11px] px-1.5 py-0.2 rounded-full">0</span>
+                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200 cursor-pointer">
+            <span>🔴 Bị mất</span>
+            <span id="tabCountLost" class="bg-slate-200 text-slate-800 text-[10px] px-1.5 rounded-full">0</span>
           </button>
         </div>
 
-        <!-- Filter Controls: Platform, Date Display/Sorting & Arrival Date -->
-        <div class="flex flex-wrap items-center gap-2">
-          <!-- Filter by Platform (Sàn TMĐT) -->
-          <div class="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
-            <span class="text-[11px] font-bold text-slate-700 pl-1.5 flex items-center gap-1">
-              <span>🛍️ Lọc sàn:</span>
-            </span>
-            <select id="platformFilterSelect" onchange="setPlatformFilter(this.value)"
-                    class="text-xs font-bold bg-orange-50 border border-orange-300 text-orange-950 rounded px-2 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-orange-500">
-              <option value="all">🌐 Tất cả sàn</option>
-              <option value="Shopee">🟠 Shopee</option>
-              <option value="TikTok Shop">⚫ TikTok Shop</option>
-              <option value="Lazada">🔵 Lazada</option>
-              <option value="Khác">📦 Sàn khác / Ngoài</option>
-            </select>
-          </div>
+        <!-- Compact Filters & Pagination Controls -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <!-- Lọc sàn -->
+          <select id="platformFilterSelect" onchange="setPlatformFilter(this.value)"
+                  title="Lọc theo sàn TMĐT"
+                  class="text-[11px] font-bold bg-white border border-slate-300 text-slate-800 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-orange-400">
+            <option value="all">🛍️ Tất cả sàn</option>
+            <option value="Shopee">🟠 Shopee</option>
+            <option value="TikTok Shop">⚫ TikTok Shop</option>
+            <option value="Lazada">🔵 Lazada</option>
+            <option value="Khác">📦 Sàn khác</option>
+          </select>
 
-          <!-- Date Display & Sorting Buttons (Ngày gửi đi, Ngày hoàn về, Ngày nhận) -->
-          <div class="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
-            <span class="text-[11px] font-bold text-slate-700 pl-1.5 pr-0.5 flex items-center gap-1">
-              <span>📅 Xem theo ngày:</span>
-            </span>
-            <button type="button" id="btnDateSort_shipDate" onclick="toggleDateSort('shipDate')"
-                    class="px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-50 text-slate-700 border-slate-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 cursor-pointer"
-                    title="Bấm để sắp xếp toàn bộ đơn theo Ngày Gửi Đi (Mới nhất ➔ Cũ nhất hoặc Cũ nhất ➔ Mới nhất)">
-              <span>🚚 Ngày gửi đi</span>
-              <span id="iconDateSort_shipDate" class="text-[10px] text-slate-400">⇅</span>
-            </button>
-            <button type="button" id="btnDateSort_returnDate" onclick="toggleDateSort('returnDate')"
-                    class="px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-50 text-slate-700 border-slate-300 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300 cursor-pointer"
-                    title="Bấm để sắp xếp toàn bộ đơn theo Ngày Hoàn / Hủy (Mới nhất ➔ Cũ nhất hoặc Cũ nhất ➔ Mới nhất)">
-              <span>↩️ Ngày hoàn về</span>
-              <span id="iconDateSort_returnDate" class="text-[10px] text-slate-400">⇅</span>
-            </button>
-            <button type="button" id="btnDateSort_recvDate" onclick="toggleDateSort('recvDate')"
-                    class="px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-50 text-slate-700 border-slate-300 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 cursor-pointer"
-                    title="Bấm để sắp xếp toàn bộ đơn theo Ngày & Giờ Về Kho (Mới nhất ➔ Cũ nhất hoặc Cũ nhất ➔ Mới nhất)">
-              <span>📥 Ngày nhận</span>
-              <span id="iconDateSort_recvDate" class="text-[10px] text-slate-400">⇅</span>
-            </button>
-            <button type="button" id="btnDateSort_default" onclick="resetDateSort()"
-                    class="px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-800 text-white border-slate-900 shadow-xs cursor-pointer"
-                    title="Khôi phục thứ tự nhập ban đầu (Theo STT gốc)">
-              <span>↺ Mặc định</span>
-            </button>
-            <label class="ml-1 inline-flex items-center text-[11px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap pl-1.5 border-l border-slate-200 pr-1"
-                   title="Tích chọn để chỉ hiển thị các đơn có ngày này (Ẩn các đơn chưa có ngày)">
-              <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-blue-600 focus:ring-blue-500" />
-              <span>Chỉ đơn có ngày</span>
+          <!-- Sắp xếp theo ngày (Gộp 4 nút rời thành 1 menu thả gọn gàng + vẫn bấm trực tiếp trên tiêu đề cột được) -->
+          <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
+            <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
+                    title="Sắp xếp đơn hàng theo Ngày gửi đi, Ngày hoàn về hoặc Ngày nhận (Hoặc bấm trực tiếp vào tiêu đề cột ngày trên bảng)"
+                    class="text-[11px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer py-0.5">
+              <option value="default">📅 Xếp ngày: Mặc định (STT)</option>
+              <option value="recvDate_desc">📥 Ngày về kho (Mới ➔ Cũ)</option>
+              <option value="recvDate_asc">📥 Ngày về kho (Cũ ➔ Mới)</option>
+              <option value="returnDate_desc">↩️ Ngày hoàn (Mới ➔ Cũ)</option>
+              <option value="returnDate_asc">↩️ Ngày hoàn (Cũ ➔ Mới)</option>
+              <option value="shipDate_desc">🚚 Ngày gửi đi (Mới ➔ Cũ)</option>
+              <option value="shipDate_asc">🚚 Ngày gửi đi (Cũ ➔ Mới)</option>
+            </select>
+            <label class="ml-1.5 pl-1.5 border-l border-slate-200 inline-flex items-center text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap"
+                   title="Chỉ hiển thị các đơn đã có ngày">
+              <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3 h-3 mr-1 rounded text-blue-600" />
+              <span>Có ngày</span>
             </label>
           </div>
 
-          <!-- Filter by Arrival Date / Time -->
-          <div class="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-300 shadow-2xs">
-            <span class="text-[11px] font-bold text-slate-700 pl-1.5 flex items-center gap-1">
-              <span>🕒 Lọc mốc ngày:</span>
-            </span>
-            <select id="recvDateFilterSelect" onchange="setRecvDateFilter(this.value)"
-                    class="text-xs font-semibold bg-emerald-50 border border-emerald-300 text-emerald-950 rounded px-2 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-emerald-500">
-              <option value="all">Tất cả thời gian</option>
-              <option value="today">⚡ Về hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="7days">7 ngày gần nhất</option>
-            </select>
-          </div>
-        </div>
-      </div>
+          <!-- Lọc mốc ngày -->
+          <select id="recvDateFilterSelect" onchange="setRecvDateFilter(this.value)"
+                  title="Lọc nhanh theo mốc thời gian"
+                  class="text-[11px] font-bold bg-white border border-slate-300 text-emerald-900 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-emerald-500">
+            <option value="all">🕒 Mọi thời gian</option>
+            <option value="today">⚡ Về hôm nay</option>
+            <option value="yesterday">Hôm qua</option>
+            <option value="7days">7 ngày qua</option>
+          </select>
 
-      <!-- Row 6: Smooth Performance Pagination Bar (Tối ưu mượt mà khi có 500 - 2,000+ đơn hàng) -->
-      <div id="tablePaginationBar" class="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
-        <div class="flex items-center gap-2 text-slate-600">
-          <span class="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-            <span>⚡ Chế độ Siêu Mượt</span>
-          </span>
-          <span id="paginationSummaryText" class="font-semibold text-slate-700">Đang hiển thị 0 - 0 / 0 đơn</span>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="flex items-center gap-1 bg-white px-2 py-0.5 rounded-lg border border-slate-300">
-            <span class="text-[11px] font-semibold text-slate-600">Số đơn / trang:</span>
-            <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="text-xs font-bold text-slate-900 bg-transparent outline-none cursor-pointer py-0.5">
-              <option value="50">50 đơn (Nhanh nhất)</option>
-              <option value="100" selected>100 đơn (Mượt - Khuyên dùng)</option>
-              <option value="200">200 đơn / trang</option>
-              <option value="0">Tất cả đơn trên 1 trang</option>
+          <!-- Phân trang Siêu Mượt nằm gọn ngay bên phải -->
+          <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
+            <span id="paginationSummaryText" class="text-[10.5px] font-semibold text-slate-600 hidden xl:inline px-1">0 đơn</span>
+            <select id="pageSizeSelect" onchange="changePageSize(this.value)" title="Số đơn hiển thị trên mỗi trang" class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 outline-none cursor-pointer">
+              <option value="30">⚡ 30 đơn/trang</option>
+              <option value="50" selected>⚡ 50 đơn/trang (Siêu mượt)</option>
+              <option value="100">100 đơn/trang</option>
+              <option value="200">200 đơn/trang</option>
+              <option value="0">Tất cả đơn</option>
             </select>
-          </div>
-          <div class="flex items-center gap-1">
-            <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition">
-              ◀ Trang trước
+            <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition" title="Trang trước">
+              ◀
             </button>
-            <span id="pageIndicatorText" class="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-bold text-[11px]">
-              Trang 1 / 1
+            <span id="pageIndicatorText" class="px-1.5 py-0.5 rounded bg-slate-800 text-white font-bold text-[10.5px] whitespace-nowrap">
+              1 / 1
             </span>
-            <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 font-bold text-slate-700 disabled:opacity-40 disabled:pointer-events-none cursor-pointer transition">
-              Trang sau ▶
+            <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition" title="Trang sau">
+              ▶
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Main Spreadsheet Table -->
-    <div id="mainTableScrollContainer" class="overflow-x-auto max-h-[580px] min-h-[480px]">
+    <!-- Main Spreadsheet Table (Tăng chiều cao hiển thị tối đa nhờ thu gọn thanh công cụ phía trên) -->
+    <div id="mainTableScrollContainer" class="overflow-x-auto max-h-[680px] min-h-[520px]">
       <table class="excel-table">
         <thead>
           <tr class="h-8 text-xs">
@@ -2950,17 +2923,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let currentPlatformFilter = 'all'; // 'all' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'Khác'
     let currentDateSort = 'default'; // 'default' | 'shipDate_desc' | 'shipDate_asc' | 'returnDate_desc' | 'returnDate_asc' | 'recvDate_desc' | 'recvDate_asc'
     let currentPage = 1;
-    let pageSize = 100; // 100 đơn / trang giúp bảng siêu mượt kể cả khi có hàng nghìn đơn
+    let pageSize = 50; // 50 đơn / trang giúp bảng siêu mượt kể cả khi có hàng nghìn đơn và nhiều ảnh
     let totalFilteredPages = 1;
     let searchDebounceTimer = null;
     let cellEditSaveTimer = null;
-    const APP_VERSION_NUMBER = '1.2.1';
+    let diskPersistDebounceTimer = null;
+    let summaryRenderDebounceTimer = null;
+    const APP_VERSION_NUMBER = '1.2.2';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
         currentPage = 1;
-        renderAll();
+        renderAll(false);
       }, 150);
     }
 
@@ -2969,20 +2944,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       cellEditSaveTimer = setTimeout(() => {
         saveOrders();
         recalcTotalsAndSummary(true);
-      }, 500);
+      }, 450);
     }
 
     function changePageSize(newVal) {
       pageSize = parseInt(newVal, 10) || 0;
       currentPage = 1;
-      renderAll();
+      renderAll(false);
     }
 
     function changeTablePage(delta) {
       const next = currentPage + delta;
       if (next < 1 || next > totalFilteredPages) return;
       currentPage = next;
-      renderAll();
+      renderAll(false);
       const scrollBox = document.getElementById('mainTableScrollContainer');
       if (scrollBox) scrollBox.scrollTop = 0;
     }
@@ -2993,10 +2968,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới trong phiên bản ${curVer}:\n` +
-        `1. Khắc phục triệt để 100% lỗi nhấp con trỏ vào ô nhập văn bản bị đơ / khóa bàn phím trên Windows (loại bỏ hoàn toàn hộp thoại chặn focus Win32 và giữ nguyên con trỏ khi đang gõ).\n` +
-        `2. Khắc phục hoàn toàn Bộ lọc Bảng Tổng Kết 300+ Phân Loại bên dưới (Lọc theo Tên SP, Màu sắc, Size hỗ trợ cả có dấu & không dấu, hiển thị chính xác số phân loại).\n` +
-        `3. Chế độ Phân Trang Siêu Mượt (100 đơn/trang) & chống giật lag trên danh sách 500 - 2.000+ đơn.\n` +
-        `4. Truyền ảnh chụp tự động từ Điện Thoại (chia gói nhỏ vượt giới hạn 4KB + lưu thẳng vào ổ cứng máy tính).`
+        `1. Giao diện Tinh Gọn & Rộng Rãi: Thu gọn toàn bộ thanh công cụ trên cùng, gom các nút chức năng vào 2 menu [📂 Nhập / Xuất Dữ Liệu] và [⚙️ Hệ Thống], mở rộng tối đa diện tích bảng đơn hàng.\n` +
+        `2. Chống Lag Tuyệt Đối Khi Nhiều Đơn & Nhiều Ảnh: Tối ưu ghi ổ cứng bất đồng bộ (Async I/O), tải ảnh thông minh (lazy decode) và mặc định 50 đơn/trang siêu mượt.\n` +
+        `3. Giữ nguyên đầy đủ 100% dữ liệu đơn hàng & ảnh đã lưu trên ổ cứng máy tính.`
       );
     }
 
@@ -3130,24 +3104,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentFilterTab = tab;
       currentPage = 1;
       document.querySelectorAll('#pipelineTabs button').forEach(b => {
-        b.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 border ' +
-          'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100';
+        b.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 border ' +
+          'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
       });
       const activeBtn = document.getElementById('tabBtn_' + tab);
       if (activeBtn) {
-        if (tab === 'all') activeBtn.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-slate-900 text-white shadow-xs';
-        else if (tab === 'waiting') activeBtn.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-amber-500 text-white border-amber-600 shadow-xs';
-        else if (tab === 'returned') activeBtn.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-emerald-600 text-white border-emerald-700 shadow-xs';
-        else if (tab === 'overdue') activeBtn.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-rose-600 text-white border-rose-700 shadow-xs';
-        else if (tab === 'lost') activeBtn.className = 'px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1.5 bg-slate-800 text-white border-slate-900 shadow-xs';
+        if (tab === 'all') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-900 text-white shadow-2xs cursor-pointer';
+        else if (tab === 'waiting') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-amber-500 text-white border-amber-600 shadow-2xs cursor-pointer';
+        else if (tab === 'returned') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-emerald-600 text-white border-emerald-700 shadow-2xs cursor-pointer';
+        else if (tab === 'overdue') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-600 text-white border-rose-700 shadow-2xs cursor-pointer';
+        else if (tab === 'lost') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-800 text-white border-slate-900 shadow-2xs cursor-pointer';
       }
-      renderAll();
+      renderAll(false);
     }
 
     function setRecvDateFilter(filterVal) {
       currentRecvDateFilter = filterVal;
       currentPage = 1;
-      renderAll();
+      renderAll(false);
+    }
+
+    function setDateSortFromDropdown(val) {
+      currentDateSort = val || 'default';
+      currentPage = 1;
+      renderAll(false);
     }
 
     function toggleDateSort(field) {
@@ -3159,7 +3139,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         currentDateSort = `${field}_desc`;
       }
       currentPage = 1;
-      renderAll();
+      renderAll(false);
     }
 
     function resetDateSort() {
@@ -3167,47 +3147,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentPage = 1;
       const chk = document.getElementById('chkOnlyWithDate');
       if (chk) chk.checked = false;
-      renderAll();
+      renderAll(false);
     }
 
     function updateDateSortUI() {
       const fields = ['shipDate', 'returnDate', 'recvDate'];
-      const activeColorMap = {
-        'shipDate': 'bg-blue-600 text-white border-blue-700 shadow-xs',
-        'returnDate': 'bg-amber-600 text-white border-amber-700 shadow-xs',
-        'recvDate': 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-      };
-      const defaultBtnClass = 'px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
-
       fields.forEach(f => {
-        const btn = document.getElementById('btnDateSort_' + f);
-        const icon = document.getElementById('iconDateSort_' + f);
         const thIcon = document.getElementById('thSortIcon_' + f);
-
         const isDesc = currentDateSort === `${f}_desc`;
         const isAsc = currentDateSort === `${f}_asc`;
-        const isActive = isDesc || isAsc;
-
-        if (btn) {
-          if (isActive) {
-            btn.className = `px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border cursor-pointer ${activeColorMap[f]}`;
-          } else {
-            btn.className = defaultBtnClass;
-          }
-        }
-        const arrowText = isDesc ? '⬇ Mới' : isAsc ? '⬆ Cũ' : '⇅';
         const thArrow = isDesc ? '▼' : isAsc ? '▲' : '⇅';
-        if (icon) icon.textContent = arrowText;
         if (thIcon) thIcon.textContent = thArrow;
       });
-
-      const defaultBtn = document.getElementById('btnDateSort_default');
-      if (defaultBtn) {
-        if (currentDateSort === 'default') {
-          defaultBtn.className = 'px-2 py-1 rounded text-xs font-bold transition flex items-center gap-1 border bg-slate-800 text-white border-slate-900 shadow-xs cursor-pointer';
-        } else {
-          defaultBtn.className = 'px-2 py-1 rounded text-xs font-semibold transition flex items-center gap-1 border bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200 cursor-pointer';
-        }
+      const sortSel = document.getElementById('dateSortSelect');
+      if (sortSel && sortSel.value !== currentDateSort) {
+        sortSel.value = currentDateSort;
       }
     }
 
@@ -3905,46 +3859,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const btnAdd = document.getElementById('btnAddOrder');
       const btnReset = document.getElementById('btnResetSample');
       const btnImport = document.getElementById('btnMenuImport');
-      const btnExport = document.getElementById('btnMenuExport');
       const btnPhone = document.getElementById('btnPhoneScanner');
 
       if (isLocked) {
-        btn.className = 'px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg shadow-xs transition ring-2 ring-white';
-        btn.innerHTML = '🔒 ĐANG KHÓA CHỈ XEM (Bấm nhập MK để sửa)';
+        btn.className = 'px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg shadow-xs transition ring-1 ring-white cursor-pointer';
+        btn.innerHTML = '🔒 Đang Khóa (Bấm mở)';
         if (btnAdd) btnAdd.classList.add('hidden');
-        if (btnReset) btnReset.classList.remove('hidden'); // Giữ nút khôi phục mẫu luôn hiện, khi bấm sẽ xác thực mật khẩu
+        if (btnReset) btnReset.classList.remove('hidden');
         if (btnImport) {
-          btnImport.classList.remove('bg-orange-900/60');
-          btnImport.classList.add('bg-rose-950/70', 'ring-1', 'ring-rose-400/40');
-          btnImport.innerHTML = '<span>🔒 Nhập Đơn</span><span class="text-[10px] opacity-80">▾</span>';
-          btnImport.title = '🔒 Đang khóa! Bấm vào để nhập mật khẩu mở khóa trước khi nhập đơn.';
-        }
-        if (btnExport) {
-          btnExport.classList.remove('bg-orange-900/60');
-          btnExport.classList.add('bg-rose-950/70', 'ring-1', 'ring-rose-400/40');
-          btnExport.innerHTML = '<span>🔒 Xuất & Báo Cáo</span><span class="text-[10px] opacity-80">▾</span>';
-          btnExport.title = '🔒 Đang khóa! Bấm vào để nhập mật khẩu mở khóa trước khi xuất báo cáo.';
+          btnImport.classList.remove('bg-orange-950/70');
+          btnImport.classList.add('bg-rose-950/80', 'ring-1', 'ring-rose-400/40');
+          btnImport.innerHTML = '<span>🔒 Nhập / Xuất Dữ Liệu</span><span class="text-[10px] opacity-80">▾</span>';
+          btnImport.title = '🔒 Đang khóa! Bấm vào để nhập mật khẩu mở khóa.';
         }
         if (btnPhone) {
           btnPhone.innerHTML = '<span>🔒</span><span>Quét Bằng ĐT</span>';
           btnPhone.title = '🔒 Đang khóa! Bấm vào để nhập mật khẩu mở khóa trước khi quét mã.';
         }
       } else {
-        btn.className = 'px-3.5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-xs transition';
-        btn.innerHTML = '🔓 Đang Mở Khóa (Bấm để Khóa Chỉ Xem)';
+        btn.className = 'px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-xs transition cursor-pointer';
+        btn.innerHTML = '🔓 Đang Mở Khóa';
         if (btnAdd) btnAdd.classList.remove('hidden');
         if (btnReset) btnReset.classList.remove('hidden');
         if (btnImport) {
-          btnImport.classList.remove('bg-rose-950/70', 'ring-1', 'ring-rose-400/40');
-          btnImport.classList.add('bg-orange-900/60');
-          btnImport.innerHTML = '<span>📥 Nhập Đơn</span><span id="headerImportDot" class="hidden w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse"></span><span class="text-[10px] opacity-80">▾</span>';
-          btnImport.title = 'Các công cụ nạp file Shopee/TikTok, dán danh sách và OCR';
-        }
-        if (btnExport) {
-          btnExport.classList.remove('bg-rose-950/70', 'ring-1', 'ring-rose-400/40');
-          btnExport.classList.add('bg-orange-900/60');
-          btnExport.innerHTML = '<span>📤 Xuất & Báo Cáo</span><span class="text-[10px] opacity-80">▾</span>';
-          btnExport.title = 'Xuất file Excel, sao lưu và in ấn';
+          btnImport.classList.remove('bg-rose-950/80', 'ring-1', 'ring-rose-400/40');
+          btnImport.classList.add('bg-orange-950/70');
+          btnImport.innerHTML = '<span>📂 Nhập / Xuất Dữ Liệu</span><span id="headerImportDot" class="hidden w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse"></span><span class="text-[10px] opacity-80">▾</span>';
+          btnImport.title = 'Nạp file Shopee/TikTok, Dán nhanh nhiều đơn, Xuất Excel, Sao lưu & Khiếu nại sàn';
         }
         if (btnPhone) {
           btnPhone.innerHTML = '<span>📱</span><span>Quét Bằng ĐT</span>';
@@ -4352,7 +4293,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    function saveOrders() {
+    function flushPersistOrdersToDiskAndStorage() {
+      if (diskPersistDebounceTimer) {
+        clearTimeout(diskPersistDebounceTimer);
+        diskPersistDebounceTimer = null;
+      }
       try {
         // 1. Tách ảnh nặng (Base64) lưu vào IndexedDB, chỉ lưu dữ liệu nhẹ vào localStorage để chống tràn 5MB
         const leanOrders = orders.map(o => {
@@ -4360,7 +4305,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!o.photoId) {
               o.photoId = 'p_' + (o.track || o.orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
             }
-            savePhotoToDb(o.photoId, o.photo);
+            if (!photoMemoryCache.has(o.photoId)) {
+              savePhotoToDb(o.photoId, o.photo);
+            }
             const copy = Object.assign({}, o);
             copy.photo = ''; // LocalStorage lưu siêu nhẹ, không bao giờ bị đầy bộ nhớ!
             return copy;
@@ -4390,8 +4337,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {
         console.warn('Storage warning:', e);
       }
-      markUnsavedToFile();
     }
+
+    function saveOrders(immediate = false) {
+      markUnsavedToFile();
+      if (immediate) {
+        flushPersistOrdersToDiskAndStorage();
+        return;
+      }
+      if (diskPersistDebounceTimer) clearTimeout(diskPersistDebounceTimer);
+      diskPersistDebounceTimer = setTimeout(() => {
+        flushPersistOrdersToDiskAndStorage();
+      }, 300);
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (diskPersistDebounceTimer) {
+        flushPersistOrdersToDiskAndStorage();
+      }
+    });
 
     function openHardDriveDataFolder() {
       if (window.desktopDiskAPI && typeof window.desktopDiskAPI.openDataFolder === 'function') {
@@ -4422,13 +4386,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         badge.classList.remove('hidden');
         badge.classList.add('inline-flex');
         const count = (orders && orders.length) ? orders.length : 0;
-        badge.innerHTML = `<span>💾 Đã lưu ổ cứng (${count} đơn${timeStr ? ' lúc ' + timeStr : ''}): Documents\\QuanLyHangHoan</span> <span class="text-xs">📁</span>`;
-        badge.className = "inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2.5 py-1.5 rounded-lg cursor-pointer transition shadow-2xs";
+        badge.innerHTML = `<span>💾 Đã lưu ổ cứng (${count} đơn)</span> <span class="text-[10px]">📁</span>`;
+        badge.title = `Đã tự động lưu ${count} đơn${timeStr ? ' lúc ' + timeStr : ''} vào ổ cứng tại: Documents\\QuanLyHangHoan (Bấm để mở thư mục)`;
+        badge.className = "inline-flex items-center gap-1 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded-full cursor-pointer transition shadow-2xs";
       } else {
         badge.classList.remove('hidden');
         badge.classList.add('inline-flex');
         const count = (orders && orders.length) ? orders.length : 0;
-        badge.innerHTML = `<span>💾 Trình duyệt (${count} đơn): Lưu tự động</span>`;
+        badge.innerHTML = `<span>💾 Tự động lưu (${count} đơn)</span>`;
       }
     }
 
@@ -4900,7 +4865,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       `;
     }
 
-    function renderAll() {
+    function renderAll(rebuildSummaryImmediately = true) {
       const kw = document.getElementById('searchInput').value.trim();
       const filterOnly = document.getElementById('chkFilterOnly').checked;
       const onlyWithDate = document.getElementById('chkOnlyWithDate') ? document.getElementById('chkOnlyWithDate').checked : false;
@@ -4993,13 +4958,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const sumEl = document.getElementById('paginationSummaryText');
       if (sumEl) {
         if (totalFiltered === 0) {
-          sumEl.textContent = 'Không có đơn hàng nào khớp bộ lọc';
+          sumEl.textContent = '0 đơn khớp';
         } else {
-          sumEl.textContent = `Đang hiển thị đơn ${startIdx + 1} - ${endIdx} / Tổng ${totalFiltered} đơn`;
+          sumEl.textContent = `Đơn ${startIdx + 1}-${endIdx} / ${totalFiltered}`;
         }
       }
       const pageIndEl = document.getElementById('pageIndicatorText');
-      if (pageIndEl) pageIndEl.textContent = `Trang ${currentPage} / ${totalFilteredPages}`;
+      if (pageIndEl) pageIndEl.textContent = `Trang ${currentPage}/${totalFilteredPages}`;
       const prevBtn = document.getElementById('btnPrevPage');
       if (prevBtn) prevBtn.disabled = (currentPage <= 1);
       const nextBtn = document.getElementById('btnNextPage');
@@ -5019,7 +4984,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const actualPhoto = order.photo || (order.photoId && photoMemoryCache.get(order.photoId)) || '';
         const photoInner = actualPhoto
-          ? `<img src="${actualPhoto}" alt="Ảnh đơn" title="Bấm để phóng to / Ctrl+V để thay ảnh" class="w-full h-full object-cover" />
+          ? `<img src="${actualPhoto}" loading="lazy" decoding="async" alt="Ảnh đơn" title="Bấm để phóng to / Ctrl+V để thay ảnh" class="w-full h-full object-cover" />
              <div class="photo-overlay absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
                <span class="text-white text-[10px]" title="Phóng to">🔍</span>
                <button type="button" onclick="event.stopPropagation(); triggerPcOcrForOrder(${orderIdx})" class="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow" title="Đọc chữ từ ảnh tem này">⚡</button>
@@ -5187,9 +5152,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       tbody.innerHTML = html;
-      recalcTotalsAndSummary();
       applyLockUI();
       updateDateSortUI();
+      if (rebuildSummaryImmediately) {
+        recalcTotalsAndSummary();
+      } else {
+        // Khi chỉ lật trang / đổi tab / gõ tìm kiếm, cập nhật tức thì KPI & số đếm tab (0ms),
+        // và trì hoãn nhẹ việc vẽ lại bảng 300+ SKU phía dưới để lật trang mượt 60fps không bao giờ khựng!
+        if (summaryRenderDebounceTimer) clearTimeout(summaryRenderDebounceTimer);
+        recalcTotalsAndSummary(true);
+        summaryRenderDebounceTimer = setTimeout(() => {
+          recalcTotalsAndSummary(false);
+        }, 120);
+      }
     }
 
     function recalcTotalsAndSummary(skipDomRebuildIfTyping = false) {
@@ -5332,14 +5307,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const previewEl = document.getElementById('searchPreviewBar');
       if (!kw) {
-        previewEl.className = 'text-xs px-3 py-1.5 rounded bg-slate-200/70 text-slate-700';
-        previewEl.innerHTML = '💡 <b>Mẹo:</b> Đã tách riêng <b>Ngày Gửi Đi</b>, <b>Ngày Khách Bấm Hoàn</b> và <b>Ngày Hàng Về Kho</b>. Khi bạn đổi trạng thái sang <b>[🟢 Hàng đã trả]</b>, cột Ngày Hàng Về Kho sẽ tự động điền ngày hôm nay!';
+        previewEl.className = 'hidden';
+        previewEl.innerHTML = '';
       } else if (matchCount === 0) {
-        previewEl.className = 'text-xs px-3 py-1.5 rounded bg-rose-100 text-rose-800 font-semibold';
+        previewEl.className = 'text-xs px-2.5 py-1 rounded bg-rose-100 text-rose-800 font-semibold';
         previewEl.innerHTML = `❌ Không tìm thấy đơn hàng nào khớp với từ khóa <b>"${escapeAttr(kw)}"</b>`;
       } else {
         const spSummary = firstMatch.items.map(x => `${x.product} (${x.color}/${x.size} x${x.qty})`).join(', ');
-        previewEl.className = 'text-xs px-3 py-1.5 rounded bg-amber-100 border border-amber-300 text-amber-900 font-semibold';
+        previewEl.className = 'text-xs px-2.5 py-1 rounded bg-amber-100 border border-amber-300 text-amber-900 font-semibold';
         previewEl.innerHTML = `✅ Tìm thấy <b>${matchCount} đơn</b> khớp! Đơn đầu tiên (#${firstMatchIdx}): Mã đơn <b>${escapeAttr(firstMatch.orderId)}</b> | MVĐ: <b>${escapeAttr(firstMatch.track)}</b> | Ngày bấm hoàn: <b>${escapeAttr(firstMatch.returnDate)}</b> | Gồm ${firstMatch.items.length} SP: <b>${escapeAttr(spSummary)}</b> | Trạng thái: <b>[${firstMatch.status}]</b>`;
       }
 
@@ -6642,7 +6617,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=121',
+      github: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=122',
       brewpage: 'https://my-uywwt16q64.brewpage.app/',
       beacon: 'https://hinged-butte-86.beacon.host/',
       short: 'https://is.gd/vOTcdJ'

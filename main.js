@@ -199,7 +199,7 @@ ipcMain.handle('read-hard-drive-data', async () => {
   try {
     const dataFilePath = getDataFilePath();
     if (fs.existsSync(dataFilePath)) {
-      const raw = fs.readFileSync(dataFilePath, 'utf8');
+      const raw = await fs.promises.readFile(dataFilePath, 'utf8');
       const parsed = JSON.parse(raw);
       return { success: true, data: parsed, path: dataFilePath };
     }
@@ -209,11 +209,36 @@ ipcMain.handle('read-hard-drive-data', async () => {
   }
 });
 
+let isWritingDisk = false;
+let pendingWriteData = null;
+
+async function flushDiskWriteQueue() {
+  if (isWritingDisk || !pendingWriteData) return;
+  isWritingDisk = true;
+  const dataToWrite = pendingWriteData;
+  pendingWriteData = null;
+  const dataFilePath = getDataFilePath();
+  const tempFilePath = dataFilePath + '.tmp';
+  try {
+    await fs.promises.writeFile(tempFilePath, JSON.stringify(dataToWrite), 'utf8');
+    await fs.promises.rename(tempFilePath, dataFilePath);
+  } catch (err) {
+    try {
+      await fs.promises.writeFile(dataFilePath, JSON.stringify(dataToWrite), 'utf8');
+    } catch (e2) {}
+  } finally {
+    isWritingDisk = false;
+    if (pendingWriteData) {
+      flushDiskWriteQueue();
+    }
+  }
+}
+
 ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   try {
-    const dataFilePath = getDataFilePath();
-    fs.writeFileSync(dataFilePath, JSON.stringify(dataToSave, null, 2), 'utf8');
-    return { success: true, path: dataFilePath, time: new Date().toLocaleTimeString('vi-VN') };
+    pendingWriteData = dataToSave;
+    flushDiskWriteQueue();
+    return { success: true, path: getDataFilePath(), time: new Date().toLocaleTimeString('vi-VN') };
   } catch (err) {
     return { success: false, error: err.message };
   }

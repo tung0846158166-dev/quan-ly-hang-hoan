@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.1
+          name: QuanLyHangHoan-Windows-Installer-v1.2.2
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,26 +66,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.1
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.1 (Sửa Lỗi Đơ Con Trỏ Nhập Liệu & Bộ Lọc Bảng Tổng Kết)"
+          tag_name: v1.2.2
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.2 (Giao Diện Tinh Gọn & Tối Ưu Chống Lag Khi Nhiều Đơn / Ảnh)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.1
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.2
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.1`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.1.exe`)
-            - **Điểm nâng cấp & sửa lỗi trong v1.2.1**:
-              1. ⌨️ **Khắc phục triệt để 100% lỗi nhấp con trỏ vào ô nhập văn bản bị đơ / khóa bàn phím trên Windows**:
-                 - Thay thế toàn bộ hộp thoại `window.alert` và `window.confirm` mặc định của Windows bằng **Hộp thoại In-App thông minh** (tránh lỗi hệ điều hành Windows khóa focus bàn phím sau khi đóng thông báo Mở khóa / Xóa đơn / Nhập Excel).
-                 - Tự động kích hoạt `webContents.focus()` và giữ nguyên con trỏ trong ô đang gõ, không bao giờ làm mất con trỏ khi đang nhập liệu.
-              2. 🔍 **Khắc phục hoàn toàn Bộ Lọc Bảng Tổng Kết 300+ Phân Loại bên dưới**:
-                 - Hoạt động nhạy bén tức thì khi gõ lọc **Tên sản phẩm**, **Màu sắc**, **Size** (hỗ trợ tìm cả có dấu lẫn không dấu, ví dụ gõ `quan` hoặc `quần` đều ra `Quần jeans`, `Quần kaki`) và lọc theo trạng thái (`Đã có hàng về`, `Có chênh lệch`, `Đang chờ về`, `Bị mất`).
-                 - Hiển thị chính xác bộ đếm `Hiển thị X / Y phân loại` và nút `✕ Xóa bộ lọc`.
-                 - Chống giật lag khi gõ vào **Ô Tìm Kiếm Nhanh** và khi gõ sửa thông tin từng ô.
-              4. 📸 **Sửa triệt để lỗi Quét Mã Điện Thoại Tự Chụp Đơn "Cái Được Cái Không"**:
-                 - Tự động chia nhỏ ảnh chụp thành các gói `< 2.5KB` khi truyền qua `ntfy.sh` kết hợp `MQTT`, vượt qua giới hạn `4KB` của máy chủ để **100% lần quét đều nhận đủ cả mã vạch lẫn ảnh chụp kiện hàng**.
-                 - Xử lý thông minh khi gói ảnh đến sau gói mã vạch 50–300ms (không bị bộ chống trùng 2 giây chặn nhầm).
-                 - Lưu thẳng hình ảnh chụp vào file dữ liệu trên ổ cứng máy tính (`Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`).
-              5. 💾 **Giữ nguyên 100% dữ liệu cũ**: Cài đè trực tiếp lên bản cũ, toàn bộ 511+ đơn hàng trên ổ cứng được giữ nguyên vẹn.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.2`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.2.exe`)
+            - **Điểm nâng cấp & tối ưu trong v1.2.2**:
+              1. 🎨 **Thu gọn thanh công cụ & gom nhóm nút chức năng gọn gàng**:
+                 - Chỉ giữ lại **3 nút thao tác chính** ở ngoài (`📱 Quét Bằng ĐT`, `➕ Thêm Đơn`, `🔓 Đang Mở Khóa`).
+                 - Gom toàn bộ các công cụ phụ vào **2 menu thả xuống gọn gàng**: `📂 Nhập / Xuất Dữ Liệu ▾` và `⚙️ Hệ Thống ▾`.
+                 - Thu gọn chiều cao **Ô Tìm Kiếm Nhanh** và **4 ô thống kê tổng SL** xuống còn 1 dòng mỏng (`28px`), ẩn thanh mẹo tĩnh khi không tìm kiếm.
+                 - Gộp các nút lọc sàn, sắp xếp ngày, lọc mốc ngày và phân trang vào **1 hàng duy nhất**, giúp phần bảng dữ liệu đơn hàng rộng rãi hơn rất nhiều.
+              2. ⚡ **Triệt tiêu hiện tượng lag khi hiển thị nhiều đơn & nhiều ảnh chụp**:
+                 - Chuyển cơ chế ghi file ổ cứng trong `main.js` sang **Bất đồng bộ hoàn toàn (`fs.promises.writeFile` + Queue)** kết hợp **Debounce 300ms**, không bao giờ làm khựng giao diện khi quét liên tục hoặc sửa đơn.
+                 - Tối ưu hiển thị ảnh đơn hàng với `loading="lazy" decoding="async"` và CSS `content-visibility: auto`.
+                 - Mặc định phân trang **50 đơn/trang (Siêu mượt)** và tách riêng việc cập nhật số liệu tức thì (0ms) với việc vẽ lại bảng tổng kết 300+ SKU phía dưới.
+              3. 💾 **Giữ nguyên 100% dữ liệu cũ**: Cài đè trực tiếp lên bản đang dùng, toàn bộ đơn hàng và hình ảnh trong `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json` được giữ nguyên vẹn.
           files: |
             dist/*.exe
         env:

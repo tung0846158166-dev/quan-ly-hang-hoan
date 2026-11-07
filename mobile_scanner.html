@@ -521,22 +521,33 @@
       <input id="roomCodeInput" class="room-input" value="SHP-2026" onchange="changeRoomCode(this.value)" />
     </div>
 
-    <!-- KHỐI HÀNG ĐỢI NGOẠI TUYẾN KÈM ẢNH (OFFLINE QUEUE WITH PHOTOS) -->
+        <!-- KHỐI HÀNG ĐỢI NGOẠI TUYẾN KÈM ẢNH (OFFLINE QUEUE WITH PHOTOS) -->
     <div id="offlineQueueCard" class="hidden" style="margin-bottom: 12px; background: linear-gradient(135deg, #0f172a, #1e293b); border: 1.5px solid #f59e0b; border-radius: 14px; padding: 12px 14px; color: #fff; box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
         <span style="font-size:12px; font-weight:900; color:#fbbf24; display:flex; align-items:center; gap:6px;">
-          <span>⚡ HÀNG ĐỢI OFFLINE (LÚC PC TẮT):</span>
-          <span id="offlineCountBadge" style="background:#f59e0b; color:#000; font-size:11px; padding:1px 8px; border-radius:999px; font-weight:900;">0 kiện</span>
+          <span>⚡ ĐANG CHỜ ĐỒNG BỘ:</span>
+          <span id="offlineCountBadge" style="background:#f59e0b; color:#000; font-size:11px; padding:2px 9px; border-radius:999px; font-weight:900;">0 kiện</span>
         </span>
         <span id="offlinePhotoCountBadge" style="font-size:11px; color:#38bdf8; font-weight:bold;">📸 0 ảnh</span>
       </div>
       <p style="font-size:11px; color:#cbd5e1; margin:0 0 10px 0; line-height:1.4;">
-        Toàn bộ mã và <b>ảnh chụp bóc kiện</b> được lưu an toàn 100% trong bộ nhớ máy. Khi mở máy tính, bấm nút bên dưới để đẩy trọn gói sang máy tính:
+        Các đơn & ảnh chụp bóc kiện được lưu an toàn trong máy. Bạn có thể xóa từng đơn hoặc bấm đồng bộ:
       </p>
-      <button onclick="syncOfflineQueueToPc()" id="btnSyncOffline" style="width:100%; background:linear-gradient(135deg, #f59e0b, #d97706); color:#0f172a; border:none; border-radius:9px; padding:10px 14px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; box-shadow:0 3px 10px rgba(245,158,11,0.45); transition:transform 0.1s ease;">
-        <span>🔄 ĐỒNG BỘ TOÀN BỘ MÃ & ẢNH SANG MÁY TÍNH (1-CHẠM)</span>
-      </button>
-      <div id="syncProgressText" style="display:none; font-size:11px; color:#38bdf8; font-weight:bold; margin-top:6px; text-align:center;">Đang đồng bộ...</div>
+
+      <!-- Danh sách cuộn các đơn đang chờ đồng bộ -->
+      <div id="offlineQueueItemsList" style="max-height: 160px; overflow-y: auto; margin-bottom: 10px; background: rgba(0,0,0,0.35); border-radius: 9px; padding: 6px; border: 1px solid rgba(245,158,11,0.25);">
+      </div>
+
+      <!-- Cụm nút thao tác: Đồng bộ & Xóa tất cả hàng đợi -->
+      <div style="display:grid; grid-template-columns: 1fr auto; gap: 8px;">
+        <button onclick="syncOfflineQueueToPc()" id="btnSyncOffline" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:#0f172a; border:none; border-radius:9px; padding:10px 12px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 3px 10px rgba(245,158,11,0.45); transition:transform 0.1s ease;">
+          <span>🔄 ĐỒNG BỘ SANG MÁY TÍNH</span>
+        </button>
+        <button onclick="clearAllOfflineQueue()" id="btnClearOfflineQueue" style="background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid #ef4444; border-radius:9px; padding:10px 12px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; transition:all 0.15s ease;" title="Xóa toàn bộ các đơn đang chờ đồng bộ">
+          <span>🧹 Xóa tất cả</span>
+        </button>
+      </div>
+      <div id="syncProgressText" style="display:none; font-size:11px; color:#38bdf8; font-weight:bold; margin-top:8px; text-align:center;">Đang đồng bộ...</div>
     </div>
 
     <div class="camera-box">
@@ -944,11 +955,28 @@
         } else if (isNotFound) {
           badgeSpan.textContent = `🟡 KHÔNG CÓ TRÊN HT`;
         } else {
+          if (entry.synced !== true && !isDup && !isNotFound) {
+          badgeSpan.textContent = entry.orderNum ? `🟢 ĐƠN #${entry.orderNum} (Chờ đồng bộ)` : '⏳ Chờ đồng bộ';
+          badgeSpan.style.background = '#f59e0b';
+          badgeSpan.style.color = '#0f172a';
+        } else {
           badgeSpan.textContent = entry.orderNum ? `🟢 ĐƠN #${entry.orderNum}` : '🟢 HỢP LỆ';
+        }
         }
 
         topRow.appendChild(codeSpan);
         topRow.appendChild(badgeSpan);
+
+        // Nút xóa từng đơn trong lịch sử
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '🗑️';
+        delBtn.title = 'Xóa đơn này';
+        delBtn.style.cssText = 'background:transparent; border:none; color:#ef4444; font-size:12px; cursor:pointer; padding:2px 4px; margin-left:6px; border-radius:4px;';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteSingleHistoryItem(entry.code);
+        };
+        topRow.appendChild(delBtn);
 
         const botRow = document.createElement('div');
         botRow.className = 'history-bottom-row';
@@ -1999,16 +2027,72 @@
     });
   
     // =========================================================================
-    // v1.3.5: QUẢN LÝ HÀNG ĐỢI OFFLINE KÈM ẢNH (OFFLINE PHOTO QUEUE ENGINE)
+    // v1.6.2: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
     // =========================================================================
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function getUnsyncedItems() {
       return scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
+    }
+
+    function removeSingleOfflineItem(code) {
+      const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
+      const idx = scanHistory.findIndex(e => (extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase()) === clean && e.synced !== true && e.status === 'success');
+      if (idx !== -1) {
+        scanHistory.splice(idx, 1);
+        saveScanHistory();
+        updateOfflineQueueUI();
+        renderScanHistory();
+        if (typeof showToast === 'function') {
+          showToast('Đã xóa đơn ' + clean + ' khỏi hàng đợi đồng bộ!');
+        }
+      }
+    }
+
+    function clearAllOfflineQueue() {
+      const unsynced = getUnsyncedItems();
+      if (!unsynced.length) {
+        alert('Hàng đợi hiện không có đơn nào đang chờ đồng bộ!');
+        return;
+      }
+      if (confirm(`Bạn có chắc muốn xóa TẤT CẢ ${unsynced.length} đơn đang chờ đồng bộ không?\n(Các đơn này sẽ không được gửi sang máy tính nữa)`)) {
+        scanHistory = scanHistory.filter(e => e.synced === true || e.status !== 'success');
+        saveScanHistory();
+        updateOfflineQueueUI();
+        renderScanHistory();
+        if (typeof showToast === 'function') {
+          showToast(`Đã xóa sạch ${unsynced.length} đơn chờ đồng bộ!`);
+        }
+      }
+    }
+
+    function deleteSingleHistoryItem(code) {
+      const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
+      const idx = scanHistory.findIndex(e => (extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase()) === clean);
+      if (idx !== -1) {
+        scanHistory.splice(idx, 1);
+        saveScanHistory();
+        updateOfflineQueueUI();
+        renderScanHistory();
+        if (typeof showToast === 'function') {
+          showToast('Đã xóa đơn ' + clean + ' khỏi lịch sử quét!');
+        }
+      }
     }
 
     function updateOfflineQueueUI() {
       const card = document.getElementById('offlineQueueCard');
       const badge = document.getElementById('offlineCountBadge');
       const photoBadge = document.getElementById('offlinePhotoCountBadge');
+      const listEl = document.getElementById('offlineQueueItemsList');
       if (!card || !badge) return;
 
       const unsynced = getUnsyncedItems();
@@ -2018,8 +2102,30 @@
         card.classList.remove('hidden');
         badge.textContent = unsynced.length + ' kiện';
         if (photoBadge) photoBadge.textContent = '📸 ' + photoCount + ' ảnh';
+
+        if (listEl) {
+          listEl.innerHTML = unsynced.map((item, i) => {
+            const timeStr = item.time ? new Date(item.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
+            const hasPhoto = item.photo && item.photo.length > 50;
+            const codeDisplay = escapeHtml(item.code || '');
+            return `
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-bottom:4px; background:rgba(255,255,255,0.07); border-radius:7px; font-size:11px; border:1px solid rgba(255,255,255,0.06);">
+                <div style="display:flex; align-items:center; gap:6px; overflow:hidden; min-width:0;">
+                  <span style="color:#fbbf24; font-weight:bold; font-size:10px;">#${i + 1}</span>
+                  <span style="font-family:monospace; font-weight:800; color:#fff; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:130px;" title="${codeDisplay}">${codeDisplay}</span>
+                  ${hasPhoto ? '<span style="font-size:9.5px; color:#38bdf8; background:rgba(56,189,248,0.22); padding:1px 5px; border-radius:4px; font-weight:bold; white-space:nowrap;">📸 Có ảnh</span>' : ''}
+                  <span style="color:#94a3b8; font-size:10px; white-space:nowrap;">${timeStr}</span>
+                </div>
+                <button onclick="removeSingleOfflineItem('${codeDisplay}')" style="background:#ef4444; color:#fff; border:none; border-radius:5px; padding:3px 8px; font-size:10px; font-weight:bold; cursor:pointer; margin-left:6px; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.3);">
+                  ✕ Xóa
+                </button>
+              </div>
+            `;
+          }).join('');
+        }
       } else {
         card.classList.add('hidden');
+        if (listEl) listEl.innerHTML = '';
       }
     }
 

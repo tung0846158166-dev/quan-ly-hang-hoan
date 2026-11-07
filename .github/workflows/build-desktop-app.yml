@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.1
+          name: QuanLyHangHoan-Windows-Installer-v1.6.2
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,17 +67,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.1
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.1 (Tối Ưu Tinh Gọn Giao Diện 4 Tầng, Sắp Xếp Hạn Cần Xử Lý Thông Minh, Tự Bỏ Chọn Sau Theo Dõi & Dọn Đơn Đã Về)"
+          tag_name: v1.6.2
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.2 (Tối Ưu Tinh Gọn Giao Diện 4 Tầng, Sắp Xếp Hạn Cần Xử Lý Thông Minh, Tự Bỏ Chọn Sau Theo Dõi & Dọn Đơn Đã Về)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.1
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.2
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.1`)
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.2`)
             - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.1.exe`)
-            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.1**:
+            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.2**:
               1. 🎨 **Tối Ưu Tinh Gọn Giao Diện 4 Tầng Chuẩn Mực**:
                  - Tối ưu gom 7 thanh xếp chồng cồng kềnh trước đây xuống còn **4 tầng điều khiển cực kỳ thông thoáng, đẳng cấp**, giải phóng thêm 50% diện tích để hiển thị bảng đơn hàng.
-                 - Tầng 1 (Top Bar đỏ): Gom logo, phiên bản v1.6.1, 1 badge lưu an toàn duy nhất và nhóm nút thao tác chính trên 1 hàng thẳng tắp.
+                 - Tầng 1 (Top Bar đỏ): Gom logo, phiên bản v1.6.2, 1 badge lưu an toàn duy nhất và nhóm nút thao tác chính trên 1 hàng thẳng tắp.
                  - Tầng 2 (Điều hướng tổng): Gộp Tuần nạp, Sàn TMĐT (segmented buttons phẳng hiện đại), Chế độ xem bảng (chuyển lên đây loại bỏ hẳn hàng đen cũ), Phân tích & Ca nhận.
                  - Tầng 3 (Tìm kiếm & Pipeline): Ô tìm nhanh viền cam nổi bật + 7 Tab Pipeline trạng thái có màu sắc tương phản cao + Nút Xuất Đơn Đã Về.
                  - Tầng 4 (Bộ lọc chi tiết & Phân trang): Loại đơn, Trước/Thường, MVĐ, Sắp xếp ngày & hạn xử lý, Lọc ngày giờ đa năng thu gọn và thanh phân trang.

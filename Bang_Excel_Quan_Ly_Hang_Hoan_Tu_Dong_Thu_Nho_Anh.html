@@ -190,6 +190,54 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       contain-intrinsic-size: auto 34px;
     }
   
+    /* Sticky Checkbox & STT Columns on Horizontal Scroll (v1.6.1) */
+    .excel-table th:nth-child(1) {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 34 !important;
+      width: 48px !important;
+      min-width: 48px !important;
+      max-width: 48px !important;
+      background-color: #0f172a !important; /* slate-900 */
+    }
+    .excel-table td:nth-child(1) {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 18 !important;
+      width: 48px !important;
+      min-width: 48px !important;
+      max-width: 48px !important;
+      background-color: #f8fafc;
+    }
+    .excel-table th:nth-child(2) {
+      position: sticky !important;
+      left: 48px !important;
+      z-index: 34 !important;
+      width: 40px !important;
+      min-width: 40px !important;
+      max-width: 40px !important;
+      background-color: #0f172a !important; /* slate-900 */
+      border-right: 2px solid #475569 !important;
+    }
+    .excel-table td:nth-child(2) {
+      position: sticky !important;
+      left: 48px !important;
+      z-index: 18 !important;
+      width: 40px !important;
+      min-width: 40px !important;
+      max-width: 40px !important;
+      background-color: #f8fafc;
+      border-right: 2px solid #cbd5e1 !important;
+    }
+    .excel-table tr:hover td:nth-child(1),
+    .excel-table tr:hover td:nth-child(2) {
+      background-color: #f1f5f9 !important;
+    }
+    .excel-table tr.bg-blue-50 td:nth-child(1),
+    .excel-table tr.bg-blue-50 td:nth-child(2) {
+      background-color: #eff6ff !important;
+    }
+
     /* Sticky Table Footers & Bottom Summary Dock */
     #mainTableScrollContainer table tfoot tr {
       position: sticky !important;
@@ -218,71 +266,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <div class="w-full bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 overflow-hidden">
 
-    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions -->
-    <div class="bg-[#ee4d2d] text-white px-4 py-2 flex flex-wrap items-center justify-between gap-2 relative z-30">
-      <div class="flex flex-wrap items-center gap-2">
-        <h1 class="text-sm sm:text-base font-extrabold tracking-wide uppercase">
-          📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
+    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.1) -->
+    <div class="bg-[#ee4d2d] text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 relative z-30">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
+          <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.6.0
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.1">
+          🚀 v1.6.1
         </span>
-        <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
-        <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
-              class="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded-full cursor-pointer transition shadow-2xs"
-              title="Bấm để mở thư mục chứa file dữ liệu vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan)">
-          <span>💾 Tự lưu ổ cứng</span>
-          <span class="text-[10px]">📁</span>
-        </span>
-        <!-- Nút Trung Tâm Lưu Trữ An Toàn & Đóng Gói Tháng -->
+        <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
-              class="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-950 bg-emerald-200 hover:bg-emerald-300 border border-emerald-400 px-2.5 py-0.5 rounded-full cursor-pointer transition shadow-2xs select-none"
-              title="Trung tâm lưu trữ an toàn IndexedDB không giới hạn dung lượng, đóng gói lưu trữ theo tháng và sao lưu dự phòng">
-          <span>🛡️ Lưu Trữ An Toàn</span>
-          <span id="safeStorageCountBadge" class="bg-emerald-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">250 đơn</span>
+              class="inline-flex items-center gap-1 text-[10.5px] font-extrabold text-emerald-950 bg-emerald-200 hover:bg-emerald-300 border border-emerald-400 px-2 py-0.5 rounded-full cursor-pointer transition shadow-2xs select-none"
+              title="Trung tâm lưu trữ an toàn IndexedDB không giới hạn dung lượng & sao lưu ổ cứng">
+          <span>🛡️ Lưu An Toàn:</span>
+          <span id="safeStorageCountBadge" class="bg-emerald-800 text-white text-[9.5px] px-1.5 py-0.2 rounded-full font-bold">250 đơn</span>
         </button>
+        <span id="diskSaveNotice" class="hidden" style="display:none !important"></span>
       </div>
 
-      <div class="flex flex-wrap items-center gap-1.5 no-print">
-        <!-- Chỉ giữ 3 nút thao tác trực tiếp quan trọng nhất ở ngoài -->
-        <!-- Nút Trung Tâm Thông Báo & Cập Nhật (v1.5.0) -->
-        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.0) -->
+      <div class="flex flex-wrap items-center gap-1 text-xs no-print">
+        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.1) -->
         <button type="button" id="btnOpenWatchlistModal" onclick="openWatchlistModal()"
-              class="relative inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-amber-300 cursor-pointer select-none active:scale-95"
-              title="Mở Bảng Theo Dõi Đơn Hàng Đặc Biệt: Xem các đơn được tích chọn theo dõi riêng, hạn xử lý và tiến độ">
+              class="relative inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-lg shadow-2xs transition ring-1 ring-amber-300 cursor-pointer select-none active:scale-95"
+              title="Mở Bảng Theo Dõi Đơn Hàng Đặc Biệt">
           <span>⭐</span>
-          <span>Đơn Theo Dõi</span>
+          <span>Theo Dõi</span>
           <span id="headerWatchlistCountBadge" class="bg-slate-900 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-black">0</span>
         </button>
+
+        <!-- Nút Trung Tâm Thông Báo & Cập Nhật -->
         <button type="button" id="btnNotificationCenter" onclick="openNotificationModal()"
-              class="relative inline-flex items-center gap-1.5 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-amber-200 cursor-pointer select-none"
-              title="Mở Bảng Thông Báo: Xem lịch sử quét điện thoại, kết quả nạp file cập nhật trạng thái và tra cứu theo Mã đơn / MVĐ">
+              class="relative inline-flex items-center gap-1 px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-lg shadow-2xs transition ring-1 ring-amber-200 cursor-pointer select-none"
+              title="Mở Bảng Thông Báo & Lịch Sử Quét Điện Thoại">
           <span>🔔</span>
           <span>Thông Báo</span>
           <span id="unreadNotifBadge" class="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black animate-pulse">0</span>
         </button>
-        <button id="btnPhoneScanner" onclick="openPhoneScannerModal()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-sky-200 flex items-center gap-1 cursor-pointer" title="Dùng Camera Điện Thoại quét mã vạch trên bọc hàng hoàn -> Tự động nhảy thẳng vào bảng máy tính này!">
+
+        <!-- Quét Bằng ĐT -->
+        <button id="btnPhoneScanner" onclick="openPhoneScannerModal()" class="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-lg shadow-2xs transition ring-1 ring-sky-200 flex items-center gap-1 cursor-pointer" title="Dùng Camera Điện Thoại quét mã vạch">
           <span>📱</span>
-          <span>Quét Bằng ĐT</span>
-        </button>
-        <button id="btnAddOrder" onclick="addOrder()" class="px-3 py-1 bg-white text-[#ee4d2d] hover:bg-orange-50 font-black text-xs rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer" title="Thêm 1 dòng đơn hàng mới (Phím tắt: Alt + N)">
-          <span>➕</span>
-          <span>Thêm Đơn (Alt+N)</span>
-        </button>
-        <button id="btnLockToggle" onclick="togglePasswordLock()" class="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-xs transition cursor-pointer" title="Khóa / Mở khóa bảng chỉ xem (Mẹo: Nhấp Chuột phải vào bất kỳ ô nào để khóa riêng ô đó)">
-          🔓 Đang Mở Khóa
+          <span>Quét ĐT</span>
         </button>
 
-        <!-- Menu Gộp 1: Nhập & Xuất Dữ Liệu (Gom toàn bộ Nhập đơn, Xuất Excel, Sao lưu, Khiếu nại, Lưu HTML vào 1 menu gọn gàng) -->
+        <!-- Thêm Đơn (Alt+N) -->
+        <button id="btnAddOrder" onclick="addOrder()" class="px-2.5 py-1 bg-white text-[#ee4d2d] hover:bg-orange-50 font-black text-xs rounded-lg shadow-2xs transition flex items-center gap-1 cursor-pointer" title="Thêm 1 dòng đơn hàng mới (Alt + N)">
+          <span>➕</span>
+          <span>Thêm Đơn</span>
+        </button>
+
+        <!-- Nạp Nhanh Shopee & TikTok (Đặt trực tiếp tại Header, siêu tiện) -->
+        <button type="button" id="btnImportShopeeRow15" onclick="openShopeeDbModal('shopee')"
+                class="px-2.5 py-1 rounded-lg font-extrabold text-xs bg-white text-[#ee4d2d] hover:bg-orange-100 shadow-2xs transition flex items-center gap-1 cursor-pointer shrink-0"
+                title="Nạp file Shopee (Đơn hủy, Giao thất bại, Trả hàng/Hoàn tiền)">
+          <span>🟠 Nạp Shopee</span>
+        </button>
+        <button type="button" id="btnImportTikTokRow15" onclick="openShopeeDbModal('tiktok')"
+                class="px-2.5 py-1 rounded-lg font-extrabold text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer shrink-0"
+                title="Nạp file TikTok Shop / Salework">
+          <span>⚫ Nạp TikTok</span>
+        </button>
+
+        <!-- Menu Gộp 1: Nhập / Xuất Dữ Liệu -->
         <div class="relative inline-block text-left header-dropdown-container">
           <button
             type="button"
             id="btnMenuImport"
             onclick="toggleHeaderMenu(event, 'headerMenuImport')"
-            class="px-3 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-            title="Nạp file Shopee/TikTok, Dán nhanh nhiều đơn, Xuất Excel, Sao lưu & Khiếu nại sàn"
+            class="px-2.5 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1 cursor-pointer"
+            title="Nạp file, Dán nhanh nhiều đơn, Xuất Excel, Sao lưu & Khiếu nại sàn"
           >
-            <span>📂 Nhập / Xuất Dữ Liệu</span>
+            <span>📂 Nhập / Xuất</span>
             <span id="headerImportDot" class="hidden w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse"></span>
             <span class="text-[10px] opacity-80">▾</span>
           </button>
@@ -477,7 +532,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             type="button"
             id="btnMenuTools"
             onclick="toggleHeaderMenu(event, 'headerMenuTools')"
-            class="px-3 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            class="px-2.5 py-1 bg-orange-950/70 hover:bg-orange-950 text-white font-bold text-xs rounded-lg border border-orange-300/40 shadow-xs transition flex items-center gap-1 cursor-pointer"
             title="Cài đặt danh mục SP, mật khẩu, ổ cứng và nhật ký bảo mật"
           >
             <span>⚙️ Hệ Thống</span>
@@ -588,339 +643,300 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.0</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.1</span>
               </div>
             </div>
           </div>
-        </div>
+
+        <!-- Nút Khóa / Mở Khóa -->
+        <button id="btnLockToggle" onclick="togglePasswordLock()" class="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs rounded-lg shadow-2xs transition cursor-pointer" title="Khóa / Mở khóa bảng chỉ xem">
+          🔓 Mở Khóa
+        </button>
       </div>
     </div>
 
-    <!-- Row 1.5: Thanh Phân Loại 2 Sàn Riêng Biệt (🟠 SÀN SHOPEE vs ⚫ SÀN TIKTOK SHOP) + Nút Nạp Tách Biệt -->
-    <div class="px-2.5 py-1 bg-gradient-to-r from-orange-50 via-white to-slate-100 border-b border-slate-200 flex flex-nowrap items-center justify-between gap-2 overflow-x-auto no-print scrollbar-thin">
-      <div class="flex flex-nowrap items-center gap-1 shrink-0" id="platformBigTabs">
-        <span class="text-[11px] font-extrabold text-slate-700 uppercase tracking-wide mr-1 flex items-center gap-1">
-          <span>🛍️ PHÂN LOẠI SÀN:</span>
-        </span>
-        <button type="button" id="platBigBtn_all" onclick="setPlatformFilter('all')"
-                class="px-3 py-1 rounded-lg font-extrabold text-xs transition flex items-center gap-1.5 bg-indigo-700 text-white shadow-xs ring-2 ring-indigo-300 cursor-pointer">
-          <span>🌐 Gộp Cả 2 Sàn</span>
-          <span id="platCount_all" class="bg-white/20 text-white text-[10.5px] px-1.5 py-0.2 rounded-full">0 đơn</span>
-        </button>
-        <button type="button" id="platBigBtn_Shopee" onclick="setPlatformFilter('Shopee')"
-                class="px-3 py-1 rounded-lg font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-[#ee4d2d] border border-orange-300 hover:bg-orange-50 cursor-pointer">
-          <span>🟠 RIÊNG SÀN SHOPEE</span>
-          <span id="platCount_Shopee" class="bg-orange-100 text-orange-900 text-[10.5px] px-1.5 py-0.2 rounded-full">0 đơn (0 SP)</span>
-        </button>
-        <button type="button" id="platBigBtn_TikTok" onclick="setPlatformFilter('TikTok Shop')"
-                class="px-3 py-1 rounded-lg font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-slate-900 border border-slate-300 hover:bg-slate-100 cursor-pointer">
-          <span>⚫ RIÊNG SÀN TIKTOK SHOP</span>
-          <span id="platCount_TikTok" class="bg-slate-200 text-slate-900 text-[10.5px] px-1.5 py-0.2 rounded-full">0 đơn (0 SP)</span>
-        </button>
-      </div>
-      <div class="flex flex-nowrap items-center gap-1.5 shrink-0">
-        <button type="button" onclick="openAnalyticsDashboardModal()"
-                class="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-indigo-700 hover:bg-indigo-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
-                title="Bảng phân tích chuyên sâu: Top mẫu áo bị hoàn nhiều nhất, lý do hoàn và đối soát chi phí vận chuyển 2 chiều">
-          <span>📊 Phân Tích & Đối Soát</span>
-        </button>
-        <button type="button" onclick="openBatchSessionModal()" id="btnSessionScanHeader"
-                class="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
-                title="Quản lý ca quét nhận kiện từ shipper, xem số kiện đã nhận trong ca và xuất biên bản giao nhận">
-          <span>📦 Ca Nhận: <span id="sessionScanCountBadge" class="bg-white/20 px-1 rounded">0</span> kiện</span>
-        </button>
-        <button type="button" id="btnImportShopeeRow15" onclick="openShopeeDbModal('shopee')"
-                class="px-2.5 py-0.5 rounded-lg font-extrabold text-[11px] bg-[#ee4d2d] hover:bg-orange-700 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer shrink-0"
-                title="Mở cơ chế nạp dữ liệu chuyên biệt cho Sàn Shopee (Đơn hủy, Giao thất bại, Trả hàng/Hoàn tiền)">
-          <span>📥 Nạp Đơn Shopee</span>
-        </button>
-        <button type="button" id="btnImportTikTokRow15" onclick="openShopeeDbModal('tiktok')"
-                class="px-2.5 py-0.5 rounded-lg font-extrabold text-[11px] bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer shrink-0"
-                title="Mở cơ chế nạp dữ liệu chuyên biệt cho Sàn TikTok / Salework (Giữ nguyên chữ Premium Cao Cấp, tự lấy MVĐ & chọn cột Giá trị)">
-          <span>📥 Nạp Đơn TikTok</span>
-        </button>
-        <div id="activePlatformBannerBadge" class="hidden xl:inline-block text-[11px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
-          🌐 Đang hiển thị & thống kê: <b>Cả 2 sàn (Shopee + TikTok Shop)</b>
-        </div>
-      </div>
-    </div>
-
-    
-    <!-- Row 1.6: Thanh Tab Phân Chia Số Lượng Đơn Theo Tuần Nạp File Excel (Weekly Import Tabs) -->
-    <div class="px-3 py-1.5 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-slate-100 border-b border-purple-200/80 flex flex-wrap items-center justify-between gap-2 no-print">
-      <div class="flex flex-wrap items-center gap-1.5" id="weeklyImportTabsContainer">
-        <span class="text-[11px] font-extrabold text-purple-950 uppercase tracking-wide mr-1 flex items-center gap-1">
-          <span>📅 PHÂN CHIA THEO TUẦN NẠP:</span>
-        </span>
-        <div id="dynamicWeekTabs" class="flex flex-wrap items-center gap-1">
-          <!-- Dynamically populated tabs: All, Week 45, Week 44, etc. -->
-        </div>
-        <button type="button" onclick="openWeekTabModal()" class="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition cursor-pointer flex items-center gap-1 shadow-2xs" title="Tạo thêm tab tuần tùy chọn hoặc chọn khoảng ngày nạp file">
-          <span>➕ Thêm Tab Tuần</span>
-        </button>
-      </div>
-      <div class="text-[10.5px] text-purple-800 font-medium hidden sm:flex items-center gap-1">
-        <span>⏱️ Tuần tính theo <b>thời gian nạp file Excel</b> vào máy tính</span>
-      </div>
-    </div>
-
-    <!-- Row 2: Slim Search Bar, Inline KPI Pills & Unified Toolbar -->
-    <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 space-y-1.5">
-      <!-- Slim Line 1: Search Input + 4 Inline KPI Pills -->
-      <div class="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2">
-        <!-- Search Input Box -->
-        <div class="flex items-stretch flex-1 min-w-[280px]">
-          <div class="bg-slate-800 text-white font-bold text-[11px] px-2.5 flex items-center rounded-l-lg whitespace-nowrap">
-            🔍 TÌM NHANH:
+    <!-- Row 2: Thanh Điều Hướng: Tuần Nạp + Sàn TMĐT + Chế Độ Xem + Phân Tích & Ca Nhận (v1.6.1 Siêu Gọn) -->
+    <div class="px-3 py-1 bg-gradient-to-r from-purple-50 via-slate-50 to-indigo-50 border-b border-purple-200/80 flex flex-wrap items-center justify-between gap-2 no-print">
+      <!-- Cụm Trái: Tab Tuần Nạp & Tab Sàn TMĐT -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Tab Tuần -->
+        <div class="flex items-center gap-1" id="weeklyImportTabsContainer">
+          <span class="text-[10.5px] font-black text-purple-950 uppercase tracking-wide mr-0.5 flex items-center gap-0.5">
+            <span>📅 TUẦN:</span>
+          </span>
+          <div id="dynamicWeekTabs" class="flex flex-wrap items-center gap-1">
+            <!-- Dynamically populated tabs: All, Week 45, etc. -->
           </div>
-          <input
-            id="searchInput"
-            type="text"
-            oninput="handleSearchInputDebounced()"
-            placeholder="Nhập Mã đơn, Mã vận đơn, Tên SP, Màu sắc, Size..."
-            class="flex-1 bg-[#fef9c3] border border-[#ee4d2d] px-2.5 py-1 text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg h-7"
-          />
-          <label class="ml-2 inline-flex items-center text-[11px] font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
-            <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-orange-600 focus:ring-orange-500" />
-            Chỉ hiện đơn khớp
+          <button type="button" onclick="openWeekTabModal()" class="px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition cursor-pointer flex items-center gap-0.5 shadow-2xs" title="Tạo thêm tab tuần tùy chọn">
+            <span>➕ Tuần</span>
+          </button>
+        </div>
+
+        <div class="h-4 w-px bg-slate-300 hidden md:block"></div>
+
+        <!-- Phân Loại Sàn (Segmented Tabs gọn gàng) -->
+        <div class="flex items-center gap-1" id="platformBigTabs">
+          <span class="text-[10.5px] font-black text-slate-700 uppercase tracking-wide mr-0.5 flex items-center gap-0.5">
+            <span>🛍️ SÀN:</span>
+          </span>
+          <button type="button" id="platBigBtn_all" onclick="setPlatformFilter('all')"
+                  class="px-2.5 py-0.5 rounded-md font-extrabold text-xs transition flex items-center gap-1 bg-indigo-700 text-white shadow-2xs ring-1 ring-indigo-300 cursor-pointer">
+            <span>🌐 Cả 2 Sàn</span>
+            <span id="platCount_all" class="bg-white/20 text-white text-[10px] px-1 py-0.2 rounded-full">0</span>
+          </button>
+          <button type="button" id="platBigBtn_Shopee" onclick="setPlatformFilter('Shopee')"
+                  class="px-2.5 py-0.5 rounded-md font-extrabold text-xs transition flex items-center gap-1 bg-white text-[#ee4d2d] border border-orange-300 hover:bg-orange-50 cursor-pointer">
+            <span>🟠 Shopee</span>
+            <span id="platCount_Shopee" class="bg-orange-100 text-orange-900 text-[10px] px-1 py-0.2 rounded-full">0</span>
+          </button>
+          <button type="button" id="platBigBtn_TikTok" onclick="setPlatformFilter('TikTok Shop')"
+                  class="px-2.5 py-0.5 rounded-md font-extrabold text-xs transition flex items-center gap-1 bg-white text-slate-900 border border-slate-300 hover:bg-slate-100 cursor-pointer">
+            <span>⚫ TikTok</span>
+            <span id="platCount_TikTok" class="bg-slate-200 text-slate-900 text-[10px] px-1 py-0.2 rounded-full">0</span>
+          </button>
+          <div id="activePlatformBannerBadge" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- Cụm Phải: Chế Độ Xem (Chuyển lên đây loại bỏ hẳn hàng đen cũ) + Phân Tích & Ca Nhận -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <!-- Chế độ xem segmented pills -->
+        <div class="inline-flex items-center gap-0.5 bg-slate-200/90 p-0.5 rounded-lg border border-slate-300">
+          <span class="text-[10px] font-black text-slate-600 px-1">CHẾ ĐỘ:</span>
+          <button type="button" id="btnViewOrdersTab" onclick="switchMainView('orders')"
+                  class="px-2 py-0.5 rounded font-extrabold text-xs transition flex items-center gap-1 bg-white text-indigo-950 shadow-2xs cursor-pointer ring-1 ring-indigo-300">
+            <span>📋 Đơn Hàng</span>
+            <span id="viewOrdersCountBadge" class="bg-slate-200 text-slate-900 text-[10px] px-1 rounded-full font-mono">0</span>
+          </button>
+          <button type="button" id="btnViewSummaryTab" onclick="switchMainView('summary')"
+                  class="px-2 py-0.5 rounded font-bold text-xs transition flex items-center gap-1 text-slate-700 hover:bg-white/60 cursor-pointer"
+                  title="Xem Bảng Thống Kê Phân Loại Màu & Size">
+            <span>📊 Thống Kê SKU</span>
+            <span id="viewSummaryCountBadge" class="bg-teal-800 text-teal-100 text-[10px] px-1 rounded-full font-mono">0</span>
+          </button>
+          <button type="button" id="btnViewBothTab" onclick="switchMainView('both')"
+                  class="px-1.5 py-0.5 rounded font-semibold text-xs text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                  title="Hiển thị cả 2 bảng">
+            <span>👁️ Cả hai</span>
+          </button>
+        </div>
+
+        <button type="button" onclick="openAnalyticsDashboardModal()"
+                class="px-2 py-1 rounded-md font-extrabold text-[11px] bg-indigo-700 hover:bg-indigo-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
+                title="Bảng phân tích chuyên sâu: Top mẫu áo bị hoàn nhiều nhất, lý do hoàn và đối soát chi phí">
+          <span>📊 Phân Tích</span>
+        </button>
+
+        <button type="button" onclick="openBatchSessionModal()" id="btnSessionScanHeader"
+                class="px-2 py-1 rounded-md font-extrabold text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
+                title="Quản lý ca quét nhận kiện từ shipper">
+          <span>📦 Ca: <span id="sessionScanCountBadge" class="bg-white/20 px-1 rounded font-mono">0</span></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 3: Thanh Tìm Kiếm & Chỉ Số Trạng Thái (Pipeline) (Gộp KPI vào Pipeline, loại bỏ trùng lặp) -->
+    <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 no-print">
+      <!-- Search Input Box -->
+      <div class="flex items-stretch min-w-[260px] sm:min-w-[320px] max-w-[420px]">
+        <div class="bg-slate-800 text-white font-bold text-[11px] px-2 flex items-center rounded-l-lg whitespace-nowrap">
+          🔍 TÌM:
+        </div>
+        <input
+          id="searchInput"
+          type="text"
+          oninput="handleSearchInputDebounced()"
+          placeholder="Mã đơn, MVĐ, Tên SP, Màu, Size..."
+          class="flex-1 bg-[#fef9c3] border border-[#ee4d2d] px-2 py-1 text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg h-7"
+        />
+        <label class="ml-2 inline-flex items-center text-[10.5px] font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
+          <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-orange-600 focus:ring-orange-500" />
+          Chỉ hiện khớp
+        </label>
+      </div>
+
+      <!-- Pipeline Status Tabs (Gộp số đơn, màu sắc rõ nét) -->
+      <div class="flex flex-wrap items-center gap-1 text-[11px]" id="pipelineTabs">
+        <button type="button" onclick="setPipelineFilter('all')" id="tabBtn_all"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-900 text-white shadow-2xs cursor-pointer">
+          <span>📋 Tất cả</span>
+          <span id="tabCountAll" class="bg-white/20 text-white text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('waiting')" id="tabBtn_waiting"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer"
+                title="Chờ hàng về kho (Loại trừ đơn Đã nhận và Không cần nhận)">
+          <span>⏳ Chưa nhận</span>
+          <span id="tabCountWaiting" class="bg-amber-200 text-amber-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('returned')" id="tabBtn_returned"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 cursor-pointer"
+                title="Đã nhận kiện về kho">
+          <span>🟢 Đã nhận</span>
+          <span id="tabCountReturned" class="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('unneeded')" id="tabBtn_unneeded"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 cursor-pointer"
+                title="Đơn hủy trước khi gửi (Không cần nhận về kho)">
+          <span>⚪ K.cần nhận</span>
+          <span id="tabCountUnneeded" class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('upcoming')" id="tabBtn_upcoming"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-orange-50 text-orange-950 border border-orange-300 hover:bg-orange-100 cursor-pointer"
+                title="Cảnh báo vàng: Từ lúc hủy 2 ngày (>= 48 giờ) chưa nhận được hàng">
+          <span>⚠️ Báo Vàng (2 ngày)</span>
+          <span id="tabCountUpcomingDeadline" class="bg-orange-200 text-orange-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('overdue')" id="tabBtn_overdue"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 cursor-pointer"
+                title="Cảnh báo đỏ: Sau 3 ngày (>= 72 giờ) từ lúc hủy vẫn chưa nhận được hàng">
+          <span>🚨 Báo Đỏ (3 ngày)</span>
+          <span id="tabCountOverdue" class="bg-rose-200 text-rose-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" onclick="setPipelineFilter('lost')" id="tabBtn_lost"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200 cursor-pointer">
+          <span>🔴 Bị mất</span>
+          <span id="tabCountLost" class="bg-slate-200 text-slate-800 text-[10px] px-1.5 rounded-full font-mono">0</span>
+        </button>
+        <button type="button" id="btnExportReturnedHeader" onclick="exportReturnedOrdersToExcel()"
+                title="Xuất danh sách đơn hàng đã về kho và bảng SKU nhập lại kho (.xlsx)"
+                class="px-2 py-1 rounded-md font-extrabold text-[11px] transition flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs cursor-pointer ml-1">
+          <span>📥 Xuất Đơn Đã Về</span>
+        </button>
+
+        <!-- Hidden KPI Spans (Bảo toàn 100% tương thích cho các hàm JS tính tổng) -->
+        <span id="kpiTotalQty" class="hidden">0 SP</span>
+        <span id="kpiReturnedQty" class="hidden">0 SP</span>
+        <span id="kpiUnreturnedQty" class="hidden">0 SP</span>
+        <span id="kpiUnneededQty" class="hidden">0 SP</span>
+        <span id="kpiLostInfo" class="hidden">0 SP (0 đ)</span>
+      </div>
+
+      <!-- Instant Search Preview Bar -->
+      <div id="searchPreviewBar" class="hidden text-xs px-2.5 py-1 rounded bg-amber-100 text-amber-900 w-full mt-1"></div>
+    </div>
+
+    <!-- Row 4: Thanh Bộ Lọc Thuộc Tính, Lọc Ngày Giờ & Phân Trang (Siêu Tinh Gọn, Không Vỡ Dòng) -->
+    <div class="px-3 py-1 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-1.5 text-[11px] no-print">
+      <!-- Cụm Dropdown Lọc Thuộc Tính -->
+      <div class="flex items-center gap-1 flex-wrap">
+        <!-- Hidden Platform Select (Đã có Segmented Buttons ở Row 2) -->
+        <select id="platformFilterSelect" onchange="setPlatformFilter(this.value)" class="hidden">
+          <option value="all">Tất cả sàn</option>
+          <option value="Shopee">Shopee</option>
+          <option value="TikTok Shop">TikTok Shop</option>
+          <option value="Lazada">Lazada</option>
+          <option value="Khác">Khác</option>
+        </select>
+
+        <!-- Lọc Loại đơn -->
+        <select id="orderTypeFilterSelect" onchange="setOrderTypeFilter(this.value)"
+                title="Lọc theo Loại đơn (Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU)"
+                class="text-[11px] font-bold bg-slate-50 border border-indigo-300 text-indigo-900 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-indigo-500">
+          <option value="all">📂 Loại đơn (Tất cả)</option>
+          <option value="Giao không thành công">🚚 Giao không thành công</option>
+          <option value="Trả hàng/Hoàn tiền">↩️ Trả hàng/Hoàn tiền</option>
+          <option value="Đơn hủy">🚫 Đơn hủy</option>
+          <option value="THẤT THU">⚫ THẤT THU</option>
+        </select>
+
+        <!-- Lọc Hàng đặt trước -->
+        <select id="preOrderFilterSelect" onchange="setPreOrderFilter(this.value)"
+                title="Lọc theo Hàng đặt trước hoặc Đơn thường"
+                class="text-[11px] font-bold bg-slate-50 border border-purple-300 text-purple-950 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-purple-500">
+          <option value="all">📦 Trước/Thường</option>
+          <option value="Hàng đặt trước">⭐ Đặt trước</option>
+          <option value="Đơn thường">⚡ Đơn thường</option>
+        </select>
+
+        <!-- Lọc Có/Không MVĐ -->
+        <select id="trackingFilterSelect" onchange="setTrackingFilter(this.value)"
+                title="Lọc đơn có mã vận đơn hoặc không có mã vận đơn"
+                class="text-[11px] font-bold bg-slate-50 border border-blue-300 text-blue-950 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-blue-500">
+          <option value="all">🔖 MVĐ (Tất cả)</option>
+          <option value="has_track">✅ Có mã vận đơn</option>
+          <option value="no_track">❌ Không có MVĐ</option>
+        </select>
+      </div>
+
+      <!-- Cụm Sắp Xếp & Lọc Ngày Giờ Đa Năng (Compact) -->
+      <div class="flex items-center gap-1 flex-wrap">
+        <!-- Sắp xếp ngày & hạn xử lý -->
+        <div class="inline-flex items-center bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
+          <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
+                  title="Sắp xếp đơn hàng"
+                  class="text-[10.5px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer">
+            <option value="default">📅 Xếp ngày: Mặc định (STT)</option>
+            <option value="deadline_desc">🚨 Hạn: Báo Đỏ ➔ Vàng ➔ Trong hạn</option>
+            <option value="deadline_asc">⏳ Hạn: Trong hạn ➔ Báo Đỏ</option>
+            <option value="recvDate_desc">📥 Ngày về kho (Mới ➔ Cũ)</option>
+            <option value="recvDate_asc">📥 Ngày về kho (Cũ ➔ Mới)</option>
+            <option value="returnDate_desc">↩️ Ngày hoàn (Mới ➔ Cũ)</option>
+            <option value="returnDate_asc">↩️ Ngày hoàn (Cũ ➔ Mới)</option>
+            <option value="shipDate_desc">🚚 Ngày gửi đi (Mới ➔ Cũ)</option>
+            <option value="shipDate_asc">🚚 Ngày gửi đi (Cũ ➔ Mới)</option>
+          </select>
+          <label class="ml-1 pl-1 border-l border-slate-200 inline-flex items-center text-[10px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap"
+                 title="Chỉ hiển thị các đơn đã có ngày">
+            <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3 h-3 mr-0.5 rounded text-blue-600" />
+            <span>Có ngày</span>
           </label>
         </div>
 
-        <!-- Inline Compact KPI Pills (Chiều cao chỉ 28px thay vì 56px như trước) -->
-        <div class="flex flex-wrap items-center gap-1.5 text-xs">
-          <div class="bg-slate-800 text-white px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7 shadow-2xs">
-            <span class="text-[11px] text-slate-300">Tổng hoàn:</span>
-            <span id="kpiTotalQty" class="font-extrabold text-xs">0 SP</span>
-          </div>
-          <div class="bg-[#dcfce7] text-[#15803d] border border-green-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
-            <span class="text-[11px] font-semibold">Đã nhận:</span>
-            <span id="kpiReturnedQty" class="font-extrabold text-xs">0 SP</span>
-          </div>
-          <div class="bg-[#fef3c7] text-[#b45309] border border-amber-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
-            <span class="text-[11px] font-semibold">Chờ nhận:</span>
-            <span id="kpiUnreturnedQty" class="font-extrabold text-xs">0 SP</span>
-          </div>
-          <div class="bg-slate-100 text-slate-700 border border-slate-300 px-2 py-1 rounded-lg flex items-center gap-1 h-7" title="Đơn hủy trước khi gửi (Không cần nhận về kho)">
-            <span class="text-[11px] font-semibold text-slate-500">K.Cần nhận:</span>
-            <span id="kpiUnneededQty" class="font-extrabold text-xs text-slate-700">0 SP</span>
-          </div>
-          <div class="bg-[#fee2e2] text-[#b91c1c] border border-red-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 h-7">
-            <span class="text-[11px] font-semibold">Bị mất:</span>
-            <span id="kpiLostInfo" class="font-extrabold text-xs">0 SP (0 đ)</span>
-          </div>
+        <!-- Bộ Lọc Ngày & Giờ Thu Gọn -->
+        <div class="inline-flex items-center bg-slate-50 border border-slate-300 rounded-md p-0.5 gap-0.5 shadow-2xs">
+          <select id="dateFilterTypeSelect" onchange="setDateFilterType(this.value)"
+                  class="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded px-1 py-0.2 outline-none cursor-pointer">
+            <option value="any">📅 Mọi mốc</option>
+            <option value="returnDate" selected>↩️ Ngày hủy</option>
+            <option value="recvDate">📥 Ngày về</option>
+            <option value="shipDate">🚚 Ngày gửi</option>
+          </select>
+
+          <select id="recvDateFilterSelect" onchange="setQuickDatePreset(this.value)"
+                  class="text-[10px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 rounded px-1 py-0.2 outline-none cursor-pointer">
+            <option value="all">🕒 Mọi lúc</option>
+            <option value="today">Hôm nay</option>
+            <option value="yesterday">Hôm qua</option>
+            <option value="7days">7 ngày qua</option>
+            <option value="shift_morning">☀️ Ca Sáng (06-18h)</option>
+            <option value="shift_evening">🌙 Ca Tối (18-06h)</option>
+          </select>
+
+          <span class="text-[9px] font-bold text-slate-500">Ngày:</span>
+          <input type="date" id="filterDateFrom" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-slate-300 rounded px-0.5 py-0.2 outline-none text-slate-800 w-[105px]" title="Từ ngày" />
+          <span class="text-slate-400 text-[8px]">➔</span>
+          <input type="date" id="filterDateTo" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-slate-300 rounded px-0.5 py-0.2 outline-none text-slate-800 w-[105px]" title="Đến ngày" />
+
+          <span class="text-[9px] font-bold text-amber-800">Giờ:</span>
+          <input type="time" id="filterTimeFrom" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[68px]" title="Từ giờ (HH:mm)" />
+          <span class="text-amber-400 text-[8px]">➔</span>
+          <input type="time" id="filterTimeTo" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[68px]" title="Đến giờ (HH:mm)" />
+
+          <button type="button" onclick="clearDateTimeFilter()" class="text-rose-500 hover:text-white hover:bg-rose-600 rounded px-1 py-0.2 text-[10px] font-extrabold transition cursor-pointer" title="Xóa toàn bộ lọc ngày & giờ">
+            ✕
+          </button>
         </div>
       </div>
 
-      <!-- Instant Search Preview Bar (Ẩn hoàn toàn khi không gõ tìm kiếm để tiết kiệm diện tích dọc!) -->
-      <div id="searchPreviewBar" class="hidden text-xs px-2.5 py-1 rounded bg-amber-100 text-amber-900"></div>
-
-      <!-- Slim Line 2: Unified Status Tabs + Compact Filters + Pagination on ONE single bar -->
-      <div class="pt-1.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-1.5 text-[11px] no-print">
-        <!-- Pipeline Status Tabs (Tách riêng Chưa nhận, Đã nhận, Không cần nhận & Hạn xử lý) -->
-        <div class="flex flex-wrap items-center gap-1" id="pipelineTabs">
-          <button type="button" onclick="setPipelineFilter('all')" id="tabBtn_all"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-900 text-white shadow-2xs cursor-pointer">
-            <span>📋 Tất cả</span>
-            <span id="tabCountAll" class="bg-white/20 text-white text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('waiting')" id="tabBtn_waiting"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer"
-                  title="Chờ hàng về kho (Loại trừ đơn Đã nhận và Không cần nhận)">
-            <span>⏳ Chưa nhận</span>
-            <span id="tabCountWaiting" class="bg-amber-200 text-amber-900 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('returned')" id="tabBtn_returned"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 cursor-pointer"
-                  title="Đã nhận kiện về kho (Đã quét hoặc chọn Đã nhận)">
-            <span>🟢 Đã nhận</span>
-            <span id="tabCountReturned" class="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('unneeded')" id="tabBtn_unneeded"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 cursor-pointer"
-                  title="Đơn hủy trước khi gửi (Không phát sinh hàng hoàn về kho)">
-            <span>⚪ Không cần nhận</span>
-            <span id="tabCountUnneeded" class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('upcoming')" id="tabBtn_upcoming"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-orange-50 text-orange-950 border border-orange-300 hover:bg-orange-100 cursor-pointer"
-                  title="Đơn sắp đến hạn phản hồi / khiếu nại sàn (Còn <= 48 giờ)">
-            <span>⏰ Sắp đến hạn</span>
-            <span id="tabCountUpcomingDeadline" class="bg-orange-200 text-orange-900 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('overdue')" id="tabBtn_overdue"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 cursor-pointer"
-                  title="Đơn đã quá hạn phản hồi sàn hoặc quá 7 ngày chưa về">
-            <span>🚨 Quá hạn</span>
-            <span id="tabCountOverdue" class="bg-rose-200 text-rose-900 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="setPipelineFilter('lost')" id="tabBtn_lost"
-                  class="px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200 cursor-pointer">
-            <span>🔴 Bị mất</span>
-            <span id="tabCountLost" class="bg-slate-200 text-slate-800 text-[10px] px-1.5 rounded-full">0</span>
-          </button>
-          <button type="button" onclick="exportReturnedOrdersToExcel()"
-                  title="Xuất ngay danh sách các đơn hàng đã về kho và bảng tổng kết SKU nhập lại kho (.xlsx)"
-                  class="px-2 py-1 rounded-md font-extrabold text-[11px] transition flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs cursor-pointer">
-            <span>📥 Xuất Đơn Đã Về</span>
-          </button>
-        </div>
-
-        <!-- Compact Filters & Pagination Controls -->
-        <div class="flex flex-wrap items-center gap-1.5">
-          <!-- Lọc sàn -->
-          <select id="platformFilterSelect" onchange="setPlatformFilter(this.value)"
-                  title="Lọc theo sàn TMĐT"
-                  class="text-[11px] font-bold bg-white border border-slate-300 text-slate-800 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-orange-400">
-            <option value="all">🛍️ Tất cả sàn</option>
-            <option value="Shopee">🟠 Shopee</option>
-            <option value="TikTok Shop">⚫ TikTok Shop</option>
-            <option value="Lazada">🔵 Lazada</option>
-            <option value="Khác">📦 Sàn khác</option>
-          </select>
-
-          <!-- Lọc Loại đơn (Nguồn phát sinh) -->
-          <select id="orderTypeFilterSelect" onchange="setOrderTypeFilter(this.value)"
-                  title="Lọc theo Loại đơn (Nguồn phát sinh: Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU)"
-                  class="text-[11px] font-bold bg-white border border-indigo-300 text-indigo-900 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-indigo-500">
-            <option value="all">📂 Tất cả loại đơn</option>
-            <option value="Giao không thành công">🚚 Giao không thành công</option>
-            <option value="Trả hàng/Hoàn tiền">↩️ Trả hàng/Hoàn tiền</option>
-            <option value="Đơn hủy">🚫 Đơn hủy</option>
-            <option value="THẤT THU">⚫ THẤT THU (Gốc Salework)</option>
-          </select>
-
-          <!-- Lọc Hàng đặt trước hay Đơn thường -->
-          <select id="preOrderFilterSelect" onchange="setPreOrderFilter(this.value)"
-                  title="Lọc theo Hàng đặt trước hoặc Đơn thường"
-                  class="text-[11px] font-bold bg-white border border-purple-300 text-purple-950 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-purple-500">
-            <option value="all">📦 Trước / Thường (Tất cả)</option>
-            <option value="Hàng đặt trước">⭐ Hàng đặt trước</option>
-            <option value="Đơn thường">⚡ Đơn thường</option>
-          </select>
-
-          <!-- Lọc đơn Có MVĐ hoặc Không có MVĐ -->
-          <select id="trackingFilterSelect" onchange="setTrackingFilter(this.value)"
-                  title="Lọc đơn có mã vận đơn hoặc không có mã vận đơn (hủy trước gửi)"
-                  class="text-[11px] font-bold bg-white border border-blue-300 text-blue-950 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-blue-500">
-            <option value="all">🔖 Tất cả MVĐ</option>
-            <option value="has_track">✅ Có mã vận đơn</option>
-            <option value="no_track">❌ Không có MVĐ (Hủy trước gửi)</option>
-          </select>
-
-          <!-- Sắp xếp theo ngày (Gộp 4 nút rời thành 1 menu thả gọn gàng + vẫn bấm trực tiếp trên tiêu đề cột được) -->
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
-            <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
-                    title="Sắp xếp đơn hàng theo Ngày gửi đi, Ngày hoàn về hoặc Ngày nhận (Hoặc bấm trực tiếp vào tiêu đề cột ngày trên bảng)"
-                    class="text-[11px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer py-0.5">
-              <option value="default">📅 Xếp ngày: Mặc định (STT)</option>
-              <option value="recvDate_desc">📥 Ngày về kho (Mới ➔ Cũ)</option>
-              <option value="recvDate_asc">📥 Ngày về kho (Cũ ➔ Mới)</option>
-              <option value="returnDate_desc">↩️ Ngày hoàn (Mới ➔ Cũ)</option>
-              <option value="returnDate_asc">↩️ Ngày hoàn (Cũ ➔ Mới)</option>
-              <option value="shipDate_desc">🚚 Ngày gửi đi (Mới ➔ Cũ)</option>
-              <option value="shipDate_asc">🚚 Ngày gửi đi (Cũ ➔ Mới)</option>
-            </select>
-            <label class="ml-1.5 pl-1.5 border-l border-slate-200 inline-flex items-center text-[10.5px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap"
-                   title="Chỉ hiển thị các đơn đã có ngày">
-              <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3 h-3 mr-1 rounded text-blue-600" />
-              <span>Có ngày</span>
-            </label>
-          </div>
-
-          <!-- Bộ Lọc Ngày & Giờ Đa Năng (Từ ngày - Đến ngày, Từ giờ - Đến giờ) v1.5.2 -->
-          <div class="inline-flex items-center flex-wrap bg-white border border-slate-300 rounded-lg p-0.5 gap-1 shadow-2xs">
-            <!-- Mốc thời gian lọc -->
-            <select id="dateFilterTypeSelect" onchange="setDateFilterType(this.value)"
-                    title="Chọn mốc thời gian lọc: Mọi mốc, Ngày hoàn/hủy (mặc định), Ngày về kho, Ngày gửi đi"
-                    class="text-[10.5px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer">
-              <option value="any">📅 Mọi mốc</option>
-              <option value="returnDate" selected>↩️ Ngày hoàn/hủy</option>
-              <option value="recvDate">📥 Ngày về kho</option>
-              <option value="shipDate">🚚 Ngày gửi đi</option>
-            </select>
-
-            <!-- Lọc nhanh theo mẫu / ca làm việc -->
-            <select id="recvDateFilterSelect" onchange="setQuickDatePreset(this.value)"
-                    title="Chọn nhanh mốc ngày hoặc ca làm việc"
-                    class="text-[10.5px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 rounded px-1 py-0.5 outline-none cursor-pointer">
-              <option value="all">🕒 Mọi lúc</option>
-              <option value="today">⚡ Hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="7days">7 ngày qua</option>
-              <option value="shift_morning">☀️ Ca Sáng (06h - 18h)</option>
-              <option value="shift_evening">🌙 Ca Tối (18h - 06h)</option>
-            </select>
-
-            <!-- Lọc Khoảng Ngày: Từ ngày ➔ Đến ngày (có thể để trống để lọc độc lập theo giờ) -->
-            <div class="inline-flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded px-1 py-0.2" title="Lọc khoảng ngày: Từ ngày ➔ Đến ngày (để trống nếu muốn lọc giờ trên mọi ngày)">
-              <span class="text-[9.5px] font-bold text-slate-500">Ngày:</span>
-              <input type="date" id="filterDateFrom" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" title="Từ ngày (bỏ trống nếu không lọc ngày)" />
-              <span class="text-slate-400 text-[9px]">➔</span>
-              <input type="date" id="filterDateTo" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" title="Đến ngày (bỏ trống nếu không lọc ngày)" />
-            </div>
-
-            <!-- Lọc Khoảng Giờ: Từ giờ ➔ Đến giờ (lọc độc lập hoặc kết hợp cùng ngày) -->
-            <div class="inline-flex items-center gap-0.5 bg-amber-50 border border-amber-200 rounded px-1 py-0.2" title="Lọc khoảng giờ: Từ giờ ➔ Đến giờ (lọc độc lập hoặc kết hợp cùng ngày đã chọn)">
-              <span class="text-[9.5px] font-bold text-amber-800">Giờ:</span>
-              <input type="time" id="filterTimeFrom" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-amber-300 rounded px-1 py-0.2 outline-none text-slate-800 font-mono" title="Từ giờ (HH:mm - ví dụ: 06:00)" />
-              <span class="text-amber-400 text-[9px]">➔</span>
-              <input type="time" id="filterTimeTo" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-amber-300 rounded px-1 py-0.2 outline-none text-slate-800 font-mono" title="Đến giờ (HH:mm - ví dụ: 18:00)" />
-            </div>
-
-            <!-- Nút Xóa Lọc -->
-            <button type="button" onclick="clearDateTimeFilter()" class="text-rose-500 hover:text-white hover:bg-rose-600 rounded px-1 py-0.5 text-[11px] font-extrabold transition cursor-pointer" title="Xóa toàn bộ lọc ngày & giờ để hiện tất cả">
-              ✕
-            </button>
-          </div>
-
-          <!-- Phân trang Siêu Mượt nằm gọn ngay bên phải -->
-          <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
-            <span id="paginationSummaryText" class="text-[10.5px] font-semibold text-slate-600 hidden xl:inline px-1">0 đơn</span>
-            <select id="pageSizeSelect" onchange="changePageSize(this.value)" title="Số đơn hiển thị trên mỗi trang" class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1 py-0.5 outline-none cursor-pointer">
-              <option value="30">⚡ 30 đơn/trang</option>
-              <option value="50" selected>⚡ 50 đơn/trang (Siêu mượt)</option>
-              <option value="100">100 đơn/trang</option>
-              <option value="200">200 đơn/trang</option>
-              <option value="0">Tất cả đơn</option>
-            </select>
-            <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition" title="Trang trước">
-              ◀
-            </button>
-            <span id="pageIndicatorText" class="px-1.5 py-0.5 rounded bg-slate-800 text-white font-bold text-[10.5px] whitespace-nowrap">
-              1 / 1
-            </span>
-            <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition" title="Trang sau">
-              ▶
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    
-    <!-- View Switcher Tabs: Chuyển Nhanh Xem Bảng Đơn Hàng Hoặc Bảng Thống Kê Phân Loại Không Cần Cuộn Trang -->
-    <div class="px-3 py-1.5 bg-slate-800 text-white flex flex-wrap items-center justify-between gap-2 rounded-t-lg no-print">
-      <div class="flex items-center gap-1.5">
-        <span class="text-[11px] font-extrabold text-slate-300 uppercase tracking-wide mr-1">CHẾ ĐỘ XEM:</span>
-        <button type="button" id="btnViewOrdersTab" onclick="switchMainView('orders')"
-                class="px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer">
-          <span>📋 Bảng Danh Sách Đơn Hàng</span>
-          <span id="viewOrdersCountBadge" class="bg-slate-200 text-slate-900 text-[10.5px] px-1.5 py-0.2 rounded-full font-mono">0 đơn</span>
+      <!-- Phân Trang Siêu Mượt Nằm Gọn Bên Phải -->
+      <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
+        <span id="paginationSummaryText" class="text-[10px] font-semibold text-slate-600 hidden xl:inline px-1">0 đơn</span>
+        <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-200 rounded px-1 py-0.2 outline-none cursor-pointer">
+          <option value="30">⚡ 30/trang</option>
+          <option value="50" selected>⚡ 50/trang</option>
+          <option value="100">100/trang</option>
+          <option value="200">200/trang</option>
+          <option value="0">Tất cả</option>
+        </select>
+        <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
+          ◀
         </button>
-        <button type="button" id="btnViewSummaryTab" onclick="switchMainView('summary')"
-                class="px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-teal-700 text-white cursor-pointer"
-                title="Xem ngay Bảng Tổng Kết Thống Kê Chi Tiết Theo Sản Phẩm - Màu Sắc - Size ở trên cùng mà không cần cuộn trang!">
-          <span>📊 Bảng Thống Kê Phân Loại (Màu & Size)</span>
-          <span id="viewSummaryCountBadge" class="bg-teal-900 text-teal-200 text-[10.5px] px-1.5 py-0.2 rounded-full font-mono">0 phân loại</span>
+        <span id="pageIndicatorText" class="px-1.5 py-0.2 rounded bg-slate-800 text-white font-bold text-[10px] whitespace-nowrap">
+          1 / 1
+        </span>
+        <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
+          ▶
         </button>
-        <button type="button" id="btnViewBothTab" onclick="switchMainView('both')"
-                class="px-2 py-1 rounded font-semibold text-xs text-slate-400 hover:text-white transition cursor-pointer"
-                title="Hiển thị cả 2 bảng tuần tự trên cùng một trang">
-          <span>🔀 Xem Cả Hai</span>
-        </button>
-      </div>
-      <div class="text-[11px] text-teal-300 font-medium hidden md:flex items-center gap-1">
-        <span>⚡ Bấm tab <b>Bảng Thống Kê</b> để xem số liệu phân loại ngay lập tức không cần cuộn!</span>
       </div>
     </div>
 
@@ -1153,7 +1169,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
   </div>
 
-  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.0) -->
+  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.1) -->
   <div id="watchlistModal" onclick="closeWatchlistModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
     <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
       <!-- Header -->
@@ -1174,6 +1190,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <button type="button" onclick="exportWatchlistToExcel()" class="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1" title="Xuất danh sách các đơn theo dõi này ra file Excel">
             <span>📊</span>
             <span>Xuất Excel</span>
+          </button>
+          <button type="button" onclick="cleanReturnedOrdersFromWatchlist()" class="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-900 text-xs font-black rounded-lg transition cursor-pointer flex items-center gap-1 shadow-xs" title="1-Click gỡ theo dõi toàn bộ các đơn đã quét nhận về kho">
+            <span>✨</span>
+            <span>Dọn Đơn Đã Về Kho</span>
           </button>
           <button type="button" onclick="clearAllWatchlist()" class="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg transition cursor-pointer" title="Bỏ theo dõi toàn bộ đơn hiện tại">
             🧹 Bỏ Tất Cả
@@ -5500,6 +5520,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setImportWeekFilter(weekKey) {
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.1: Xóa selection khi đổi tuần
       currentImportWeekFilter = weekKey;
       try {
         localStorage.setItem(SAVED_ACTIVE_WEEK_KEY, weekKey);
@@ -5732,16 +5753,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       if (btnOrders && btnSummary && btnBoth) {
         btnOrders.className = viewMode === 'orders'
-          ? 'px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer ring-2 ring-indigo-400'
-          : 'px-3 py-1 rounded font-bold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 cursor-pointer';
+          ? 'px-2 py-0.5 rounded font-extrabold text-xs transition flex items-center gap-1 bg-white text-indigo-950 shadow-2xs cursor-pointer ring-1 ring-indigo-300'
+          : 'px-2 py-0.5 rounded font-medium text-xs transition flex items-center gap-1 text-slate-600 hover:text-slate-900 hover:bg-slate-200 cursor-pointer';
 
         btnSummary.className = viewMode === 'summary'
-          ? 'px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-teal-500 text-slate-950 shadow-xs cursor-pointer ring-2 ring-teal-300'
-          : 'px-3 py-1 rounded font-bold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-teal-700 text-white cursor-pointer';
+          ? 'px-2 py-0.5 rounded font-extrabold text-xs transition flex items-center gap-1 bg-teal-600 text-white shadow-2xs cursor-pointer ring-1 ring-teal-400'
+          : 'px-2 py-0.5 rounded font-medium text-xs transition flex items-center gap-1 text-slate-600 hover:text-teal-900 hover:bg-slate-200 cursor-pointer';
 
         btnBoth.className = viewMode === 'both'
-          ? 'px-2 py-1 rounded font-extrabold text-xs text-white bg-slate-600 ring-1 ring-white/50 cursor-pointer'
-          : 'px-2 py-1 rounded font-semibold text-xs text-slate-400 hover:text-white transition cursor-pointer';
+          ? 'px-1.5 py-0.5 rounded font-extrabold text-xs text-indigo-950 bg-indigo-100 ring-1 ring-indigo-300 cursor-pointer'
+          : 'px-1.5 py-0.5 rounded font-medium text-xs text-slate-500 hover:text-slate-800 transition cursor-pointer';
       }
 
       if (ordersContainer && summaryWrapper) {
@@ -5788,7 +5809,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.0';
+    const APP_VERSION_NUMBER = '1.6.1';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -5928,13 +5949,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const bannerBadge = document.getElementById('activePlatformBannerBadge');
       if (bannerBadge) {
         if (currentPlatformFilter === 'Shopee') {
-          bannerBadge.className = 'text-[11px] font-bold text-orange-950 bg-orange-100 border border-orange-300 px-2.5 py-0.5 rounded-full';
+          bannerBadge.className = 'hidden';
           bannerBadge.innerHTML = `🟠 Đang tách riêng: <b>SÀN SHOPEE (${shopeeOrd} đơn / ${shopeeSp} SP)</b>`;
         } else if (currentPlatformFilter === 'TikTok Shop') {
-          bannerBadge.className = 'text-[11px] font-bold text-white bg-slate-900 border border-slate-700 px-2.5 py-0.5 rounded-full';
+          bannerBadge.className = 'hidden';
           bannerBadge.innerHTML = `⚫ Đang tách riêng: <b>SÀN TIKTOK SHOP (${tiktokOrd} đơn / ${tiktokSp} SP)</b>`;
         } else {
-          bannerBadge.className = 'text-[11px] font-bold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full';
+          bannerBadge.className = 'hidden';
           bannerBadge.innerHTML = `🌐 Đang hiển thị & thống kê: <b>Cả 2 sàn (${allOrd} đơn / ${allSp} SP)</b>`;
         }
       }
@@ -5962,6 +5983,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setPlatformFilter(filterVal) {
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.1: Tự động bỏ chọn khi đổi sàn
+      
       currentPlatformFilter = filterVal;
       currentPage = 1;
       updatePlatformSwitcherUI();
@@ -6115,7 +6138,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.0: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
+    // v1.6.1: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
     // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ) mà chưa nhận được hàng
     // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
     // =========================================================================
@@ -6133,9 +6156,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return { level: 'lost', status: 'lost', text: '🔴 Bị mất', timeStr: 'Bị mất', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       }
 
-      const refStr = order.returnDate || order.shipDate;
+      // v1.6.1: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
+      // TUYỆT ĐỐI KHÔNG FALLBACK SANG shipDate ĐỂ TRÁNH BÁO ĐỎ OAN CHO ĐƠN MỚI GỬI!
+      const refStr = order.returnDate;
       if (!refStr) {
-        return { level: 'none', status: 'none', text: order.deadline || '+ Thêm hạn', timeStr: '', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+        return {
+          level: 'none',
+          status: 'none',
+          text: order.deadline || '⏳ Chờ ngày hủy',
+          timeStr: 'Chưa có ngày hủy',
+          elapsedHours: 0,
+          elapsedMinutes: 0,
+          elapsedDays: 0
+        };
       }
       const refDt = parseFullDate(refStr);
       if (!refDt) {
@@ -6252,7 +6285,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function setPipelineFilter(tab) {
       currentFilterTab = tab;
       currentPage = 1;
-      document.querySelectorAll('#pipelineTabs button').forEach(b => {
+      document.querySelectorAll('#pipelineTabs button:not(#btnExportReturnedHeader)').forEach(b => {
         b.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 border ' +
           'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
       });
@@ -6291,6 +6324,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       currentPage = 1;
       renderAll(false);
+    }
+
+    function resetAllFiltersQuick() {
+      currentFilterTab = 'all';
+      currentPlatformFilter = 'all';
+      currentImportWeekFilter = 'all';
+      currentOrderTypeFilter = 'all';
+      currentPreOrderFilter = 'all';
+      currentTrackingFilter = 'all';
+      currentDateSort = 'default';
+      clearDateTimeFilter();
+      const sInput = document.getElementById('searchInput');
+      if (sInput) sInput.value = '';
+      const chkFilter = document.getElementById('chkFilterOnly');
+      if (chkFilter) chkFilter.checked = false;
+      renderWeeklyImportTabs();
+      updatePlatformFilterUI();
+      recalcTotalsAndSummary();
+      renderAll(true);
+      showAppToast('Đã xóa tất cả bộ lọc về mặc định!', 'info');
     }
 
     function resetDateSort() {
@@ -7972,20 +8025,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function updateDiskNoticeStatus(saved, timeStr) {
-      const badge = document.getElementById('diskSaveNotice');
-      if (!badge) return;
-      if (window.desktopDiskAPI && window.desktopDiskAPI.isDesktopApp) {
-        badge.classList.remove('hidden');
-        badge.classList.add('inline-flex');
-        const count = (orders && orders.length) ? orders.length : 0;
-        badge.innerHTML = `<span>💾 Đã lưu ổ cứng (${count} đơn)</span> <span class="text-[10px]">📁</span>`;
-        badge.title = `Đã tự động lưu ${count} đơn${timeStr ? ' lúc ' + timeStr : ''} vào ổ cứng tại: Documents\\QuanLyHangHoan (Bấm để mở thư mục)`;
-        badge.className = "inline-flex items-center gap-1 text-[11px] font-bold text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded-full cursor-pointer transition shadow-2xs";
-      } else {
-        badge.classList.remove('hidden');
-        badge.classList.add('inline-flex');
-        const count = (orders && orders.length) ? orders.length : 0;
-        badge.innerHTML = `<span>💾 Tự động lưu (${count} đơn)</span>`;
+      const count = (orders && orders.length) ? orders.length : 0;
+      const safeBadge = document.getElementById('safeStorageCountBadge');
+      if (safeBadge) safeBadge.textContent = `${count} đơn`;
+      const btnSafe = document.getElementById('btnSafeStorageHeader');
+      if (btnSafe) {
+        if (window.desktopDiskAPI && window.desktopDiskAPI.isDesktopApp) {
+          btnSafe.title = `Đã tự động lưu ${count} đơn${timeStr ? ' lúc ' + timeStr : ''} vào ổ cứng (Documents\\QuanLyHangHoan) & IndexedDB an toàn`;
+        }
       }
     }
 
@@ -9239,6 +9286,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const sortDir = parts[1]; // 'desc' | 'asc'
 
         filteredEntries.sort((a, b) => {
+          // v1.6.1: Sắp xếp thông minh theo Hạn Cần Xử Lý (Cảnh báo Báo Đỏ >= 72h -> Báo Vàng >= 48h -> Trong hạn)
+          if (sortField === 'deadline') {
+            const elA = getOrderReturnElapsedInfo(a.order);
+            const elB = getOrderReturnElapsedInfo(b.order);
+            const getPriority = (el) => {
+              if (el.level === 'danger') return 4;
+              if (el.level === 'warning') return 3;
+              if (el.level === 'safe') return 2;
+              if (el.level === 'done') return 1;
+              return 0;
+            };
+            const priA = getPriority(elA);
+            const priB = getPriority(elB);
+            if (priA !== priB) {
+              return sortDir === 'desc' ? (priB - priA) : (priA - priB);
+            }
+            const hoursA = elA.elapsedHours || 0;
+            const hoursB = elB.elapsedHours || 0;
+            if (hoursA !== hoursB) {
+              return sortDir === 'desc' ? (hoursB - hoursA) : (hoursA - hoursB);
+            }
+            return a.originalIndex - b.originalIndex;
+          }
+
           const dateA = parseFullDate(a.order[sortField]);
           const dateB = parseFullDate(b.order[sortField]);
 
@@ -9459,7 +9530,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
             </select>`;
 
-        // Format Deadline Cell (v1.6.0: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
+        // Format Deadline Cell (v1.6.1: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
         const elapsed = getOrderReturnElapsedInfo(order);
         let deadlineHtml = '';
         if (isReceived) {
@@ -9688,18 +9759,59 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       if (pageEntries.length === 0) {
-        const emptyMsg = orders.length === 0
-          ? `<div class="py-10 flex flex-col items-center justify-center gap-2 text-slate-500">
+        let emptyMsg = '';
+        if (orders.length === 0) {
+          emptyMsg = `<div class="py-10 flex flex-col items-center justify-center gap-2 text-slate-500">
                <div class="text-2xl">📭</div>
                <div class="font-bold text-slate-700 text-sm">Bảng hiện tại đang trống (0 đơn hàng)</div>
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
-             </div>`
-          : `<div class="py-8 text-center text-slate-500 text-xs font-semibold">Không có đơn hàng nào khớp với bộ lọc hiện tại.</div>`;
+             </div>`;
+        } else if (currentImportWeekFilter !== 'all') {
+          // v1.6.1: Gợi ý thông minh khi chọn trúng Tab Tuần 0 đơn
+          const weekMap = new Map();
+          orders.forEach(o => {
+            const wk = getOrderImportWeek(o);
+            weekMap.set(wk, (weekMap.get(wk) || 0) + 1);
+          });
+          const currWeekInfo = getWeekInfoFromKey(currentImportWeekFilter);
+          const topOtherWeek = Array.from(weekMap.entries()).sort((a,b) => b[1] - a[1])[0];
+          const topWeekKey = topOtherWeek ? topOtherWeek[0] : null;
+          const topWeekCount = topOtherWeek ? topOtherWeek[1] : 0;
+          const topWeekInfo = topWeekKey ? getWeekInfoFromKey(topWeekKey) : null;
+
+          emptyMsg = `
+            <div class="py-10 flex flex-col items-center justify-center gap-2.5 text-slate-600">
+              <div class="text-3xl">📅</div>
+              <div class="font-bold text-sm text-purple-950">
+                Tuần đang chọn (${currWeekInfo.label}) hiện chưa có đơn nào (0 đơn).
+              </div>
+              <div class="text-xs text-slate-600 flex flex-wrap items-center justify-center gap-2">
+                ${topWeekKey ? `
+                  <button type="button" onclick="setImportWeekFilter('${topWeekKey}')"
+                          class="px-3 py-1.5 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-extrabold text-xs shadow-xs cursor-pointer transition">
+                    👉 Bấm để xem ${topWeekInfo ? topWeekInfo.label : topWeekKey} (${topWeekCount} đơn)
+                  </button>
+                ` : ''}
+                <button type="button" onclick="setImportWeekFilter('all')"
+                        class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs shadow-xs cursor-pointer transition">
+                  🌐 Xem Tất Cả Các Tuần (${orders.length} đơn)
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          emptyMsg = `<div class="py-8 text-center text-slate-500 text-xs font-semibold">
+            Không có đơn hàng nào khớp với bộ lọc hiện tại.
+            <button type="button" onclick="resetAllFiltersQuick()" class="ml-2 text-blue-600 underline hover:text-blue-800 font-bold cursor-pointer">
+              Xóa các bộ lọc để xem toàn bộ ${orders.length} đơn
+            </button>
+          </div>`;
+        }
         html = `<tr><td colspan="22" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
       tbody.innerHTML = html;
 
-      // v1.6.0: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
+      // v1.6.1: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
       const chkSelectAll = document.getElementById('chkSelectAllOrders');
       if (chkSelectAll && window.lastPageEntries) {
         chkSelectAll.checked = (window.lastPageEntries.length > 0 && window.lastPageEntries.every(e => selectedOrdersSet.has(e.originalIndex)));
@@ -13520,7 +13632,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.0: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
+    // v1.6.1: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
     // =========================================================================
     // selectedOrdersSet is initialized globally above
 
@@ -13615,6 +13727,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       saveOrders();
       updateWatchlistBadge();
       renderAll(false);
+      clearAllSelectedOrders(); // v1.6.1: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
       showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Danh Sách Theo Dõi!`, 'success');
       addAppNotification({
         type: 'system',
@@ -13708,7 +13821,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.0: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
+    // v1.6.1: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
     // =========================================================================
     let currentWatchlistFilter = 'all';
 
@@ -14020,6 +14133,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showAppToast(`Đã gỡ đơn #${orderIdx + 1} khỏi danh sách theo dõi`, 'info');
     }
 
+    // v1.6.1: Dọn dẹp các đơn đã nhận về kho khỏi danh sách theo dõi
+    function cleanReturnedOrdersFromWatchlist() {
+      let cleaned = 0;
+      orders.forEach(o => {
+        if (o && o.isWatchlist && isOrderReceived(o)) {
+          o.isWatchlist = false;
+          cleaned++;
+        }
+      });
+      if (cleaned > 0) {
+        saveOrders();
+        updateWatchlistBadge();
+        renderWatchlistTable();
+        renderAll(false);
+        showAppToast(`✨ Đã dọn sạch ${cleaned} đơn đã về kho khỏi danh sách theo dõi!`, 'success');
+      } else {
+        showAppToast('Hiện không có đơn đã về kho nào trong danh sách theo dõi.', 'info');
+      }
+    }
+
     async function clearAllWatchlist() {
       const count = orders.filter(o => Boolean(o && o.isWatchlist)).length;
       if (count === 0) {
@@ -14096,7 +14229,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <datalist id="productList"></datalist>
   <datalist id="colorList"></datalist>
   <datalist id="sizeList"></datalist>
-  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.0) -->
+  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.1) -->
   <div id="bulkActionBar" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[90] hidden bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 transition-all">
     <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
       <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-black text-xs flex items-center justify-center" id="bulkSelectedCountBadge">0</span>

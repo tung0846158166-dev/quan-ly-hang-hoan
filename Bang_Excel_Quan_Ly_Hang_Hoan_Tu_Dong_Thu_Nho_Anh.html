@@ -136,6 +136,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       content-visibility: auto;
       contain-intrinsic-size: auto 34px;
     }
+  
+    /* Sticky Table Footers & Bottom Summary Dock */
+    #mainTableScrollContainer table tfoot tr {
+      position: sticky !important;
+      bottom: 0 !important;
+      z-index: 25 !important;
+      background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+      box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.15) !important;
+      border-top: 2px solid #0f172a !important;
+    }
+    #summaryTableBody + tfoot tr,
+    .excel-table tfoot tr {
+      position: sticky !important;
+      bottom: 0 !important;
+      z-index: 25 !important;
+      background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+      box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.15) !important;
+      border-top: 2px solid #0f172a !important;
+    }
+    #mainTableScrollContainer {
+      scroll-behavior: smooth;
+    }
+
   </style>
 </head>
 <body class="p-1.5 sm:p-2.5">
@@ -149,7 +172,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.5
+          🚀 Phiên bản v1.3.6
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -473,7 +496,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.5</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.6</span>
               </div>
             </div>
           </div>
@@ -530,6 +553,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
     </div>
 
+    
+    <!-- Row 1.6: Thanh Tab Phân Chia Số Lượng Đơn Theo Tuần Nạp File Excel (Weekly Import Tabs) -->
+    <div class="px-3 py-1.5 bg-gradient-to-r from-purple-50 via-indigo-50/50 to-slate-100 border-b border-purple-200/80 flex flex-wrap items-center justify-between gap-2 no-print">
+      <div class="flex flex-wrap items-center gap-1.5" id="weeklyImportTabsContainer">
+        <span class="text-[11px] font-extrabold text-purple-950 uppercase tracking-wide mr-1 flex items-center gap-1">
+          <span>📅 PHÂN CHIA THEO TUẦN NẠP:</span>
+        </span>
+        <div id="dynamicWeekTabs" class="flex flex-wrap items-center gap-1">
+          <!-- Dynamically populated tabs: All, Week 45, Week 44, etc. -->
+        </div>
+        <button type="button" onclick="promptCreateCustomWeekTab()" class="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition cursor-pointer flex items-center gap-1" title="Tạo thêm tab tuần tùy chọn hoặc chọn khoảng ngày nạp file">
+          <span>➕ Thêm Tab Tuần</span>
+        </button>
+      </div>
+      <div class="text-[10.5px] text-purple-800 font-medium hidden sm:flex items-center gap-1">
+        <span>⏱️ Tuần tính theo <b>thời gian nạp file Excel</b> vào máy tính</span>
+      </div>
+    </div>
+
     <!-- Row 2: Slim Search Bar, Inline KPI Pills & Unified Toolbar -->
     <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 space-y-1.5">
       <!-- Slim Line 1: Search Input + 4 Inline KPI Pills -->
@@ -748,6 +790,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
     </div>
 
+    
+    <!-- View Switcher Tabs: Chuyển Nhanh Xem Bảng Đơn Hàng Hoặc Bảng Thống Kê Phân Loại Không Cần Cuộn Trang -->
+    <div class="px-3 py-1.5 bg-slate-800 text-white flex flex-wrap items-center justify-between gap-2 rounded-t-lg no-print">
+      <div class="flex items-center gap-1.5">
+        <span class="text-[11px] font-extrabold text-slate-300 uppercase tracking-wide mr-1">CHẾ ĐỘ XEM:</span>
+        <button type="button" id="btnViewOrdersTab" onclick="switchMainView('orders')"
+                class="px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer">
+          <span>📋 Bảng Danh Sách Đơn Hàng</span>
+          <span id="viewOrdersCountBadge" class="bg-slate-200 text-slate-900 text-[10.5px] px-1.5 py-0.2 rounded-full font-mono">0 đơn</span>
+        </button>
+        <button type="button" id="btnViewSummaryTab" onclick="switchMainView('summary')"
+                class="px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-teal-700 text-white cursor-pointer"
+                title="Xem ngay Bảng Tổng Kết Thống Kê Chi Tiết Theo Sản Phẩm - Màu Sắc - Size ở trên cùng mà không cần cuộn trang!">
+          <span>📊 Bảng Thống Kê Phân Loại (Màu & Size)</span>
+          <span id="viewSummaryCountBadge" class="bg-teal-900 text-teal-200 text-[10.5px] px-1.5 py-0.2 rounded-full font-mono">0 phân loại</span>
+        </button>
+        <button type="button" id="btnViewBothTab" onclick="switchMainView('both')"
+                class="px-2 py-1 rounded font-semibold text-xs text-slate-400 hover:text-white transition cursor-pointer"
+                title="Hiển thị cả 2 bảng tuần tự trên cùng một trang">
+          <span>🔀 Xem Cả Hai</span>
+        </button>
+      </div>
+      <div class="text-[11px] text-teal-300 font-medium hidden md:flex items-center gap-1">
+        <span>⚡ Bấm tab <b>Bảng Thống Kê</b> để xem số liệu phân loại ngay lập tức không cần cuộn!</span>
+      </div>
+    </div>
+
     <!-- Main Spreadsheet Table (Một đơn một dòng tổng - Siêu mượt, không bao giờ đơ) -->
     <div id="mainTableScrollContainer" class="overflow-x-auto max-h-[680px] min-h-[520px]">
       <table class="excel-table">
@@ -796,7 +865,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
 
     <!-- Bottom Summary Table by Product Name & Classification -->
-    <div class="mt-6 border-t-4 border-teal-700">
+    <div id="categorySummaryWrapper" class="mt-6 border-t-4 border-teal-700">
       <div class="bg-teal-700 text-white px-5 py-2 font-bold text-sm uppercase tracking-wide flex flex-wrap items-center justify-between gap-2">
         <div class="flex flex-wrap items-center gap-2">
           <span>📊</span>
@@ -4734,7 +4803,209 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let currentFilterTab = 'all'; // 'all' | 'waiting' | 'returned' | 'overdue' | 'lost'
     let currentRecvDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | '7days'
     let currentPlatformFilter = 'all'; // 'all' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'Khác'
-    let currentOrderTypeFilter = 'all'; // 'all' | 'Giao không thành công' | 'Trả hàng/Hoàn tiền' | 'Đơn hủy' | 'THẤT THU'
+    let currentOrderTypeFilter = 'all'; // 'all' | 'Giao không thành công' | 'Trả hàng/Hoàn tiền' | 'Đơn hủy' | 'THẤT THU'
+    let currentImportWeekFilter = 'all'; // 'all' or week key e.g. '2026-W45'
+    let currentMainView = 'both'; // 'orders' | 'summary' | 'both'
+    let customWeekTabs = [];
+
+    function getWeekInfo(dateInput) {
+      let d = dateInput instanceof Date ? new Date(dateInput) : new Date(dateInput || Date.now());
+      if (isNaN(d.getTime())) d = new Date();
+
+      const day = d.getDay();
+      const diffToMonday = (day === 0 ? -6 : 1) - day;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() + diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      const jan4 = new Date(monday.getFullYear(), 0, 4);
+      const startOfW1 = new Date(jan4);
+      const jan4Day = jan4.getDay();
+      startOfW1.setDate(jan4.getDate() - (jan4Day === 0 ? 6 : jan4Day - 1));
+      startOfW1.setHours(0, 0, 0, 0);
+
+      const weekNum = Math.round(((monday - startOfW1) / 86400000) / 7) + 1;
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const monStr = `${pad(monday.getDate())}/${pad(monday.getMonth() + 1)}`;
+      const sunStr = `${pad(sunday.getDate())}/${pad(sunday.getMonth() + 1)}`;
+      const year = monday.getFullYear();
+
+      const key = `${year}-W${pad(weekNum)}`;
+      const label = `Tuần ${weekNum} (${monStr} - ${sunStr})`;
+      return { key, weekNum, year, label, monday, sunday, range: `${monStr} - ${sunStr}/${year}` };
+    }
+
+    function getOrderImportWeek(order) {
+      if (!order) return getWeekInfo(new Date()).key;
+      if (order.importWeek) return order.importWeek;
+      if (order.importedAt) {
+        const info = getWeekInfo(order.importedAt);
+        order.importWeek = info.key;
+        return info.key;
+      }
+      const nowInfo = getWeekInfo(new Date());
+      order.importWeek = nowInfo.key;
+      order.importedAt = new Date().toISOString();
+      order.importedAtFormatted = new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN');
+      return nowInfo.key;
+    }
+
+    function setImportWeekFilter(weekKey) {
+      currentImportWeekFilter = weekKey;
+      currentPage = 1;
+      renderWeeklyImportTabs();
+      recalcTotalsAndSummary();
+      renderAll(false);
+      renderCategorySummaryTable();
+    }
+
+    function renderWeeklyImportTabs() {
+      const container = document.getElementById('dynamicWeekTabs');
+      if (!container) return;
+
+      const weekMap = new Map();
+      let totalOrdersAllWeeks = orders.length;
+      let totalQtyAllWeeks = 0;
+
+      orders.forEach(o => {
+        const wKey = getOrderImportWeek(o);
+        const wInfo = getWeekInfo(o.importedAt || new Date());
+        if (!weekMap.has(wKey)) {
+          weekMap.set(wKey, {
+            key: wKey,
+            label: wInfo.label,
+            orderCount: 0,
+            qtyCount: 0
+          });
+        }
+        const item = weekMap.get(wKey);
+        item.orderCount++;
+        const q = (Array.isArray(o.items) && o.items.length > 0)
+          ? o.items.reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0)
+          : (parseInt(o.qty, 10) || 1);
+        item.qtyCount += q;
+        totalQtyAllWeeks += q;
+      });
+
+      const sortedWeeks = Array.from(weekMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+
+      let html = `
+        <button type="button" onclick="setImportWeekFilter('all')"
+                class="px-2.5 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                  currentImportWeekFilter === 'all'
+                    ? 'bg-purple-800 text-white shadow-xs ring-2 ring-purple-300 font-extrabold'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
+                }">
+          <span>🌐 Tất Cả Các Tuần</span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded-full ${
+            currentImportWeekFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
+          }">${totalOrdersAllWeeks} đơn (${totalQtyAllWeeks} SP)</span>
+        </button>
+      `;
+
+      sortedWeeks.forEach(w => {
+        const isActive = (currentImportWeekFilter === w.key);
+        html += `
+          <button type="button" onclick="setImportWeekFilter('${w.key}')"
+                  class="px-2.5 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
+                    isActive
+                      ? 'bg-purple-700 text-white shadow-xs ring-2 ring-purple-300 font-extrabold'
+                      : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                  }">
+            <span>📅 ${w.label}</span>
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full ${
+              isActive ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-900'
+            }">${w.orderCount} đơn (${w.qtyCount} SP)</span>
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function promptCreateCustomWeekTab() {
+      const nowInfo = getWeekInfo(new Date());
+      const choice = prompt(
+        `📅 TẠO HOẶC CHỌN TAB TUẦN NẠP FILE EXCEL:\n\n` +
+        `• Nhập số tuần muốn xem (Ví dụ: 45 hoặc 44):\n` +
+        `• Hiện tại là: ${nowInfo.label}\n\n` +
+        `Nhập số tuần:`,
+        nowInfo.weekNum
+      );
+      if (!choice) return;
+      const wNum = parseInt(choice.trim(), 10);
+      if (isNaN(wNum) || wNum < 1 || wNum > 53) {
+        alert('⚠️ Số tuần không hợp lệ (nhập từ 1 đến 53)!');
+        return;
+      }
+      const year = new Date().getFullYear();
+      const targetKey = `${year}-W${String(wNum).padStart(2, '0')}`;
+      setImportWeekFilter(targetKey);
+    }
+
+    function switchMainView(viewMode) {
+      currentMainView = viewMode;
+      const ordersContainer = document.getElementById('mainTableScrollContainer');
+      const summaryWrapper = document.getElementById('categorySummaryWrapper');
+      const btnOrders = document.getElementById('btnViewOrdersTab');
+      const btnSummary = document.getElementById('btnViewSummaryTab');
+      const btnBoth = document.getElementById('btnViewBothTab');
+
+      if (btnOrders && btnSummary && btnBoth) {
+        btnOrders.className = viewMode === 'orders'
+          ? 'px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-white text-slate-900 shadow-xs cursor-pointer ring-2 ring-indigo-400'
+          : 'px-3 py-1 rounded font-bold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 cursor-pointer';
+
+        btnSummary.className = viewMode === 'summary'
+          ? 'px-3 py-1 rounded font-extrabold text-xs transition flex items-center gap-1.5 bg-teal-500 text-slate-950 shadow-xs cursor-pointer ring-2 ring-teal-300'
+          : 'px-3 py-1 rounded font-bold text-xs transition flex items-center gap-1.5 bg-slate-700 hover:bg-teal-700 text-white cursor-pointer';
+
+        btnBoth.className = viewMode === 'both'
+          ? 'px-2 py-1 rounded font-extrabold text-xs text-white bg-slate-600 ring-1 ring-white/50 cursor-pointer'
+          : 'px-2 py-1 rounded font-semibold text-xs text-slate-400 hover:text-white transition cursor-pointer';
+      }
+
+      if (ordersContainer && summaryWrapper) {
+        if (viewMode === 'orders') {
+          ordersContainer.classList.remove('hidden');
+          summaryWrapper.classList.add('hidden');
+        } else if (viewMode === 'summary') {
+          ordersContainer.classList.add('hidden');
+          summaryWrapper.classList.remove('hidden');
+          summaryWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          ordersContainer.classList.remove('hidden');
+          summaryWrapper.classList.remove('hidden');
+        }
+      }
+    }
+
+    function scrollToSummaryTable() {
+      const summaryWrapper = document.getElementById('categorySummaryWrapper');
+      if (summaryWrapper) {
+        summaryWrapper.classList.remove('hidden');
+        summaryWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function scrollToMainTable() {
+      const ordersContainer = document.getElementById('mainTableScrollContainer');
+      if (ordersContainer) {
+        ordersContainer.classList.remove('hidden');
+        ordersContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    window.switchMainView = switchMainView;
+    window.setImportWeekFilter = setImportWeekFilter;
+    window.renderWeeklyImportTabs = renderWeeklyImportTabs;
+    window.scrollToSummaryTable = scrollToSummaryTable;
+    window.scrollToMainTable = scrollToMainTable; // 'all' | 'Giao không thành công' | 'Trả hàng/Hoàn tiền' | 'Đơn hủy' | 'THẤT THU'
     let currentDateSort = 'default'; // 'default' | 'shipDate_desc' | 'shipDate_asc' | 'returnDate_desc' | 'returnDate_asc' | 'recvDate_desc' | 'recvDate_asc'
     let currentPage = 1;
     let pageSize = 50; // 50 đơn / trang giúp bảng siêu mượt kể cả khi có hàng nghìn đơn và nhiều ảnh
@@ -4743,7 +5014,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.5';
+    const APP_VERSION_NUMBER = '1.3.6';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -7503,7 +7774,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         // Platform Filtering (Shopee / TikTok Shop / Lazada / Khác)
-        if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) return false;
+        if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) return false;
+      if (currentImportWeekFilter !== 'all' && getOrderImportWeek(order) !== currentImportWeekFilter) return false;
 
         // Order Type Filtering (Giao không thành công / Trả hàng/Hoàn tiền / Đơn hủy / THẤT THU)
         if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) return false;
@@ -7974,7 +8246,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const totalQty = items.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
 
       return `
-        <div class="bg-gradient-to-r from-indigo-50 to-sky-50 border border-indigo-200 rounded-xl p-3 shadow-inner">
+        <div class="bg-gradient-to-r from-indigo-50 to-sky-50 border border-indigo-200 rounded-xl p-3 shadow-inner">
+          <!-- KHỐI THỜI GIAN NHẬP FILE EXCEL & TÊN FILE NGUỒN -->
+          <div class="mb-2.5 p-2 rounded-lg bg-indigo-50 border border-indigo-200 flex flex-wrap items-center justify-between gap-2 text-xs shadow-2xs">
+            <div class="flex flex-wrap items-center gap-2 font-bold text-indigo-950">
+              <span class="flex items-center gap-1">⏱️ Thời gian nạp file Excel:</span>
+              <span class="font-mono text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300 font-extrabold text-[12px] shadow-2xs">
+                ${order.importedAtFormatted || (order.importedAt ? new Date(order.importedAt).toLocaleString('vi-VN') : '07/11/2026 20:55:00')}
+              </span>
+              <span class="text-[10px] text-purple-900 bg-purple-100 px-2 py-0.5 rounded font-bold border border-purple-200">
+                ${order.importWeek ? ('📅 ' + getWeekInfo(order.importedAt || new Date()).label) : '📅 Tuần hiện tại'}
+              </span>
+            </div>
+            <div class="text-[11px] text-slate-600 font-medium">
+              📁 File Excel nguồn: <span class="font-mono text-slate-800 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">${escapeAttr(order.sourceFile || order.__sourceFileName || 'Nạp trực tiếp từ file Excel')}</span>
+            </div>
+          </div>
           <div class="flex flex-wrap items-center justify-between gap-2 mb-2 pb-1.5 border-b border-indigo-200">
             <div class="flex items-center gap-2">
               <span class="text-xs font-extrabold text-indigo-900 uppercase tracking-wide">📦 Chi Tiết Sản Phẩm Đơn #${orderIdx + 1} (${escapeAttr(order.orderId || order.track || 'Đơn hàng')})</span>
@@ -8152,6 +8439,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       orders.forEach((order, idx) => {
         // Khi đang lọc theo sàn (Shopee / TikTok...) hoặc Loại đơn, các thẻ thống kê & bảng kế toán tính theo bộ lọc đang chọn!
+        if (currentImportWeekFilter !== 'all' && getOrderImportWeek(order) !== currentImportWeekFilter) return;
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) {
           return;
         }
@@ -8273,7 +8561,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // Update Pipeline Filter Tabs count (tự động theo sàn được chọn)
       let countAll = 0, countWaiting = 0, countReturned = 0, countUnneeded = 0, countUpcoming = 0, countOverdue = 0, countLost = 0;
       orders.forEach(o => {
-        if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return;
+        if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return;
+        if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return;
         countAll++;
         if (isOrderReceived(o)) {
           countReturned++;
@@ -8305,7 +8594,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elLost) elLost.textContent = countLost;
 
       document.getElementById('footTotalQty').textContent = totalQty;
-      document.getElementById('footTotalPrice').textContent = formatMoney(totalPrice);
+      document.getElementById('footTotalPrice').textContent = formatMoney(totalPrice);
+
+      // Cập nhật View Switcher Badges & Sticky Bottom Dock Badges
+      const viewOrdBadge = document.getElementById('viewOrdersCountBadge');
+      if (viewOrdBadge) viewOrdBadge.textContent = `${orders.length} đơn`;
+
+      const dockOrd = document.getElementById('dockOrdersBadge');
+      if (dockOrd) dockOrd.textContent = `${orders.length} đơn`;
+      const dockQty = document.getElementById('dockQtyBadge');
+      if (dockQty) dockQty.textContent = `${totalQty} SP`;
+      const dockRet = document.getElementById('dockReturnedBadge');
+      if (dockRet) dockRet.textContent = `🟢 Đã về: ${returnedQty}`;
+      const dockUnret = document.getElementById('dockUnreturnedBadge');
+      if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${unreturnedQty}`;
+      const dockP = document.getElementById('dockPriceBadge');
+      if (dockP) dockP.textContent = formatMoney(totalPrice);
+
+      renderWeeklyImportTabs();
 
       const previewEl = document.getElementById('searchPreviewBar');
       if (!previewEl) return;
@@ -10667,7 +10973,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
   
     // =========================================================================
-    // v1.3.5: ÂM THANH PHÂN LOẠI QUÉT MÃ VẠCH (AUDIO FEEDBACK CHUYÊN NGHIỆP)
+    // v1.3.6: ÂM THANH PHÂN LOẠI QUÉT MÃ VẠCH (AUDIO FEEDBACK CHUYÊN NGHIỆP)
     // =========================================================================
     function playScanSuccessTone() {
       try {
@@ -10734,7 +11040,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.3.5: ĐỒNG HỒ ĐẾM NGƯỢC HẠN PHẢN HỒI KHIẾU NẠI (DEADLINE COUNTDOWN)
+    // v1.3.6: ĐỒNG HỒ ĐẾM NGƯỢC HẠN PHẢN HỒI KHIẾU NẠI (DEADLINE COUNTDOWN)
     // =========================================================================
     function getDeadlineCountdownInfo(order) {
       if (!order || !order.deadline) return { text: '', status: 'none', days: 0 };
@@ -10765,7 +11071,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.3.5: QUẢN LÝ CA QUÉT NHẬN HÀNG (BATCH SESSION TRACKER)
+    // v1.3.6: QUẢN LÝ CA QUÉT NHẬN HÀNG (BATCH SESSION TRACKER)
     // =========================================================================
     let activeScanSession = {
       startTime: new Date(),
@@ -10873,7 +11179,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.3.5: HỒ SƠ KHIẾU NẠI SÀN 1 ĐƠN (DISPUTE DOSSIER GENERATOR)
+    // v1.3.6: HỒ SƠ KHIẾU NẠI SÀN 1 ĐƠN (DISPUTE DOSSIER GENERATOR)
     // =========================================================================
     let currentDisputeOrderIndex = -1;
 
@@ -10981,7 +11287,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.3.5: IN TEM KIỂM KHO RE-STOCK (DECAL 50x30mm HOẶC K80)
+    // v1.3.6: IN TEM KIỂM KHO RE-STOCK (DECAL 50x30mm HOẶC K80)
     // =========================================================================
     function printRestockLabel(orderIdx) {
       const order = orders[orderIdx];
@@ -11015,7 +11321,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <div class="order-meta">Mã: ${escapeAttr(order.orderId || order.track || '-')} | ${today}</div>
           </div>
           <scr' + 'ipt>window.onload = function() { window.print(); };<\/scr' + 'ipt>
-        </body>
+        
+    <!-- Sticky Bottom Summary Dock (Thanh dock cố định ở mép dưới màn hình) -->
+    <div id="stickyBottomDock" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md text-white px-4 py-2 border-t-2 border-teal-500 shadow-2xl flex flex-wrap items-center justify-between gap-2.5 text-xs no-print transition-transform duration-300">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-extrabold text-teal-400 flex items-center gap-1 uppercase tracking-wide">
+          <span>📊 TỔNG KẾT TỨC THÌ:</span>
+        </span>
+        <span id="dockOrdersBadge" class="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded font-mono font-bold text-white">0 đơn</span>
+        <span id="dockQtyBadge" class="bg-indigo-900 border border-indigo-600 px-2 py-0.5 rounded font-mono font-bold text-indigo-100">0 SP</span>
+        <span id="dockReturnedBadge" class="bg-emerald-950 border border-emerald-600 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">🟢 Đã về: 0</span>
+        <span id="dockUnreturnedBadge" class="bg-amber-950 border border-amber-600 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">🟠 Chưa về: 0</span>
+        <span id="dockPriceBadge" class="bg-rose-950 border border-rose-600 text-rose-300 px-2 py-0.5 rounded font-mono font-bold">0 đ</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="switchMainView('summary'); scrollToSummaryTable();"
+                class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-extrabold transition shadow-xs flex items-center gap-1 cursor-pointer">
+          <span>▲ Xem Bảng Thống Kê Phân Loại (Màu & Size)</span>
+        </button>
+        <button type="button" onclick="switchMainView('orders'); scrollToMainTable();"
+                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition cursor-pointer">
+          <span>📋 Bảng Đơn Hàng</span>
+        </button>
+      </div>
+    </div>
+
+</body>
         </html>
       `;
 
@@ -11030,7 +11361,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.3.5: BẢNG PHÂN TÍCH & ĐỐI SOÁT TÀI CHÍNH NÂNG CAO (ANALYTICS DASHBOARD)
+    // v1.3.6: BẢNG PHÂN TÍCH & ĐỐI SOÁT TÀI CHÍNH NÂNG CAO (ANALYTICS DASHBOARD)
     // =========================================================================
     function openAnalyticsDashboardModal() {
       const modal = document.getElementById('analyticsDashboardModal');
@@ -11162,7 +11493,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 
     // =========================================================================
-    // v1.3.5: TỰ ĐỘNG KÉO MÃ & ẢNH ĐÃ QUÉT LÚC TẮT MÁY (OFFLINE PHOTO CATCH-UP)
+    // v1.3.6: TỰ ĐỘNG KÉO MÃ & ẢNH ĐÃ QUÉT LÚC TẮT MÁY (OFFLINE PHOTO CATCH-UP)
     // =========================================================================
     function broadcastPcHello() {
       const topic = getNtfyTopic();

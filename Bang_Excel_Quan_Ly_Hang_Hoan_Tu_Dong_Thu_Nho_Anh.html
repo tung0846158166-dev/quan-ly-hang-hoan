@@ -225,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.4.0
+          🚀 Phiên bản v1.4.1
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -572,7 +572,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.4.0</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.4.1</span>
               </div>
             </div>
           </div>
@@ -1049,21 +1049,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <input id="hiddenPhotoInput" type="file" accept="image/*" class="hidden" />
 
-  <!-- Zoom Image Lightbox Modal -->
-  <div id="zoomModal" onclick="closeZoomModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-4 cursor-zoom-out">
-    <div class="relative max-w-3xl max-h-[90vh] bg-white p-3 rounded-2xl shadow-2xl" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-200">
-        <div id="zoomModalTitle" class="text-xs font-bold text-slate-800">Ảnh chụp thông tin đơn hàng</div>
-        <div class="flex items-center gap-2">
-          <button onclick="removeCurrentZoomPhoto()" class="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-semibold rounded-lg">
-            🗑 Xóa ảnh này
+  <!-- Zoom Image Lightbox Modal (v1.4.1 Hỗ trợ Phóng to, Tải ảnh về máy, Xoay ảnh & Đọc mã) -->
+  <div id="zoomModal" onclick="closeZoomModal()" class="fixed inset-0 bg-slate-900/85 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 cursor-zoom-out select-none transition-all">
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+        <div id="zoomModalTitle" class="text-xs sm:text-sm font-bold text-slate-800 truncate mr-2">Ảnh chụp thông tin đơn hàng</div>
+        <div class="flex items-center gap-1.5 flex-wrap shrink-0">
+          <!-- Nút Tải Ảnh Về Máy -->
+          <button type="button" onclick="downloadCurrentZoomPhoto()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer" title="Tải ảnh gốc này về máy tính">
+            <span>📥</span>
+            <span>Tải Ảnh Về</span>
           </button>
-          <button onclick="closeZoomModal()" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-lg">
+          <!-- Nút Xoay Ảnh -->
+          <button type="button" onclick="rotateCurrentZoomPhoto()" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition cursor-pointer" title="Xoay ảnh 90 độ">
+            <span>🔄</span>
+            <span>Xoay</span>
+          </button>
+          <!-- Nút OCR Đọc Chữ -->
+          <button type="button" onclick="if(currentZoomOrderIndex!==null) triggerPcOcrForOrder(currentZoomOrderIndex)" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold rounded-lg flex items-center gap-1 transition cursor-pointer" title="Quét chữ từ ảnh tem này">
+            <span>⚡</span>
+            <span>Đọc Mã</span>
+          </button>
+          <!-- Nút Xóa Ảnh -->
+          <button type="button" onclick="removeCurrentZoomPhoto()" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg flex items-center gap-1 transition cursor-pointer" title="Xóa ảnh chụp của đơn này">
+            <span>🗑</span>
+            <span>Xóa</span>
+          </button>
+          <!-- Nút Đóng -->
+          <button type="button" onclick="closeZoomModal()" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition cursor-pointer" title="Đóng cửa sổ xem ảnh (hoặc bấm Esc)">
             ✕ Đóng
           </button>
         </div>
       </div>
-      <img id="zoomModalImg" src="" alt="Order Photo" class="max-h-[78vh] w-auto mx-auto rounded-lg object-contain" />
+      <div class="p-3 sm:p-4 bg-slate-900/90 flex items-center justify-center min-h-[300px] max-h-[82vh] overflow-auto">
+        <img id="zoomModalImg" src="" alt="Order Photo" class="max-h-[78vh] w-auto max-w-full mx-auto rounded-lg object-contain shadow-lg cursor-default transition-transform" />
+      </div>
     </div>
   </div>
 
@@ -5501,7 +5521,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.4.0';
+    const APP_VERSION_NUMBER = '1.4.1';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6293,6 +6313,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     };
 
     window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const zm = document.getElementById('zoomModal');
+        if (zm && !zm.classList.contains('hidden')) {
+          closeZoomModal();
+        }
+      }
       const dlg = document.getElementById('customDialogModal');
       if (dlg && !dlg.classList.contains('hidden')) {
         if (e.key === 'Escape') {
@@ -8066,18 +8092,94 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       e.target.value = '';
     });
 
-    function handlePhotoBoxClick(orderIdx) {
+    let currentZoomRotation = 0;
+
+    function openZoomModal(photoSrc, orderIdx = null) {
+      if (typeof orderIdx === 'number' && orders[orderIdx]) {
+        activePhotoOrderIndex = orderIdx;
+        currentZoomOrderIndex = orderIdx;
+        const o = orders[orderIdx];
+        if (!photoSrc) {
+          photoSrc = o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '';
+        }
+        const oCode = o.orderId || o.track || o.returnTrack || o.forwardTrack || ('Đơn #' + (orderIdx + 1));
+        const firstItem = (o.items && o.items[0]) ? o.items[0].product : '';
+        const titleEl = document.getElementById('zoomModalTitle');
+        if (titleEl) {
+          titleEl.innerHTML = `📸 <b>Đơn #${orderIdx + 1}</b>: <span class="font-mono text-indigo-700 font-bold">${escapeAttr(oCode)}</span> ${firstItem ? `<span class="text-slate-500 font-normal">(${escapeAttr(firstItem)})</span>` : ''}`;
+        }
+      } else {
+        const titleEl = document.getElementById('zoomModalTitle');
+        if (titleEl) titleEl.textContent = '📸 Ảnh chụp thông tin kiện hàng';
+      }
+
+      if (!photoSrc) {
+        if (typeof orderIdx === 'number') {
+          activePhotoOrderIndex = orderIdx;
+          if (!isLocked) {
+            handlePhotoBoxDblClick(orderIdx);
+          } else {
+            showToast('ℹ️ Ô này chưa có ảnh. Mở khóa bảng rồi dán ảnh (Ctrl+V)!', 'info');
+          }
+        }
+        return;
+      }
+
+      currentZoomRotation = 0;
+      const imgEl = document.getElementById('zoomModalImg');
+      if (imgEl) {
+        imgEl.src = photoSrc;
+        imgEl.style.transform = 'rotate(0deg)';
+      }
+      const modal = document.getElementById('zoomModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function handlePhotoCellClick(orderIdx) {
       activePhotoOrderIndex = orderIdx;
       const o = orders[orderIdx];
-      if (o) {
-        const photoSrc = o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '';
-        if (photoSrc) {
-          currentZoomOrderIndex = orderIdx;
-          document.getElementById('zoomModalTitle').textContent =
-            `Đơn #${orderIdx + 1}: ${o.orderId || ''} | MVĐ: ${o.track || ''} (${o.items.length} loại SP)`;
-          document.getElementById('zoomModalImg').src = photoSrc;
-          document.getElementById('zoomModal').classList.remove('hidden');
-        }
+      const photoSrc = o ? (o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '') : '';
+      openZoomModal(photoSrc, orderIdx);
+    }
+    const handlePhotoBoxClick = handlePhotoCellClick;
+
+    function downloadCurrentZoomPhoto() {
+      const imgEl = document.getElementById('zoomModalImg');
+      const photoSrc = imgEl ? imgEl.src : '';
+      if (!photoSrc || photoSrc === window.location.href) {
+        showToast('⚠️ Không có ảnh để tải về!', 'warning');
+        return;
+      }
+
+      let fileName = 'Anh_Kien_Hang_' + Date.now() + '.jpg';
+      if (currentZoomOrderIndex !== null && orders[currentZoomOrderIndex]) {
+        const o = orders[currentZoomOrderIndex];
+        const rawCode = o.orderId || o.track || o.returnTrack || o.forwardTrack || ('Don_' + (currentZoomOrderIndex + 1));
+        const cleanCode = String(rawCode).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+        fileName = `Anh_Don_${cleanCode}.jpg`;
+      }
+
+      try {
+        const a = document.createElement('a');
+        a.href = photoSrc;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 100);
+        showToast(`📥 Đã tải ảnh [${fileName}] về máy thành công!`, 'success');
+      } catch (e) {
+        showToast('⚠️ Không thể tải ảnh trực tiếp, vui lòng nhấp chuột phải vào ảnh và chọn Lưu ảnh!', 'warning');
+      }
+    }
+
+    function rotateCurrentZoomPhoto() {
+      currentZoomRotation = (currentZoomRotation + 90) % 360;
+      const imgEl = document.getElementById('zoomModalImg');
+      if (imgEl) {
+        imgEl.style.transform = `rotate(${currentZoomRotation}deg)`;
+        imgEl.style.transition = 'transform 0.25s ease';
       }
     }
 
@@ -8087,12 +8189,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
       activePhotoOrderIndex = orderIdx;
-      document.getElementById('hiddenPhotoInput').click();
+      const fileInp = document.getElementById('hiddenPhotoInput');
+      if (fileInp) fileInp.click();
     }
 
     function closeZoomModal() {
-      document.getElementById('zoomModal').classList.add('hidden');
+      const modal = document.getElementById('zoomModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
       currentZoomOrderIndex = null;
+      currentZoomRotation = 0;
     }
 
     function removeCurrentZoomPhoto() {
@@ -8104,6 +8212,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         saveOrders();
         closeZoomModal();
         renderAll();
+        showToast('🗑 Đã xóa ảnh của đơn hàng này.', 'info');
       }
     }
 

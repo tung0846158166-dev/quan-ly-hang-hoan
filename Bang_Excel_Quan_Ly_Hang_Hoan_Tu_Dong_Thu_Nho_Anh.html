@@ -149,7 +149,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.3
+          🚀 Phiên bản v1.3.4
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -473,7 +473,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.4</span>
               </div>
             </div>
           </div>
@@ -504,6 +504,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </button>
       </div>
       <div class="flex flex-wrap items-center gap-1.5">
+        <button type="button" onclick="openAnalyticsDashboardModal()"
+                class="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-indigo-700 hover:bg-indigo-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
+                title="Bảng phân tích chuyên sâu: Top mẫu áo bị hoàn nhiều nhất, lý do hoàn và đối soát chi phí vận chuyển 2 chiều">
+          <span>📊 Phân Tích & Đối Soát</span>
+        </button>
+        <button type="button" onclick="openBatchSessionModal()" id="btnSessionScanHeader"
+                class="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
+                title="Quản lý ca quét nhận kiện từ shipper, xem số kiện đã nhận trong ca và xuất biên bản giao nhận">
+          <span>📦 Ca Nhận: <span id="sessionScanCountBadge" class="bg-white/20 px-1 rounded">0</span> kiện</span>
+        </button>
         <button type="button" onclick="openShopeeDbModal('shopee')"
                 class="px-2.5 py-1 rounded-lg font-extrabold text-[11px] bg-[#ee4d2d] hover:bg-orange-700 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
                 title="Mở cơ chế nạp dữ liệu chuyên biệt cho Sàn Shopee (Đơn hủy, Giao thất bại, Trả hàng/Hoàn tiền)">
@@ -1699,6 +1709,157 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <div>
       <div class="text-xs font-bold text-amber-300" id="ocrLoadingTitle">Đang quét chữ từ ảnh tem (OCR)...</div>
       <div class="text-[11px] text-slate-300" id="ocrLoadingText">Vui lòng đợi vài giây</div>
+    </div>
+  </div>
+
+  
+  <!-- MODAL 1: HỒ SƠ KHIẾU NẠI SÀN 1 ĐƠN (SHOPEE / TIKTOK DISPUTE DOSSIER) -->
+  <div id="singleDisputeModal" onclick="closeSingleOrderDisputeModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-gradient-to-r from-rose-700 via-rose-600 to-orange-600 text-white px-5 py-3.5 flex items-center justify-between shrink-0 shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">🛡️</span>
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold tracking-tight">Hồ Sơ Khiếu Nại Sàn (Đòi Tiền Bồi Thường)</h3>
+            <p class="text-[11px] text-rose-100 font-medium" id="singleDisputeSubtitle">Đơn hàng # ---</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSingleOrderDisputeModal()" class="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center text-lg font-bold cursor-pointer transition">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1">
+        <!-- Thông tin kiện hàng tóm tắt -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div><span class="text-slate-500">Mã khiếu nại:</span> <b id="dispClaimId" class="font-mono text-indigo-800">-</b></div>
+          <div><span class="text-slate-500">Mã đơn hàng:</span> <b id="dispOrderId" class="font-mono text-slate-900">-</b></div>
+          <div><span class="text-slate-500">↩️ MVĐ Trả hàng:</span> <b id="dispReturnTrack" class="font-mono text-emerald-800">-</b></div>
+          <div><span class="text-slate-500">🚚 MVĐ Giao ban đầu:</span> <b id="dispForwardTrack" class="font-mono text-slate-700">-</b></div>
+          <div><span class="text-slate-500">Sản phẩm:</span> <b id="dispProduct" class="text-slate-800">-</b></div>
+          <div><span class="text-slate-500">Tiền yêu cầu hoàn:</span> <b id="dispRefundAmount" class="text-rose-700 font-bold">-</b></div>
+        </div>
+
+        <!-- Chọn tình trạng thực tế khi bóc kiện tại kho -->
+        <div class="space-y-1.5">
+          <label class="font-bold text-slate-800 flex items-center gap-1">
+            <span>📦 Tình Trạng Thực Tế Khi Nhận Tại Kho:</span>
+            <span class="text-rose-500">*</span>
+          </label>
+          <select id="dispReasonSelect" onchange="updateDisputeMessageDraft()" class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-lg p-2 outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500">
+            <option value="Hàng bị tráo đổi (Không phải sản phẩm của shop)">🚨 Hàng bị tráo đổi (Khách gửi lại giẻ lau / đồ cũ / sản phẩm khác)</option>
+            <option value="Hàng bị hư hỏng / rách nát / bẩn trong quá trình vận chuyển">💔 Hàng bị rách / bẩn / hỏng nát do vận chuyển (Cần đơn vị vận chuyển đền bù)</option>
+            <option value="Kiện hàng bị rỗng / thiếu sản phẩm bên trong">📦 Kiện hàng bị rỗng / thiếu số lượng sản phẩm so với lúc gửi</option>
+            <option value="Hàng đã qua sử dụng / mất tem mác / giặt ủi">⚠️ Hàng đã qua sử dụng, bị bóc tem mác, có mùi lạ không thể bán lại</option>
+            <option value="Quá hạn 7 ngày đơn vị vận chuyển chưa giao về kho">⏳ Quá hạn 7 ngày đơn vị vận chuyển chưa giao hàng hoàn về kho</option>
+            <option value="Khác">📝 Tình trạng khác (Nhập chi tiết bên dưới)</option>
+          </select>
+        </div>
+
+        <!-- Ghi chú chi tiết bổ sung -->
+        <div class="space-y-1.5">
+          <label class="font-bold text-slate-800">Ghi chú chi tiết (nếu có):</label>
+          <input type="text" id="dispDetailNote" oninput="updateDisputeMessageDraft()" placeholder="Ví dụ: Áo len bị rách toạc ống tay, túi niêm phong bị rạch..." class="w-full text-xs bg-white border border-slate-300 rounded-lg p-2 outline-none focus:border-rose-500" />
+        </div>
+
+        <!-- Ảnh bằng chứng đính kèm -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800">📸 Ảnh Bằng Chứng (Đã Chụp Khi Bóc Kiện):</span>
+            <span id="dispPhotoNotice" class="text-[11px] text-slate-500">Đã tự động lấy ảnh từ hệ thống</span>
+          </div>
+          <div id="dispPhotoContainer" class="p-2.5 bg-slate-100 rounded-xl border border-slate-200 flex items-center gap-3">
+            <img id="dispPhotoImg" src="" alt="Ảnh bằng chứng" class="w-24 h-24 object-cover rounded-lg border border-slate-300 hidden" />
+            <div id="dispPhotoEmpty" class="text-slate-400 italic text-xs py-3 text-center w-full">Chưa có ảnh chụp cho đơn này. Bạn có thể dùng camera điện thoại hoặc webcam để chụp ngay!</div>
+            <div id="dispPhotoActions" class="space-y-1.5 hidden">
+              <button type="button" onclick="downloadDisputePhoto()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded font-bold text-[11px] cursor-pointer">💾 Tải ảnh về máy</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Văn bản khiếu nại soạn sẵn -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-800">📝 Văn Bản Khiếu Nại Soạn Sẵn (Chỉ Việc Copy):</label>
+            <button type="button" onclick="copyDisputeLetter()" class="text-rose-700 hover:text-rose-800 font-extrabold flex items-center gap-1 cursor-pointer">
+              <span>📋 Sao chép nội dung</span>
+            </button>
+          </div>
+          <textarea id="dispLetterTextarea" rows="6" class="w-full font-mono text-[11px] bg-amber-50/70 border border-amber-300 rounded-xl p-2.5 leading-relaxed text-slate-800 outline-none focus:border-rose-500"></textarea>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 border-t border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <button type="button" onclick="closeSingleOrderDisputeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold text-xs cursor-pointer">Đóng</button>
+        <button type="button" onclick="copyDisputeLetter()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-md transition flex items-center gap-1.5 cursor-pointer">
+          <span>📋 SAO CHÉP VĂN BẢN KHIẾU NẠI (1-CLICK)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: BẢNG PHÂN TÍCH & ĐỐI SOÁT NÂNG CAO (ANALYTICS DASHBOARD) -->
+  <div id="analyticsDashboardModal" onclick="closeAnalyticsDashboardModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white px-5 py-3.5 flex items-center justify-between shrink-0 shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">📊</span>
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold tracking-tight">Bảng Phân Tích & Đối Soát Tài Chính Nâng Cao</h3>
+            <p class="text-[11px] text-indigo-200 font-medium">Thống kê thất thoát, Top mẫu áo bị hoàn và đối soát chi phí vận chuyển</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAnalyticsDashboardModal()" class="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center text-lg font-bold cursor-pointer transition">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-5 text-xs flex-1" id="analyticsDashboardBody">
+        <!-- Nội dung được dựng tự động bằng JavaScript -->
+      </div>
+
+      <div class="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-end shrink-0">
+        <button type="button" onclick="closeAnalyticsDashboardModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: QUẢN LÝ CA QUÉT NHẬN HÀNG (BATCH SESSION SCANNER) -->
+  <div id="batchSessionModal" onclick="closeBatchSessionModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-gradient-to-r from-emerald-800 to-teal-700 text-white px-5 py-3.5 flex items-center justify-between shrink-0 shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">📦</span>
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold tracking-tight">Quản Lý Ca Quét Nhận Kiện (Biên Bản Shipper)</h3>
+            <p class="text-[11px] text-emerald-100 font-medium" id="batchSessionSubtitle">Bắt đầu ca: ---</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeBatchSessionModal()" class="w-8 h-8 rounded-full hover:bg-white/20 text-white flex items-center justify-center text-lg font-bold cursor-pointer transition">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+          <div>
+            <div class="text-[11px] text-emerald-800 font-semibold">Tổng số kiện đã quét trong ca này:</div>
+            <div class="text-2xl font-black text-emerald-950" id="sessionModalCount">0 kiện</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="startNewScanSession()" class="px-3 py-1.5 bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 rounded-lg font-bold text-xs cursor-pointer transition">🔄 Bắt Đầu Ca Mới</button>
+            <button type="button" onclick="copySessionReceipt()" class="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs cursor-pointer transition flex items-center gap-1">📋 Sao Chép Biên Bản</button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="font-bold text-slate-800 flex items-center justify-between">
+            <span>Danh Sách Kiện Hàng Đã Quét Trong Ca:</span>
+            <span class="text-[11px] text-slate-500" id="sessionListStatus">Tự động tích lũy khi quét qua điện thoại / camera PC / súng quét</span>
+          </div>
+          <div class="border border-slate-200 rounded-xl max-h-64 overflow-y-auto divide-y divide-slate-100" id="sessionScannedListContainer">
+            <!-- Danh sách các mã quét trong ca -->
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-end shrink-0">
+        <button type="button" onclick="closeBatchSessionModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer">Đóng</button>
+      </div>
     </div>
   </div>
 
@@ -4577,7 +4738,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.3';
+    const APP_VERSION_NUMBER = '1.3.4';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -7563,16 +7724,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
             </select>`;
 
-        // Format Deadline Cell
+        // Format Deadline Cell (Kèm đếm ngược thông minh)
         const dlStatus = getDeadlineStatus(order);
+        const countdownInfo = getDeadlineCountdownInfo(order);
         let deadlineHtml = '';
         if (order.deadline) {
           if (dlStatus === 'overdue') {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-800 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap" title="Bấm để chỉnh sửa hạn xử lý">🚨 ${escapeAttr(order.deadline)}</div>`;
+            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-800 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap leading-tight" title="Quá hạn xử lý sàn! Bấm để chỉnh sửa">
+              <div>🚨 ${escapeAttr(order.deadline)}</div>
+              <div class="text-[9.5px] text-rose-700 font-extrabold animate-pulse mt-0.5">${countdownInfo.text}</div>
+            </div>`;
           } else if (dlStatus === 'upcoming') {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap" title="Hạn gấp trong 48 giờ! Bấm để chỉnh sửa">⏰ ${escapeAttr(order.deadline)}</div>`;
+            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap leading-tight" title="Hạn gấp trong 48 giờ! Bấm để chỉnh sửa">
+              <div>⏰ ${escapeAttr(order.deadline)}</div>
+              <div class="text-[9.5px] text-amber-800 font-extrabold mt-0.5">${countdownInfo.text}</div>
+            </div>`;
           } else {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded font-medium text-[10.5px] text-center cursor-pointer whitespace-nowrap" title="Bấm để chỉnh sửa hạn xử lý">${escapeAttr(order.deadline)}</div>`;
+            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded font-medium text-[10.5px] text-center cursor-pointer whitespace-nowrap leading-tight" title="Bấm để chỉnh sửa hạn xử lý">
+              <div>${escapeAttr(order.deadline)}</div>
+              ${countdownInfo.text ? `<div class="text-[9.5px] text-slate-500 font-medium mt-0.5">${countdownInfo.text}</div>` : ''}
+            </div>`;
           }
         } else {
           deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1 py-0.5 text-center text-[10px] text-slate-400 italic hover:text-blue-600 cursor-pointer select-none" title="Bấm để thêm ngày hạn xử lý sàn">+ Thêm hạn</div>`;
@@ -7918,6 +8089,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                     <div class="text-slate-700 text-[10.5px] leading-tight">${escapeAttr(order.rawDetails.sellerNote)}</div>
                   </div>
                 ` : ''}
+              </div>
+            </div>
+
+            <!-- Thanh Hành Động Bổ Trợ: Tạo Hồ Sơ Khiếu Nại Sàn & In Tem Kiểm Kho Re-stock -->
+            <div class="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-2 rounded-lg">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openSingleOrderDisputeModal(${orderIdx})"
+                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+                  <span>🛡️ Tạo Hồ Sơ Khiếu Nại Sàn (1-Click)</span>
+                </button>
+                <button type="button" onclick="printRestockLabel(${orderIdx})"
+                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-lg shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                        title="In tem decal nhiệt dán lên bọc sản phẩm để xếp lại vào kệ hàng sẵn sàng bán tiếp">
+                  <span>🖨️ In Tem Kiểm Kho Re-Stock</span>
+                </button>
+              </div>
+              <div class="text-[11px] text-slate-500 italic">
+                Mẹo: Hệ thống tự động điền sẵn toàn bộ mã đơn, mã khiếu nại, MVĐ và ảnh chụp kiện hàng.
               </div>
             </div>
           </div>
@@ -10121,7 +10310,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
           addAuditLog('⚠️ QUÉT ĐT TRÙNG LẶP', `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} ĐÃ TRẢ từ trước!`);
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
-          playBeepSound(350, 260);
+          playScanDuplicateTone(); recordCodeToActiveSession(cleanCode, existingIdx, true);
           sendAckToPhone(existingIdx + 1, cleanCode, '⚠️ ĐÃ TRẢ TỪ TRƯỚC (QUÉT TRÙNG)', 'duplicate', true, requestId, clientRoom);
           return;
         }
@@ -10141,7 +10330,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         activePhotoOrderIndex = existingIdx;
         addAuditLog('📱 QUÉT ĐT ĐỐI SOÁT', `Quét mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} tự động khớp thông tin & chuyển sang [🟢 Hàng đã trả]`);
         appendPhoneLiveLog(`✅ Khớp Đơn #${existingIdx + 1} (${cleanCode}) ➔ [🟢 Hàng đã trả]`);
-        playBeepSound(1480, 160);
+        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, typeof existingIdx !== "undefined" ? existingIdx : targetIdx, false);
         sendAckToPhone(existingIdx + 1, cleanCode, 'ĐÃ KHỚP ĐƠN #' + (existingIdx + 1) + ' (Hàng đã trả)', 'success', false, requestId, clientRoom);
         saveOrders();
         renderAll();
@@ -10167,7 +10356,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         addAuditLog('📱 QUÉT ĐT ĐIỀN MÃ', `Điền MVĐ [${cleanCode}] (${autoCarrier}) vào Đơn #${targetIdx + 1}`);
         appendPhoneLiveLog(`🎯 Đã điền [${cleanCode}] (${autoCarrier}) vào Đơn #${targetIdx + 1}`);
-        playBeepSound(1480, 160);
+        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, typeof existingIdx !== "undefined" ? existingIdx : targetIdx, false);
         sendAckToPhone(targetIdx + 1, cleanCode, 'ĐÃ ĐIỀN VÀO ĐƠN #' + (targetIdx + 1), 'success', false, requestId, clientRoom);
         saveOrders();
         renderAll();
@@ -10178,7 +10367,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // TUYỆT ĐỐI KHÔNG TẠO ĐƠN MỚI NỮA!
       addAuditLog('⚠️ QUÉT ĐT KHÔNG TỒN TẠI', `Quét mã [${cleanCode}] ➔ KHÔNG TÌM THẤY trong danh sách đơn hàng máy tính!`);
       appendPhoneLiveLog(`🟡 KHÔNG CÓ TRÊN HT: Mã [${cleanCode}] chưa có trong danh sách!`);
-      playBeepSound(480, 280);
+      playScanUnknownTone(); recordCodeToActiveSession(cleanCode, -1, false);
       sendAckToPhone(0, cleanCode, '⚠️ KHÔNG TÌM THẤY ĐƠN HÀNG TRÊN HỆ THỐNG!', 'not_found', false, requestId, clientRoom);
     }
 
@@ -10364,7 +10553,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // Đơn quét từ phiếu ảnh không có trong danh sách ➔ Báo không tồn tại, không tạo đơn mới
       addAuditLog('⚠️ QUÉT PHIẾU KHÔNG TỒN TẠI', `Quét phiếu [${rawTrack || rawOrderId}] ➔ KHÔNG TÌM THẤY trong danh sách đơn hàng máy tính!`);
       appendPhoneLiveLog(`🟡 KHÔNG CÓ TRÊN HT: Phiếu [${rawTrack || rawOrderId}] chưa có trong danh sách!`);
-      playBeepSound(480, 280);
+      playScanUnknownTone(); recordCodeToActiveSession(cleanCode, -1, false);
       sendAckToPhone(0, rawTrack || rawOrderId, '⚠️ KHÔNG TÌM THẤY TRÊN HỆ THỐNG!', 'not_found', false, data.requestId || '', data.room || '');
     }
 
@@ -10455,7 +10644,502 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         console.warn('Phone receiver init warning:', phoneErr);
       }
     }
-  </script>
+  
+    // =========================================================================
+    // v1.3.4: ÂM THANH PHÂN LOẠI QUÉT MÃ VẠCH (AUDIO FEEDBACK CHUYÊN NGHIỆP)
+    // =========================================================================
+    function playScanSuccessTone() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1320, now + 0.07);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.19);
+        setTimeout(() => ctx.close(), 250);
+      } catch (e) {}
+    }
+
+    function playScanDuplicateTone() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        [0, 0.08, 0.16].forEach(t => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(587, now + t);
+          gain.gain.setValueAtTime(0.22, now + t);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + t + 0.06);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + t);
+          osc.stop(now + t + 0.07);
+        });
+        setTimeout(() => ctx.close(), 300);
+      } catch (e) {}
+    }
+
+    function playScanUnknownTone() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.linearRampToValueAtTime(180, now + 0.25);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.29);
+        setTimeout(() => ctx.close(), 350);
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // v1.3.4: ĐỒNG HỒ ĐẾM NGƯỢC HẠN PHẢN HỒI KHIẾU NẠI (DEADLINE COUNTDOWN)
+    // =========================================================================
+    function getDeadlineCountdownInfo(order) {
+      if (!order || !order.deadline) return { text: '', status: 'none', days: 0 };
+      if (isOrderReceived(order) || isOrderUnneeded(order)) return { text: '', status: 'done', days: 0 };
+      const dt = parseFullDate(order.deadline);
+      if (!dt) return { text: '', status: 'custom', days: 0 };
+      const now = new Date();
+      // Set to midnight comparison for clean day diff
+      const deadlineMidnight = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 23, 59, 59);
+      const diffMs = deadlineMidnight.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (24 * 3600 * 1000));
+      const diffHours = Math.ceil(diffMs / (3600 * 1000));
+
+      if (diffMs < 0) {
+        const overdueDays = Math.abs(diffDays);
+        return { text: `🚨 Quá hạn ${overdueDays} ngày`, status: 'overdue', days: diffDays };
+      }
+      if (diffDays === 0 || diffHours <= 12) {
+        return { text: `⏳ Hết hạn hôm nay (${diffHours > 0 ? diffHours + 'h' : 'gấp'})!`, status: 'today', days: 0 };
+      }
+      if (diffDays === 1) {
+        return { text: '⚠️ Còn 1 ngày', status: 'tomorrow', days: 1 };
+      }
+      if (diffDays <= 2) {
+        return { text: `⏰ Còn ${diffDays} ngày`, status: 'upcoming', days: diffDays };
+      }
+      return { text: `🕒 Còn ${diffDays} ngày`, status: 'normal', days: diffDays };
+    }
+
+    // =========================================================================
+    // v1.3.4: QUẢN LÝ CA QUÉT NHẬN HÀNG (BATCH SESSION TRACKER)
+    // =========================================================================
+    let activeScanSession = {
+      startTime: new Date(),
+      scannedItems: []
+    };
+
+    function recordCodeToActiveSession(code, orderIdx = -1, isDuplicate = false) {
+      if (!code) return;
+      const clean = extractCleanTrackingCode(code) || String(code).trim().toUpperCase();
+      activeScanSession.scannedItems.unshift({
+        code: clean,
+        orderIdx: orderIdx,
+        isDuplicate: isDuplicate,
+        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      });
+      updateSessionCounterBadge();
+    }
+
+    function updateSessionCounterBadge() {
+      const b = document.getElementById('sessionScanCountBadge');
+      if (b) b.textContent = activeScanSession.scannedItems.filter(x => !x.isDuplicate).length;
+    }
+
+    function startNewScanSession() {
+      if (activeScanSession.scannedItems.length > 0) {
+        if (!confirm('Bạn có chắc muốn BẮT ĐẦU CA MỚI?\n(Số đếm ca hiện tại sẽ về 0. Lịch sử đơn hàng vẫn được giữ nguyên 100%)')) return;
+      }
+      activeScanSession = {
+        startTime: new Date(),
+        scannedItems: []
+      };
+      updateSessionCounterBadge();
+      renderBatchSessionList();
+      alert('✅ Đã bắt đầu ca làm việc mới! Bộ đếm đã đặt lại về 0 kiện.');
+    }
+
+    function openBatchSessionModal() {
+      const modal = document.getElementById('batchSessionModal');
+      if (!modal) return;
+      const sub = document.getElementById('batchSessionSubtitle');
+      if (sub) sub.textContent = 'Bắt đầu từ: ' + activeScanSession.startTime.toLocaleTimeString('vi-VN') + ' ngày ' + activeScanSession.startTime.toLocaleDateString('vi-VN');
+      renderBatchSessionList();
+      modal.classList.remove('hidden');
+    }
+
+    function closeBatchSessionModal() {
+      document.getElementById('batchSessionModal')?.classList.add('hidden');
+    }
+
+    function renderBatchSessionList() {
+      const container = document.getElementById('sessionScannedListContainer');
+      const countEl = document.getElementById('sessionModalCount');
+      if (!container) return;
+
+      const validItems = activeScanSession.scannedItems.filter(x => !x.isDuplicate);
+      if (countEl) countEl.textContent = validItems.length + ' kiện';
+
+      if (!activeScanSession.scannedItems.length) {
+        container.innerHTML = '<div class="p-6 text-center text-slate-400 italic">Chưa có kiện nào được quét trong ca này. Hãy quét mã vạch để bắt đầu ca!</div>';
+        return;
+      }
+
+      container.innerHTML = activeScanSession.scannedItems.map((item, idx) => {
+        const ord = item.orderIdx >= 0 ? orders[item.orderIdx] : null;
+        const prodName = ord?.items?.[0]?.product || '';
+        const colorSize = ord?.items?.[0] ? `(${ord.items[0].color || ''} ${ord.items[0].size || ''})` : '';
+        return `
+          <div class="p-2.5 flex items-center justify-between ${item.isDuplicate ? 'bg-amber-50/60' : 'hover:bg-slate-50'}">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-400 text-[10px]">#${activeScanSession.scannedItems.length - idx}</span>
+              <span class="${item.isDuplicate ? 'text-amber-800 font-extrabold' : 'text-emerald-800 font-mono font-bold'}">${escapeAttr(item.code)}</span>
+              ${item.isDuplicate ? '<span class="text-[9.5px] bg-amber-200 text-amber-900 px-1 rounded font-bold">Trùng lặp</span>' : ''}
+              ${prodName ? `<span class="text-slate-600 truncate max-w-xs text-[11px]">- ${escapeAttr(prodName)} ${escapeAttr(colorSize)}</span>` : ''}
+            </div>
+            <div class="text-[10px] text-slate-400 font-mono">${item.time}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function copySessionReceipt() {
+      const validItems = activeScanSession.scannedItems.filter(x => !x.isDuplicate);
+      if (!validItems.length) {
+        alert('Chưa có kiện hàng nào trong ca này để tạo biên bản.');
+        return;
+      }
+      const nowStr = new Date().toLocaleString('vi-VN');
+      const lines = [
+        '========================================',
+        'BIÊN BẢN GIAO NHẬN KIỆN HÀNG HOÀN VỀ KHO',
+        '========================================',
+        `Thời gian lập: ${nowStr}`,
+        `Tổng số lượng kiện đã nhận: ${validItems.length} kiện`,
+        '',
+        'DANH SÁCH MÃ VẬN ĐƠN ĐÃ QUÉT THỰC TẾ:'
+      ];
+      validItems.forEach((it, i) => {
+        lines.push(`${i + 1}. ${it.code} (${it.time})`);
+      });
+      lines.push('');
+      lines.push('Đại diện Shipper: .....................');
+      lines.push('Đại diện Kho Shop: ...................');
+
+      copyTextToClipboard(lines.join('\n'), 'Đã sao chép biên bản giao nhận ' + validItems.length + ' kiện!');
+    }
+
+    // =========================================================================
+    // v1.3.4: HỒ SƠ KHIẾU NẠI SÀN 1 ĐƠN (DISPUTE DOSSIER GENERATOR)
+    // =========================================================================
+    let currentDisputeOrderIndex = -1;
+
+    function openSingleOrderDisputeModal(orderIdx) {
+      const order = orders[orderIdx];
+      if (!order) return;
+      currentDisputeOrderIndex = orderIdx;
+
+      document.getElementById('singleDisputeSubtitle').textContent = `Đơn hàng #${orderIdx + 1} - ${order.platform || 'Shopee'}`;
+      document.getElementById('dispClaimId').textContent = order.rawDetails?.claimId || order.claimId || 'Không có';
+      document.getElementById('dispOrderId').textContent = order.orderId || '-';
+      document.getElementById('dispReturnTrack').textContent = (order.returnTrack || order.rawDetails?.returnTrack || order.track || '-') + (order.returnCarrier ? ` (${order.returnCarrier})` : '');
+      document.getElementById('dispForwardTrack').textContent = order.forwardTrack || order.rawDetails?.forwardTrack || '-';
+
+      const firstItem = order.items?.[0];
+      const prodText = firstItem ? `${firstItem.product || 'Sản phẩm'} (${firstItem.color || ''} - ${firstItem.size || ''})` : '-';
+      document.getElementById('dispProduct').textContent = prodText;
+      document.getElementById('dispRefundAmount').textContent = formatMoney(order.rawDetails?.refundAmount || order.price || 0);
+
+      // Handle photo preview
+      const img = document.getElementById('dispPhotoImg');
+      const emptyNotice = document.getElementById('dispPhotoEmpty');
+      const photoActions = document.getElementById('dispPhotoActions');
+      if (order.photo) {
+        img.src = order.photo;
+        img.classList.remove('hidden');
+        emptyNotice.classList.add('hidden');
+        photoActions.classList.remove('hidden');
+      } else {
+        img.src = '';
+        img.classList.add('hidden');
+        emptyNotice.classList.remove('hidden');
+        photoActions.classList.add('hidden');
+      }
+
+      updateDisputeMessageDraft();
+      document.getElementById('singleDisputeModal')?.classList.remove('hidden');
+    }
+
+    function closeSingleOrderDisputeModal() {
+      document.getElementById('singleDisputeModal')?.classList.add('hidden');
+      currentDisputeOrderIndex = -1;
+    }
+
+    function updateDisputeMessageDraft() {
+      if (currentDisputeOrderIndex < 0 || !orders[currentDisputeOrderIndex]) return;
+      const order = orders[currentDisputeOrderIndex];
+      const reasonSelect = document.getElementById('dispReasonSelect')?.value || '';
+      const detailNote = document.getElementById('dispDetailNote')?.value.trim() || '';
+
+      const claimId = order.rawDetails?.claimId || order.claimId || order.orderId || '';
+      const orderId = order.orderId || '';
+      const retTrack = order.returnTrack || order.rawDetails?.returnTrack || order.track || '';
+      const fwdTrack = order.forwardTrack || order.rawDetails?.forwardTrack || '';
+      const prodSummary = (order.items || []).map(x => `${x.product || 'SP'} (${x.color || ''}/${x.size || ''}) x${x.qty || 1}`).join(', ');
+      const refundAmt = formatMoney(order.rawDetails?.refundAmount || order.price || 0);
+      const buyerName = order.rawDetails?.buyerUsername || 'Khách hàng';
+
+      const draft = [
+        `[KHIẾU NẠI & YÊU CẦU BỒI THƯỜNG HÀNG HOÀN - ${(order.platform || 'SHOPEE').toUpperCase()}]`,
+        '',
+        'Kính gửi Bộ phận Khiếu nại & Giải quyết Tranh chấp Sàn,',
+        `Shop xin gửi yêu cầu bồi thường đối với đơn hàng sau:`,
+        `• Mã số khiếu nại sàn: ${claimId}`,
+        `• Mã đơn hàng: ${orderId}`,
+        `• Mã vận đơn trả hàng (Hoàn): ${retTrack}`,
+        `• Mã vận đơn giao ban đầu: ${fwdTrack}`,
+        `• Tài khoản Người mua: ${buyerName}`,
+        `• Sản phẩm khiếu nại: ${prodSummary}`,
+        `• Giá trị thiệt hại yêu cầu bồi hoàn: ${refundAmt}`,
+        '',
+        `👉 TÌNH TRẠNG THỰC TẾ KHI SHOP BÓC KIỆN TẠI KHO:`,
+        `• Lý do khiếu nại: ${reasonSelect}`,
+        (detailNote ? `• Mô tả chi tiết: ${detailNote}` : ''),
+        (order.photo ? '• Bằng chứng: Shop đã chụp lại ảnh bọc kiện và sản phẩm thực tế nhận được (kèm theo hồ sơ này).' : '• Bằng chứng: Video/ảnh bóc kiện tại kho.'),
+        '',
+        'Kính đề nghị Bộ phận Khiếu nại xem xét, bảo vệ quyền lợi chính đáng cho Shop và tiến hành bồi thường thỏa đáng theo chính sách bảo hộ Người Bán!',
+        'Trân trọng cảm ơn!'
+      ].filter(Boolean).join('\n');
+
+      const textarea = document.getElementById('dispLetterTextarea');
+      if (textarea) textarea.value = draft;
+    }
+
+    function copyDisputeLetter() {
+      const textarea = document.getElementById('dispLetterTextarea');
+      if (textarea && textarea.value) {
+        copyTextToClipboard(textarea.value, 'Đã sao chép văn bản khiếu nại 1-click! Bạn có thể dán ngay vào ô khiếu nại của sàn.');
+      }
+    }
+
+    function downloadDisputePhoto() {
+      if (currentDisputeOrderIndex < 0 || !orders[currentDisputeOrderIndex]) return;
+      const order = orders[currentDisputeOrderIndex];
+      if (!order.photo) {
+        alert('Đơn này chưa có ảnh chụp kiện hàng.');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = order.photo;
+      a.download = `Bang_Chung_Khieu_Nai_${order.orderId || order.returnTrack || 'don'}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // =========================================================================
+    // v1.3.4: IN TEM KIỂM KHO RE-STOCK (DECAL 50x30mm HOẶC K80)
+    // =========================================================================
+    function printRestockLabel(orderIdx) {
+      const order = orders[orderIdx];
+      if (!order) return;
+      const firstItem = order.items?.[0] || { product: 'Sản phẩm', color: '', size: '', qty: 1 };
+      const today = new Date().toLocaleDateString('vi-VN');
+
+      const printHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Tem Kiểm Kho - ${escapeAttr(order.orderId || '')}</title>
+          <style>
+            @page { size: 50mm 30mm; margin: 0; }
+            body { margin: 0; padding: 2mm; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+            .label-card { width: 46mm; text-align: center; border: 1.5px dashed #000; border-radius: 4px; padding: 1.5mm; box-sizing: border-box; }
+            .shop-title { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; border-bottom: 1px solid #000; padding-bottom: 1.5px; }
+            .badge { font-size: 8px; font-weight: 800; color: #047857; margin-top: 2px; }
+            .prod-title { font-size: 9px; font-weight: 800; line-height: 1.2; margin-top: 3px; max-height: 22px; overflow: hidden; }
+            .variant { font-size: 9px; font-weight: bold; margin-top: 2px; }
+            .order-meta { font-size: 7.5px; color: #334155; margin-top: 2px; font-family: monospace; }
+          </style>
+        </head>
+        <body>
+          <div class="label-card">
+            <div class="shop-title">LAVI STUDIO - KIỂM KHO</div>
+            <div class="badge">✔ HÀNG ĐẠT CHUẨN - NHẬP LẠI KỆ</div>
+            <div class="prod-title">${escapeAttr(firstItem.product || 'Sản phẩm')}</div>
+            <div class="variant">Màu: ${escapeAttr(firstItem.color || '-')} | Size: ${escapeAttr(firstItem.size || '-')}</div>
+            <div class="order-meta">Mã: ${escapeAttr(order.orderId || order.track || '-')} | ${today}</div>
+          </div>
+          <scr' + 'ipt>window.onload = function() { window.print(); };<\/scr' + 'ipt>
+        </body>
+        </html>
+      `;
+
+      const printWin = window.open('', '_blank', 'width=350,height=300');
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(printHtml);
+        printWin.document.close();
+      } else {
+        alert('Vui lòng cho phép popup trình duyệt để mở cửa sổ in tem!');
+      }
+    }
+
+    // =========================================================================
+    // v1.3.4: BẢNG PHÂN TÍCH & ĐỐI SOÁT TÀI CHÍNH NÂNG CAO (ANALYTICS DASHBOARD)
+    // =========================================================================
+    function openAnalyticsDashboardModal() {
+      const modal = document.getElementById('analyticsDashboardModal');
+      const body = document.getElementById('analyticsDashboardBody');
+      if (!modal || !body) return;
+
+      // 1. Calculate Top 10 Returned Products
+      const productStats = {};
+      let totalReturnedItemsCount = 0;
+      let totalRefundAmountSum = 0;
+      let totalForwardShippingFee = 0;
+      let totalReturnShippingFee = 0;
+      let totalCompensation = 0;
+
+      // Reason stats
+      const reasonStats = {};
+
+      orders.forEach(o => {
+        // Collect finance
+        const refundAmt = Number(o.rawDetails?.refundAmount || o.price) || 0;
+        totalRefundAmountSum += refundAmt;
+        totalForwardShippingFee += Number(o.rawDetails?.forwardShippingFee) || 0;
+        totalReturnShippingFee += Number(o.rawDetails?.returnShippingFee) || 0;
+        totalCompensation += Number(o.rawDetails?.compensation) || 0;
+
+        // Collect reasons
+        const reason = (o.rawDetails?.returnReason || o.note || '').trim() || 'Lý do khác / Chưa ghi';
+        reasonStats[reason] = (reasonStats[reason] || 0) + 1;
+
+        // Collect products
+        (o.items || []).forEach(it => {
+          const pName = it.product || 'Sản phẩm khác';
+          const qty = Number(it.qty) || 1;
+          totalReturnedItemsCount += qty;
+          if (!productStats[pName]) {
+            productStats[pName] = { name: pName, qty: 0, orderCount: 0, variants: {} };
+          }
+          productStats[pName].qty += qty;
+          productStats[pName].orderCount += 1;
+          const vKey = `${it.color || 'Màu mặc định'} / ${it.size || 'Size mặc định'}`;
+          productStats[pName].variants[vKey] = (productStats[pName].variants[vKey] || 0) + qty;
+        });
+      });
+
+      const topProducts = Object.values(productStats).sort((a, b) => b.qty - a.qty).slice(0, 10);
+      const topReasons = Object.entries(reasonStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+      body.innerHTML = `
+        <!-- Thẻ 1: Chỉ số Tài Chính Đối Soát -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+            <div class="text-[10.5px] font-bold text-rose-800">💰 Tổng Tiền Hoàn Cho Khách:</div>
+            <div class="text-base sm:text-lg font-black text-rose-950 mt-1">${formatMoney(totalRefundAmountSum)}</div>
+          </div>
+          <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <div class="text-[10.5px] font-bold text-amber-800">🚚 Phí Ship Chiều Giao:</div>
+            <div class="text-base sm:text-lg font-black text-amber-950 mt-1">${formatMoney(totalForwardShippingFee)}</div>
+          </div>
+          <div class="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+            <div class="text-[10.5px] font-bold text-orange-800">↩️ Phí Ship Chiều Hoàn:</div>
+            <div class="text-base sm:text-lg font-black text-orange-950 mt-1">${formatMoney(totalReturnShippingFee)}</div>
+          </div>
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div class="text-[10.5px] font-bold text-emerald-800">🎁 Sàn Đã Bồi Thường:</div>
+            <div class="text-base sm:text-lg font-black text-emerald-950 mt-1">${formatMoney(totalCompensation)}</div>
+          </div>
+        </div>
+
+        <!-- Thẻ 2: Top 10 Mẫu Áo Bị Hoàn Nhiều Nhất -->
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+              <span>👕 Top 10 Mẫu Sản Phẩm Bị Hoàn Nhiều Nhất</span>
+            </h4>
+            <span class="text-[11px] text-slate-500 font-semibold">Tổng: ${totalReturnedItemsCount} sản phẩm hoàn</span>
+          </div>
+
+          <div class="space-y-2">
+            ${topProducts.map((p, idx) => {
+              const pct = totalReturnedItemsCount > 0 ? Math.round((p.qty / totalReturnedItemsCount) * 100) : 0;
+              const topVariant = Object.entries(p.variants).sort((a, b) => b[1] - a[1])[0];
+              const varText = topVariant ? `(${topVariant[0]}: ${topVariant[1]} SP)` : '';
+              return `
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="w-5 h-5 rounded-full ${idx === 0 ? 'bg-amber-400 text-slate-900 font-black' : idx < 3 ? 'bg-indigo-100 text-indigo-900 font-bold' : 'bg-slate-100 text-slate-700'} flex items-center justify-center text-[10px] shrink-0">${idx + 1}</span>
+                      <span class="font-extrabold text-slate-800 truncate text-xs">${escapeAttr(p.name)}</span>
+                      <span class="text-[10.5px] text-slate-500 italic shrink-0">${escapeAttr(varText)}</span>
+                    </div>
+                    <div class="font-black text-rose-700 text-xs shrink-0">${p.qty} SP <span class="text-[10px] text-slate-400 font-normal">(${p.orderCount} đơn)</span></div>
+                  </div>
+                  <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Thẻ 3: Top Lý Do Hoàn Phổ Biến & Khuyến Nghị -->
+        <div class="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-3">
+          <h4 class="font-black text-amber-950 text-xs sm:text-sm flex items-center gap-1.5">
+            <span>💡 Phân Tích Lý Do Khách Trả Hàng & Đề Xuất Khắc Phục</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${topReasons.map(([reason, count]) => {
+              const rPct = orders.length > 0 ? Math.round((count / orders.length) * 100) : 0;
+              return `
+                <div class="p-2.5 bg-white rounded-xl border border-amber-200/80 shadow-2xs">
+                  <div class="flex items-center justify-between font-bold text-slate-800">
+                    <span class="truncate mr-2">${escapeAttr(reason)}</span>
+                    <span class="text-amber-800 shrink-0 font-extrabold">${count} đơn (${rPct}%)</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeAnalyticsDashboardModal() {
+      document.getElementById('analyticsDashboardModal')?.classList.add('hidden');
+    }
+
+</script>
 
   <!-- Custom Smart Suggest Dropdown Popup (Anchored to input cell!) -->
   <div id="smartSuggestBox" class="absolute z-50 hidden bg-white border-2 border-indigo-600 rounded-xl shadow-2xl max-h-60 overflow-y-auto"></div>

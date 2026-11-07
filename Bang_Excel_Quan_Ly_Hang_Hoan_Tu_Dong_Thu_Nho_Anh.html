@@ -225,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.5.1
+          🚀 Phiên bản v1.5.2
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -580,7 +580,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.2</span>
               </div>
             </div>
           </div>
@@ -819,35 +819,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </label>
           </div>
 
-          <!-- Lọc mốc ngày & Khoảng ngày tùy chọn (Từ ngày - Đến ngày) -->
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5 gap-1">
+          <!-- Bộ Lọc Ngày & Giờ Đa Năng (Từ ngày - Đến ngày, Từ giờ - Đến giờ) v1.5.2 -->
+          <div class="inline-flex items-center flex-wrap bg-white border border-slate-300 rounded-lg p-0.5 gap-1 shadow-2xs">
+            <!-- Mốc thời gian lọc -->
             <select id="dateFilterTypeSelect" onchange="setDateFilterType(this.value)"
-                    title="Chọn mốc ngày cần lọc: Bất kỳ mốc nào, Ngày về kho, Ngày hoàn/hủy, hoặc Ngày gửi đi"
-                    class="text-[10.5px] font-bold text-slate-700 bg-transparent outline-none cursor-pointer">
-              <option value="any">📅 Lọc: Mọi mốc ngày</option>
+                    title="Chọn mốc thời gian lọc: Mọi mốc, Ngày hoàn/hủy (mặc định), Ngày về kho, Ngày gửi đi"
+                    class="text-[10.5px] font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 outline-none cursor-pointer">
+              <option value="any">📅 Mọi mốc</option>
+              <option value="returnDate" selected>↩️ Ngày hoàn/hủy</option>
               <option value="recvDate">📥 Ngày về kho</option>
-              <option value="returnDate">↩️ Ngày hoàn/hủy</option>
               <option value="shipDate">🚚 Ngày gửi đi</option>
             </select>
-            <select id="recvDateFilterSelect" onchange="setRecvDateFilter(this.value)"
-                    title="Lọc nhanh theo mốc hoặc chọn khoảng ngày cụ thể"
-                    class="text-[11px] font-bold bg-transparent text-emerald-900 outline-none cursor-pointer pl-1 border-l border-slate-200">
-              <option value="all">🕒 Mọi thời gian</option>
+
+            <!-- Lọc nhanh theo mẫu / ca làm việc -->
+            <select id="recvDateFilterSelect" onchange="setQuickDatePreset(this.value)"
+                    title="Chọn nhanh mốc ngày hoặc ca làm việc"
+                    class="text-[10.5px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-200 rounded px-1 py-0.5 outline-none cursor-pointer">
+              <option value="all">🕒 Mọi lúc</option>
               <option value="today">⚡ Hôm nay</option>
               <option value="yesterday">Hôm qua</option>
               <option value="7days">7 ngày qua</option>
-              <option value="30days">30 ngày qua</option>
-              <option value="custom">📆 Khoảng ngày...</option>
+              <option value="shift_morning">☀️ Ca Sáng (06h - 18h)</option>
+              <option value="shift_evening">🌙 Ca Tối (18h - 06h)</option>
             </select>
-            <!-- Khung chọn Từ ngày - Đến ngày -->
-            <div id="customDateRangeBox" class="hidden items-center gap-1 pl-1 border-l border-slate-200">
-              <input type="date" id="customDateFrom" onchange="applyCustomDateRange()"
-                     title="Từ ngày" class="text-[10.5px] border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" />
-              <span class="text-slate-400 text-[10px]">➔</span>
-              <input type="date" id="customDateTo" onchange="applyCustomDateRange()"
-                     title="Đến ngày" class="text-[10.5px] border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" />
-              <button type="button" onclick="clearCustomDateRange()" class="text-rose-500 hover:text-rose-700 text-xs px-1 font-bold cursor-pointer" title="Xóa lọc khoảng ngày">✕</button>
+
+            <!-- Lọc Khoảng Ngày: Từ ngày ➔ Đến ngày (có thể để trống để lọc độc lập theo giờ) -->
+            <div class="inline-flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded px-1 py-0.2" title="Lọc khoảng ngày: Từ ngày ➔ Đến ngày (để trống nếu muốn lọc giờ trên mọi ngày)">
+              <span class="text-[9.5px] font-bold text-slate-500">Ngày:</span>
+              <input type="date" id="filterDateFrom" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" title="Từ ngày (bỏ trống nếu không lọc ngày)" />
+              <span class="text-slate-400 text-[9px]">➔</span>
+              <input type="date" id="filterDateTo" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" title="Đến ngày (bỏ trống nếu không lọc ngày)" />
             </div>
+
+            <!-- Lọc Khoảng Giờ: Từ giờ ➔ Đến giờ (lọc độc lập hoặc kết hợp cùng ngày) -->
+            <div class="inline-flex items-center gap-0.5 bg-amber-50 border border-amber-200 rounded px-1 py-0.2" title="Lọc khoảng giờ: Từ giờ ➔ Đến giờ (lọc độc lập hoặc kết hợp cùng ngày đã chọn)">
+              <span class="text-[9.5px] font-bold text-amber-800">Giờ:</span>
+              <input type="time" id="filterTimeFrom" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-amber-300 rounded px-1 py-0.2 outline-none text-slate-800 font-mono" title="Từ giờ (HH:mm - ví dụ: 06:00)" />
+              <span class="text-amber-400 text-[9px]">➔</span>
+              <input type="time" id="filterTimeTo" onchange="applyDateTimeFilter()" class="text-[10px] bg-white border border-amber-300 rounded px-1 py-0.2 outline-none text-slate-800 font-mono" title="Đến giờ (HH:mm - ví dụ: 18:00)" />
+            </div>
+
+            <!-- Nút Xóa Lọc -->
+            <button type="button" onclick="clearDateTimeFilter()" class="text-rose-500 hover:text-white hover:bg-rose-600 rounded px-1 py-0.5 text-[11px] font-extrabold transition cursor-pointer" title="Xóa toàn bộ lọc ngày & giờ để hiện tất cả">
+              ✕
+            </button>
           </div>
 
           <!-- Phân trang Siêu Mượt nằm gọn ngay bên phải -->
@@ -908,10 +923,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <tr class="h-8 text-xs">
             <th class="w-10 py-1.5">STT</th>
             <th class="w-14 py-1.5">KQ Tìm</th>
-            <th id="thCol_shipDate" onclick="toggleDateSort('shipDate')" class="w-24 py-1.5 cursor-pointer hover:bg-slate-800 transition select-none" title="Bấm để sắp xếp theo Ngày Gửi Đi">
+            <th id="thCol_shipDate" onclick="toggleDateSort('shipDate')" class="min-w-[130px] w-36 py-1.5 cursor-pointer hover:bg-slate-800 transition select-none" title="Ngày & Giờ gửi đi - Bấm để sắp xếp">
               <span>Ngày Gửi Đi</span> <span id="thSortIcon_shipDate" class="text-[10px] text-slate-300">⇅</span>
             </th>
-            <th id="thCol_returnDate" onclick="toggleDateSort('returnDate')" class="w-28 !bg-amber-900 hover:!bg-amber-800 py-1.5 cursor-pointer transition select-none" title="Bấm để sắp xếp theo Ngày Hoàn / Hủy">
+            <th id="thCol_returnDate" onclick="toggleDateSort('returnDate')" class="min-w-[135px] w-36 !bg-amber-900 hover:!bg-amber-800 py-1.5 cursor-pointer transition select-none" title="Ngày & Giờ khách bấm hoàn/hủy - Bấm để sắp xếp">
               <span>Ngày Hoàn / Hủy</span> <span id="thSortIcon_returnDate" class="text-[10px] text-amber-200">⇅</span>
             </th>
             <th id="thCol_deadline" onclick="toggleDateSort('deadline')" class="min-w-[130px] w-36 !bg-rose-950 hover:!bg-rose-900 py-1.5 cursor-pointer transition select-none text-rose-100" title="Hạn Người Bán Cần Phản Hồi / Xử Lý Khiếu Nại Sàn - Bấm để sắp xếp">
@@ -3234,33 +3249,64 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function extractDateFromCellValue(val) {
       if (val === null || val === undefined) return '';
       if (typeof val === 'number' && val > 20000 && val < 90000) {
-        const utcDays = Math.floor(val - 25569);
-        const d = new Date(utcDays * 86400 * 1000);
+        const totalSec = Math.round((val - 25569) * 86400);
+        const d = new Date(totalSec * 1000);
         if (!isNaN(d.getTime())) {
           const dd = String(d.getUTCDate()).padStart(2, '0');
           const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
           const yyyy = d.getUTCFullYear();
+          const fraction = val - Math.floor(val);
+          if (fraction > 0.00001) {
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const min = String(d.getUTCMinutes()).padStart(2, '0');
+            const sec = String(d.getUTCSeconds()).padStart(2, '0');
+            return `${dd}/${mm}/${yyyy} ${hh}:${min}${sec && sec !== '00' ? ':' + sec : ''}`;
+          }
           return `${dd}/${mm}/${yyyy}`;
         }
       }
       const s = String(val).trim();
       if (!s) return '';
-      // Tìm mẫu DD/MM/YYYY hoặc DD-MM-YYYY ở bất kỳ vị trí nào trong chuỗi (kể cả khi giờ đứng trước ngày như "08:44:57 07/11/2026")
-      const mDmy = s.match(/(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}\b)/);
+
+      // Tìm chuỗi giờ:phút[:giây] trong ô nếu có
+      let timeStr = '';
+      const mTime = s.match(/(?:\s|^)(\d{1,2}:\d{2}(?::\d{2})?)(?:\s|$)/);
+      if (mTime) {
+        const tParts = mTime[1].split(':');
+        const hh = tParts[0].padStart(2, '0');
+        const min = tParts[1].padStart(2, '0');
+        const ss = tParts[2] ? tParts[2].padStart(2, '0') : '';
+        timeStr = `${hh}:${min}${ss && ss !== '00' ? ':' + ss : ''}`;
+      }
+
+      // Tìm mẫu DD/MM/YYYY hoặc DD-MM-YYYY hoặc DD.MM.YYYY
+      const mDmy = s.match(/(\b\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\b/);
       if (mDmy) {
-        return normalizeShortDate(mDmy[1]);
+        const dd = mDmy[1].padStart(2, '0');
+        const mm = mDmy[2].padStart(2, '0');
+        const yyyy = mDmy[3];
+        return `${dd}/${mm}/${yyyy}${timeStr ? ' ' + timeStr : ''}`;
       }
-      // Tìm mẫu YYYY-MM-DD hoặc YYYY/MM/DD
-      const mIso = s.match(/(\b\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}\b)/);
+
+      // Tìm mẫu YYYY-MM-DD hoặc YYYY/MM/DD hoặc YYYY.MM.DD
+      const mIso = s.match(/(\b\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})\b/);
       if (mIso) {
-        return normalizeShortDate(mIso[1]);
+        const yyyy = mIso[1];
+        const mm = mIso[2].padStart(2, '0');
+        const dd = mIso[3].padStart(2, '0');
+        return `${dd}/${mm}/${yyyy}${timeStr ? ' ' + timeStr : ''}`;
       }
-      // Dự phòng mẫu DD/MM/YY
-      const mShortYear = s.match(/(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2}\b)/);
+
+      // Tìm mẫu DD/MM/YY
+      const mShortYear = s.match(/(\b\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})\b/);
       if (mShortYear) {
-        return normalizeShortDate(mShortYear[1]);
+        const dd = mShortYear[1].padStart(2, '0');
+        const mm = mShortYear[2].padStart(2, '0');
+        const yyyy = '20' + mShortYear[3];
+        return `${dd}/${mm}/${yyyy}${timeStr ? ' ' + timeStr : ''}`;
       }
-      return normalizeShortDate(s.slice(0, 10));
+
+      return normalizeShortDate(s);
     }
 
     // Tách gọn Tên sản phẩm, Màu sắc, Size từ dữ liệu Salework / TikTok / Shopee
@@ -5638,7 +5684,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.5.1';
+    const APP_VERSION_NUMBER = '1.5.2';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8658,9 +8704,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // =========================================================================
     let currentPreOrderFilter = 'all'; // 'all' | 'Hàng đặt trước' | 'Đơn thường'
     let currentTrackingFilter = 'all'; // 'all' | 'has_track' | 'no_track'
-    let currentDateFilterType = 'any'; // 'any' | 'recvDate' | 'returnDate' | 'shipDate'
+    let currentDateFilterType = 'returnDate'; // 'any' | 'recvDate' | 'returnDate' | 'shipDate'
     let currentCustomDateFrom = '';
     let currentCustomDateTo = '';
+    let currentCustomTimeFrom = '';
+    let currentCustomTimeTo = '';
 
     function setPreOrderFilter(filterVal) {
       currentPreOrderFilter = filterVal || 'all';
@@ -8681,45 +8729,191 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setDateFilterType(filterVal) {
-      currentDateFilterType = filterVal || 'any';
+      currentDateFilterType = filterVal || 'returnDate';
       renderAll();
       recalcTotalsAndSummary();
     }
 
-    function applyCustomDateRange() {
-      const fromEl = document.getElementById('customDateFrom');
-      const toEl = document.getElementById('customDateTo');
-      currentCustomDateFrom = fromEl ? fromEl.value : '';
-      currentCustomDateTo = toEl ? toEl.value : '';
-      if (currentCustomDateFrom || currentCustomDateTo) {
-        currentRecvDateFilter = 'custom';
-        const sel = document.getElementById('recvDateFilterSelect');
-        if (sel) sel.value = 'custom';
+    // v1.5.2: Kiểm tra đơn hàng có khớp điều kiện lọc Ngày & Giờ (độc lập hoặc kết hợp)
+    function checkOrderDateTimeMatch(order) {
+      if (!currentCustomDateFrom && !currentCustomDateTo && !currentCustomTimeFrom && !currentCustomTimeTo && currentRecvDateFilter === 'all') {
+        return true;
+      }
+
+      let candidateFields = [];
+      if (currentDateFilterType === 'recvDate') {
+        candidateFields = ['recvDate'];
+      } else if (currentDateFilterType === 'returnDate') {
+        candidateFields = ['returnDate'];
+      } else if (currentDateFilterType === 'shipDate') {
+        candidateFields = ['shipDate'];
+      } else {
+        candidateFields = ['returnDate', 'recvDate', 'shipDate'];
+      }
+
+      return candidateFields.some(field => {
+        const rawVal = String(order[field] || '').trim();
+        if (!rawVal) return false;
+
+        const p = parseFullDate(rawVal);
+        if (!p) return false;
+
+        // 1. Điều kiện khoảng ngày (nếu người dùng có nhập Từ ngày hoặc Đến ngày)
+        if (currentCustomDateFrom || currentCustomDateTo) {
+          const ymd = p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0') + '-' + String(p.getDate()).padStart(2, '0');
+          if (currentCustomDateFrom && ymd < currentCustomDateFrom) return false;
+          if (currentCustomDateTo && ymd > currentCustomDateTo) return false;
+        }
+
+        // 2. Điều kiện khoảng giờ (nếu người dùng có nhập Từ giờ hoặc Đến giờ)
+        if (currentCustomTimeFrom || currentCustomTimeTo) {
+          const hasTimeInStr = /\b\d{1,2}:\d{2}\b/.test(rawVal);
+          if (!hasTimeInStr && p.getHours() === 0 && p.getMinutes() === 0 && p.getSeconds() === 0) {
+            return false;
+          }
+
+          const orderTime = String(p.getHours()).padStart(2, '0') + ':' + String(p.getMinutes()).padStart(2, '0');
+
+          if (currentCustomTimeFrom && currentCustomTimeTo) {
+            if (currentCustomTimeFrom <= currentCustomTimeTo) {
+              if (orderTime < currentCustomTimeFrom || orderTime > currentCustomTimeTo) return false;
+            } else {
+              // Ca qua đêm (Ví dụ: 18:00 -> 06:00 sáng hôm sau)
+              if (orderTime < currentCustomTimeFrom && orderTime > currentCustomTimeTo) return false;
+            }
+          } else if (currentCustomTimeFrom) {
+            if (orderTime < currentCustomTimeFrom) return false;
+          } else if (currentCustomTimeTo) {
+            if (orderTime > currentCustomTimeTo) return false;
+          }
+        }
+
+        // 3. Mốc lọc nhanh preset (hôm nay, hôm qua, 7 ngày)
+        if (currentRecvDateFilter === 'today') {
+          const now = new Date();
+          const todayYmd = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+          const orderYmd = p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0') + '-' + String(p.getDate()).padStart(2, '0');
+          if (orderYmd !== todayYmd) return false;
+        } else if (currentRecvDateFilter === 'yesterday') {
+          const yest = new Date(Date.now() - 86400000);
+          const yestYmd = yest.getFullYear() + '-' + String(yest.getMonth() + 1).padStart(2, '0') + '-' + String(yest.getDate()).padStart(2, '0');
+          const orderYmd = p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0') + '-' + String(p.getDate()).padStart(2, '0');
+          if (orderYmd !== yestYmd) return false;
+        } else if (currentRecvDateFilter === '7days') {
+          const diffDays = Math.floor((Date.now() - p.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays < 0 || diffDays > 7) return false;
+        }
+
+        return true;
+      });
+    }
+
+    function applyDateTimeFilter() {
+      const fromDateEl = document.getElementById('filterDateFrom') || document.getElementById('customDateFrom');
+      const toDateEl = document.getElementById('filterDateTo') || document.getElementById('customDateTo');
+      const fromTimeEl = document.getElementById('filterTimeFrom');
+      const toTimeEl = document.getElementById('filterTimeTo');
+
+      currentCustomDateFrom = fromDateEl ? fromDateEl.value : '';
+      currentCustomDateTo = toDateEl ? toDateEl.value : '';
+      currentCustomTimeFrom = fromTimeEl ? fromTimeEl.value : '';
+      currentCustomTimeTo = toTimeEl ? toTimeEl.value : '';
+
+      currentRecvDateFilter = 'all';
+      const sel = document.getElementById('recvDateFilterSelect');
+      if (sel) sel.value = 'all';
+
+      currentPage = 1;
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function setQuickDatePreset(val) {
+      const now = new Date();
+      const formatYmd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+      const fromDateEl = document.getElementById('filterDateFrom') || document.getElementById('customDateFrom');
+      const toDateEl = document.getElementById('filterDateTo') || document.getElementById('customDateTo');
+      const fromTimeEl = document.getElementById('filterTimeFrom');
+      const toTimeEl = document.getElementById('filterTimeTo');
+
+      if (val === 'today') {
+        const todayStr = formatYmd(now);
+        currentCustomDateFrom = todayStr;
+        currentCustomDateTo = todayStr;
+        if (fromDateEl) fromDateEl.value = todayStr;
+        if (toDateEl) toDateEl.value = todayStr;
+        currentRecvDateFilter = 'all';
+      } else if (val === 'yesterday') {
+        const yest = new Date(Date.now() - 86400000);
+        const yestStr = formatYmd(yest);
+        currentCustomDateFrom = yestStr;
+        currentCustomDateTo = yestStr;
+        if (fromDateEl) fromDateEl.value = yestStr;
+        if (toDateEl) toDateEl.value = yestStr;
+        currentRecvDateFilter = 'all';
+      } else if (val === '7days') {
+        const past7 = new Date(Date.now() - 7 * 86400000);
+        currentCustomDateFrom = formatYmd(past7);
+        currentCustomDateTo = formatYmd(now);
+        if (fromDateEl) fromDateEl.value = currentCustomDateFrom;
+        if (toDateEl) toDateEl.value = currentCustomDateTo;
+        currentRecvDateFilter = 'all';
+      } else if (val === 'shift_morning') {
+        currentCustomTimeFrom = '06:00';
+        currentCustomTimeTo = '18:00';
+        if (fromTimeEl) fromTimeEl.value = '06:00';
+        if (toTimeEl) toTimeEl.value = '18:00';
+      } else if (val === 'shift_evening') {
+        currentCustomTimeFrom = '18:00';
+        currentCustomTimeTo = '06:00';
+        if (fromTimeEl) fromTimeEl.value = '18:00';
+        if (toTimeEl) toTimeEl.value = '06:00';
+      } else if (val === 'all') {
+        currentCustomDateFrom = '';
+        currentCustomDateTo = '';
+        currentCustomTimeFrom = '';
+        currentCustomTimeTo = '';
+        if (fromDateEl) fromDateEl.value = '';
+        if (toDateEl) toDateEl.value = '';
+        if (fromTimeEl) fromTimeEl.value = '';
+        if (toTimeEl) toTimeEl.value = '';
       }
       currentPage = 1;
       renderAll();
       recalcTotalsAndSummary();
     }
 
-    function clearCustomDateRange() {
+    function clearDateTimeFilter() {
       currentCustomDateFrom = '';
       currentCustomDateTo = '';
+      currentCustomTimeFrom = '';
+      currentCustomTimeTo = '';
       currentRecvDateFilter = 'all';
-      const fromEl = document.getElementById('customDateFrom');
-      const toEl = document.getElementById('customDateTo');
+
+      const fromDateEl = document.getElementById('filterDateFrom') || document.getElementById('customDateFrom');
+      const toDateEl = document.getElementById('filterDateTo') || document.getElementById('customDateTo');
+      const fromTimeEl = document.getElementById('filterTimeFrom');
+      const toTimeEl = document.getElementById('filterTimeTo');
       const sel = document.getElementById('recvDateFilterSelect');
-      const box = document.getElementById('customDateRangeBox');
-      if (fromEl) fromEl.value = '';
-      if (toEl) toEl.value = '';
+
+      if (fromDateEl) fromDateEl.value = '';
+      if (toDateEl) toDateEl.value = '';
+      if (fromTimeEl) fromTimeEl.value = '';
+      if (toTimeEl) toTimeEl.value = '';
       if (sel) sel.value = 'all';
-      if (box) {
-        box.classList.add('hidden');
-        box.classList.remove('inline-flex');
-      }
+
       currentPage = 1;
       renderAll();
       recalcTotalsAndSummary();
+      if (typeof showToast === 'function') {
+        showToast('Đã xóa bộ lọc ngày & giờ, hiển thị lại tất cả đơn!', 'info');
+      }
     }
+
+    // Tương thích ngược với các tên hàm cũ
+    function applyCustomDateRange() { applyDateTimeFilter(); }
+    function clearCustomDateRange() { clearDateTimeFilter(); }
 
     function escapeJs(str) {
       if (str === null || str === undefined) return '';
@@ -8799,50 +8993,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentFilterTab === 'overdue' && getDeadlineStatus(order) !== 'overdue' && !isOrderOverdue(order, 7)) return false;
         if (currentFilterTab === 'lost' && order.status !== 'Bị mất' && order.status !== 'Hư hỏng') return false;
 
-        // Arrival / Active Date Filtering (Hỗ trợ cả mốc nhanh & Khoảng ngày tùy chọn Từ ngày - Đến ngày)
-        if (currentRecvDateFilter !== 'all') {
-          if (currentRecvDateFilter === 'custom') {
-            const checkOrderDateInRange = (dateStr) => {
-              if (!dateStr) return false;
-              const p = parseFullDate(dateStr);
-              if (!p) return false;
-              const ymd = p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0') + '-' + String(p.getDate()).padStart(2, '0');
-              if (currentCustomDateFrom && ymd < currentCustomDateFrom) return false;
-              if (currentCustomDateTo && ymd > currentCustomDateTo) return false;
-              return true;
-            };
-
-            if (currentDateFilterType === 'recvDate') {
-              if (!checkOrderDateInRange(order.recvDate)) return false;
-            } else if (currentDateFilterType === 'returnDate') {
-              if (!checkOrderDateInRange(order.returnDate)) return false;
-            } else if (currentDateFilterType === 'shipDate') {
-              if (!checkOrderDateInRange(order.shipDate)) return false;
-            } else {
-              const inRecv = checkOrderDateInRange(order.recvDate);
-              const inRet = checkOrderDateInRange(order.returnDate);
-              const inShip = checkOrderDateInRange(order.shipDate);
-              if (!inRecv && !inRet && !inShip) return false;
-            }
-          } else {
-            const targetDateVal = String(order[activeFilterDateField] || '').trim();
-            if (!targetDateVal) return false;
-            if (currentRecvDateFilter === 'today' && !targetDateVal.startsWith(todayDateStr)) return false;
-            if (currentRecvDateFilter === 'yesterday' && !targetDateVal.startsWith(yesterdayDateStr)) return false;
-            if (currentRecvDateFilter === '7days') {
-              const p = parseFullDate(targetDateVal);
-              if (!p) return false;
-              const diffDays = Math.floor((now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays < 0 || diffDays > 7) return false;
-            }
-            if (currentRecvDateFilter === '30days') {
-              const p = parseFullDate(targetDateVal);
-              if (!p) return false;
-              const diffDays = Math.floor((now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays < 0 || diffDays > 30) return false;
-            }
-          }
-        }
+        // Date & Time Filtering (v1.5.2: Lọc Từ ngày - Đến ngày, Từ giờ - Đến giờ kết hợp hoặc độc lập)
+        if (!checkOrderDateTimeMatch(order)) return false;
 
         // Platform Filtering (Shopee / TikTok Shop / Lazada / Khác)
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) return false;
@@ -9228,8 +9380,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="text-center font-bold text-xs ${matched ? 'text-orange-800' : 'text-slate-300'}">
               ${matched ? '🔍 KHỚP' : ''}
             </td>
-            <td class="${shipTdClass}">${renderCellInput(`${orderIdx}:shipDate`, `Ngày gửi đơn #${orderIdx+1}`, order.shipDate, 'text-center', 'Gõ 20/10 -> 20/10/2026', `updateOrderField(${orderIdx},'shipDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'shipDate',this)`)}</td>
-            <td class="${returnTdClass}">${renderCellInput(`${orderIdx}:returnDate`, `Ngày bấm hoàn đơn #${orderIdx+1}`, order.returnDate, 'text-center font-semibold text-amber-900', 'Gõ 25/10...', `updateOrderField(${orderIdx},'returnDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'returnDate',this)`)}</td>
+            <td class="${shipTdClass}">${renderCellInput(`${orderIdx}:shipDate`, `Ngày & Giờ gửi đơn #${orderIdx+1}`, order.shipDate, 'text-center font-medium text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'shipDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'shipDate',this)`)}</td>
+            <td class="${returnTdClass}">${renderCellInput(`${orderIdx}:returnDate`, `Ngày & Giờ hoàn/hủy đơn #${orderIdx+1}`, order.returnDate, 'text-center font-semibold text-amber-900 text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'returnDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'returnDate',this)`)}</td>
             <td class="${deadlineTdClass}">${deadlineHtml}</td>
             <td class="${recvTdClass}">${renderCellInput(`${orderIdx}:recvDate`, `Ngày & Giờ về kho đơn #${orderIdx+1}`, order.recvDate, 'text-center font-semibold text-emerald-800 text-[11px]', 'dd/mm/yyyy hh:mm:ss', `updateOrderField(${orderIdx},'recvDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'recvDate',this)`)}</td>
             <td class="text-center min-w-[105px] px-1">${platformCellHtml}</td>

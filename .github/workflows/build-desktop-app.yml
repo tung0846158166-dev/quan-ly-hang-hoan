@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.5.2
+          name: QuanLyHangHoan-Windows-Installer-v1.6.0
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,8 +67,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.5.2
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.5.2 (Hiển Thị Đầy Đủ Giờ Phút Từng Cột Theo File Nạp, Bộ Lọc Nhanh Ngày & Giờ Đa Năng Kết Hợp Hoặc Độc Lập)"
+          tag_name: v1.6.0
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.0 (Hạn Cần Xử Lý Báo Vàng 2 Ngày / Báo Đỏ 3 Ngày Theo Giờ Phút, Ô Tích Chọn Xóa Nhiều Đơn & Bảng Theo Dõi Đơn Hàng)"
           body: |
             ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.5.2
 

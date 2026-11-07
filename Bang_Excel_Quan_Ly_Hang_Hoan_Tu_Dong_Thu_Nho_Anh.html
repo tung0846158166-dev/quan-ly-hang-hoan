@@ -225,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.5.2
+          🚀 Phiên bản v1.6.0
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -246,6 +246,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="flex flex-wrap items-center gap-1.5 no-print">
         <!-- Chỉ giữ 3 nút thao tác trực tiếp quan trọng nhất ở ngoài -->
         <!-- Nút Trung Tâm Thông Báo & Cập Nhật (v1.5.0) -->
+        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.0) -->
+        <button type="button" id="btnOpenWatchlistModal" onclick="openWatchlistModal()"
+              class="relative inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-amber-300 cursor-pointer select-none active:scale-95"
+              title="Mở Bảng Theo Dõi Đơn Hàng Đặc Biệt: Xem các đơn được tích chọn theo dõi riêng, hạn xử lý và tiến độ">
+          <span>⭐</span>
+          <span>Đơn Theo Dõi</span>
+          <span id="headerWatchlistCountBadge" class="bg-slate-900 text-amber-300 text-[10px] px-1.5 py-0.2 rounded-full font-black">0</span>
+        </button>
         <button type="button" id="btnNotificationCenter" onclick="openNotificationModal()"
               class="relative inline-flex items-center gap-1.5 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-amber-200 cursor-pointer select-none"
               title="Mở Bảng Thông Báo: Xem lịch sử quét điện thoại, kết quả nạp file cập nhật trạng thái và tra cứu theo Mã đơn / MVĐ">
@@ -580,7 +588,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.0</span>
               </div>
             </div>
           </div>
@@ -921,6 +929,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <table class="excel-table">
         <thead>
           <tr class="h-8 text-xs">
+            <th class="w-12 py-1.5 text-center !bg-slate-900 select-none no-print" title="Tích chọn / Bỏ chọn tất cả các đơn đang hiển thị">
+              <input type="checkbox" id="chkSelectAllOrders" onchange="toggleSelectAllVisibleOrders(this.checked)" class="w-4 h-4 cursor-pointer accent-blue-600 rounded" title="Chọn tất cả đơn trên trang này" />
+            </th>
             <th class="w-10 py-1.5">STT</th>
             <th class="w-14 py-1.5">KQ Tìm</th>
             <th id="thCol_shipDate" onclick="toggleDateSort('shipDate')" class="min-w-[130px] w-36 py-1.5 cursor-pointer hover:bg-slate-800 transition select-none" title="Ngày & Giờ gửi đi - Bấm để sắp xếp">
@@ -955,7 +966,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <tbody id="orderTableBody"></tbody>
         <tfoot>
           <tr class="bg-slate-100 font-bold text-xs border-t-2 border-slate-800">
-            <td colspan="14" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
+            <td colspan="15" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
             <td id="footTotalQty" class="text-center py-2.5 text-slate-900 text-sm">0</td>
             <td id="footTotalPrice" class="text-right py-2.5 px-2 text-slate-900 text-sm">0 đ</td>
             <td colspan="5"></td>
@@ -1138,6 +1149,99 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
         <span>💡 Mẹo: Bấm <b>"🎯 Định Vị Đơn"</b> tại thông báo để máy tính tự động cuộn đến đơn và nháy xanh!</span>
         <span id="notifFilteredCountText" class="font-bold text-slate-700">0 thông báo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.0) -->
+  <div id="watchlistModal" onclick="closeWatchlistModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
+    <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 text-white px-5 py-3 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">⭐</span>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold uppercase tracking-wide flex items-center gap-2">
+              BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT
+              <span id="watchlistTotalBadge" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-mono font-bold">0</span>
+            </h2>
+            <p class="text-xs text-amber-100 mt-0.5">
+              Tập trung theo dõi các đơn hàng quan trọng, cần kiểm tra hạn xử lý, đôn đốc vận chuyển hoặc khiếu nại
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="exportWatchlistToExcel()" class="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1" title="Xuất danh sách các đơn theo dõi này ra file Excel">
+            <span>📊</span>
+            <span>Xuất Excel</span>
+          </button>
+          <button type="button" onclick="clearAllWatchlist()" class="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg transition cursor-pointer" title="Bỏ theo dõi toàn bộ đơn hiện tại">
+            🧹 Bỏ Tất Cả
+          </button>
+          <button type="button" onclick="closeWatchlistModal()" class="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition cursor-pointer" title="Đóng cửa sổ (Esc)">
+            ✕ Đóng
+          </button>
+        </div>
+      </div>
+
+      <!-- Search & Status Filter Toolbar -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+        <!-- Ô TÌM KIẾM TRONG DANH SÁCH THEO DÕI -->
+        <div class="flex-1 min-w-[280px] relative">
+          <span class="absolute left-3 top-2 text-sm text-slate-400">🔍</span>
+          <input type="text" id="watchlistSearchInput" oninput="renderWatchlistTable()"
+                 placeholder="Gõ Mã đơn, Mã vận đơn (MVĐ), Tên sản phẩm trong danh sách theo dõi..."
+                 class="w-full pl-9 pr-8 py-1.5 bg-[#fef9c3] border border-amber-400 rounded-lg text-xs font-bold text-amber-950 placeholder:font-normal placeholder:text-amber-800/60 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-2xs" />
+          <button type="button" onclick="document.getElementById('watchlistSearchInput').value=''; renderWatchlistTable();"
+                  class="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-700 cursor-pointer" title="Xóa tìm kiếm">✕</button>
+        </div>
+
+        <!-- Bộ Lọc Danh Mục Đơn Theo Dõi -->
+        <div class="flex items-center gap-1 flex-wrap shrink-0">
+          <button type="button" onclick="setWatchlistFilter('all')" id="wlFilterBtn_all" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white shadow-2xs cursor-pointer transition">
+            Tất Cả (<span id="wlCount_all">0</span>)
+          </button>
+          <button type="button" onclick="setWatchlistFilter('danger')" id="wlFilterBtn_danger" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-rose-700 border border-rose-300 hover:bg-rose-50 cursor-pointer transition">
+            🚨 Báo Đỏ (+3 ngày) (<span id="wlCount_danger">0</span>)
+          </button>
+          <button type="button" onclick="setWatchlistFilter('warning')" id="wlFilterBtn_warning" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-amber-700 border border-amber-300 hover:bg-amber-50 cursor-pointer transition">
+            ⚠️ Báo Vàng (2 ngày) (<span id="wlCount_warning">0</span>)
+          </button>
+          <button type="button" onclick="setWatchlistFilter('pending')" id="wlFilterBtn_pending" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
+            ⏳ Chưa Về Kho (<span id="wlCount_pending">0</span>)
+          </button>
+          <button type="button" onclick="setWatchlistFilter('received')" id="wlFilterBtn_received" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-emerald-700 border border-emerald-300 hover:bg-emerald-50 cursor-pointer transition">
+            ✅ Đã Nhận (<span id="wlCount_received">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Bảng Danh Sách Đơn Theo Dõi -->
+      <div class="flex-1 overflow-x-auto overflow-y-auto max-h-[62vh] min-h-[320px] bg-white">
+        <table class="w-full text-xs text-left border-collapse">
+          <thead class="bg-slate-900 text-white text-[11px] uppercase sticky top-0 z-10">
+            <tr>
+              <th class="w-10 py-2 text-center border-r border-slate-700">STT</th>
+              <th class="w-32 py-2 px-2 border-r border-slate-700">Mã Đơn Hàng</th>
+              <th class="w-36 py-2 px-2 border-r border-slate-700">Mã Vận Đơn</th>
+              <th class="min-w-[200px] py-2 px-2 border-r border-slate-700">Sản Phẩm & Phân Loại</th>
+              <th class="w-32 py-2 text-center border-r border-slate-700">Ngày Hủy</th>
+              <th class="w-40 py-2 text-center border-r border-slate-700">Hạn Cần Xử Lý</th>
+              <th class="w-32 py-2 text-center border-r border-slate-700">Trạng Thái Sàn</th>
+              <th class="w-28 py-2 text-center border-r border-slate-700">Nhận Tại Kho</th>
+              <th class="w-28 py-2 text-center">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="watchlistModalTableBody" class="divide-y divide-slate-200">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer Info -->
+      <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <span>💡 Bấm <b>"🎯 Định Vị Đơn"</b> để đóng bảng này, chuyển đến đúng tuần và nháy sáng dòng đơn trên bảng chính!</span>
+        <span id="watchlistFilteredCountText" class="font-bold text-slate-700">0 đơn khớp</span>
       </div>
     </div>
   </div>
@@ -1512,7 +1616,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="bg-gradient-to-r from-rose-800 to-red-900 text-white px-5 py-3.5 flex items-center justify-between">
         <div>
           <h2 class="text-sm sm:text-base font-bold uppercase tracking-wide flex items-center gap-2">
-            <span>🚨 KHIẾU NẠI SÀN 1-CLICK: DANH SÁCH ĐƠN QUÁ 7 NGÀY CHƯA VỀ KHO</span>
+            <span>🚨 KHIẾU NẠI SÀN 1-CLICK: DANH SÁCH ĐƠN QUÁ 3 NGÀY (72 GIỜ) CHƯA VỀ KHO</span>
           </h2>
           <p class="text-xs text-rose-200 mt-0.5">
             Tự động tổng hợp danh sách đơn hàng có nguy cơ thất lạc / bị ngâm bưu cục để đòi Shopee & ĐVVC đền bù 100%!
@@ -2595,9 +2699,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // MODAL KHIẾU NẠI SÀN 1-CLICK CHO ĐƠN QUÁ 7 NGÀY
+    // MODAL KHIẾU NẠI SÀN 1-CLICK CHO ĐƠN QUÁ 3 NGÀY (72 GIỜ)
     // =========================================================================
-    function getOverdueOrdersList(thresholdDays = 7) {
+    function getOverdueOrdersList(thresholdHours = 72) {
       return orders.filter(o => {
         if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
         return isOrderOverdue(o, thresholdDays);
@@ -2605,10 +2709,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function openClaimModal() {
-      const overdueList = getOverdueOrdersList(7);
+      const overdueList = getOverdueOrdersList(72);
       if (!overdueList.length) {
         const platText = currentPlatformFilter === 'all' ? '' : ` của sàn [${currentPlatformFilter}]`;
-        alert(`🎉 TUYỆT VỜI!\n\nHiện tại kho của bạn không có đơn hàng nào${platText} bị quá hạn 7 ngày chưa về.\nTất cả hàng hoàn đang được luân chuyển đúng tiến độ!`);
+        alert(`🎉 TUYỆT VỜI!\n\nHiện tại kho của bạn không có đơn hàng nào${platText} bị quá hạn 3 ngày (72 giờ) chưa về.\nTất cả hàng hoàn đang được luân chuyển đúng tiến độ!`);
         return;
       }
 
@@ -2620,7 +2724,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const lines = [
         `Kính gửi Bộ phận Hỗ trợ & Vận hành ${platformHeader},`,
         '',
-        `Shop xin gửi danh sách ${overdueList.length} đơn hàng hoàn đã QUÁ 7 NGÀY từ khi khách bấm trả hàng / hủy đơn nhưng thực tế Shop vẫn CHƯA NHẬN ĐƯỢC kiện hàng về kho:`,
+        `Shop xin gửi danh sách ${overdueList.length} đơn hàng hoàn đã QUÁ 3 NGÀY (72 GIỜ) từ khi khách bấm trả hàng / hủy đơn nhưng thực tế Shop vẫn CHƯA NHẬN ĐƯỢC kiện hàng về kho:`,
         ''
       ];
 
@@ -2696,7 +2800,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function copyClaimTrackingList() {
-      const overdueList = getOverdueOrdersList(7);
+      const overdueList = getOverdueOrdersList(72);
       if (!overdueList.length) return;
       const tracks = overdueList.map(o => extractCleanTrackingCode(o.track)).filter(Boolean).join(', ');
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2712,7 +2816,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function exportClaimExcel() {
       if (!(await requireUnlocked('Xuất File Khiếu Nại Sàn'))) return;
-      const overdueList = getOverdueOrdersList(7);
+      const overdueList = getOverdueOrdersList(72);
       if (!overdueList.length) {
         alert('Không có đơn quá hạn nào để xuất!');
         return;
@@ -2731,7 +2835,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           'Giá Trị Đơn (VNĐ)': Number(o.price) || 0,
           'Đã Nhận Thực Tế': o.status === 'Hàng đã trả' ? 'Đã nhận' : o.status === 'Bị mất' ? 'Bị mất' : 'Chưa nhận',
           'Sản Phẩm Trong Đơn': (o.items || []).map(x => `${x.product} (${x.color}/${x.size} x${x.qty})`).join('; '),
-          'Ghi Chú': 'Quá 7 ngày chưa về kho - Đề nghị kiểm tra và bồi thường'
+          'Ghi Chú': 'Quá 3 ngày chưa về kho - Đề nghị kiểm tra và bồi thường'
         });
       });
       const wb = XLSX.utils.book_new();
@@ -5684,7 +5788,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.5.2';
+    const APP_VERSION_NUMBER = '1.6.0';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6010,16 +6114,117 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return !isOrderReceived(order) && !isOrderUnneeded(order) && order.status !== 'Bị mất' && order.status !== 'Hư hỏng';
     }
 
+    // =========================================================================
+    // v1.6.0: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
+    // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ) mà chưa nhận được hàng
+    // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
+    // =========================================================================
+    function getOrderReturnElapsedInfo(order) {
+      if (!order) return { level: 'none', status: 'none', text: '', timeStr: '', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      const isRecv = isOrderReceived(order);
+      const isUnneeded = isOrderUnneeded(order);
+      if (isRecv) {
+        return { level: 'done', status: 'done', text: '✅ Đã nhận hàng', timeStr: 'Đã nhận', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+      if (isUnneeded) {
+        return { level: 'done', status: 'done', text: '⚪ Không cần nhận', timeStr: 'Không cần nhận', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+      if (order.status === 'Bị mất') {
+        return { level: 'lost', status: 'lost', text: '🔴 Bị mất', timeStr: 'Bị mất', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+
+      const refStr = order.returnDate || order.shipDate;
+      if (!refStr) {
+        return { level: 'none', status: 'none', text: order.deadline || '+ Thêm hạn', timeStr: '', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+      const refDt = parseFullDate(refStr);
+      if (!refDt) {
+        return { level: 'none', status: 'none', text: refStr, timeStr: refStr, elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+
+      const now = new Date();
+      const elapsedMs = now.getTime() - refDt.getTime();
+      if (elapsedMs < 0) {
+        return { level: 'safe', status: 'normal', text: '⏳ Vừa tạo', timeStr: 'Vừa tạo', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
+      }
+
+      const totalMinutes = Math.floor(elapsedMs / (60 * 1000));
+      const totalHours = Math.floor(elapsedMs / (3600 * 1000));
+      const days = Math.floor(totalHours / 24);
+      const remHours = totalHours % 24;
+      const remMinutes = totalMinutes % 60;
+
+      let timeStr = '';
+      if (days > 0) {
+        timeStr = `${days} ngày ${remHours}h ${remMinutes}p`;
+      } else if (totalHours > 0) {
+        timeStr = `${totalHours}h ${remMinutes}p`;
+      } else {
+        timeStr = `${remMinutes}p`;
+      }
+
+      // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
+      if (totalHours >= 72) {
+        return {
+          level: 'danger',
+          status: 'overdue',
+          text: `🚨 QUÁ HẠN (+3 ngày)`,
+          timeStr: timeStr,
+          badgeText: `🚨 Quá 3 ngày`,
+          elapsedHours: totalHours,
+          elapsedMinutes: remMinutes,
+          elapsedDays: days
+        };
+      }
+
+      // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ và < 72 giờ) mà vẫn chưa nhận được hàng
+      if (totalHours >= 48) {
+        return {
+          level: 'warning',
+          status: 'upcoming',
+          text: `⚠️ CẦN XỬ LÝ (+2 ngày)`,
+          timeStr: timeStr,
+          badgeText: `⚠️ 2 ngày`,
+          elapsedHours: totalHours,
+          elapsedMinutes: remMinutes,
+          elapsedDays: days
+        };
+      }
+
+      // DƯỚI 2 NGÀY (< 48 giờ): Trong hạn an toàn
+      return {
+        level: 'safe',
+        status: 'normal',
+        text: `⏳ Trong hạn (< 2 ngày)`,
+        timeStr: timeStr,
+        badgeText: '',
+        elapsedHours: totalHours,
+        elapsedMinutes: remMinutes,
+        elapsedDays: days
+      };
+    }
+
     function getDeadlineStatus(order) {
-      if (!order || !order.deadline) return 'none';
+      if (!order) return 'none';
       if (isOrderReceived(order) || isOrderUnneeded(order)) return 'done';
-      const dt = parseFullDate(order.deadline);
-      if (!dt) return 'custom';
-      const now = Date.now();
-      const diffMs = dt.getTime() - now;
-      if (diffMs < 0) return 'overdue';
-      if (diffMs <= 48 * 60 * 60 * 1000) return 'upcoming';
-      return 'normal';
+      if (order.status === 'Bị mất') return 'lost';
+
+      const elapsed = getOrderReturnElapsedInfo(order);
+      if (elapsed.level === 'danger') return 'overdue';
+      if (elapsed.level === 'warning') return 'upcoming';
+
+      // Nếu có nhập hạn sàn cụ thể
+      if (order.deadline) {
+        const dt = parseFullDate(order.deadline);
+        if (dt) {
+          const diffMs = dt.getTime() - Date.now();
+          if (diffMs < 0) return 'overdue';
+          if (diffMs <= 48 * 3600 * 1000) return 'upcoming';
+        }
+      }
+
+      if (elapsed.level === 'safe') return 'normal';
+      return 'none';
     }
 
     const expandedOrderDrawers = new Set();
@@ -6033,24 +6238,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll(false);
     }
 
-    function isOrderOverdue(order, thresholdDays = 7) {
+    function isOrderOverdue(order, thresholdHours = 72) {
       if (!isOrderPending(order)) return false;
-      const refDate = parseDateParts(order.returnDate) || parseDateParts(order.shipDate);
-      if (!refDate) return false;
-      const now = new Date();
-      const diffMs = now.getTime() - refDate.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      return diffDays >= thresholdDays;
+      const elapsed = getOrderReturnElapsedInfo(order);
+      return elapsed.level === 'danger' || elapsed.elapsedHours >= thresholdHours;
     }
 
     function getOrderAgeText(order) {
-      const refDate = parseDateParts(order.returnDate) || parseDateParts(order.shipDate);
-      if (!refDate) return '';
-      const now = new Date();
-      const diffMs = now.getTime() - refDate.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays <= 0) return 'Hôm nay';
-      return `${diffDays} ngày`;
+      const elapsed = getOrderReturnElapsedInfo(order);
+      return elapsed.timeStr || '';
     }
 
     function setPipelineFilter(tab) {
@@ -7246,6 +7442,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     ];
 
     let orders = [];
+    var selectedOrdersSet = new Set();
 
     function loadOrders() {
       try {
@@ -8990,7 +9187,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentFilterTab === 'returned' && !isOrderReceived(order)) return false;
         if (currentFilterTab === 'unneeded' && !isOrderUnneeded(order)) return false;
         if (currentFilterTab === 'upcoming' && getDeadlineStatus(order) !== 'upcoming') return false;
-        if (currentFilterTab === 'overdue' && getDeadlineStatus(order) !== 'overdue' && !isOrderOverdue(order, 7)) return false;
+        if (currentFilterTab === 'overdue' && getDeadlineStatus(order) !== 'overdue' && !isOrderOverdue(order, 72)) return false;
         if (currentFilterTab === 'lost' && order.status !== 'Bị mất' && order.status !== 'Hư hỏng') return false;
 
         // Date & Time Filtering (v1.5.2: Lọc Từ ngày - Đến ngày, Từ giờ - Đến giờ kết hợp hoặc độc lập)
@@ -9069,6 +9266,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const startIdx = pageSize > 0 ? (currentPage - 1) * pageSize : 0;
       const endIdx = pageSize > 0 ? Math.min(startIdx + pageSize, totalFiltered) : totalFiltered;
       const pageEntries = filteredEntries.slice(startIdx, endIdx);
+      window.lastPageEntries = pageEntries;
 
       // Update pagination bar UI
       const sumEl = document.getElementById('paginationSummaryText');
@@ -9096,10 +9294,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const isUnneeded = isOrderUnneeded(order);
         const isPending = isOrderPending(order);
         const statusClass = getStatusClass(order.status);
-        const isOverdue = isOrderOverdue(order, 7);
-        const overdueTag = isOverdue
-          ? `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-rose-100 text-rose-700 rounded border border-rose-300 whitespace-nowrap" title="Đơn đã quá 7 ngày chưa về! Cần khiếu nại sàn!">⚠️ Quá 7 ngày</span>`
-          : '';
+        const elapsedInfo = getOrderReturnElapsedInfo(order);
+        let overdueTag = '';
+        if (elapsedInfo.level === 'danger') {
+          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-rose-100 text-rose-700 rounded border border-rose-300 whitespace-nowrap" title="Đã quá 3 ngày từ lúc hủy mà chưa nhận được hàng! Cần khiếu nại sàn ngay!">🚨 Quá 3 ngày</span>`;
+        } else if (elapsedInfo.level === 'warning') {
+          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300 whitespace-nowrap" title="Đã trôi qua từ 2 ngày từ lúc hủy mà chưa nhận được hàng!">⚠️ 2 ngày</span>`;
+        }
 
         const actualPhoto = order.photo || (order.photoId && photoMemoryCache.get(order.photoId)) || '';
         const photoInner = actualPhoto
@@ -9258,29 +9459,57 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
             </select>`;
 
-        // Format Deadline Cell (Kèm đếm ngược thông minh)
-        const dlStatus = getDeadlineStatus(order);
-        const countdownInfo = getDeadlineCountdownInfo(order);
+        // Format Deadline Cell (v1.6.0: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
+        const elapsed = getOrderReturnElapsedInfo(order);
         let deadlineHtml = '';
-        if (order.deadline) {
-          if (dlStatus === 'overdue') {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-800 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap leading-tight" title="Quá hạn xử lý sàn! Bấm để chỉnh sửa">
-              <div>🚨 ${escapeAttr(order.deadline)}</div>
-              <div class="text-[9.5px] text-rose-700 font-extrabold animate-pulse mt-0.5">${countdownInfo.text}</div>
-            </div>`;
-          } else if (dlStatus === 'upcoming') {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded font-bold text-[10.5px] text-center cursor-pointer shadow-2xs whitespace-nowrap leading-tight" title="Hạn gấp trong 48 giờ! Bấm để chỉnh sửa">
-              <div>⏰ ${escapeAttr(order.deadline)}</div>
-              <div class="text-[9.5px] text-amber-800 font-extrabold mt-0.5">${countdownInfo.text}</div>
-            </div>`;
-          } else {
-            deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded font-medium text-[10.5px] text-center cursor-pointer whitespace-nowrap leading-tight" title="Bấm để chỉnh sửa hạn xử lý">
-              <div>${escapeAttr(order.deadline)}</div>
-              ${countdownInfo.text ? `<div class="text-[9.5px] text-slate-500 font-medium mt-0.5">${countdownInfo.text}</div>` : ''}
-            </div>`;
-          }
+        if (isReceived) {
+          deadlineHtml = `<div class="px-1.5 py-0.5 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded font-bold text-[10.5px] text-center shadow-2xs whitespace-nowrap leading-tight" title="Hàng hoàn đã được nhận về kho">
+            <div>✅ Đã nhận</div>
+          </div>`;
+        } else if (isUnneeded) {
+          deadlineHtml = `<div class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 text-slate-600 rounded font-medium text-[10.5px] text-center whitespace-nowrap leading-tight" title="Đơn hủy trước khi gửi hoặc không cần nhận kiện">
+            <div>⚪ Không cần nhận</div>
+          </div>`;
+        } else if (elapsed.level === 'danger') {
+          deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
+               class="px-1.5 py-1 bg-rose-100 hover:bg-rose-200 border-2 border-rose-500 text-rose-950 rounded-lg font-bold text-[10.5px] text-center cursor-pointer shadow-xs whitespace-nowrap leading-tight transition" 
+               title="🚨 BÁO ĐỎ: Đã quá 3 ngày (${elapsed.timeStr}) từ lúc khách bấm hủy mà vẫn chưa nhận được hàng về kho! Bấm để sửa hạn hoặc khiếu nại">
+            <div class="text-rose-700 font-black animate-pulse flex items-center justify-center gap-1">
+              <span>🚨 BÁO ĐỎ</span>
+              <span class="text-[9.5px]">(+3 ngày)</span>
+            </div>
+            <div class="text-[9.5px] text-rose-900 font-extrabold mt-0.5">
+              Đã qua: ${elapsed.timeStr}
+            </div>
+            ${order.deadline ? `<div class="text-[9px] text-slate-600 font-normal mt-0.5">Hạn sàn: ${escapeAttr(order.deadline)}</div>` : ''}
+          </div>`;
+        } else if (elapsed.level === 'warning') {
+          deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
+               class="px-1.5 py-1 bg-amber-100 hover:bg-amber-200 border-2 border-amber-500 text-amber-950 rounded-lg font-bold text-[10.5px] text-center cursor-pointer shadow-xs whitespace-nowrap leading-tight transition" 
+               title="⚠️ BÁO VÀNG: Đã qua từ 2 ngày (${elapsed.timeStr}) từ lúc khách hủy mà vẫn chưa nhận được hàng! Bấm để sửa hạn">
+            <div class="text-amber-800 font-black flex items-center justify-center gap-1">
+              <span>⚠️ BÁO VÀNG</span>
+              <span class="text-[9.5px]">(2 ngày)</span>
+            </div>
+            <div class="text-[9.5px] text-amber-950 font-extrabold mt-0.5">
+              Đã qua: ${elapsed.timeStr}
+            </div>
+            ${order.deadline ? `<div class="text-[9px] text-slate-600 font-normal mt-0.5">Hạn sàn: ${escapeAttr(order.deadline)}</div>` : ''}
+          </div>`;
+        } else if (elapsed.level === 'safe') {
+          deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
+               class="px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-900 rounded font-medium text-[10.5px] text-center cursor-pointer whitespace-nowrap leading-tight transition" 
+               title="⏳ Trong hạn: Đã hủy ${elapsed.timeStr}. Còn ${Math.max(0, 48 - elapsed.elapsedHours)}h trước khi sang mốc báo vàng (2 ngày). Bấm để chỉnh sửa">
+            <div class="text-sky-800 font-bold text-[10px]">⏳ An toàn (&lt; 2 ngày)</div>
+            <div class="text-[9.5px] text-sky-700 font-semibold mt-0.5">${elapsed.timeStr}</div>
+            ${order.deadline ? `<div class="text-[9px] text-slate-500 font-normal mt-0.5">Hạn sàn: ${escapeAttr(order.deadline)}</div>` : ''}
+          </div>`;
         } else {
-          deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1 py-0.5 text-center text-[10px] text-slate-400 italic hover:text-blue-600 cursor-pointer select-none" title="Bấm để thêm ngày hạn xử lý sàn">+ Thêm hạn</div>`;
+          deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
+               class="px-1 py-0.5 text-center text-[10px] text-slate-400 italic hover:text-blue-600 cursor-pointer select-none" 
+               title="Bấm để thêm ngày hạn xử lý sàn">
+            ${order.deadline ? escapeAttr(order.deadline) : '+ Thêm hạn'}
+          </div>`;
         }
 
         // Format Tracking Cell: Hiển thị chuẩn xác cả Mã vận đơn Hoàn và Mã vận đơn Giao
@@ -9374,8 +9603,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const deadlineTdClass = isSortColumnActive('deadline') ? 'td-sort-active' : '';
 
         // Generate the single order row
+        const isOrderChecked = selectedOrdersSet.has(orderIdx);
+        const rowSelectedClass = isOrderChecked ? 'bg-blue-50/80 ring-1 ring-blue-300' : '';
         html += `
-          <tr id="order_row_${orderIdx}" data-order-idx="${orderIdx}" class="${rowBgClass} border-b border-slate-200 transition-colors" onfocusin="activePhotoOrderIndex=${orderIdx}">
+          <tr id="order_row_${orderIdx}" data-order-idx="${orderIdx}" class="${rowBgClass} ${rowSelectedClass} border-b border-slate-200 transition-colors" onfocusin="activePhotoOrderIndex=${orderIdx}">
+            <td class="text-center bg-slate-50/80 px-1 py-1 no-print">
+              <div class="flex items-center justify-center gap-1">
+                <input type="checkbox" class="order-bulk-chk w-4 h-4 cursor-pointer accent-blue-600 rounded" 
+                       data-order-idx="${orderIdx}" 
+                       ${isOrderChecked ? 'checked' : ''} 
+                       onchange="toggleSingleOrderSelection(${orderIdx}, this.checked)" />
+                <button type="button" onclick="toggleOrderWatchlist(${orderIdx})" 
+                        class="text-[14px] leading-none transition transform hover:scale-125 focus:outline-none cursor-pointer" 
+                        title="${order.isWatchlist ? 'Đang theo dõi đơn này (Bấm để gỡ khỏi theo dõi)' : 'Bấm để thêm đơn này vào Danh Sách Theo Dõi'}">
+                  ${order.isWatchlist ? '⭐' : '<span class="text-slate-300 hover:text-amber-500 font-bold">☆</span>'}
+                </button>
+              </div>
+            </td>
             <td class="text-center font-bold text-slate-700 bg-slate-50/60">${sttDisplay}${overdueTag}</td>
             <td class="text-center font-bold text-xs ${matched ? 'text-orange-800' : 'text-slate-300'}">
               ${matched ? '🔍 KHỚP' : ''}
@@ -9435,7 +9679,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (isDrawerOpen) {
           html += `
             <tr id="drawer_row_${orderIdx}" class="bg-indigo-50/40 border-y-2 border-indigo-200">
-              <td colspan="21" class="p-2.5 sm:p-3">
+              <td colspan="22" class="p-2.5 sm:p-3">
                 ${renderOrderItemsDrawer(order, orderIdx)}
               </td>
             </tr>
@@ -9451,9 +9695,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
              </div>`
           : `<div class="py-8 text-center text-slate-500 text-xs font-semibold">Không có đơn hàng nào khớp với bộ lọc hiện tại.</div>`;
-        html = `<tr><td colspan="21" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
+        html = `<tr><td colspan="22" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
       tbody.innerHTML = html;
+
+      // v1.6.0: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
+      const chkSelectAll = document.getElementById('chkSelectAllOrders');
+      if (chkSelectAll && window.lastPageEntries) {
+        chkSelectAll.checked = (window.lastPageEntries.length > 0 && window.lastPageEntries.every(e => selectedOrdersSet.has(e.originalIndex)));
+      }
+      updateBulkActionBarUI();
+
       applyLockUI();
       updateDateSortUI();
       if (rebuildSummaryImmediately) {
@@ -9830,7 +10082,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           countWaiting++;
           const dlSt = getDeadlineStatus(o);
           if (dlSt === 'upcoming') countUpcoming++;
-          if (dlSt === 'overdue' || isOrderOverdue(o, 7)) countOverdue++;
+          if (dlSt === 'overdue' || isOrderOverdue(o, 72)) countOverdue++;
           if (o.status === 'Bị mất' || o.status === 'Hư hỏng') countLost++;
         }
       });
@@ -12185,7 +12437,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           (currentFilterTab === 'returned' && isOrderReceived(targetOrder)) ||
           (currentFilterTab === 'unneeded' && isOrderUnneeded(targetOrder)) ||
           (currentFilterTab === 'upcoming' && getDeadlineStatus(targetOrder) === 'upcoming') ||
-          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 7))) ||
+          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 72))) ||
           (currentFilterTab === 'lost' && (targetOrder.status === 'Bị mất' || targetOrder.status === 'Hư hỏng'))
         );
         if (!matchesTab) {
@@ -13267,6 +13519,567 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
+    // =========================================================================
+    // v1.6.0: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
+    // =========================================================================
+    // selectedOrdersSet is initialized globally above
+
+    function toggleSingleOrderSelection(orderIdx, isChecked) {
+      if (isChecked) {
+        selectedOrdersSet.add(orderIdx);
+      } else {
+        selectedOrdersSet.delete(orderIdx);
+      }
+      updateBulkActionBarUI();
+
+      const row = document.getElementById('order_row_' + orderIdx);
+      if (row) {
+        if (isChecked) row.classList.add('bg-blue-50/80', 'ring-1', 'ring-blue-300');
+        else row.classList.remove('bg-blue-50/80', 'ring-1', 'ring-blue-300');
+      }
+
+      // Đồng bộ checkbox chọn tất cả trên trang
+      const chkAll = document.getElementById('chkSelectAllOrders');
+      if (chkAll && window.lastPageEntries && window.lastPageEntries.length > 0) {
+        chkAll.checked = window.lastPageEntries.every(e => selectedOrdersSet.has(e.originalIndex));
+      }
+    }
+
+    function toggleSelectAllVisibleOrders(isChecked) {
+      const pageEntries = window.lastPageEntries || [];
+      pageEntries.forEach(entry => {
+        if (isChecked) {
+          selectedOrdersSet.add(entry.originalIndex);
+        } else {
+          selectedOrdersSet.delete(entry.originalIndex);
+        }
+      });
+      updateBulkActionBarUI();
+
+      document.querySelectorAll('.order-bulk-chk').forEach(chk => {
+        const idx = parseInt(chk.getAttribute('data-order-idx'), 10);
+        chk.checked = selectedOrdersSet.has(idx);
+        const row = document.getElementById('order_row_' + idx);
+        if (row) {
+          if (chk.checked) row.classList.add('bg-blue-50/80', 'ring-1', 'ring-blue-300');
+          else row.classList.remove('bg-blue-50/80', 'ring-1', 'ring-blue-300');
+        }
+      });
+    }
+
+    function updateBulkActionBarUI() {
+      const bar = document.getElementById('bulkActionBar');
+      const countBadge = document.getElementById('bulkSelectedCountBadge');
+      if (!bar) return;
+      const count = selectedOrdersSet.size;
+      if (count > 0) {
+        bar.classList.remove('hidden');
+        if (countBadge) countBadge.textContent = count;
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    function clearAllSelectedOrders() {
+      selectedOrdersSet.clear();
+      updateBulkActionBarUI();
+      const chkAll = document.getElementById('chkSelectAllOrders');
+      if (chkAll) chkAll.checked = false;
+      document.querySelectorAll('.order-bulk-chk').forEach(chk => {
+        chk.checked = false;
+        const idx = parseInt(chk.getAttribute('data-order-idx'), 10);
+        const row = document.getElementById('order_row_' + idx);
+        if (row) row.classList.remove('bg-blue-50/80', 'ring-1', 'ring-blue-300');
+      });
+    }
+
+    function shiftSelectedOrdersAfterDelete(deletedIdx) {
+      const newSet = new Set();
+      selectedOrdersSet.forEach(idx => {
+        if (idx < deletedIdx) newSet.add(idx);
+        else if (idx > deletedIdx) newSet.add(idx - 1);
+      });
+      selectedOrdersSet = newSet;
+      updateBulkActionBarUI();
+    }
+
+    function bulkAddSelectedToWatchlist() {
+      if (selectedOrdersSet.size === 0) return;
+      let countAdded = 0;
+      selectedOrdersSet.forEach(idx => {
+        if (orders[idx]) {
+          orders[idx].isWatchlist = true;
+          countAdded++;
+        }
+      });
+      saveOrders();
+      updateWatchlistBadge();
+      renderAll(false);
+      showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Danh Sách Theo Dõi!`, 'success');
+      addAppNotification({
+        type: 'system',
+        title: `⭐ Đã thêm ${countAdded} đơn vào Danh Sách Theo Dõi`,
+        content: `Người dùng đã đánh dấu theo dõi cho ${countAdded} đơn hàng. Bạn có thể mở Bảng Theo Dõi để kiểm tra bất kỳ lúc nào.`,
+        isImportant: false
+      });
+    }
+
+    async function bulkDeleteSelectedOrders(skipConfirm = false) {
+      if (selectedOrdersSet.size === 0) return;
+      const count = selectedOrdersSet.size;
+
+      if (!skipConfirm) {
+        // Kiểm tra khóa mật khẩu
+        const anyLocked = isLocked || Array.from(selectedOrdersSet).some(idx => hasLockedCellsInOrder(idx));
+      if (anyLocked) {
+        const entered = await appPrompt({
+          title: `Xác Nhận Xóa Hàng Loạt ${count} Đơn Hàng`,
+          subtitle: `Có đơn hàng đang được KHÓA bảo vệ.\nNhập mật khẩu Chủ Shop để xác nhận xóa hàng loạt:`,
+          icon: '🗑️'
+        });
+        if (entered === null) return;
+        if (!verifyPassword(entered)) {
+          alert('❌ Mật khẩu Chủ Shop không đúng! Mật khẩu mặc định là 123456.');
+          return;
+        }
+      } else {
+        const ok = await appConfirm(
+          `⚠️ XÁC NHẬN XÓA HÀNG LOẠT:\n\nBạn có chắc chắn muốn XÓA HOÀN TOÀN ${count} đơn hàng đã chọn khỏi hệ thống không?\n\nThao tác này không thể hoàn tác!`,
+          `Xác Nhận Xóa ${count} Đơn Hàng`
+        );
+        if (!ok) return;
+      }
+      }
+
+      const sortedIndices = Array.from(selectedOrdersSet).sort((a, b) => b - a);
+      let deletedOrderIds = [];
+      sortedIndices.forEach(idx => {
+        const o = orders[idx];
+        if (o) {
+          deletedOrderIds.push(o.orderId || o.returnTrack || `#${idx + 1}`);
+          if (o.photoId) {
+            deletePhotoFromDb(o.photoId);
+          }
+          orders.splice(idx, 1);
+          shiftCellLocksAfterOrderDelete(idx);
+          shiftSelectedOrdersAfterDelete(idx);
+        }
+      });
+
+      selectedOrdersSet.clear();
+      updateBulkActionBarUI();
+      saveOrders();
+      updateWatchlistBadge();
+      renderAll(true);
+      showAppToast(`🗑️ Đã xóa thành công ${count} đơn hàng đã chọn!`, 'info');
+      addAppNotification({
+        type: 'system',
+        title: `🗑️ Đã xóa hàng loạt ${count} đơn hàng`,
+        content: `Người dùng đã xóa ${count} đơn hàng: ${deletedOrderIds.slice(0, 5).join(', ')}${deletedOrderIds.length > 5 ? '...' : ''}`,
+        isImportant: true
+      });
+    }
+
+    function toggleOrderWatchlist(orderIdx) {
+      if (!orders[orderIdx]) return;
+      orders[orderIdx].isWatchlist = !orders[orderIdx].isWatchlist;
+      saveOrders();
+      updateWatchlistBadge();
+      renderAll(false);
+      const isNow = orders[orderIdx].isWatchlist;
+      showAppToast(
+        isNow 
+          ? `⭐ Đã thêm đơn #${orderIdx + 1} (${orders[orderIdx].orderId || ''}) vào Danh Sách Theo Dõi!`
+          : `Đã bỏ theo dõi đơn #${orderIdx + 1}`,
+        isNow ? 'success' : 'info'
+      );
+    }
+
+    function updateWatchlistBadge() {
+      const count = orders.filter(o => Boolean(o && o.isWatchlist)).length;
+      const badge = document.getElementById('headerWatchlistCountBadge');
+      if (badge) {
+        badge.textContent = count;
+        if (count > 0) badge.classList.add('animate-pulse');
+        else badge.classList.remove('animate-pulse');
+      }
+      const totalBadge = document.getElementById('watchlistTotalBadge');
+      if (totalBadge) totalBadge.textContent = count;
+    }
+
+    // =========================================================================
+    // v1.6.0: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
+    // =========================================================================
+    let currentWatchlistFilter = 'all';
+
+    function openWatchlistModal() {
+      const modal = document.getElementById('watchlistModal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      renderWatchlistTable();
+      setTimeout(() => {
+        const inp = document.getElementById('watchlistSearchInput');
+        if (inp) inp.focus();
+      }, 100);
+    }
+
+    function closeWatchlistModal() {
+      const modal = document.getElementById('watchlistModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function setWatchlistFilter(filter) {
+      currentWatchlistFilter = filter || 'all';
+      ['all', 'danger', 'warning', 'pending', 'received'].forEach(f => {
+        const btn = document.getElementById('wlFilterBtn_' + f);
+        if (!btn) return;
+        if (f === currentWatchlistFilter) {
+          btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white shadow-2xs cursor-pointer transition';
+        } else {
+          let textCol = 'text-slate-700 border-slate-300';
+          if (f === 'danger') textCol = 'text-rose-700 border-rose-300';
+          else if (f === 'warning') textCol = 'text-amber-700 border-amber-300';
+          else if (f === 'received') textCol = 'text-emerald-700 border-emerald-300';
+          btn.className = `px-2.5 py-1 rounded text-xs font-bold bg-white ${textCol} border hover:bg-slate-50 cursor-pointer transition`;
+        }
+      });
+      renderWatchlistTable();
+    }
+
+    function renderWatchlistTable() {
+      const tbody = document.getElementById('watchlistModalTableBody');
+      if (!tbody) return;
+      const kw = (document.getElementById('watchlistSearchInput')?.value || '').trim().toLowerCase();
+
+      const watchlistEntries = [];
+      orders.forEach((order, originalIndex) => {
+        if (order && order.isWatchlist) {
+          watchlistEntries.push({ order, originalIndex });
+        }
+      });
+
+      const totalWl = watchlistEntries.length;
+      updateWatchlistBadge();
+
+      // Counts for filter pills
+      let countDanger = 0, countWarning = 0, countPending = 0, countReceived = 0;
+      watchlistEntries.forEach(({ order }) => {
+        const elapsed = getOrderReturnElapsedInfo(order);
+        if (isOrderReceived(order)) countReceived++;
+        else {
+          countPending++;
+          if (elapsed.level === 'danger') countDanger++;
+          else if (elapsed.level === 'warning') countWarning++;
+        }
+      });
+
+      const elAll = document.getElementById('wlCount_all');
+      if (elAll) elAll.textContent = totalWl;
+      const elDang = document.getElementById('wlCount_danger');
+      if (elDang) elDang.textContent = countDanger;
+      const elWarn = document.getElementById('wlCount_warning');
+      if (elWarn) elWarn.textContent = countWarning;
+      const elPend = document.getElementById('wlCount_pending');
+      if (elPend) elPend.textContent = countPending;
+      const elRecv = document.getElementById('wlCount_received');
+      if (elRecv) elRecv.textContent = countReceived;
+
+      // Filter and search entries
+      const filtered = watchlistEntries.filter(({ order }) => {
+        const elapsed = getOrderReturnElapsedInfo(order);
+        const isRecv = isOrderReceived(order);
+
+        if (currentWatchlistFilter === 'danger' && elapsed.level !== 'danger') return false;
+        if (currentWatchlistFilter === 'warning' && elapsed.level !== 'warning') return false;
+        if (currentWatchlistFilter === 'pending' && isRecv) return false;
+        if (currentWatchlistFilter === 'received' && !isRecv) return false;
+
+        if (kw) {
+          const searchBlob = [
+            order.orderId || '',
+            order.returnTrack || '',
+            order.forwardTrack || '',
+            order.track || '',
+            order.carrier || '',
+            order.platform || '',
+            order.platformStatus || '',
+            (order.items || []).map(i => `${i.product || i.name || ''} ${i.color || i.variant || ''} ${i.size || ''}`).join(' ')
+          ].join(' ').toLowerCase();
+          if (!searchBlob.includes(kw)) return false;
+        }
+        return true;
+      });
+
+      const countText = document.getElementById('watchlistFilteredCountText');
+      if (countText) countText.textContent = `${filtered.length}/${totalWl} đơn khớp`;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr>
+          <td colspan="9" class="text-center py-10 text-slate-400 bg-slate-50/50">
+            <div class="text-3xl mb-1.5">⭐</div>
+            <div class="font-bold text-slate-600 text-sm">
+              ${totalWl === 0 ? 'Chưa có đơn hàng nào trong danh sách theo dõi' : 'Không có đơn theo dõi nào khớp với bộ lọc hiện tại'}
+            </div>
+            <div class="text-xs text-slate-500 mt-1">
+              ${totalWl === 0 
+                ? 'Bạn có thể tích chọn nhiều đơn ở bảng chính và bấm <b>[⭐ Thêm Vào Theo Dõi]</b>, hoặc bấm trực tiếp biểu tượng <b>☆</b> ở đầu mỗi dòng đơn.' 
+                : 'Thử đổi từ khóa tìm kiếm hoặc bấm tab "Tất Cả" ở trên.'}
+            </div>
+          </td>
+        </tr>`;
+        return;
+      }
+
+      let rowsHtml = '';
+      filtered.forEach(({ order, originalIndex }, idx) => {
+        const elapsed = getOrderReturnElapsedInfo(order);
+        const isRecv = isOrderReceived(order);
+        const isUnneeded = isOrderUnneeded(order);
+
+        // Badge deadline
+        let deadlineBadgeHtml = '';
+        if (isRecv) {
+          deadlineBadgeHtml = `<span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10.5px]">✅ Đã nhận kho</span>`;
+        } else if (isUnneeded) {
+          deadlineBadgeHtml = `<span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium text-[10.5px]">⚪ Không cần nhận</span>`;
+        } else if (elapsed.level === 'danger') {
+          deadlineBadgeHtml = `
+            <div class="px-2 py-1 rounded-lg bg-rose-100 border border-rose-300 text-rose-900 font-bold text-[10.5px] leading-tight">
+              <div class="text-rose-700 font-black animate-pulse">🚨 BÁO ĐỎ (+3 ngày)</div>
+              <div class="text-[9.5px] text-rose-800 font-extrabold mt-0.5">${elapsed.timeStr}</div>
+            </div>`;
+        } else if (elapsed.level === 'warning') {
+          deadlineBadgeHtml = `
+            <div class="px-2 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-950 font-bold text-[10.5px] leading-tight">
+              <div class="text-amber-800 font-black">⚠️ BÁO VÀNG (2 ngày)</div>
+              <div class="text-[9.5px] text-amber-900 font-extrabold mt-0.5">${elapsed.timeStr}</div>
+            </div>`;
+        } else {
+          deadlineBadgeHtml = `
+            <div class="px-2 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-800 text-[10.5px] leading-tight">
+              <div class="font-bold">⏳ An toàn</div>
+              <div class="text-[9.5px] text-sky-700 mt-0.5">${elapsed.timeStr}</div>
+            </div>`;
+        }
+
+        // Format tracking codes
+        const retTrack = order.returnTrack || '';
+        const fwdTrack = order.forwardTrack || (order.track && order.track !== retTrack ? order.track : '');
+        let trackHtml = '';
+        if (retTrack && fwdTrack && retTrack !== fwdTrack) {
+          trackHtml = `
+            <div class="leading-tight">
+              <div class="font-mono font-bold text-emerald-800 text-[11px] cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(retTrack)}', 'Đã copy MVĐ Hoàn: ${escapeAttr(retTrack)}')">
+                <span class="bg-emerald-100 text-emerald-800 text-[8.5px] px-1 py-0.2 rounded font-extrabold">↩️</span> ${escapeAttr(retTrack)}
+              </div>
+              <div class="font-mono text-slate-500 text-[10px] mt-0.5 cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(fwdTrack)}', 'Đã copy MVĐ Giao: ${escapeAttr(fwdTrack)}')">
+                <span class="bg-slate-100 text-slate-600 text-[8.5px] px-1 py-0.2 rounded">🚚</span> ${escapeAttr(fwdTrack)}
+              </div>
+            </div>`;
+        } else {
+          const singleTrack = retTrack || fwdTrack || order.track || '-';
+          trackHtml = `<div class="font-mono font-bold text-slate-800 text-[11px] cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(singleTrack)}', 'Đã copy MVĐ: ${escapeAttr(singleTrack)}')">${escapeAttr(singleTrack)}</div>`;
+        }
+
+        // Product snippet
+        const items = order.items && order.items.length > 0 ? order.items : [{ product: order.product || order.name || 'Sản phẩm', qty: order.qty || 1, color: order.color || '', size: order.size || '' }];
+        const firstItem = items[0];
+        const itemDesc = `${firstItem.product || firstItem.name || 'Sản phẩm'}${(firstItem.color || firstItem.size) ? ' - ' + (firstItem.color || '') + ' ' + (firstItem.size || '') : ''} (x${firstItem.qty || 1})${items.length > 1 ? ` +${items.length - 1} SP khác` : ''}`;
+
+        // Warehouse status badge
+        let recvStatusBadge = '';
+        if (isRecv) {
+          recvStatusBadge = `<span class="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Đã nhận kho</span>`;
+        } else if (isUnneeded) {
+          recvStatusBadge = `<span class="inline-block px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-medium text-[10px]">K.Cần nhận</span>`;
+        } else if (order.status === 'Bị mất') {
+          recvStatusBadge = `<span class="inline-block px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">Bị mất</span>`;
+        } else {
+          recvStatusBadge = `<span class="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Chưa nhận</span>`;
+        }
+
+        const platformStatusText = order.platformStatus || '-';
+
+        rowsHtml += `
+          <tr class="hover:bg-amber-50/50 transition border-b border-slate-100">
+            <td class="py-2 text-center font-bold text-slate-600 bg-slate-50/50">${idx + 1}</td>
+            <td class="py-2 px-2 font-mono font-bold text-slate-900 cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.orderId || '')}', 'Đã copy Mã đơn: ${escapeAttr(order.orderId || '')}')" title="Bấm để copy">
+              ${escapeAttr(order.orderId || '-')}
+            </td>
+            <td class="py-2 px-2">${trackHtml}</td>
+            <td class="py-2 px-2">
+              <div class="truncate max-w-[220px] font-medium text-slate-800" title="${escapeAttr(itemDesc)}">
+                ${escapeAttr(itemDesc)}
+              </div>
+              <div class="text-[10px] text-slate-500 mt-0.5">${escapeAttr(order.platform || 'Shopee')} • ${escapeAttr(order.carrier || '')}</div>
+            </td>
+            <td class="py-2 text-center font-semibold text-amber-900">
+              ${escapeAttr(order.returnDate || order.shipDate || '-')}
+            </td>
+            <td class="py-2 text-center px-1">
+              ${deadlineBadgeHtml}
+            </td>
+            <td class="py-2 text-center px-1">
+              <span class="inline-block px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-semibold max-w-[120px] truncate" title="${escapeAttr(platformStatusText)}">
+                ${escapeAttr(platformStatusText)}
+              </span>
+            </td>
+            <td class="py-2 text-center px-1">
+              ${recvStatusBadge}
+            </td>
+            <td class="py-2 text-center px-1">
+              <div class="flex items-center justify-center gap-1">
+                <button type="button" onclick="locateOrderFromWatchlist(${originalIndex})"
+                        class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10.5px] shadow-xs transition cursor-pointer flex items-center gap-1 active:scale-95"
+                        title="Đóng bảng và cuộn ngay đến dòng đơn này trên bảng chính">
+                  <span>🎯</span>
+                  <span>Định Vị</span>
+                </button>
+                <button type="button" onclick="removeOrderFromWatchlist(${originalIndex})"
+                        class="px-1.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded text-[10.5px] font-semibold transition cursor-pointer"
+                        title="Bỏ theo dõi đơn này">
+                  ❌
+                </button>
+              </div>
+            </td>
+          </tr>`;
+      });
+
+      tbody.innerHTML = rowsHtml;
+    }
+
+    function locateOrderFromWatchlist(orderIdx) {
+      closeWatchlistModal();
+      if (!orders[orderIdx]) return;
+      const targetOrder = orders[orderIdx];
+
+      // 1. Nếu có tab tuần, chuyển sang đúng tab chứa đơn
+      if (typeof currentImportWeekFilter !== 'undefined' && currentImportWeekFilter !== 'all') {
+        const orderWeek = getOrderImportWeek(targetOrder);
+        if (orderWeek && orderWeek !== currentImportWeekFilter) {
+          if (typeof setImportWeekFilter === 'function') {
+            setImportWeekFilter(orderWeek);
+          }
+        }
+      }
+
+      // 2. Xóa ô tìm kiếm nếu đang lọc ẩn đơn
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput && searchInput.value.trim() && !isOrderMatch(targetOrder, searchInput.value.trim().toLowerCase())) {
+        searchInput.value = '';
+      }
+
+      // 3. Reset pipeline filter nếu tab hiện tại ẩn đơn
+      if (typeof currentFilterTab !== 'undefined' && currentFilterTab !== 'all') {
+        const isReceived = isOrderReceived(targetOrder);
+        const isUnneeded = isOrderUnneeded(targetOrder);
+        const isPending = isOrderPending(targetOrder);
+        const matchesCurrentTab = 
+          (currentFilterTab === 'waiting' && isPending) ||
+          (currentFilterTab === 'returned' && isReceived) ||
+          (currentFilterTab === 'unneeded' && isUnneeded) ||
+          (currentFilterTab === 'upcoming' && getDeadlineStatus(targetOrder) === 'upcoming') ||
+          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 72))) ||
+          (currentFilterTab === 'lost' && targetOrder.status === 'Bị mất');
+        if (!matchesCurrentTab) {
+          setPipelineFilter('all');
+        }
+      }
+
+      // 4. Tìm vị trí trang hiển thị
+      const filtered = typeof getFilteredAndSortedOrders === 'function' ? getFilteredAndSortedOrders() : (window.lastFilteredEntries || []);
+      const entryIdx = filtered.findIndex(e => e.originalIndex === orderIdx);
+      if (entryIdx !== -1) {
+        const targetPage = Math.floor(entryIdx / (pageSize > 0 ? pageSize : filtered.length)) + 1;
+        currentPage = targetPage;
+      }
+
+      renderAll(false);
+
+      // 5. Cuộn mượt và nháy xanh nổi bật
+      setTimeout(() => {
+        const rowEl = document.getElementById('order_row_' + orderIdx);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          rowEl.classList.remove('row-match');
+          void rowEl.offsetWidth; // trigger reflow
+          rowEl.classList.add('row-match');
+          setTimeout(() => rowEl.classList.remove('row-match'), 3200);
+        }
+        showAppToast(`🎯 Đã định vị đơn #${orderIdx + 1}: ${targetOrder.orderId || targetOrder.returnTrack || ''}`, 'info');
+      }, 120);
+    }
+
+    function removeOrderFromWatchlist(orderIdx) {
+      if (!orders[orderIdx]) return;
+      orders[orderIdx].isWatchlist = false;
+      saveOrders();
+      updateWatchlistBadge();
+      renderWatchlistTable();
+      renderAll(false);
+      showAppToast(`Đã gỡ đơn #${orderIdx + 1} khỏi danh sách theo dõi`, 'info');
+    }
+
+    async function clearAllWatchlist() {
+      const count = orders.filter(o => Boolean(o && o.isWatchlist)).length;
+      if (count === 0) {
+        alert('Danh sách theo dõi hiện đang trống (0 đơn).');
+        return;
+      }
+      const ok = await appConfirm(
+        `Bạn có chắc chắn muốn BỎ THEO DÕI toàn bộ ${count} đơn hàng trong danh sách không?\n\n(Thao tác này chỉ gỡ cờ theo dõi, không làm mất hay xóa dữ liệu đơn hàng)`,
+        'Bỏ Theo Dõi Tất Cả'
+      );
+      if (!ok) return;
+
+      orders.forEach(o => {
+        if (o) o.isWatchlist = false;
+      });
+      saveOrders();
+      updateWatchlistBadge();
+      renderWatchlistTable();
+      renderAll(false);
+      showAppToast(`🧹 Đã bỏ theo dõi toàn bộ ${count} đơn hàng!`, 'info');
+    }
+
+    function exportWatchlistToExcel() {
+      const wlOrders = orders.filter(o => Boolean(o && o.isWatchlist));
+      if (wlOrders.length === 0) {
+        alert('Danh sách theo dõi đang trống (0 đơn). Hãy tích chọn các đơn cần theo dõi trước!');
+        return;
+      }
+      const rows = wlOrders.map((o, idx) => {
+        const elapsed = getOrderReturnElapsedInfo(o);
+        return {
+          'STT': idx + 1,
+          'Mã Đơn Hàng': o.orderId || '',
+          'Mã Vận Đơn Hoàn': o.returnTrack || '',
+          'Mã Vận Đơn Giao': o.forwardTrack || o.track || '',
+          'Sàn TMĐT': o.platform || 'Shopee',
+          'ĐVVC': o.carrier || '',
+          'Ngày Gửi': o.shipDate || '',
+          'Ngày Hủy/Hoàn': o.returnDate || '',
+          'Hạn Xử Lý': elapsed.text || '',
+          'Thời Gian Trôi Qua': elapsed.timeStr || '',
+          'Mức Cảnh Báo': elapsed.level === 'danger' ? 'BÁO ĐỎ (+3 ngày)' : elapsed.level === 'warning' ? 'BÁO VÀNG (2 ngày)' : 'Trong hạn',
+          'Trạng Thái Sàn': o.platformStatus || '',
+          'Nhận Tại Kho': o.status || 'Chưa nhận',
+          'Ngày Về Kho': o.recvDate || '',
+          'Tổng SL': (o.items || []).reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0),
+          'Tổng Giá Trị': Number(o.price) || 0,
+          'Sản Phẩm': (o.items || []).map(it => `${it.product || it.name || ''} [${it.color || it.variant || ''} ${it.size || ''}] x${it.qty || 1}`).join('; '),
+          'Lý Do Hoàn': o.note || '',
+          'Ghi Chú Người Mua': o.buyerNote || ''
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Don_Theo_Doi');
+      const dStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '_');
+      XLSX.writeFile(wb, `Danh_Sach_Don_Theo_Doi_${dStr}.xlsx`);
+      showAppToast(`📊 Đã xuất Excel gồm ${wlOrders.length} đơn theo dõi thành công!`, 'success');
+    }
+
 </script>
 
   <!-- Custom Smart Suggest Dropdown Popup (Anchored to input cell!) -->
@@ -13283,5 +14096,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <datalist id="productList"></datalist>
   <datalist id="colorList"></datalist>
   <datalist id="sizeList"></datalist>
+  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.0) -->
+  <div id="bulkActionBar" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[90] hidden bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 transition-all">
+    <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
+      <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-black text-xs flex items-center justify-center" id="bulkSelectedCountBadge">0</span>
+      <span class="font-bold text-xs text-slate-200">Đơn đã chọn</span>
+    </div>
+    <button type="button" onclick="bulkAddSelectedToWatchlist()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95">
+      <span>⭐</span>
+      <span>Thêm Vào Theo Dõi</span>
+    </button>
+    <button type="button" onclick="bulkDeleteSelectedOrders()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95">
+      <span>🗑️</span>
+      <span>Xóa Các Đơn Đã Chọn</span>
+    </button>
+    <button type="button" onclick="clearAllSelectedOrders()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg font-medium text-xs transition cursor-pointer">
+      ✕ Bỏ chọn
+    </button>
+  </div>
+
 </body>
 </html>

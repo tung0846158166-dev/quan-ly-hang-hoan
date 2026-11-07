@@ -225,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.4.1
+          🚀 Phiên bản v1.5.0
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -245,6 +245,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       <div class="flex flex-wrap items-center gap-1.5 no-print">
         <!-- Chỉ giữ 3 nút thao tác trực tiếp quan trọng nhất ở ngoài -->
+        <!-- Nút Trung Tâm Thông Báo & Cập Nhật (v1.5.0) -->
+        <button type="button" id="btnNotificationCenter" onclick="openNotificationModal()"
+              class="relative inline-flex items-center gap-1.5 px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-amber-200 cursor-pointer select-none"
+              title="Mở Bảng Thông Báo: Xem lịch sử quét điện thoại, kết quả nạp file cập nhật trạng thái và tra cứu theo Mã đơn / MVĐ">
+          <span>🔔</span>
+          <span>Thông Báo</span>
+          <span id="unreadNotifBadge" class="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black animate-pulse">0</span>
+        </button>
         <button id="btnPhoneScanner" onclick="openPhoneScannerModal()" class="px-3 py-1 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-lg shadow-xs transition ring-1 ring-sky-200 flex items-center gap-1 cursor-pointer" title="Dùng Camera Điện Thoại quét mã vạch trên bọc hàng hoàn -> Tự động nhảy thẳng vào bảng máy tính này!">
           <span>📱</span>
           <span>Quét Bằng ĐT</span>
@@ -572,7 +580,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.4.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.0</span>
               </div>
             </div>
           </div>
@@ -914,6 +922,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </th>
             <th class="min-w-[105px] w-24 !bg-orange-950 py-1.5">Sàn TMĐT</th>
             <th class="min-w-[140px] w-36 !bg-indigo-950 py-1.5" title="Nguồn phát sinh đơn: Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU (Gốc Salework)">Loại Đơn / Sàn</th>
+            <th class="min-w-[155px] w-40 !bg-teal-950 text-teal-100 py-1.5" title="Trạng thái chi tiết từ Sàn TMĐT (Chờ bạn xác nhận, Đã hoàn tiền, Giao hàng hoàn trả thành công, Đang chuyển hoàn...) - Nhấp đúp để sửa">Trạng Thái Sàn</th>
             <th class="min-w-[110px] w-28 !bg-purple-950 text-purple-100 py-1.5" title="Đơn Hàng Đặt Trước (Pre-order): Hiển thị ⭐ Đặt trước hoặc Thường">Hàng Đặt Trước</th>
             <th class="w-32 py-1.5">Mã Đơn Hàng</th>
             <th class="w-36 py-1.5" title="Mã Vận Đơn: Ưu tiên mã hoàn khi nhận kiện, hiển thị cả mã giao">Mã Vận Đơn</th>
@@ -931,7 +940,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <tbody id="orderTableBody"></tbody>
         <tfoot>
           <tr class="bg-slate-100 font-bold text-xs border-t-2 border-slate-800">
-            <td colspan="13" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
+            <td colspan="14" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
             <td id="footTotalQty" class="text-center py-2.5 text-slate-900 text-sm">0</td>
             <td id="footTotalPrice" class="text-right py-2.5 px-2 text-slate-900 text-sm">0 đ</td>
             <td colspan="5"></td>
@@ -1048,6 +1057,75 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   </div> <!-- End of main full-width responsive wrapper -->
 
   <input id="hiddenPhotoInput" type="file" accept="image/*" class="hidden" />
+
+  <!-- Notification Center Modal (Trung Tâm Thông Báo & Lịch Sử Cập Nhật Đơn Hàng v1.5.0) -->
+  <div id="notificationModal" onclick="closeNotificationModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 text-white px-5 py-3 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <span class="text-2xl">🔔</span>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold uppercase tracking-wide flex items-center gap-2">
+              BẢNG THÔNG BÁO & LỊCH SỬ CẬP NHẬT ĐƠN HÀNG
+              <span id="notifTotalBadge" class="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full font-mono font-bold">0</span>
+            </h2>
+            <p class="text-xs text-orange-100 mt-0.5">
+              Theo dõi tức thì mọi lượt quét từ điện thoại, nạp file Excel & cập nhật trạng thái đơn trùng
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="clearAllNotifications()" class="px-2.5 py-1 bg-white/15 hover:bg-white/25 text-white text-xs font-semibold rounded-lg transition cursor-pointer" title="Xóa toàn bộ lịch sử thông báo">
+            🧹 Xóa Hết
+          </button>
+          <button type="button" onclick="closeNotificationModal()" class="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-lg transition cursor-pointer" title="Đóng cửa sổ (Esc)">
+            ✕ Đóng
+          </button>
+        </div>
+      </div>
+
+      <!-- Search & Category Filter Toolbar -->
+      <div class="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
+        <!-- Ô TÌM KIẾM THEO MÃ ĐƠN / MVĐ / TỪ KHÓA -->
+        <div class="flex-1 min-w-[280px] relative">
+          <span class="absolute left-3 top-2 text-sm text-slate-400">🔍</span>
+          <input type="text" id="notifSearchInput" oninput="renderNotificationList()"
+                 placeholder="Gõ Mã đơn hàng, Mã vận đơn (MVĐ) hoặc từ khóa để tra cứu thông báo..."
+                 class="w-full pl-9 pr-8 py-1.5 bg-[#fef9c3] border border-orange-400 rounded-lg text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-800/60 focus:outline-none focus:ring-2 focus:ring-orange-500 shadow-2xs" />
+          <button type="button" onclick="document.getElementById('notifSearchInput').value=''; renderNotificationList();"
+                  class="absolute right-2.5 top-1.5 text-xs text-slate-400 hover:text-slate-700 cursor-pointer" title="Xóa tìm kiếm">✕</button>
+        </div>
+
+        <!-- Bộ Lọc Danh Mục Thông Báo -->
+        <div class="flex items-center gap-1 flex-wrap shrink-0">
+          <button type="button" onclick="setNotifFilterCategory('all')" id="notifCatBtn_all" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white shadow-2xs cursor-pointer transition">
+            Tất Cả (<span id="notifCount_all">0</span>)
+          </button>
+          <button type="button" onclick="setNotifFilterCategory('phone')" id="notifCatBtn_phone" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
+            📱 Quét ĐT (<span id="notifCount_phone">0</span>)
+          </button>
+          <button type="button" onclick="setNotifFilterCategory('excel')" id="notifCatBtn_excel" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
+            🔄 Cập Nhật Excel (<span id="notifCount_excel">0</span>)
+          </button>
+          <button type="button" onclick="setNotifFilterCategory('warning')" id="notifCatBtn_warning" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
+            ⚠️ Trùng & Cảnh Báo (<span id="notifCount_warning">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Danh Sách Thông Báo -->
+      <div id="notificationItemsContainer" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 max-h-[62vh] min-h-[300px] bg-slate-100/60">
+        <!-- Rendered by JS -->
+      </div>
+
+      <!-- Footer Info -->
+      <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <span>💡 Mẹo: Bấm <b>"🎯 Định Vị Đơn"</b> tại thông báo để máy tính tự động cuộn đến đơn và nháy xanh!</span>
+        <span id="notifFilteredCountText" class="font-bold text-slate-700">0 thông báo</span>
+      </div>
+    </div>
+  </div>
 
   <!-- Zoom Image Lightbox Modal (v1.4.1 Hỗ trợ Phóng to, Tải ảnh về máy, Xoay ảnh & Đọc mã) -->
   <div id="zoomModal" onclick="closeZoomModal()" class="fixed inset-0 bg-slate-900/85 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 cursor-zoom-out select-none transition-all">
@@ -4514,8 +4592,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
 
           if (existingIdx !== -1) {
+            const oldPlatStatus = orders[existingIdx].platformStatus || '';
+            const newPlatStatus = orderData.platformStatus || (orderData.rawDetails?.returnStatus) || '';
+            const oldRetTrack = orders[existingIdx].returnTrack || '';
+            const newRetTrack = orderData.returnTrack || '';
+
             const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
-            if (changed) enrichedTableCount++;
+            if (changed) {
+              enrichedTableCount++;
+              let detailMsg = 'Cập nhật đơn trùng:';
+              if (oldPlatStatus !== newPlatStatus && newPlatStatus) {
+                detailMsg += ` Trạng thái sàn: [${oldPlatStatus || 'Chưa rõ'}] ➔ [${newPlatStatus}].`;
+              }
+              if (oldRetTrack !== newRetTrack && newRetTrack) {
+                detailMsg += ` Bổ sung MVĐ Hoàn [${newRetTrack}].`;
+              }
+              if (!detailMsg.includes('Trạng thái') && !detailMsg.includes('MVĐ')) {
+                detailMsg += ' Cập nhật hạn xử lý & dữ liệu chi tiết từ sàn.';
+              }
+              addAppNotification({
+                type: 'excel_update',
+                title: '🔄 Cập Nhật Trạng Thái Đơn #' + (existingIdx + 1),
+                detail: detailMsg,
+                code: orders[existingIdx].orderId || orders[existingIdx].track || cleanTrack,
+                orderIdx: existingIdx
+              });
+            }
           } else {
             let targetIdx = orders.length;
             if (orders.length > 0) {
@@ -5521,7 +5623,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.4.1';
+    const APP_VERSION_NUMBER = '1.5.0';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6317,6 +6419,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const zm = document.getElementById('zoomModal');
         if (zm && !zm.classList.contains('hidden')) {
           closeZoomModal();
+        }
+        const nm = document.getElementById('notificationModal');
+        if (nm && !nm.classList.contains('hidden')) {
+          closeNotificationModal();
         }
       }
       const dlg = document.getElementById('customDialogModal');
@@ -8848,6 +8954,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <option value="THẤT THU" ${curOrderType === 'THẤT THU' ? 'selected' : ''}>⚫ THẤT THU</option>
              </select>`;
 
+        const curPlatStatus = order.platformStatus || order.rawDetails?.returnStatus || order.rawDetails?.returnShippingStatus || (order.orderType === 'Giao không thành công' ? 'Đang chuyển hoàn' : order.orderType === 'Đơn hủy' ? 'Đã hủy đơn' : 'Chờ sàn cập nhật');
+        let platStatusBadgeClass = 'bg-slate-100 text-slate-800 border-slate-300';
+        const stLower = removeVietnameseTones(curPlatStatus).toLowerCase();
+        if (stLower.includes('cho ban xac nhan') || stLower.includes('cho phan hoi') || stLower.includes('khieu nai')) {
+          platStatusBadgeClass = 'bg-amber-100 text-amber-950 border-amber-300 font-extrabold';
+        } else if (stLower.includes('da hoan tien') || stLower.includes('hoan tien thanh cong')) {
+          platStatusBadgeClass = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
+        } else if (stLower.includes('giao hang hoan tra thanh cong') || stLower.includes('tra hang thanh cong')) {
+          platStatusBadgeClass = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
+        } else if (stLower.includes('van chuyen') || stLower.includes('chuyen hoan')) {
+          platStatusBadgeClass = 'bg-sky-100 text-sky-950 border-sky-300 font-medium';
+        } else if (stLower.includes('huy')) {
+          platStatusBadgeClass = 'bg-rose-100 text-rose-950 border-rose-300 font-medium';
+        } else if (stLower.includes('dong') || stLower.includes('that thu')) {
+          platStatusBadgeClass = 'bg-slate-800 text-slate-100 border-slate-700 font-medium';
+        }
+
+        const platformStatusLocked = Boolean(cellLocks[`${orderIdx}:platformStatus`]);
+        const platformStatusCellHtml = platformStatusLocked
+          ? `<div onclick="promptUnlockSingleCell('${orderIdx}:platformStatus','Trạng thái sàn Đơn #${orderIdx+1}')"
+                  oncontextmenu="handleCellContextMenu(event,'${orderIdx}:platformStatus','Trạng thái sàn Đơn #${orderIdx+1}')"
+                  title="Ô Trạng thái sàn đang khóa. Bấm để mở khóa!"
+                  class="flex items-center justify-center gap-1 px-1.5 py-0.5 rounded cursor-pointer font-bold text-[10.5px] border ${platStatusBadgeClass}">
+               <span class="truncate max-w-[130px]">${escapeAttr(curPlatStatus)}</span>
+               <span class="text-[10px] text-rose-500">🔒</span>
+             </div>`
+          : `<div class="w-full text-center font-bold text-[10.5px] py-0.5 px-1 rounded border transition shadow-2xs truncate cursor-default ${platStatusBadgeClass}"
+                  title="Trạng thái chi tiết từ sàn: ${escapeAttr(curPlatStatus)} (Bấm đúp để chỉnh sửa nếu cần)"
+                  ondblclick="promptEditPlatformStatus(${orderIdx})"
+                  oncontextmenu="handleCellContextMenu(event,'${orderIdx}:platformStatus','Trạng thái sàn Đơn #${orderIdx+1}')">
+               ${escapeAttr(curPlatStatus)}
+             </div>`;
+
         const preOrderLocked = Boolean(cellLocks[`${orderIdx}:preOrder`]);
         const isPreOrder = order.preOrder === 'Hàng đặt trước';
         const preOrderStyle = isPreOrder
@@ -9016,6 +9155,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="${recvTdClass}">${renderCellInput(`${orderIdx}:recvDate`, `Ngày & Giờ về kho đơn #${orderIdx+1}`, order.recvDate, 'text-center font-semibold text-emerald-800 text-[11px]', 'dd/mm/yyyy hh:mm:ss', `updateOrderField(${orderIdx},'recvDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'recvDate',this)`)}</td>
             <td class="text-center min-w-[105px] px-1">${platformCellHtml}</td>
             <td class="text-center min-w-[135px] px-1">${orderTypeCellHtml}</td>
+            <td class="text-center min-w-[150px] px-1">${platformStatusCellHtml}</td>
             <td class="text-center min-w-[110px] px-1">${preOrderCellHtml}</td>
             <td>${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
             <td>${trackCellHtml}</td>
@@ -9064,7 +9204,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (isDrawerOpen) {
           html += `
             <tr id="drawer_row_${orderIdx}" class="bg-indigo-50/40 border-y-2 border-indigo-200">
-              <td colspan="20" class="p-2.5 sm:p-3">
+              <td colspan="21" class="p-2.5 sm:p-3">
                 ${renderOrderItemsDrawer(order, orderIdx)}
               </td>
             </tr>
@@ -9080,7 +9220,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
              </div>`
           : `<div class="py-8 text-center text-slate-500 text-xs font-semibold">Không có đơn hàng nào khớp với bộ lọc hiện tại.</div>`;
-        html = `<tr><td colspan="20" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
+        html = `<tr><td colspan="21" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
       tbody.innerHTML = html;
       applyLockUI();
@@ -11485,6 +11625,258 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       list.insertAdjacentHTML('afterbegin', `<div class="py-0.5 border-b border-slate-800 flex justify-between"><span>${escapeAttr(text)}</span><span class="text-slate-400 ml-2">${nowStr}</span></div>`);
     }
 
+    // v1.5.0: TRUNG TÂM THÔNG BÁO & LỊCH SỬ CẬP NHẬT ĐƠN HÀNG TỰ ĐỘNG
+    const NOTIFICATIONS_STORAGE_KEY = 'shopee_app_notifications_v1';
+    let appNotifications = [];
+    let unreadNotifCount = 0;
+    let currentNotifFilter = 'all';
+
+    function loadAppNotifications() {
+      try {
+        const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+        if (raw) {
+          appNotifications = JSON.parse(raw);
+        } else {
+          appNotifications = [
+            {
+              id: 'init_1',
+              type: 'excel_import',
+              title: '📥 Khởi Tạo Hệ Thống Đối Soát',
+              detail: 'Hệ thống đã sẵn sàng theo dõi các lượt quét đơn từ điện thoại và nạp file cập nhật trạng thái sàn.',
+              code: '',
+              orderIdx: null,
+              time: Date.now(),
+              timeFormatted: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN')
+            }
+          ];
+        }
+      } catch (e) {
+        appNotifications = [];
+      }
+      updateUnreadNotifUI();
+    }
+
+    function saveAppNotifications() {
+      try {
+        if (appNotifications.length > 500) appNotifications.length = 500;
+        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(appNotifications));
+      } catch (e) {}
+      updateUnreadNotifUI();
+    }
+
+    function updateUnreadNotifUI() {
+      const badge = document.getElementById('unreadNotifBadge');
+      if (badge) {
+        badge.textContent = unreadNotifCount;
+        if (unreadNotifCount > 0) {
+          badge.classList.remove('hidden');
+          badge.classList.add('animate-pulse');
+        } else {
+          badge.classList.remove('animate-pulse');
+        }
+      }
+      const totalBadge = document.getElementById('notifTotalBadge');
+      if (totalBadge) totalBadge.textContent = appNotifications.length;
+    }
+
+    function addAppNotification(notif) {
+      const item = {
+        id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        type: notif.type || 'phone_scan', // 'phone_scan' | 'excel_update' | 'excel_import' | 'duplicate_scan' | 'unknown_scan'
+        title: notif.title || 'Thông Báo Mới',
+        detail: notif.detail || '',
+        code: notif.code || '',
+        orderIdx: typeof notif.orderIdx === 'number' ? notif.orderIdx : null,
+        time: Date.now(),
+        timeFormatted: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN')
+      };
+      appNotifications.unshift(item);
+      unreadNotifCount++;
+      saveAppNotifications();
+      renderNotificationList();
+    }
+
+    function openNotificationModal() {
+      unreadNotifCount = 0;
+      updateUnreadNotifUI();
+      const modal = document.getElementById('notificationModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      renderNotificationList();
+      const inp = document.getElementById('notifSearchInput');
+      if (inp) {
+        setTimeout(() => inp.focus(), 100);
+      }
+    }
+
+    function closeNotificationModal() {
+      const modal = document.getElementById('notificationModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function setNotifFilterCategory(cat) {
+      currentNotifFilter = cat;
+      ['all', 'phone', 'excel', 'warning'].forEach(c => {
+        const btn = document.getElementById('notifCatBtn_' + c);
+        if (btn) {
+          if (c === cat) {
+            btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-slate-900 text-white shadow-2xs cursor-pointer transition';
+          } else {
+            btn.className = 'px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition';
+          }
+        }
+      });
+      renderNotificationList();
+    }
+
+    function renderNotificationList() {
+      const container = document.getElementById('notificationItemsContainer');
+      if (!container) return;
+
+      const kw = (document.getElementById('notifSearchInput')?.value || '').trim().toLowerCase();
+      const normKw = removeVietnameseTones(kw);
+
+      let phoneCount = 0;
+      let excelCount = 0;
+      let warningCount = 0;
+
+      appNotifications.forEach(n => {
+        if (n.type === 'phone_scan') phoneCount++;
+        else if (n.type === 'excel_update' || n.type === 'excel_import') excelCount++;
+        else if (n.type === 'duplicate_scan' || n.type === 'unknown_scan') warningCount++;
+      });
+
+      const elAll = document.getElementById('notifCount_all');
+      if (elAll) elAll.textContent = appNotifications.length;
+      const elPhone = document.getElementById('notifCount_phone');
+      if (elPhone) elPhone.textContent = phoneCount;
+      const elExcel = document.getElementById('notifCount_excel');
+      if (elExcel) elExcel.textContent = excelCount;
+      const elWarn = document.getElementById('notifCount_warning');
+      if (elWarn) elWarn.textContent = warningCount;
+
+      let filtered = appNotifications.filter(item => {
+        // Category filter
+        if (currentNotifFilter === 'phone' && item.type !== 'phone_scan') return false;
+        if (currentNotifFilter === 'excel' && (item.type !== 'excel_update' && item.type !== 'excel_import')) return false;
+        if (currentNotifFilter === 'warning' && (item.type !== 'duplicate_scan' && item.type !== 'unknown_scan')) return false;
+
+        // Keyword filter (theo Mã đơn, MVĐ, tiêu đề hoặc nội dung)
+        if (kw) {
+          const hay = (item.title + ' ' + item.detail + ' ' + (item.code || '') + ' ' + (item.timeFormatted || '')).toLowerCase();
+          const normHay = removeVietnameseTones(hay);
+          return hay.includes(kw) || normHay.includes(normKw);
+        }
+        return true;
+      });
+
+      const countEl = document.getElementById('notifFilteredCountText');
+      if (countEl) countEl.textContent = `Hiển thị ${filtered.length} / ${appNotifications.length} thông báo`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="py-12 text-center text-slate-400 italic">
+            <span class="text-3xl block mb-2">📭</span>
+            Không có thông báo nào khớp với bộ lọc hiện tại.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        let badgeColor = 'bg-slate-200 text-slate-800 border-slate-300';
+        let icon = 'ℹ️';
+        if (item.type === 'phone_scan') {
+          badgeColor = 'bg-emerald-100 text-emerald-900 border-emerald-300';
+          icon = '📱';
+        } else if (item.type === 'excel_update') {
+          badgeColor = 'bg-indigo-100 text-indigo-900 border-indigo-300';
+          icon = '🔄';
+        } else if (item.type === 'excel_import') {
+          badgeColor = 'bg-sky-100 text-sky-900 border-sky-300';
+          icon = '📥';
+        } else if (item.type === 'duplicate_scan') {
+          badgeColor = 'bg-amber-100 text-amber-900 border-amber-300';
+          icon = '🚨';
+        } else if (item.type === 'unknown_scan') {
+          badgeColor = 'bg-rose-100 text-rose-900 border-rose-300';
+          icon = '⚠️';
+        }
+
+        const hasTarget = typeof item.orderIdx === 'number' && item.orderIdx >= 0 && item.orderIdx < orders.length;
+
+        return `
+          <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-start gap-2.5 min-w-0">
+              <span class="text-xl shrink-0 mt-0.5">${icon}</span>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="px-2 py-0.5 text-[10.5px] font-extrabold rounded-md border ${badgeColor}">
+                    ${escapeAttr(item.title)}
+                  </span>
+                  <span class="text-[11px] text-slate-400 font-mono font-medium">
+                    ⏱️ ${escapeAttr(item.timeFormatted)}
+                  </span>
+                  ${item.code ? `<span class="px-1.5 py-0.2 bg-slate-100 text-slate-800 rounded font-mono text-[11px] font-bold border border-slate-300">Mã: ${escapeAttr(item.code)}</span>` : ''}
+                </div>
+                <p class="text-xs text-slate-700 mt-1 font-medium leading-relaxed">
+                  ${item.detail}
+                </p>
+              </div>
+            </div>
+            ${hasTarget ? `
+              <div class="shrink-0 flex items-center justify-end">
+                <button type="button" onclick="locateOrderFromNotification(${item.orderIdx})"
+                        class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                        title="Tự động nhảy sang đúng tuần chứa đơn này và nháy xanh dòng đơn trên bảng">
+                  <span>🎯</span>
+                  <span>Định Vị Đơn</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function locateOrderFromNotification(orderIdx) {
+      closeNotificationModal();
+      setTimeout(() => {
+        highlightAndFlashOrderRow(orderIdx);
+      }, 100);
+    }
+
+    function clearAllNotifications() {
+      if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ lịch sử thông báo?')) return;
+      appNotifications = [];
+      unreadNotifCount = 0;
+      saveAppNotifications();
+      renderNotificationList();
+      showToast('🧹 Đã xóa toàn bộ lịch sử thông báo.', 'info');
+    }
+
+    function promptEditPlatformStatus(orderIdx) {
+      if (isLocked) {
+        alert('🔒 Bảng đang ở chế độ CHỈ XEM. Vui lòng mở khóa trước khi sửa!');
+        return;
+      }
+      const o = orders[orderIdx];
+      if (!o) return;
+      const cur = o.platformStatus || '';
+      const newVal = prompt(`Chỉnh sửa Trạng Thái Sàn cho Đơn #${orderIdx + 1} (${o.orderId || o.track}):\n(Ví dụ: Chờ bạn xác nhận, Đã hoàn tiền cho Người mua, Giao hàng hoàn trả thành công, Đang chuyển hoàn...)`, cur);
+      if (newVal !== null) {
+        o.platformStatus = newVal.trim();
+        addAuditLog('🔄 ĐỔI TRẠNG THÁI SÀN', `Đơn #${orderIdx + 1} (${o.orderId || o.track}): [${cur}] ➔ [${o.platformStatus}]`);
+        saveOrders();
+        renderAll(false);
+      }
+    }
+
     // v1.4.0: HỆ THỐNG FLOATING TOAST THÔNG BÁO HIỆN ĐẠI
     function showAppToast(msg, type = 'success', duration = 3200) {
       try {
@@ -11699,6 +12091,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
           playScanDuplicateTone(); recordCodeToActiveSession(cleanCode, existingIdx, true);
           sendAckToPhone(existingIdx + 1, cleanCode, '⚠️ ĐÃ TRẢ TỪ TRƯỚC (QUÉT TRÙNG)', 'duplicate', true, requestId, clientRoom);
+          addAppNotification({
+            type: 'duplicate_scan',
+            title: '🚨 Quét ĐT Trùng Lặp (Đã Trả Trước Đó)',
+            detail: `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} đã trả từ trước!`,
+            code: cleanCode,
+            orderIdx: existingIdx
+          });
           highlightAndFlashOrderRow(existingIdx, { isDuplicate: true, source: 'phone' });
           return;
         }
@@ -11721,6 +12120,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         playScanSuccessTone(); recordCodeToActiveSession(cleanCode, existingIdx, false);
         sendAckToPhone(existingIdx + 1, cleanCode, 'ĐÃ KHỚP ĐƠN #' + (existingIdx + 1) + ' (Hàng đã trả)', 'success', false, requestId, clientRoom);
         saveOrders();
+        addAppNotification({
+          type: 'phone_scan',
+          title: '📱 Quét ĐT Khớp Đơn #' + (existingIdx + 1),
+          detail: `Khớp mã [${cleanCode}] ➔ Chuyển sang [🟢 Hàng đã trả] lúc ${getNowDateTimeString()}`,
+          code: cleanCode,
+          orderIdx: existingIdx
+        });
         highlightAndFlashOrderRow(existingIdx, { isDuplicate: false, source: 'phone' });
         return;
       }
@@ -11757,6 +12163,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       appendPhoneLiveLog(`🟡 KHÔNG CÓ TRÊN HT: Mã [${cleanCode}] chưa có trong danh sách!`);
       playScanUnknownTone(); recordCodeToActiveSession(cleanCode, -1, false);
       sendAckToPhone(0, cleanCode, '⚠️ KHÔNG TÌM THẤY ĐƠN HÀNG TRÊN HỆ THỐNG!', 'not_found', false, requestId, clientRoom);
+      addAppNotification({
+        type: 'unknown_scan',
+        title: '⚠️ Quét ĐT Không Có Trên HT',
+        detail: `Mã [${cleanCode}] chưa có trong danh sách đơn hàng máy tính!`,
+        code: cleanCode,
+        orderIdx: null
+      });
     }
 
     // Parse OCR text of a shipping label -> Order ID, Product (matched with shop catalog), Color, Size, Qty

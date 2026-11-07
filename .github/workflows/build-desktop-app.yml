@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.4.1
+          name: QuanLyHangHoan-Windows-Installer-v1.5.0
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,28 +67,28 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.4.1
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.4.1 (Hộp Thoại In-App Thêm Tab Tuần 1-Click Chuẩn Xác 100% Cho Cả Desktop App & Web, Ghi Nhớ Tab Tuần & Lưu Trữ An Toàn)"
+          tag_name: v1.5.0
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.5.0 (Cột Trạng Thái Sàn, Trung Tâm Thông Báo & Tra Cứu Theo Mã Đơn/MVĐ, Định Vị Đơn 1-Click)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.4.1
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.5.0
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.4.1`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.4.1.exe`)
-            - **Các tính năng đột phá mới trong phiên bản v1.4.1**:
-              1. 📅 **Tab Phân Chia Số Lượng Đơn Theo Tuần Nạp File Excel (Weekly Import Tabs)**:
-                 - Tự động chia nhỏ số lượng đơn hàng theo từng tuần dựa trên **thời gian nạp file Excel vào máy tính** (không bị phụ thuộc vào ngày đặt hàng cũ).
-                 - Tự động sinh các tab tuần: `🌐 Tất cả các tuần`, `📅 Tuần 45 (02/11 - 08/11)`, `📅 Tuần 44`, kèm số lượng đơn và sản phẩm của từng tuần.
-                 - Bổ sung nút `➕ Thêm Tab Tuần` để tùy chọn số tuần hoặc khoảng ngày nạp theo ý muốn.
-              2. ⏱️ **Hiển Thị Đầy Đủ Ngày Giờ Nạp Đơn & Tên File Excel Nguồn Trong Chi Tiết**:
-                 - Bấm xem chi tiết đơn hàng (con mắt hoặc bấm đúp vào dòng): hiển thị thẻ nổi bật ghi rõ `Thời gian nạp file Excel: DD/MM/YYYY HH:mm:ss`, kèm `Tên file Excel nguồn` và `Tuần nạp file`.
-              3. 📌 **Ghim Hàng Tổng Cố Định Ở Đáy Bảng (Sticky Table Footer)**:
-                 - Dòng `TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN` (Tổng SL & Tổng Tiền) được ghim cố định ở đáy bảng cuộn (`sticky bottom-0`).
-                 - Dù cuộn xem 1000 đơn hàng ở bất kỳ vị trí nào, dòng tổng kết luôn luôn hiển thị trước mắt, không cần phải cuộn xuống tận đáy trang!
-              4. ⚡ **Chuyển Chế Độ Xem Bảng Thống Kê Phân Loại 1-Click (View Switcher Tabs)**:
-                 - Thanh chuyển đổi ngay trên đầu bảng: `[📋 Bảng Danh Sách Đơn Hàng]` và `[📊 Bảng Thống Kê Phân Loại (Màu & Size)]`.
-                 - Bấm tab là màn hình chuyển ngay sang Bảng Thống Kê Phân Loại 300+ SKU (Màu & Size) mà không cần cuộn trang một chút nào!
-              5. 📊 **Thanh Dock Thống Kê Cố Định Mép Dưới Màn Hình (Sticky Bottom Summary Dock)**:
-                 - Luôn hiển thị tổng số đơn, tổng SP, số lượng đã về kho, chênh lệch và giá trị hàng hoàn theo thời gian thực.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.5.0`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.5.0.exe`)
+            - **Các tính năng mới nổi bật trong phiên bản v1.5.0**:
+              1. 📊 **Bổ Sung Cột 'Trạng Thái Sàn' (Marketplace Status Column)**:
+                 - Cột dữ liệu mới hiển thị trực quan trạng thái từ Shopee/TikTok (Chờ bạn xác nhận, Đã hoàn tiền cho Người mua, Giao hàng hoàn trả thành công, Đang chuyển hoàn, Đơn hủy...).
+                 - Tự động nhận diện và gắn huy hiệu màu sắc thông minh (cảnh báo cam, thành công xanh...). Bấm đúp để chỉnh sửa nhanh.
+                 - Khi nạp các file Excel gối đầu ngày, hệ thống tự động cập nhật trạng thái sàn mới nhất mà vẫn bảo lưu 100% tình trạng nhận hàng kho thực tế của bạn.
+              2. 🔔 **Bảng Thông Báo & Lịch Sử Cập Nhật Đơn Hàng (Notification Center)**:
+                 - Nút chuông thông báo nổi bật màu hổ phách trên thanh tiêu đề kèm huy hiệu đếm số thông báo mới.
+                 - Tự động ghi nhận cả 2 nguồn thông tin quan trọng:
+                   * Lượt quét đơn từ xa bằng điện thoại: Khớp đơn, cảnh báo quét trùng lặp, mã lạ chưa có trên hệ thống.
+                   * Lượt nạp file Excel: Ghi rõ danh sách các đơn trùng lặp vừa được cập nhật trạng thái sàn hoặc bổ sung mã vận đơn hoàn mới.
+              3. 🔍 **Ô Tìm Kiếm Nhanh Bên Trong Bảng Thông Báo**:
+                 - Nhập Mã đơn hàng hoặc Mã vận đơn (MVĐ) để xem ngay lịch sử cập nhật của đơn cần xem siêu tốc.
+                 - Hỗ trợ các tab phân loại: Tất Cả, 📱 Quét ĐT, 🔄 Cập Nhật Excel, ⚠️ Trùng & Cảnh Báo.
+              4. 🎯 **Nút '🎯 Định Vị Đơn' 1-Click**:
+                 - Bấm trực tiếp trên từng mục thông báo để đóng modal, tự động chuyển sang đúng Tab tuần của đơn đó và kích hoạt hiệu ứng nháy xanh nổi bật định vị đơn hàng trên bảng.
           files: |
             dist/*.exe
         env:

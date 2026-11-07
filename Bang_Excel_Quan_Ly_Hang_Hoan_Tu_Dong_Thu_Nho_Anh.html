@@ -172,7 +172,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.7
+          🚀 Phiên bản v1.3.8
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -181,6 +181,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>💾 Tự lưu ổ cứng</span>
           <span class="text-[10px]">📁</span>
         </span>
+        <!-- Nút Trung Tâm Lưu Trữ An Toàn & Đóng Gói Tháng -->
+        <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
+              class="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-950 bg-emerald-200 hover:bg-emerald-300 border border-emerald-400 px-2.5 py-0.5 rounded-full cursor-pointer transition shadow-2xs select-none"
+              title="Trung tâm lưu trữ an toàn IndexedDB không giới hạn dung lượng, đóng gói lưu trữ theo tháng và sao lưu dự phòng">
+          <span>🛡️ Lưu Trữ An Toàn</span>
+          <span id="safeStorageCountBadge" class="bg-emerald-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">250 đơn</span>
+        </button>
       </div>
 
       <div class="flex flex-wrap items-center gap-1.5 no-print">
@@ -320,6 +327,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <div class="flex-1 min-w-0">
                   <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Xuất Toàn Bộ Đơn Hàng (.xlsx)</div>
                   <p class="text-[10.5px] text-slate-500 leading-snug">Xuất tất cả đơn (chờ về, đã về, bị mất) & bảng đối soát tổng hợp</p>
+                </div>
+              </button>
+
+              <button
+                onclick="closeAllHeaderMenus(); openSafeStorageModal();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-emerald-50 transition group cursor-pointer border border-emerald-300 bg-emerald-50/70"
+              >
+                <div class="w-7 h-7 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 font-bold text-xs shadow-xs">
+                  🛡️
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between">
+                    <span class="font-extrabold text-xs text-emerald-900 group-hover:text-emerald-950">Lưu Trữ An Toàn & Đóng Gói Tháng</span>
+                    <span class="text-[10px] bg-emerald-200 text-emerald-950 font-black px-1.5 py-0.2 rounded-full">IndexedDB</span>
+                  </div>
+                  <p class="text-[10.5px] text-emerald-800 font-medium leading-snug">Chống tràn bộ nhớ 5MB, bảo vệ dữ liệu vĩnh viễn & đóng gói tháng</p>
                 </div>
               </button>
 
@@ -496,7 +519,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.7</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.8</span>
               </div>
             </div>
           </div>
@@ -1933,6 +1956,177 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       <div class="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-end shrink-0">
         <button type="button" onclick="closeBatchSessionModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  
+  <!-- ========================================================================= -->
+  <!-- MODAL: TRUNG TÂM LƯU TRỮ AN TOÀN & ĐÓNG GÓI DỮ LIỆU THEO THÁNG (v1.3.8)  -->
+  <!-- ========================================================================= -->
+  <div id="safeStorageModal" onclick="closeSafeStorageModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border border-slate-300" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-emerald-800 via-teal-800 to-slate-900 text-white px-5 py-3.5 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-lg shadow-inner">
+            🛡️
+          </div>
+          <div>
+            <h2 class="text-sm sm:text-base font-extrabold tracking-wide uppercase flex items-center gap-2">
+              <span>Trung Tâm Lưu Trữ An Toàn & Đóng Gói Dữ Liệu</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-400 text-slate-950 uppercase shadow-2xs">IndexedDB v2</span>
+            </h2>
+            <p class="text-xs text-emerald-200 mt-0.5">
+              Bảo vệ dữ liệu không giới hạn dung lượng, tự động sao lưu 3 lớp và đóng gói đơn theo tháng
+            </p>
+          </div>
+        </div>
+        <button type="button" onclick="closeSafeStorageModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center text-sm font-bold transition cursor-pointer">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs">
+        <!-- Khối 1: 3 Lớp Bảo Vệ Dữ Liệu Song Song -->
+        <div class="bg-gradient-to-r from-emerald-50 via-teal-50 to-sky-50 border border-emerald-200 rounded-xl p-3.5 shadow-2xs space-y-2.5">
+          <div class="flex items-center justify-between border-b border-emerald-200/80 pb-2">
+            <span class="font-extrabold text-xs text-emerald-950 flex items-center gap-1.5 uppercase tracking-wide">
+              <span>🛡️ TRẠNG THÁI BẢO VỆ DỮ LIỆU: 3 LỚP AN TOÀN SONG SONG</span>
+            </span>
+            <span class="text-[11px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+              🟢 Hoạt động hoàn hảo
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+            <div class="bg-white rounded-lg p-2.5 border border-emerald-200 shadow-2xs">
+              <div class="font-bold text-emerald-900 flex items-center gap-1 mb-1">
+                <span>🗄️ Lớp 1: IndexedDB</span>
+                <span class="text-[9px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">Chính</span>
+              </div>
+              <p class="text-slate-600 leading-snug">Không giới hạn dung lượng (hàng trăm MB). Lưu 100% chi tiết đơn, sản phẩm & ảnh tem.</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-2.5 border border-emerald-200 shadow-2xs">
+              <div class="font-bold text-teal-900 flex items-center gap-1 mb-1">
+                <span>💾 Lớp 2: Ổ Cứng Máy Tính</span>
+                <span class="text-[9px] bg-teal-100 text-teal-800 px-1 rounded font-black">Vật lý</span>
+              </div>
+              <p class="text-slate-600 leading-snug">Lưu file <code class="font-mono text-slate-800 text-[10px]">du_lieu_hang_hoan.json</code> tại Documents\QuanLyHangHoan.</p>
+            </div>
+
+            <div class="bg-white rounded-lg p-2.5 border border-emerald-200 shadow-2xs">
+              <div class="font-bold text-slate-900 flex items-center gap-1 mb-1">
+                <span>⚡ Lớp 3: LocalStorage</span>
+                <span class="text-[9px] bg-slate-100 text-slate-700 px-1 rounded font-black">Tức thì</span>
+              </div>
+              <p class="text-slate-600 leading-snug">Bản tóm tắt nhẹ giúp mở bảng tức thì trong 0.05 giây mà không cần chờ nạp.</p>
+            </div>
+          </div>
+
+          <!-- Thông số dung lượng thực tế -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11.5px] font-bold text-slate-800">
+            <div>
+              📦 Tổng số đơn đang lưu: <span id="safeModalOrderCount" class="font-mono text-emerald-800 font-extrabold text-sm">0</span> đơn (<span id="safeModalQtyCount" class="font-mono text-emerald-900">0</span> SP)
+            </div>
+            <div>
+              📸 Tổng ảnh tem trong DB: <span id="safeModalPhotoCount" class="font-mono text-indigo-700 font-extrabold">0</span> ảnh
+            </div>
+            <div class="text-[11px] text-slate-500">
+              ⏱️ Lần lưu gần nhất: <span id="safeModalLastSaveTime" class="font-mono text-slate-700 font-semibold">Vừa xong</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Khối 2: ĐÓNG GÓI LƯU TRỮ THEO THÁNG (ARCHIVE BY MONTH) -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                <span>📦 ĐÓNG GÓI LƯU TRỮ THEO THÁNG (ARCHIVE)</span>
+              </h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                Tách dữ liệu của các tháng cũ ra file riêng để lưu trữ an toàn và dọn dẹp bảng cho nhẹ và mượt mà
+              </p>
+            </div>
+            <span class="text-[10px] bg-purple-100 text-purple-900 font-extrabold px-2 py-0.5 rounded-full">
+              Khuyên dùng định kỳ
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <label class="font-bold text-slate-700 whitespace-nowrap">Chọn tháng muốn đóng gói:</label>
+              <select id="archiveMonthSelect" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-slate-900 text-xs outline-none focus:border-indigo-500">
+                <!-- Dynamically populated months -->
+              </select>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="exportArchiveMonth(false)"
+                      class="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-lg font-bold text-xs transition flex items-center gap-1 shadow-2xs cursor-pointer">
+                <span>📥 Xuất File Lưu Trữ Tháng (.xlsx)</span>
+              </button>
+              <button type="button" onclick="exportArchiveMonth(true)"
+                      class="px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-bold text-xs transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                      title="Xuất file lưu trữ của tháng này vào máy tính, sau đó xóa các đơn của tháng này khỏi bảng chính để bảng luôn siêu nhẹ">
+                <span>✂️ Xuất File & Dọn Khỏi Bảng</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Khối 3: SAO LƯU DỰ PHÒNG & KHÔI PHỤC TOÀN DIỆN 1-CLICK -->
+        <div class="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs space-y-3">
+          <div class="border-b border-slate-100 pb-2">
+            <h3 class="font-extrabold text-xs text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+              <span>💾 SAO LƯU DỰ PHÒNG & KHÔI PHỤC TOÀN DIỆN 1-CLICK</span>
+            </h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">
+              Tải toàn bộ cơ sở dữ liệu (tất cả các đơn, hình ảnh, tab tuần, lịch sử sửa ô) về máy tính
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>💾 Tải File Sao Lưu Toàn Bộ</span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-snug">
+                Xuất file <code class="font-mono text-indigo-700">.json</code> chứa toàn bộ dữ liệu để cất vào Google Drive, USB hoặc gửi sang máy tính khác.
+              </p>
+              <button type="button" onclick="exportBackupJson()"
+                      class="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+                <span>💾 Tải Bản Sao Lưu (.json)</span>
+              </button>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>📂 Phục Hồi Dữ Liệu Từ File</span>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-snug">
+                Nạp lại dữ liệu từ file sao lưu cũ hoặc file đã đóng gói mà không sợ bị trùng lặp hay mất dữ liệu.
+              </p>
+              <label class="w-full py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+                <span>📂 Chọn File Sao Lưu Để Phục Hồi</span>
+                <input type="file" accept=".json" class="hidden" onchange="importBackupJson(event)" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-slate-500">
+          💡 Mẹo: Hệ thống tự động ghi nhớ tuần bạn đang xem ngay cả khi bạn tắt máy tính.
+        </span>
+        <button type="button" onclick="closeSafeStorageModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs cursor-pointer">
+          Đóng
+        </button>
       </div>
     </div>
   </div>
@@ -4812,7 +5006,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let currentRecvDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | '7days'
     let currentPlatformFilter = 'all'; // 'all' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'Khác'
     let currentOrderTypeFilter = 'all'; // 'all' | 'Giao không thành công' | 'Trả hàng/Hoàn tiền' | 'Đơn hủy' | 'THẤT THU'
-    let currentImportWeekFilter = 'all'; // 'all' or week key e.g. '2026-W45'
+    const SAVED_CUSTOM_WEEKS_KEY = 'shopee_excel_custom_week_tabs_v2';
+    const SAVED_ACTIVE_WEEK_KEY = 'shopee_excel_active_import_week_v2';
+
+    let savedCustomWeeks = [];
+    try {
+      const rawCustom = localStorage.getItem(SAVED_CUSTOM_WEEKS_KEY);
+      if (rawCustom) savedCustomWeeks = JSON.parse(rawCustom);
+    } catch (e) {}
+
+    let currentImportWeekFilter = 'all';
+    try {
+      const savedW = localStorage.getItem(SAVED_ACTIVE_WEEK_KEY);
+      if (savedW) currentImportWeekFilter = savedW;
+    } catch (e) {}
     let currentMainView = 'both'; // 'orders' | 'summary' | 'both'
     let customWeekTabs = [];
 
@@ -4848,6 +5055,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return { key, weekNum, year, label, monday, sunday, range: `${monStr} - ${sunStr}/${year}` };
     }
 
+    function getWeekInfoFromKey(weekKey) {
+      if (!weekKey || weekKey === 'all') return { key: 'all', label: 'Tất cả các tuần', range: '' };
+      const match = String(weekKey).match(/^(\d{4})-W(\d{2})$/);
+      if (!match) return { key: weekKey, label: weekKey, range: '' };
+      const year = parseInt(match[1], 10);
+      const weekNum = parseInt(match[2], 10);
+
+      const jan4 = new Date(year, 0, 4);
+      const jan4Day = jan4.getDay();
+      const startOfW1 = new Date(jan4);
+      startOfW1.setDate(jan4.getDate() - (jan4Day === 0 ? 6 : jan4Day - 1));
+      startOfW1.setHours(0, 0, 0, 0);
+
+      const monday = new Date(startOfW1.getTime() + (weekNum - 1) * 7 * 86400000);
+      const sunday = new Date(monday.getTime() + 6 * 86400000);
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const monStr = `${pad(monday.getDate())}/${pad(monday.getMonth() + 1)}`;
+      const sunStr = `${pad(sunday.getDate())}/${pad(sunday.getMonth() + 1)}`;
+      return {
+        key: weekKey,
+        weekNum: weekNum,
+        year: year,
+        label: `Tuần ${weekNum} (${monStr} - ${sunStr})`,
+        monday,
+        sunday,
+        range: `${monStr} - ${sunStr}/${year}`
+      };
+    }
+
     function getOrderImportWeek(order) {
       if (!order) return getWeekInfo(new Date()).key;
       if (order.importWeek) return order.importWeek;
@@ -4865,6 +5102,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setImportWeekFilter(weekKey) {
       currentImportWeekFilter = weekKey;
+      try {
+        localStorage.setItem(SAVED_ACTIVE_WEEK_KEY, weekKey);
+      } catch (e) {}
       currentPage = 1;
       renderWeeklyImportTabs();
       recalcTotalsAndSummary();
@@ -4880,6 +5120,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let totalOrdersAllWeeks = orders.length;
       let totalQtyAllWeeks = 0;
 
+      // 1. Thu thập tuần từ các đơn hàng thực tế
       orders.forEach(o => {
         const wKey = getOrderImportWeek(o);
         const wInfo = getWeekInfo(o.importedAt || new Date());
@@ -4888,7 +5129,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             key: wKey,
             label: wInfo.label,
             orderCount: 0,
-            qtyCount: 0
+            qtyCount: 0,
+            isCustom: false
           });
         }
         const item = weekMap.get(wKey);
@@ -4899,6 +5141,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         item.qtyCount += q;
         totalQtyAllWeeks += q;
       });
+
+      // 2. Luôn hiển thị các Tab tuần đã được người dùng tạo chủ động (kể cả khi chưa có đơn nào)
+      if (Array.isArray(savedCustomWeeks)) {
+        savedCustomWeeks.forEach(wKey => {
+          if (!weekMap.has(wKey)) {
+            const wInfo = getWeekInfoFromKey(wKey);
+            weekMap.set(wKey, {
+              key: wKey,
+              label: wInfo.label,
+              orderCount: 0,
+              qtyCount: 0,
+              isCustom: true
+            });
+          }
+        });
+      }
+
+      // 3. Nếu tab tuần đang chọn không thuộc orders hay custom, vẫn phải vẽ ra để người dùng thấy
+      if (currentImportWeekFilter !== 'all' && !weekMap.has(currentImportWeekFilter)) {
+        const wInfo = getWeekInfoFromKey(currentImportWeekFilter);
+        weekMap.set(currentImportWeekFilter, {
+          key: currentImportWeekFilter,
+          label: wInfo.label,
+          orderCount: 0,
+          qtyCount: 0,
+          isCustom: true
+        });
+      }
 
       const sortedWeeks = Array.from(weekMap.values()).sort((a, b) => b.key.localeCompare(a.key));
 
@@ -4919,31 +5189,52 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sortedWeeks.forEach(w => {
         const isActive = (currentImportWeekFilter === w.key);
         html += `
-          <button type="button" onclick="setImportWeekFilter('${w.key}')"
-                  class="px-2.5 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                    isActive
-                      ? 'bg-purple-700 text-white shadow-xs ring-2 ring-purple-300 font-extrabold'
-                      : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
-                  }">
-            <span>📅 ${w.label}</span>
-            <span class="text-[10px] px-1.5 py-0.2 rounded-full ${
-              isActive ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-900'
-            }">${w.orderCount} đơn (${w.qtyCount} SP)</span>
-          </button>
+          <div class="inline-flex items-center rounded-lg border transition shadow-2xs ${
+            isActive
+              ? 'bg-purple-700 text-white shadow-xs ring-2 ring-purple-300 border-purple-800'
+              : 'bg-white text-purple-900 hover:bg-purple-50 border-purple-200'
+          }">
+            <button type="button" onclick="setImportWeekFilter('${w.key}')"
+                    class="px-2.5 py-1 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+              <span>📅 ${w.label}</span>
+              <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                isActive ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-900'
+              }">${w.orderCount} đơn (${w.qtyCount} SP)</span>
+            </button>
+            ${(w.isCustom && w.orderCount === 0) ? `
+              <button type="button" onclick="removeCustomWeekTab('${w.key}')"
+                      class="pr-2 pl-1 py-1 text-[11px] opacity-70 hover:opacity-100 hover:text-rose-300 cursor-pointer"
+                      title="Xóa tab tuần trống này">✕</button>
+            ` : ''}
+          </div>
         `;
       });
 
       container.innerHTML = html;
     }
 
+    function removeCustomWeekTab(weekKey) {
+      savedCustomWeeks = savedCustomWeeks.filter(k => k !== weekKey);
+      try {
+        localStorage.setItem(SAVED_CUSTOM_WEEKS_KEY, JSON.stringify(savedCustomWeeks));
+      } catch (e) {}
+      if (currentImportWeekFilter === weekKey) {
+        setImportWeekFilter('all');
+      } else {
+        renderWeeklyImportTabs();
+      }
+    }
+
     function promptCreateCustomWeekTab() {
       const nowInfo = getWeekInfo(new Date());
+      const nextWeekNum = nowInfo.weekNum + 1;
       const choice = prompt(
-        `📅 TẠO HOẶC CHỌN TAB TUẦN NẠP FILE EXCEL:\n\n` +
-        `• Nhập số tuần muốn xem (Ví dụ: 45 hoặc 44):\n` +
-        `• Hiện tại là: ${nowInfo.label}\n\n` +
-        `Nhập số tuần:`,
-        nowInfo.weekNum
+        `📅 TẠO THÊM TAB TUẦN NẠP FILE EXCEL:\n\n` +
+        `• Hệ thống sẽ tạo ngay một Tab Tuần mới trên thanh công cụ để bạn phân chia đơn.\n` +
+        `• Tuần hiện tại là: ${nowInfo.label}\n` +
+        `• Gợi ý: Gõ ${nextWeekNum} để tạo Tab Tuần tới (Tuần ${nextWeekNum})\n\n` +
+        `Nhập số tuần bạn muốn tạo (từ 1 đến 53):`,
+        nextWeekNum <= 53 ? nextWeekNum : nowInfo.weekNum
       );
       if (!choice) return;
       const wNum = parseInt(choice.trim(), 10);
@@ -4953,7 +5244,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       const year = new Date().getFullYear();
       const targetKey = `${year}-W${String(wNum).padStart(2, '0')}`;
+
+      if (!savedCustomWeeks.includes(targetKey)) {
+        savedCustomWeeks.push(targetKey);
+        try {
+          localStorage.setItem(SAVED_CUSTOM_WEEKS_KEY, JSON.stringify(savedCustomWeeks));
+        } catch (e) {}
+      }
+
       setImportWeekFilter(targetKey);
+      const wInfo = getWeekInfoFromKey(targetKey);
+      alert(`✅ ĐÃ TẠO VÀ CHUYỂN SANG TAB TUẦN MỚI THÀNH CÔNG!\n\n📅 ${wInfo.label}\n\n• Tab này đã được ghim hiển thị ngay trên thanh công cụ.\n• Khi bạn thoát ra và vào lại, hệ thống vẫn sẽ lưu lại tab tuần này cho bạn!`);
     }
 
     function switchMainView(viewMode) {
@@ -5022,7 +5323,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.7';
+    const APP_VERSION_NUMBER = '1.3.8';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -5061,11 +5362,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới & Nâng cấp nổi bật trong ${curVer}:\n` +
-        `1. 📐 Giao Diện Tự Thích Nghi Toàn Màn Hình (Responsive Full-Width): Xóa bỏ khoảng trống thừa 2 bên mép màn hình, bảng tự co giãn 100% full-width trên mọi màn hình máy tính.\n` +
-        `2. ➖ Gộp Thanh Phân Loại Sàn & Nút Thao Tác Về 1 Hàng Duy Nhất: Toàn bộ nút phân loại sàn và nút nạp đơn Shopee/TikTok được tối ưu nằm gọn trên 1 hàng duy nhất.\n` +
-        `3. 📑 Tự Động Đóng Chi Tiết Đơn Khi Mở Đơn Khác (Single Accordion): Bấm xem chi tiết đơn nào thì các đơn trước tự động thu gọn lại, tránh làm dài bảng.\n` +
-        `4. 🔒 Khóa Bảng Bảo Mật Tuyệt Đối Khi Nhập Đơn: Chỉ được phép nạp đơn khi đang ở trạng thái [🔓 Đang Mở Khóa]; khi đang khóa sẽ chặn hoàn toàn.\n` +
-        `5. ⌨️ Lịch Sử Chỉnh Sửa Ô Chỉ Ghi Khi Nhấn Enter Hoặc Rời Ô (Blur): Không còn ghi log từng ký tự khi đang gõ phím, chỉ lưu lịch sử khi chốt dữ liệu bằng Enter hoặc click ra ngoài.`
+        `1. 🛡️ Trung Tâm Lưu Trữ An Toàn Đa Tầng (IndexedDB Unlimited): Không còn nỗi lo tràn bộ nhớ 5MB của trình duyệt. Tự động lưu trữ song song 3 lớp (IndexedDB không giới hạn + Ổ cứng máy tính + LocalStorage).\n` +
+        `2. 📦 Đóng Gói Dữ Liệu Theo Tháng (Monthly Archive): Cho phép bạn xuất toàn bộ đơn của các tháng cũ ra file riêng và dọn dẹp khỏi bảng để ứng dụng luôn siêu nhẹ và nhanh như mới.\n` +
+        `3. 📅 Ghi Nhớ Tab Tuần Khi Thoát Ra: Khi bạn chọn bất kỳ Tab tuần nào (Ví dụ Tuần 45), hệ thống tự động ghi nhớ và mở lại đúng tab đó khi bạn vào lại máy tính.\n` +
+        `4. ➕ Thêm Tab Tuần Chủ Động & Hiển Thị Ngay Lập Tức: Bấm "Thêm Tab Tuần" sẽ tạo ngay tab tuần mới (ví dụ Tuần 46 tới) hiển thị trực tiếp trên thanh công cụ với số lượng đơn thực tế.\n` +
+        `5. ⌨️ Chống Trùng Lặp Lịch Sử Ô & Accordion Đơn Gọn Gàng.`
       );
     }
 
@@ -6581,6 +6882,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
       sanitizeNumericColorCodes();
+      updateSafeStorageHeaderBadge();
+      loadOrdersFromSafeStore().then(safeRes => {
+        if (safeRes && Array.isArray(safeRes.data) && safeRes.data.length > orders.length) {
+          console.log('Khôi phục dữ liệu an toàn từ IndexedDB Safe Store, số đơn:', safeRes.data.length);
+          orders = safeRes.data;
+          renderAll();
+          updateSafeStorageHeaderBadge();
+        }
+      }).catch(() => {});
     }
 
     // Nhận diện câu lý do hủy/hoàn/khiếu nại hoặc thông báo giao hàng thất bại
@@ -6773,6 +7083,219 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
+    
+    // =========================================================================
+    // v1.3.8: INDEXEDDB UNLIMITED ORDERS SAFE STORE (BẢO VỆ DỮ LIỆU ĐA LỚP)
+    // =========================================================================
+    const SAFE_STORE_DB_NAME = 'ShopeeReturnSafeStoreDB_v1';
+    const ORDERS_STORE_NAME = 'orders_data';
+    let safeStoreDbInstance = null;
+
+    function openSafeStoreDb() {
+      return new Promise((resolve) => {
+        if (safeStoreDbInstance) return resolve(safeStoreDbInstance);
+        if (!window.indexedDB) return resolve(null);
+        try {
+          const req = indexedDB.open(SAFE_STORE_DB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(ORDERS_STORE_NAME)) {
+              db.createObjectStore(ORDERS_STORE_NAME, { keyPath: 'key' });
+            }
+          };
+          req.onsuccess = (e) => {
+            safeStoreDbInstance = e.target.result;
+            resolve(safeStoreDbInstance);
+          };
+          req.onerror = () => resolve(null);
+        } catch (err) {
+          resolve(null);
+        }
+      });
+    }
+
+    function saveOrdersToSafeStore(ordersList) {
+      if (!ordersList || !Array.isArray(ordersList)) return Promise.resolve(false);
+      return openSafeStoreDb().then(db => {
+        if (!db) return false;
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(ORDERS_STORE_NAME, 'readwrite');
+            const store = tx.objectStore(ORDERS_STORE_NAME);
+            store.put({
+              key: 'current_orders',
+              data: ordersList,
+              savedAt: new Date().toISOString(),
+              count: ordersList.length
+            });
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+          } catch (e) {
+            resolve(false);
+          }
+        });
+      });
+    }
+
+    function loadOrdersFromSafeStore() {
+      return openSafeStoreDb().then(db => {
+        if (!db) return null;
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(ORDERS_STORE_NAME, 'readonly');
+            const store = tx.objectStore(ORDERS_STORE_NAME);
+            const req = store.get('current_orders');
+            req.onsuccess = () => {
+              if (req.result && Array.isArray(req.result.data)) {
+                resolve(req.result);
+              } else {
+                resolve(null);
+              }
+            };
+            req.onerror = () => resolve(null);
+          } catch (e) {
+            resolve(null);
+          }
+        });
+      });
+    }
+
+    function updateSafeStorageHeaderBadge() {
+      const badge = document.getElementById('safeStorageCountBadge');
+      if (badge && orders) {
+        badge.textContent = `${orders.length} đơn`;
+      }
+    }
+
+    function openSafeStorageModal() {
+      const modal = document.getElementById('safeStorageModal');
+      if (!modal) return;
+
+      const orderCountEl = document.getElementById('safeModalOrderCount');
+      const qtyCountEl = document.getElementById('safeModalQtyCount');
+      const photoCountEl = document.getElementById('safeModalPhotoCount');
+      const timeEl = document.getElementById('safeModalLastSaveTime');
+
+      const totalQty = orders.reduce((acc, o) => {
+        const q = (Array.isArray(o.items) && o.items.length)
+          ? o.items.reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0)
+          : (parseInt(o.qty, 10) || 1);
+        return acc + q;
+      }, 0);
+
+      if (orderCountEl) orderCountEl.textContent = orders.length;
+      if (qtyCountEl) qtyCountEl.textContent = totalQty;
+      if (photoCountEl) photoCountEl.textContent = photoMemoryCache.size;
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('vi-VN');
+
+      // Populate month selection for Archive
+      const monthSelect = document.getElementById('archiveMonthSelect');
+      if (monthSelect) {
+        const monthMap = new Map();
+        orders.forEach(o => {
+          const d = parseDateParts(o.recvDate) || parseDateParts(o.returnDate) || parseDateParts(o.shipDate) || (o.importedAt ? new Date(o.importedAt) : new Date());
+          if (d) {
+            const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const mLabel = `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+            if (!monthMap.has(mKey)) {
+              monthMap.set(mKey, { key: mKey, label: mLabel, count: 0 });
+            }
+            monthMap.get(mKey).count++;
+          }
+        });
+
+        const sortedMonths = Array.from(monthMap.values()).sort((a, b) => b.key.localeCompare(a.key));
+        if (sortedMonths.length === 0) {
+          monthSelect.innerHTML = '<option value="">(Chưa có đơn hàng nào)</option>';
+        } else {
+          monthSelect.innerHTML = sortedMonths.map(m => `<option value="${m.key}">${m.label} (${m.count} đơn)</option>`).join('');
+        }
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeSafeStorageModal() {
+      const modal = document.getElementById('safeStorageModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    // ĐÓNG GÓI LƯU TRỮ THEO THÁNG (ARCHIVE)
+    async function exportArchiveMonth(shouldDelete = false) {
+      const select = document.getElementById('archiveMonthSelect');
+      const targetMonthKey = select ? select.value : '';
+      if (!targetMonthKey) {
+        alert('⚠️ Vui lòng chọn một tháng để đóng gói lưu trữ!');
+        return;
+      }
+
+      const [yearStr, monthStr] = targetMonthKey.split('-');
+      const y = parseInt(yearStr, 10);
+      const m = parseInt(monthStr, 10);
+
+      const monthOrders = orders.filter(o => {
+        const d = parseDateParts(o.recvDate) || parseDateParts(o.returnDate) || parseDateParts(o.shipDate) || (o.importedAt ? new Date(o.importedAt) : null);
+        if (!d) return false;
+        return d.getFullYear() === y && (d.getMonth() + 1) === m;
+      });
+
+      if (monthOrders.length === 0) {
+        alert(`⚠️ Không tìm thấy đơn hàng nào trong Tháng ${m}/${y} để đóng gói!`);
+        return;
+      }
+
+      if (shouldDelete && !(await requireUnlocked('Đóng gói và dọn dẹp đơn theo tháng'))) {
+        return;
+      }
+
+      // Xuất file Excel hoàn chỉnh của tháng đó
+      const wb = XLSX.utils.book_new();
+      const flatRows = [];
+      monthOrders.forEach((o, oIdx) => {
+        (o.items || [{ product: '', color: '', size: '', qty: 1 }]).forEach((it, itIdx) => {
+          flatRows.push({
+            'STT': itIdx === 0 ? (oIdx + 1) : `↳ SP ${itIdx + 1}`,
+            'Ngày & Giờ Về Kho': o.recvDate || '',
+            'Sàn TMĐT': getOrderPlatform(o),
+            'Loại Đơn': getOrderType(o),
+            'Mã Đơn Hàng': o.orderId || '',
+            'Mã Vận Đơn': o.track || '',
+            'ĐVVC': o.carrier || '',
+            'Tên Sản Phẩm': it.product || '',
+            'Màu Sắc': it.color || '',
+            'Size': it.size || '',
+            'Số Lượng': Number(it.qty) || 0,
+            'Tổng Giá Trị (VNĐ)': itIdx === 0 ? (Number(o.price) || 0) : 0,
+            'Trạng Thái Nhận': o.status || 'Chưa trả',
+            'Lý Do Hoàn': o.note || '',
+            'Ghi Chú': o.buyerNote || '',
+            'Tuần Nạp File': o.importWeek || ''
+          });
+        });
+      });
+
+      const ws = XLSX.utils.json_to_sheet(flatRows);
+      XLSX.utils.book_append_sheet(wb, ws, `Luu_Tru_Thang_${m}_${y}`);
+      const fileName = `Luu_Tru_Hang_Hoan_Thang_${m}_${y}_${monthOrders.length}_don.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      if (shouldDelete) {
+        const ok = await appConfirm(
+          `File lưu trữ [ ${fileName} ] đã được tải về máy tính thành công!\n\nBạn có chắc muốn dọn dẹp ${monthOrders.length} đơn hàng của Tháng ${m}/${y} khỏi bảng chính để bảng luôn nhẹ?\n(Bạn luôn có thể xem lại file Excel vừa tải hoặc nạp lại bất cứ lúc nào).`,
+          `Xác Nhận Dọn Dẹp Đơn Tháng ${m}/${y}`
+        );
+        if (ok) {
+          orders = orders.filter(o => !monthOrders.includes(o));
+          saveOrders(true);
+          renderAll();
+          openSafeStorageModal();
+          alert(`✅ ĐÃ ĐÓNG GÓI & DỌN DẸP THÀNH CÔNG!\n\nĐã lưu trữ an toàn và dọn ${monthOrders.length} đơn của Tháng ${m}/${y}. Bảng chính hiện còn ${orders.length} đơn hàng siêu mượt mà!`);
+        }
+      } else {
+        alert(`✅ ĐÃ XUẤT FILE LƯU TRỮ THÁNG ${m}/${y} THÀNH CÔNG!\n\nTên file: ${fileName}\nTổng số đơn lưu trữ: ${monthOrders.length} đơn.`);
+      }
+    }
+
     function flushPersistOrdersToDiskAndStorage() {
       if (diskPersistDebounceTimer) {
         clearTimeout(diskPersistDebounceTimer);
@@ -6795,6 +7318,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return o;
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(leanOrders));
+        saveOrdersToSafeStore(orders);
+        updateSafeStorageHeaderBadge();
 
         // 2. Lưu trực tiếp vào file vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan\du_lieu_hang_hoan.json)
         // Kèm đầy đủ hình ảnh chụp từ điện thoại để lưu trữ vĩnh viễn trên ổ cứng!

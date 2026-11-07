@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.0
+          name: QuanLyHangHoan-Windows-Installer-v1.6.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,28 +67,35 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.0 (Hạn Cần Xử Lý Báo Vàng 2 Ngày / Báo Đỏ 3 Ngày Theo Giờ Phút, Ô Tích Chọn Xóa Nhiều Đơn & Bảng Theo Dõi Đơn Hàng)"
+          tag_name: v1.6.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.1 (Tối Ưu Tinh Gọn Giao Diện 4 Tầng, Sắp Xếp Hạn Cần Xử Lý Thông Minh, Tự Bỏ Chọn Sau Theo Dõi & Dọn Đơn Đã Về)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.5.2
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.1
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.5.2`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.5.2.exe`)
-            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.5.2**:
-              1. ⏱️ **Hiển Thị Đầy Đủ Ngày Và Giờ Phút Theo File Nhập Cho Từng Cột**:
-                 - Nâng cấp bộ giải mã ngày giờ từ file Excel (Shopee, TikTok Shop, Salework): Giữ lại trọn vẹn cả Ngày và Giờ:phút:giây (`DD/MM/YYYY HH:mm:ss`).
-                 - Cả 3 cột thời gian trọng yếu: `Ngày Gửi Đi`, `Ngày Hoàn / Hủy`, và `Ngày & Giờ Về Kho` đều hiển thị đầy đủ, sắc nét, không còn bị cắt cụt mất phần giờ phút.
-                 - Tự động mở rộng độ rộng cột vừa vặn và hỗ trợ gõ chỉnh sửa nhanh (`DD/MM/YYYY HH:mm`).
-              2. 🔍 **Bộ Lọc Nhanh Ngày & Giờ Đa Năng (Từ Ngày - Đến Ngày, Từ Giờ - Đến Giờ)**:
-                 - Lọc linh hoạt theo 2 chế độ:
-                   * **Kết hợp cùng ngày**: Chọn Từ ngày X đến ngày Y và Từ giờ A đến giờ B (ví dụ: ngày 05/11 đến 06/11 trong khung giờ 06:00 - 18:00).
-                   * **Lọc giờ độc lập**: Bỏ trống ô ngày, chỉ chọn Từ giờ A đến giờ B để lọc các đơn phát sinh trong khung giờ đó trên toàn bộ mọi ngày (ví dụ: lọc ca sáng 06h - 18h).
-                 - Tùy chọn mốc thời gian lọc: Ngày hoàn/hủy (mặc định), Ngày về kho, Ngày gửi đi, hoặc Mọi mốc.
-                 - Các phím tắt nhanh preset: Hôm nay, Hôm qua, 7 ngày, Ca Sáng (06h - 18h), Ca Tối (18h - 06h). Nút `✕` xóa lọc tiện lợi.
-              3. 🧹 **Làm Sạch 100% Lịch Sử Chỉnh Sửa Ô Khi Reset Đơn**:
-                 - Đã xử lý triệt để việc xóa sạch lịch sử ô cũ khi bấm "🗑️ Xóa Hết Đơn Hiện Tại", kèm nút "Xóa Lịch Sử Ô Này" chủ động.
-              4. 📊 **Cột Trạng Thái Sàn & Trung Tâm Thông Báo Đơn Hàng**:
-                 - Đầy đủ tính năng v1.5.0: cột Trạng Thái Sàn, Trung tâm thông báo có ô tìm kiếm theo Mã đơn/MVĐ, và nút `🎯 Định Vị Đơn` 1-Click.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.1`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.1.exe`)
+            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.1**:
+              1. 🎨 **Tối Ưu Tinh Gọn Giao Diện 4 Tầng Chuẩn Mực**:
+                 - Tối ưu gom 7 thanh xếp chồng cồng kềnh trước đây xuống còn **4 tầng điều khiển cực kỳ thông thoáng, đẳng cấp**, giải phóng thêm 50% diện tích để hiển thị bảng đơn hàng.
+                 - Tầng 1 (Top Bar đỏ): Gom logo, phiên bản v1.6.1, 1 badge lưu an toàn duy nhất và nhóm nút thao tác chính trên 1 hàng thẳng tắp.
+                 - Tầng 2 (Điều hướng tổng): Gộp Tuần nạp, Sàn TMĐT (segmented buttons phẳng hiện đại), Chế độ xem bảng (chuyển lên đây loại bỏ hẳn hàng đen cũ), Phân tích & Ca nhận.
+                 - Tầng 3 (Tìm kiếm & Pipeline): Ô tìm nhanh viền cam nổi bật + 7 Tab Pipeline trạng thái có màu sắc tương phản cao + Nút Xuất Đơn Đã Về.
+                 - Tầng 4 (Bộ lọc chi tiết & Phân trang): Loại đơn, Trước/Thường, MVĐ, Sắp xếp ngày & hạn xử lý, Lọc ngày giờ đa năng thu gọn và thanh phân trang.
+              2. 🚨 **Sắp Xếp Cột Hạn Cần Xử Lý Thông Minh**:
+                 - Sắp xếp ưu tiên độ khẩn cấp: Báo Đỏ (+3 ngày) ➔ Báo Vàng (2 ngày) ➔ Trong hạn ➔ Đã nhận / K.cần nhận.
+                 - Đơn có số giờ trôi qua nhiều nhất luôn được nổi lên trên đầu khi chọn sắp xếp giảm dần.
+              3. 🛡️ **Loại Bỏ Lỗi Báo Đỏ Oan Cho Đơn Mới Gửi**:
+                 - Chỉ tính hạn hủy khi đơn hàng thực sự có Ngày Hủy/Hoàn. Không còn fallback sang Ngày Gửi Đi để báo quá hạn oan.
+              4. 🔒 **Tự Động Bỏ Chọn Sau Khi Thêm Vào Theo Dõi**:
+                 - Sau khi bấm "⭐ Thêm Vào Theo Dõi", hệ thống tự động bỏ chọn toàn bộ checkbox và ẩn thanh công cụ nổi, ngăn chặn hoàn toàn nguy cơ bấm nhầm nút Xóa Các Đơn Đã Chọn.
+              5. 📅 **Tự Động Xóa Lựa Chọn Khi Chuyển Tab Tuần / Đổi Sàn**:
+                 - Chống lưu vết selection ngầm giữa các tuần nạp khác nhau, bảo vệ an toàn dữ liệu tuyệt đối.
+              6. 📌 **Cố Định Vị Trí Cột Sticky (Checkbox & STT)**:
+                 - Cột Checkbox và cột STT luôn được ghim cố định ở mép trái màn hình khi cuộn ngang 22 cột, giúp tích chọn cực nhanh.
+              7. ✨ **Nút "Dọn Đơn Đã Về Kho" Trong Bảng Theo Dõi**:
+                 - 1-Click tự động gỡ theo dõi toàn bộ các đơn đã quét nhận về kho an toàn, giữ lại các đơn chưa nhận hoặc quá hạn.
+              8. 💡 **Điều Hướng Thông Minh Khi Chọn Tab Tuần 0 Đơn**:
+                 - Hiển thị nút bấm gợi ý nhảy nhanh sang tuần có dữ liệu hoặc Xem Tất Cả Các Tuần.
           files: |
             dist/*.exe
         env:

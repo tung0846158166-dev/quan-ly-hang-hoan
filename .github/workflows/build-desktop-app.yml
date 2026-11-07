@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.2
+          name: QuanLyHangHoan-Windows-Installer-v1.2.3
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,23 +66,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.2
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.2 (Giao Diện Tinh Gọn & Tối Ưu Chống Lag Khi Nhiều Đơn / Ảnh)"
+          tag_name: v1.2.3
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.3 (Nạp Chuẩn 100% File Xuất Salework / TikTok Shop / Shopee & Đơn Nhiều Sản Phẩm)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.2
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.3
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.2`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.2.exe`)
-            - **Điểm nâng cấp & tối ưu trong v1.2.2**:
-              1. 🎨 **Thu gọn thanh công cụ & gom nhóm nút chức năng gọn gàng**:
-                 - Chỉ giữ lại **3 nút thao tác chính** ở ngoài (`📱 Quét Bằng ĐT`, `➕ Thêm Đơn`, `🔓 Đang Mở Khóa`).
-                 - Gom toàn bộ các công cụ phụ vào **2 menu thả xuống gọn gàng**: `📂 Nhập / Xuất Dữ Liệu ▾` và `⚙️ Hệ Thống ▾`.
-                 - Thu gọn chiều cao **Ô Tìm Kiếm Nhanh** và **4 ô thống kê tổng SL** xuống còn 1 dòng mỏng (`28px`), ẩn thanh mẹo tĩnh khi không tìm kiếm.
-                 - Gộp các nút lọc sàn, sắp xếp ngày, lọc mốc ngày và phân trang vào **1 hàng duy nhất**, giúp phần bảng dữ liệu đơn hàng rộng rãi hơn rất nhiều.
-              2. ⚡ **Triệt tiêu hiện tượng lag khi hiển thị nhiều đơn & nhiều ảnh chụp**:
-                 - Chuyển cơ chế ghi file ổ cứng trong `main.js` sang **Bất đồng bộ hoàn toàn (`fs.promises.writeFile` + Queue)** kết hợp **Debounce 300ms**, không bao giờ làm khựng giao diện khi quét liên tục hoặc sửa đơn.
-                 - Tối ưu hiển thị ảnh đơn hàng với `loading="lazy" decoding="async"` và CSS `content-visibility: auto`.
-                 - Mặc định phân trang **50 đơn/trang (Siêu mượt)** và tách riêng việc cập nhật số liệu tức thì (0ms) với việc vẽ lại bảng tổng kết 300+ SKU phía dưới.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.3`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.3.exe`)
+            - **Điểm nâng cấp & tối ưu trong v1.2.3**:
+              1. 📥 **Tương thích 100% với file xuất đơn hàng từ Salework / TikTok Shop / Shopee**:
+                 - **Gộp trọn vẹn đơn nhiều sản phẩm (2 - 5 SP/đơn)**: Tự động nhận diện các dòng sản phẩm thứ 2, 3 (bị để trống Mã đơn & Mã vận đơn ở các dòng tiếp theo) và gộp chính xác vào cùng 1 đơn hàng, không bị sót bất kỳ sản phẩm nào.
+                 - **Khôi phục Mã đơn hàng bị dạng số khoa học (`5.8702686118684454e+17`)**: Tự động chuyển về chuỗi số nguyên chuẩn (`587026861186844540`).
+                 - **Đọc chuẩn định dạng Ngày & Giờ của Salework (`HH:MM:SS DD/MM/YYYY`)**: Tự động lấy ngày từ `Thời gian gửi` ➔ `Thời gian đóng` ➔ `Thời gian xử lý` ➔ `Ngày tạo đơn` và `Ngày giao hàng thành công` (đối với đơn `THẤT THU`).
+                 - **Làm sạch Tên sản phẩm & Phân loại (`Tên phân loại trên sàn`)**: Tự động cắt bỏ phần phân loại bị nối lặp ở đuôi Tên sản phẩm và loại bỏ hậu tố `- Premium Cao Cấp` / `( Premium )` để tách riêng **Tên SP**, **Màu sắc**, **Size** chuẩn xác cho bảng tổng kết kho.
+                 - **Tự động nhận diện Sàn `TikTok Shop`, ĐVVC `Best Express` (`TTVN...`), `J&T Express` (`8626...`) và cột `Tổng giá trị` thực tế**.
+              2. 🎨 **Giao diện tinh gọn & chống lag tuyệt đối**: Giữ trọn các nâng cấp giao diện gọn gàng và cơ chế ghi ổ cứng bất đồng bộ siêu mượt của bản `v1.2.2`.
               3. 💾 **Giữ nguyên 100% dữ liệu cũ**: Cài đè trực tiếp lên bản đang dùng, toàn bộ đơn hàng và hình ảnh trong `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json` được giữ nguyên vẹn.
           files: |
             dist/*.exe

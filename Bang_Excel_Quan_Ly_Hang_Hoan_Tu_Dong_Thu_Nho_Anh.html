@@ -144,7 +144,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.2.2
+          🚀 Phiên bản v1.2.3
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -435,7 +435,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.3</span>
               </div>
             </div>
           </div>
@@ -1952,6 +1952,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const mNinja = str.match(/((?:NIVN|NLVN|SHPVN)[0-9A-Za-z]{6,16})/i);
       if (mNinja) return mNinja[1].toUpperCase();
 
+      // 3b. Best Express / TikTok: TTVN...
+      const mTtvn = str.match(/(TTVN[0-9A-Za-z]{6,16})/i);
+      if (mTtvn) return mTtvn[1].toUpperCase();
+
       // 4. Viettel Post: VTP, VT
       const mVtp = str.match(/(VTP?[0-9A-Za-z]{6,15})/i);
       if (mVtp) return mVtp[1].toUpperCase();
@@ -1964,8 +1968,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const mGhtk = str.match(/(S\d+[\.\-][0-9A-Za-z\.\-]{6,24})/i);
       if (mGhtk) return mGhtk[1].toUpperCase();
 
-      // 7. J&T Express: 84..., 82..., 80... (10 to 14 pure digits)
-      const mJt = str.match(/(8[024][0-9]{10,13})/);
+      // 7. J&T Express: 86..., 84..., 82..., 80... (10 to 14 pure digits)
+      const mJt = str.match(/(8[0246][0-9]{10,13})/);
       if (mJt) return mJt[1];
 
       // 8. Stripping delimiters and handling compound strings like "HAN-DDA/SPXVN..."
@@ -2004,6 +2008,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function applyShopeeDbMatchToOrder(order, match) {
       if (!order || !match) return false;
       let changed = false;
+      if (match.platform && (!order.platform || order.platform === 'Shopee')) {
+        order.platform = match.platform;
+        changed = true;
+      }
       if (match.orderId && !order.orderId) {
         order.orderId = match.orderId;
         changed = true;
@@ -2012,11 +2020,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         order.shipDate = match.shipDate;
         changed = true;
       }
+      if (match.returnDate && !order.returnDate) {
+        order.returnDate = match.returnDate;
+        changed = true;
+      }
       if (match.price && (!order.price || order.price === 0)) {
         order.price = match.price;
         changed = true;
       }
-      if (match.carrier && !order.carrier) {
+      if (match.carrier && (!order.carrier || order.carrier === 'SPX Express')) {
         order.carrier = match.carrier;
         changed = true;
       }
@@ -2031,9 +2043,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (match.items && match.items.length > 0) {
         const curFirst = order.items && order.items[0];
         const isCurBlank = !curFirst || (!curFirst.product && !curFirst.color && !curFirst.size);
-        if (isCurBlank) {
+        if (isCurBlank || (match.items.length > (order.items ? order.items.length : 0))) {
           order.items = JSON.parse(JSON.stringify(match.items));
-          // Sanitize items just in case
           (order.items || []).forEach(it => {
             if (it.size && isReturnReasonText(it.size)) {
               if (!order.note) order.note = it.size;
@@ -2079,6 +2090,155 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return changed;
     }
 
+    // Chuyển đổi mã đơn hàng bị Excel xuất dạng số khoa học (VD: 5.8702686118684454e+17 -> 587026861186844540)
+    function normalizeScientificOrderId(val) {
+      if (val === null || val === undefined) return '';
+      let s = String(val).trim().replace(/^[\'\"]+|[\'\"]+$/g, '').trim();
+      if (!s) return '';
+      const mSci = s.match(/^([+-]?\d+)(?:\.(\d+))?[eE]\+?(\d+)$/);
+      if (mSci) {
+        const intPart = mSci[1].replace(/^[+-]/, '');
+        const fracPart = mSci[2] || '';
+        const exp = parseInt(mSci[3], 10);
+        if (exp >= fracPart.length) {
+          return intPart + fracPart + '0'.repeat(exp - fracPart.length);
+        } else {
+          return intPart + fracPart.slice(0, exp);
+        }
+      }
+      return s;
+    }
+
+    // Trích xuất ngày chuẩn DD/MM/YYYY từ chuỗi bất kỳ (hỗ trợ cả "13:14:41 05/11/2026" của Salework và "2026-11-05 13:14:41" của TikTok/Shopee)
+    function extractDateFromCellValue(val) {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'number' && val > 20000 && val < 90000) {
+        const utcDays = Math.floor(val - 25569);
+        const d = new Date(utcDays * 86400 * 1000);
+        if (!isNaN(d.getTime())) {
+          const dd = String(d.getUTCDate()).padStart(2, '0');
+          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const yyyy = d.getUTCFullYear();
+          return `${dd}/${mm}/${yyyy}`;
+        }
+      }
+      const s = String(val).trim();
+      if (!s) return '';
+      // Tìm mẫu DD/MM/YYYY hoặc DD-MM-YYYY ở bất kỳ vị trí nào trong chuỗi (kể cả khi giờ đứng trước ngày như "08:44:57 07/11/2026")
+      const mDmy = s.match(/(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}\b)/);
+      if (mDmy) {
+        return normalizeShortDate(mDmy[1]);
+      }
+      // Tìm mẫu YYYY-MM-DD hoặc YYYY/MM/DD
+      const mIso = s.match(/(\b\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}\b)/);
+      if (mIso) {
+        return normalizeShortDate(mIso[1]);
+      }
+      // Dự phòng mẫu DD/MM/YY
+      const mShortYear = s.match(/(\b\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2}\b)/);
+      if (mShortYear) {
+        return normalizeShortDate(mShortYear[1]);
+      }
+      return normalizeShortDate(s.slice(0, 10));
+    }
+
+    // Tách gọn Tên sản phẩm, Màu sắc, Size từ dữ liệu Salework / TikTok / Shopee (loại bỏ hậu tố "- Premium Cao Cấp" và tách phần phân loại bị nối ở đuôi tên SP)
+    function parseSaleworkProductAndVariation(rawProd, rawVar, rawSellerSku) {
+      let cleanProd = String(rawProd || '').trim();
+      let cleanVar = String(rawVar || '').trim();
+      const cleanSku = String(rawSellerSku || '').trim();
+
+      // Loại bỏ các cụm hậu tố chất lượng không phải màu/size (VD: "- Premium Cao Cấp", "( Premium )", "Cao Cấp")
+      const stripQualitySuffix = (str) => {
+        return String(str || '')
+          .replace(/\s*[\-\|\/]\s*premium\s*cao\s*c[aấ]p\b/gi, '')
+          .replace(/\s*[\-\|\/]\s*cao\s*c[aấ]p\b/gi, '')
+          .replace(/\(\s*premium\s*\)/gi, '')
+          .replace(/\bpremium\s*cao\s*c[aấ]p\b/gi, '')
+          .trim()
+          .replace(/^[\-\,\;\/\|]+|[\-\,\;\/\|]+$/g, '')
+          .trim();
+      };
+
+      // Nếu Tên sản phẩm trên sàn có chứa phần phân loại ở cuối (VD: "... Lavi Studio/ BUTTER - Trắng, XL" hoặc "... - Xanh Nâu, M - Premium Cao Cấp")
+      if (cleanProd && cleanVar) {
+        const varNoSuffix = stripQualitySuffix(cleanVar);
+        const lowerProd = cleanProd.toLowerCase();
+        const lowerVarFull = cleanVar.toLowerCase();
+        const lowerVarShort = varNoSuffix.toLowerCase();
+
+        for (const candidate of [lowerVarFull, lowerVarShort]) {
+          if (!candidate) continue;
+          const dashCandidate = ' - ' + candidate;
+          if (lowerProd.endsWith(dashCandidate)) {
+            cleanProd = cleanProd.slice(0, cleanProd.length - dashCandidate.length).trim();
+            break;
+          }
+        }
+      }
+      // Cắt hậu tố "- Premium Cao Cấp" nếu còn sót ở cuối tên sản phẩm
+      cleanProd = stripQualitySuffix(cleanProd);
+
+      // Nếu sau khi cắt mà ở cuối Tên SP vẫn còn mẫu " - <Màu>, <Size>" (VD: "Áo Polo ... - Nâu, XL")
+      const mTrailingVar = cleanProd.match(/^(.*?)\s+-\s+([^,\-]{1,25},\s*(?:XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\d{2}|Free\s*size))$/i);
+      if (mTrailingVar) {
+        cleanProd = mTrailingVar[1].trim();
+        if (!cleanVar) cleanVar = mTrailingVar[2].trim();
+      }
+
+      const cleanedVarForParse = stripQualitySuffix(cleanVar);
+      let color = '';
+      let size = '';
+      let extraNote = '';
+
+      if (cleanedVarForParse && !/^\d{4,}$/.test(cleanedVarForParse) && !/^\d+\.\d+e\+\d+$/i.test(cleanedVarForParse)) {
+        const mColor = cleanedVarForParse.match(/(?:màu\s*sắc|màu|mau\s*sac|mau|color)\s*[:\-]\s*([^,;\/\n\|]+)/i);
+        const mSize = cleanedVarForParse.match(/(?:kích\s*thước|kích\s*cỡ|size|kich\s*thuoc|kich\s*co)\s*[:\-]\s*([^,;\/\n\|]+)/i);
+        if (mColor && isValidColorString(mColor[1])) color = stripQualitySuffix(mColor[1]);
+        if (mSize && isValidSizeString(mSize[1])) size = mSize[1].trim().toUpperCase();
+
+        if (!color || !size) {
+          const SIZE_EXACT_RE = /^(XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\d{2}|Free\s*size|Freesize|One\s*size)$/i;
+          const parts = cleanedVarForParse.split(/[,;\/\|]/).map(s => stripQualitySuffix(s)).filter(Boolean);
+          parts.forEach(p => {
+            // Nếu phần tử có dấu gạch ngang như "M - Premium" đã được strip còn "M"
+            const subParts = p.split(/\s+-\s+/).map(x => stripQualitySuffix(x)).filter(Boolean);
+            subParts.forEach(sp => {
+              if (SIZE_EXACT_RE.test(sp) && !size && isValidSizeString(sp)) {
+                size = sp.toUpperCase().replace(/\s+/g, '');
+              } else if (!color && isValidColorString(sp)) {
+                color = sp.replace(/^(?:màu\s*sắc|màu|mau\s*sac|mau|color)\s*[:\-]\s*/i, '').trim();
+              } else if (isReturnReasonText(sp) && !extraNote) {
+                extraNote = sp;
+              }
+            });
+          });
+          if (!color && parts[0] && isValidColorString(parts[0]) && !SIZE_EXACT_RE.test(parts[0])) {
+            color = parts[0];
+          }
+        }
+      }
+
+      // Dự phòng trích xuất từ Mã sản phẩm Salework (VD: "BUTTER_Trang_XL", "ERWIN_XanhThanMori_L", "Bamo_MauMo_L") nếu cột phân loại trống
+      if ((!color || !size) && cleanSku && cleanSku.includes('_')) {
+        const skuParts = cleanSku.split('_').map(s => s.trim()).filter(Boolean);
+        if (skuParts.length >= 2) {
+          const lastPart = skuParts[skuParts.length - 1];
+          if (/^(XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\d{2})$/i.test(lastPart) && !size) {
+            size = lastPart.toUpperCase();
+          }
+          if (skuParts.length >= 3 && !color) {
+            color = skuParts.slice(1, skuParts.length - 1).join(' ');
+          }
+          if (!cleanProd && skuParts[0]) {
+            cleanProd = skuParts[0];
+          }
+        }
+      }
+
+      return { product: cleanProd, color, size, extraNote };
+    }
+
     function autoEnrichAllMissingOrdersFromDb(isSilent = false) {
       let enrichedCount = 0;
       (orders || []).forEach((o, idx) => {
@@ -2115,14 +2275,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      const isCsv = /\.csv$/i.test(file.name || '');
       const reader = new FileReader();
       reader.onload = async function(evt) {
         try {
-          const data = new Uint8Array(evt.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
+          let workbook;
+          if (isCsv) {
+            const text = new TextDecoder('utf-8').decode(new Uint8Array(evt.target.result));
+            workbook = XLSX.read(text, { type: 'string', raw: true });
+          } else {
+            const data = new Uint8Array(evt.target.result);
+            workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
+          }
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
           if (!rawRows || rawRows.length === 0) {
             alert('⚠️ File Excel không có dữ liệu dòng nào!');
             return;
@@ -2154,57 +2321,135 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return undefined;
       }
 
-      // Column patterns for both Shopee and TikTok Shop
+      // Column patterns for Shopee, TikTok Shop, and Salework
       const trackKey = findKey(['mavandon', 'tracking', 'mavan', 'mvd', 'matheodoi', 'makienhang', 'idgoihang', 'packageid', 'mabuugui', 'sovandon', 'trackingnumber', 'trackingid']);
       const orderIdKey = findKey(['madonhang', 'orderid', 'madon', 'iddonhang', 'iddon', 'suborderid', 'madonhangcon', 'order']);
       const carrierKey = findKey(['donvivanchuyen', 'nhavanchuyen', 'shippingprovider', 'dvvc', 'carrier', 'donvigiaohang', 'logisticsprovider', 'kenhvanchuyen', 'shippingcarrier']);
-      const productKey = findKey(['tensanpham', 'sanpham', 'tensp', 'productname', 'product', 'tenhanghoa', 'itemname', 'tenmathang']);
-      // Ưu tiên cột tên phân loại / biến thể của người; LOẠI TRỪ TUYỆT ĐỐI các cột mã số SKU ID, ID biến thể
-      const varKey = findKey(
-        ['tuychonbienthe', 'tenbienthe', 'bienthe', 'tenphanloai', 'phanloaihang', 'phanloai', 'variationname', 'variation', 'thuoctinh', 'specification', 'skuname', 'sellersku'],
-        ['masku', 'skuid', 'idbienthe', 'idphanloai', 'idgoihang', 'packageid']
+      const productKey = findKey(
+        ['tensanphamtrensan', 'tensanpham', 'sanpham', 'tensp', 'productname', 'product', 'tenhanghoa', 'itemname', 'tenmathang'],
+        ['masanpham', 'id', 'masku', 'skuid']
       );
+      // Ưu tiên cột tên phân loại / biến thể của người; LOẠI TRỪ TUYỆT ĐỐI các cột mã số SKU ID, Mã phân loại trên sàn (1.735e+18)
+      const varKey = findKey(
+        ['tenphanloaitrensan', 'tenphanloai', 'tuychonbienthe', 'tenbienthe', 'bienthe', 'phanloaihang', 'phanloai', 'variationname', 'variation', 'thuoctinh', 'specification', 'skuname'],
+        ['maphanloai', 'masanpham', 'masku', 'skuid', 'idbienthe', 'idphanloai', 'idgoihang', 'packageid']
+      );
+      const sellerSkuKey = findKey(['masanphamsalework', 'sellersku', 'maskuphanloai', 'masku', 'masanpham']);
       // Tìm cột màu sắc và kích cỡ riêng biệt nếu có trong file Excel
-      const explicitColorKey = findKey(['mausac', 'mau', 'color', 'colour'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra']);
-      const explicitSizeKey = findKey(['kichthuoc', 'kichco', 'size'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra', 'status', 'trangthai']);
-      const noteKey = findKey(['lydohoantien', 'lydotrahang', 'lydohuy', 'lydo', 'reason', 'returnreason', 'ghichu', 'note', 'chitiethoantien', 'chitietlydo', 'noidung', 'motanoidung']);
+      const explicitColorKey = findKey(['mausac', 'mau', 'color', 'colour'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra', 'maphanloai']);
+      const explicitSizeKey = findKey(['kichthuoc', 'kichco', 'size'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra', 'status', 'trangthai', 'maphanloai']);
+      const noteKey = findKey(['lydohoantien', 'lydotrahang', 'lydohuy', 'lydo', 'reason', 'returnreason', 'ghichucuakhach', 'ghichu', 'note', 'chitiethoantien', 'chitietlydo', 'noidung', 'motanoidung']);
       const qtyKey = findKey(['soluong', 'quantity', 'sl', 'soluongmathang', 'itemquantity', 'qty']);
-      const priceKey = findKey(['tonggiaban', 'giaban', 'giatien', 'tongtien', 'totalamount', 'orderamount', 'skuunitprice', 'price', 'thanhtien', 'tonggiatri', 'giagoc', 'giabanle', 'tongtienthanhtoan']);
-      const dateKey = findKey(['thoigiangiao', 'ngaygui', 'thoigiangui', 'thoigiantao', 'ngaydat', 'orderdate', 'thoidiemtao', 'thoidiemdathang', 'createdtime', 'shippedtime', 'paidtime', 'deliverytime']);
+      // Ưu tiên Tổng giá trị / Tổng tiền hàng sau chiết khấu / Doanh thu ước tính trước Tổng tiền hàng gốc chưa giảm giá
+      const priceKey = findKey(['tonggiatri', 'tongtienhangsauchietkhau', 'doanhthuuoctinh', 'tongtienthanhtoan', 'thanhtien', 'tonggiaban', 'giaban', 'giatien', 'tongtien', 'totalamount', 'orderamount', 'skuunitprice', 'price', 'giasantmdt', 'giasalework', 'giagoc', 'giabanle']);
+      // Các cột ngày gửi / đóng / xử lý / tạo đơn theo thứ tự ưu tiên để luôn lấy được ngày kể cả khi cột Thời gian gửi bị trống (như trên Salework)
+      const shipDateCandidateKeys = [
+        findKey(['thoigiangui', 'ngaygui', 'shippedtime']),
+        findKey(['thoigiandong', 'ngaydong']),
+        findKey(['thoigianxuly', 'ngayxuly']),
+        findKey(['ngaytaodon', 'thoigiantao', 'ngaydat', 'orderdate', 'thoidiemtao', 'thoidiemdathang', 'createdtime', 'paidtime'])
+      ].filter(Boolean);
+      const returnDateCandidateKeys = [
+        findKey(['ngayhoan', 'thoigianhoan', 'ngaytrahang', 'ngayhuy']),
+        findKey(['ngaygiaohangthanhcong', 'thoigiangiao', 'deliverytime'])
+      ].filter(Boolean);
       const statusKey = findKey(['trangthaidonhang', 'trangthai', 'orderstatus', 'status', 'tinhtrang', 'trangthaihoantien', 'trangthaigoihang', 'returnstatus', 'refundstatus']);
+      const creatorOrShopKey = findKey(['nguoitaodon', 'kenhban', 'san', 'shop']);
       const onlyReturns = document.getElementById('chkFilterOnlyReturns')?.checked ?? true;
 
       const tempMap = new Map();
       let addedCount = 0;
+      let multiItemAppendedCount = 0;
       let skippedSuccessCount = 0;
+      let lastGroupKey = '';
+      let lastSkippedRow = false;
 
       rawRows.forEach(row => {
         const rawTrack = trackKey ? extractCleanTrackingCode(String(row[trackKey] || '').trim()) : '';
-        const rawOrderId = orderIdKey ? String(row[orderIdKey] || '').trim().replace(/^[\'\"]/g, '') : '';
-        if (!rawTrack && !rawOrderId) return;
+        const rawOrderId = orderIdKey ? normalizeScientificOrderId(row[orderIdKey]) : '';
+        const rawProdInput = productKey ? String(row[productKey] || '').trim() : '';
+        const rawVarInput = varKey ? String(row[varKey] || '').trim() : '';
+        const rawSellerSku = sellerSkuKey ? String(row[sellerSkuKey] || '').trim() : '';
 
-        // Smart Filter: Skip successfully delivered orders if onlyReturns is checked!
-        if (onlyReturns && statusKey) {
-          const rawStatus = removeVietnameseTones(String(row[statusKey] || '')).toLowerCase();
-          const isDelivered = rawStatus.includes('thanh cong') || rawStatus.includes('da giao') || rawStatus.includes('hoan thanh') || rawStatus.includes('delivered') || rawStatus.includes('completed');
-          const isReturnOrCancel = rawStatus.includes('hoan') || rawStatus.includes('huy') || rawStatus.includes('tra') || rawStatus.includes('that bai') || rawStatus.includes('khong thanh') || rawStatus.includes('cancel') || rawStatus.includes('return') || rawStatus.includes('refund');
-          if (isDelivered && !isReturnOrCancel) {
-            skippedSuccessCount++;
+        let isContinuationRow = false;
+        if (!rawTrack && !rawOrderId) {
+          // Hỗ trợ đơn nhiều sản phẩm của Salework / TikTok / Shopee: dòng SP thứ 2, 3 để trống Mã đơn & Mã vận đơn nhưng có Tên SP hoặc Mã SKU
+          if (lastGroupKey && !lastSkippedRow && tempMap.has(lastGroupKey) && (rawProdInput || rawVarInput || rawSellerSku)) {
+            isContinuationRow = true;
+          } else {
             return;
           }
         }
 
-        const groupKey = (rawOrderId || rawTrack).toUpperCase();
-        const rawProd = productKey ? String(row[productKey] || '').trim() : '';
-        const rawVar = varKey ? String(row[varKey] || '').trim() : '';
+        // Smart Filter: Skip successfully delivered orders if onlyReturns is checked!
+        if (!isContinuationRow && onlyReturns && statusKey) {
+          const rawStatus = removeVietnameseTones(String(row[statusKey] || '')).toLowerCase();
+          const isDelivered = rawStatus.includes('thanh cong') || rawStatus.includes('da giao') || rawStatus.includes('hoan thanh') || rawStatus.includes('delivered') || rawStatus.includes('completed');
+          const isReturnOrCancel = rawStatus.includes('hoan') || rawStatus.includes('huy') || rawStatus.includes('tra') || rawStatus.includes('that thu') || rawStatus.includes('that bai') || rawStatus.includes('khong thanh') || rawStatus.includes('cancel') || rawStatus.includes('return') || rawStatus.includes('refund');
+          if (isDelivered && !isReturnOrCancel) {
+            skippedSuccessCount++;
+            lastSkippedRow = true;
+            return;
+          }
+        }
+
+        if (!isContinuationRow) {
+          lastSkippedRow = false;
+        }
+
+        const groupKey = isContinuationRow ? lastGroupKey : (rawOrderId || rawTrack).toUpperCase();
+        if (!isContinuationRow) {
+          lastGroupKey = groupKey;
+        } else {
+          multiItemAppendedCount++;
+        }
+
         const rawQty = qtyKey ? (parseInt(String(row[qtyKey]).replace(/[^\d]/g, ''), 10) || 1) : 1;
         const rawPrice = priceKey ? (parseInt(String(row[priceKey]).replace(/[^\d]/g, ''), 10) || 0) : 0;
-        const rawDate = dateKey ? normalizeShortDate(String(row[dateKey]).slice(0, 10)) : '';
-        let rawNote = noteKey ? String(row[noteKey] || '').trim() : '';
 
-        // Extract Color and Size (supports both Shopee format and TikTok format)
-        let color = '';
-        let size = '';
+        // Trích xuất Ngày gửi đi (thử lần lượt các cột Thời gian gửi -> Thời gian đóng -> Thời gian xử lý -> Ngày tạo đơn)
+        let rawShipDate = '';
+        for (const dk of shipDateCandidateKeys) {
+          if (row[dk]) {
+            const extracted = extractDateFromCellValue(row[dk]);
+            if (extracted) {
+              rawShipDate = extracted;
+              break;
+            }
+          }
+        }
+
+        // Trích xuất Ngày hoàn / hủy (nếu có trong file như cột Ngày giao hàng thành công của đơn THẤT THU hoặc Ngày tạo đơn của đơn HỦY)
+        let rawReturnDate = '';
+        for (const rdk of returnDateCandidateKeys) {
+          if (row[rdk]) {
+            const extracted = extractDateFromCellValue(row[rdk]);
+            if (extracted) {
+              rawReturnDate = extracted;
+              break;
+            }
+          }
+        }
+        if (!rawReturnDate && rawShipDate) {
+          rawReturnDate = rawShipDate;
+        }
+
+        let rawNote = noteKey ? String(row[noteKey] || '').trim() : '';
+        const rawStatusText = statusKey ? String(row[statusKey] || '').trim() : '';
+        if (rawStatusText && !rawNote) {
+          const stNorm = removeVietnameseTones(rawStatusText).toLowerCase();
+          if (stNorm === 'that thu') rawNote = 'THẤT THU (Hoàn về kho)';
+          else if (stNorm === 'huy' || stNorm.includes('da huy')) rawNote = 'Đơn HỦY';
+        }
+
+        // Tách gọn Tên sản phẩm, Màu sắc, Size bằng bộ phân tích thông minh hỗ trợ cả Salework / TikTok / Shopee
+        const parsedItem = parseSaleworkProductAndVariation(rawProdInput, rawVarInput, rawSellerSku);
+        let cleanProd = parsedItem.product;
+        let color = parsedItem.color;
+        let size = parsedItem.size;
+        if (parsedItem.extraNote && !rawNote) {
+          rawNote = parsedItem.extraNote;
+        }
 
         if (explicitColorKey && row[explicitColorKey]) {
           const cVal = String(row[explicitColorKey]).trim();
@@ -2220,31 +2465,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             size = sVal.toUpperCase();
           } else if (isReturnReasonText(sVal) && !rawNote) {
             rawNote = sVal;
-          }
-        }
-
-        if (rawVar && (!color || !size)) {
-          // Bỏ qua nếu rawVar là dãy số SKU ID thuần túy (VD: 1730066930325890001)
-          if (!/^\d{4,}$/.test(rawVar)) {
-            const mColor = rawVar.match(/(?:màu\s*sắc|màu|mau\s*sac|mau|color)\s*[:\-]\s*([^,;\/\n\|]+)/i);
-            const mSize = rawVar.match(/(?:kích\s*thước|kích\s*cỡ|size|kich\s*thuoc|kich\s*co)\s*[:\-]\s*([^,;\/\n\|]+)/i);
-            if (mColor && !color && isValidColorString(mColor[1])) color = mColor[1].trim();
-            if (mSize && !size && isValidSizeString(mSize[1])) size = mSize[1].trim().toUpperCase();
-
-            if (!color || !size) {
-              const SIZE_RE = /(XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\b\d{2}\b|Free\s*size)/i;
-              const parts = rawVar.split(/[,;\/\-\|]/).map(s => s.trim()).filter(Boolean);
-              parts.forEach(p => {
-                if (SIZE_RE.test(p) && !size && isValidSizeString(p)) {
-                  size = p.toUpperCase().replace(/\s+/g, '');
-                } else if (!color && isValidColorString(p)) {
-                  color = p.replace(/(?:màu\s*sắc|màu|mau\s*sac|mau|color)\s*[:\-]?\s*/i, '').trim();
-                } else if (isReturnReasonText(p) && !rawNote) {
-                  rawNote = p;
-                }
-              });
-              if (!color && parts[0] && isValidColorString(parts[0])) color = parts[0];
-            }
           }
         }
 
@@ -2267,9 +2487,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           size = '';
         }
 
-        // Tự động tách màu & size từ Tên sản phẩm nếu có gạch nối (VD: "Áo polo pique - Đen - L")
-        if ((!color || !size) && rawProd) {
-          const prodParts = rawProd.split(/[\-\|\/]/).map(s => s.trim()).filter(Boolean);
+        // Tự động tách màu & size từ Tên sản phẩm nếu vẫn còn thiếu
+        if ((!color || !size) && cleanProd) {
+          const prodParts = cleanProd.split(/[\-\|\/]/).map(s => s.trim()).filter(Boolean);
           if (prodParts.length > 1) {
             const SIZE_RE = /^(XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\d{2}|Free\s*size)$/i;
             prodParts.slice(1).forEach(p => {
@@ -2286,24 +2506,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const rawCarrierFromExcel = carrierKey ? String(row[carrierKey] || '').trim() : '';
         let carrier = rawCarrierFromExcel || detectCarrierByTrackingCode(rawTrack) || 'SPX Express';
         if (carrier) {
-          const cUpper = carrier.toUpperCase();
+          const cUpper = removeVietnameseTones(carrier).toUpperCase();
           if (cUpper.includes('J&T') || cUpper.includes('JT')) carrier = 'J&T Express';
           else if (cUpper.includes('NINJA')) carrier = 'Ninja Van';
           else if (cUpper.includes('SHOPEE') || cUpper.includes('SPX')) carrier = 'SPX Express';
           else if (cUpper.includes('TIET KIEM') || cUpper.includes('GHTK')) carrier = 'GHTK';
           else if (cUpper.includes('NHANH') || cUpper.includes('GHN')) carrier = 'GHN';
           else if (cUpper.includes('VIETTEL') || cUpper.includes('VTP')) carrier = 'Viettel Post';
-          else if (cUpper.includes('BEST')) carrier = 'Best Express';
+          else if (cUpper.includes('BEST') || rawTrack.startsWith('TTVN')) carrier = 'Best Express';
           else if (cUpper.includes('VNPOST') || cUpper.includes('BUU DIEN')) carrier = 'VNPost';
+        }
+
+        // Platform detection (TikTok Shop vs Shopee vs Lazada)
+        const creatorText = creatorOrShopKey ? String(row[creatorOrShopKey] || '').toUpperCase() : '';
+        let detectedPlatform = 'Shopee';
+        if (
+          creatorText.includes('TIKTOK') ||
+          rawTrack.startsWith('TTVN') ||
+          /^5[789]\d{12,18}$/.test(rawOrderId) ||
+          rawOrderId.startsWith('57') ||
+          rawOrderId.startsWith('58')
+        ) {
+          detectedPlatform = 'TikTok Shop';
+        } else if (creatorText.includes('LAZADA') || rawTrack.startsWith('LEX')) {
+          detectedPlatform = 'Lazada';
         }
 
         if (!tempMap.has(groupKey)) {
           tempMap.set(groupKey, {
+            platform: detectedPlatform,
             orderId: rawOrderId,
             track: rawTrack,
             carrier: carrier,
             price: rawPrice,
-            shipDate: rawDate,
+            shipDate: rawShipDate,
+            returnDate: rawReturnDate,
             note: rawNote,
             items: []
           });
@@ -2314,12 +2551,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (rawTrack && !entry.track) entry.track = rawTrack;
         if (rawOrderId && !entry.orderId) entry.orderId = rawOrderId;
         if (rawPrice && !entry.price) entry.price = rawPrice;
-        if (rawDate && !entry.shipDate) entry.shipDate = rawDate;
+        if (rawShipDate && !entry.shipDate) entry.shipDate = rawShipDate;
+        if (rawReturnDate && !entry.returnDate) entry.returnDate = rawReturnDate;
         if (rawNote && !entry.note) entry.note = rawNote;
+        if (detectedPlatform !== 'Shopee' && entry.platform === 'Shopee') entry.platform = detectedPlatform;
 
-        if (rawProd || color || size) {
+        if (cleanProd || color || size) {
           entry.items.push({
-            product: rawProd,
+            product: cleanProd,
             color: color,
             size: size,
             qty: rawQty
@@ -2375,8 +2614,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
             const newOrd = {
               shipDate: orderData.shipDate || '',
-              returnDate: today,
+              returnDate: orderData.returnDate || orderData.shipDate || today,
               recvDate: '',
+              platform: orderData.platform || 'Shopee',
               orderId: orderData.orderId || '',
               track: cleanTrack || orderData.track || '',
               carrier: orderData.carrier || 'SPX Express',
@@ -2404,10 +2644,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         autoEnrichAllMissingOrdersFromDb(true);
       }
 
-      addAuditLog('📥 NẠP ĐƠN SHOPEE/TIKTOK', `Đã nạp ${addedCount} đơn hàng Shopee / TikTok (Đẩy ra bảng chính: ${newTableCount} đơn mới, làm giàu ${enrichedTableCount} đơn cũ)`);
+      addAuditLog('📥 NẠP ĐƠN SHOPEE/TIKTOK', `Đã nạp ${addedCount} đơn hàng Shopee / TikTok (Đẩy ra bảng chính: ${newTableCount} đơn mới, làm giàu ${enrichedTableCount} đơn cũ, gộp ${multiItemAppendedCount} SP phụ)`);
       alert(`🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HOÀN / TRẢ / HỦY!\n\n` +
-            (pushToMain ? `• Đã tự động đẩy ${newTableCount} đơn hoàn mới ra Bảng chính (Trạng thái: 🟡 Chưa trả - Đang chờ)!\n• Cập nhật thông tin cho: ${enrichedTableCount} đơn có sẵn\n• Toàn bộ số liệu thống kê ở bảng bên dưới đã được tính toán ngay lập tức!\n\n` : '') +
-            (skippedSuccessCount > 0 ? `(Đã tự động lọc bỏ ${skippedSuccessCount} đơn giao thành công, chỉ giữ lại đơn hoàn/hủy)\n\n` : '') +
+            (pushToMain ? `• Đã tự động đẩy ${newTableCount} đơn hoàn mới ra Bảng chính (Trạng thái: 🟡 Chưa trả - Đang chờ)!\n• Cập nhật thông tin cho: ${enrichedTableCount} đơn có sẵn\n` : '') +
+            (multiItemAppendedCount > 0 ? `• Đã tự động gộp ${multiItemAppendedCount} sản phẩm thứ 2, 3 vào đúng đơn hàng nhiều SP!\n` : '') +
+            `• Toàn bộ số liệu thống kê ở bảng bên dưới đã được tính toán ngay lập tức!\n\n` +
+            (skippedSuccessCount > 0 ? `(Đã tự động lọc bỏ ${skippedSuccessCount} đơn giao thành công, chỉ giữ lại đơn hoàn/thất thu/hủy)\n\n` : '') +
             `Khi kiện hàng về kho, bạn chỉ việc dùng điện thoại hoặc máy tính quét mã vận đơn ➔ Đơn đó sẽ tự động đổi sang [🟢 Hàng đã trả]!`);
     }
 
@@ -2929,7 +3171,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.2.2';
+    const APP_VERSION_NUMBER = '1.2.3';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -2968,8 +3210,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới trong phiên bản ${curVer}:\n` +
-        `1. Giao diện Tinh Gọn & Rộng Rãi: Thu gọn toàn bộ thanh công cụ trên cùng, gom các nút chức năng vào 2 menu [📂 Nhập / Xuất Dữ Liệu] và [⚙️ Hệ Thống], mở rộng tối đa diện tích bảng đơn hàng.\n` +
-        `2. Chống Lag Tuyệt Đối Khi Nhiều Đơn & Nhiều Ảnh: Tối ưu ghi ổ cứng bất đồng bộ (Async I/O), tải ảnh thông minh (lazy decode) và mặc định 50 đơn/trang siêu mượt.\n` +
+        `1. Tương Thích 100% File Xuất Salework / TikTok Shop / Shopee: Tự động gộp sản phẩm thứ 2, 3 của các đơn nhiều SP (dòng tiếp nối trống Mã đơn), khôi phục Mã đơn hàng bị dạng số khoa học (5.87e+17), đọc đúng ngày giờ dạng [HH:MM:SS DD/MM/YYYY] và tách sạch hậu tố "- Premium Cao Cấp" khỏi Tên SP / Màu / Size.\n` +
+        `2. Giao Diện Tinh Gọn & Chống Lag Tuyệt Đối: Ghi ổ cứng bất đồng bộ (Async I/O), tải ảnh thông minh (lazy decode) và mặc định 50 đơn/trang siêu mượt.\n` +
         `3. Giữ nguyên đầy đủ 100% dữ liệu đơn hàng & ảnh đã lưu trên ổ cứng máy tính.`
       );
     }
@@ -3252,10 +3494,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (code.startsWith('VTP') || code.startsWith('VT')) {
         return 'Viettel Post';
       }
+      // 6b. Best Express (TikTok Shop): Starts with TTVN or BEST
+      if (code.startsWith('TTVN') || code.startsWith('BEST')) {
+        return 'Best Express';
+      }
       // 7. Pure numeric tracking codes (J&T Express vs Best Express vs Viettel Post):
       if (/^\d+$/.test(code)) {
-        // J&T Express: 12 pure digits starting with 84 or 66 (or 10-12 digits starting with 84/66)
-        if (code.length === 12 && (code.startsWith('84') || code.startsWith('66'))) {
+        // J&T Express: 12 pure digits starting with 80, 82, 84, 86 or 66
+        if (code.length === 12 && (code.startsWith('80') || code.startsWith('82') || code.startsWith('84') || code.startsWith('86') || code.startsWith('66'))) {
           return 'J&T Express';
         }
         // Best Express: 12 to 14 pure digits (when not starting with 84/66 of J&T)
@@ -4136,6 +4382,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Danh sách các từ chỉ màu sắc thời trang phổ biến để nhận diện và khôi phục
     const COMMON_COLOR_WORDS = [
       'xanh navy', 'xanh den', 'xanh duong', 'xanh la', 'xanh reu', 'xanh ngoc', 'xanh coban', 'xanh bo', 'xanh nhat', 'xanh dam', 'xanh pastel', 'xanh lam',
+      'xanh than', 'xanh nau', 'xanh kem', 'xam than', 'xam dam', 'xam nhat', 'mau mo', 'kaki', 'retro', 'mori', 'urban', 'koda',
       'den', 'trang', 'trang nga', 'trang tinh', 'do do', 'do tuoi', 'do man', 'do ruou', 'hong', 'hong phan', 'hong baby',
       'vang', 'vang bo', 'vang chanh', 'nau', 'nau dat', 'nau bo', 'nau tay', 'nau socola',
       'be', 'be nhat', 'be dam', 'kem', 'kem sua', 'xam', 'xam tieu', 'xam chuot', 'xam khoi', 'xam ghi', 'ghi', 'tim', 'tim than', 'cam', 'cam dat', 'reu'

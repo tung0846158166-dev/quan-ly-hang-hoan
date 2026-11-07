@@ -149,7 +149,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.0
+          🚀 Phiên bản v1.3.2
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -473,7 +473,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.2</span>
               </div>
             </div>
           </div>
@@ -645,6 +645,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <option value="THẤT THU">⚫ THẤT THU (Gốc Salework)</option>
           </select>
 
+          <!-- Lọc Hàng đặt trước hay Đơn thường -->
+          <select id="preOrderFilterSelect" onchange="setPreOrderFilter(this.value)"
+                  title="Lọc theo Hàng đặt trước hoặc Đơn thường"
+                  class="text-[11px] font-bold bg-white border border-purple-300 text-purple-950 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-purple-500">
+            <option value="all">📦 Trước / Thường (Tất cả)</option>
+            <option value="Hàng đặt trước">⭐ Hàng đặt trước</option>
+            <option value="Đơn thường">⚡ Đơn thường</option>
+          </select>
+
+          <!-- Lọc đơn Có MVĐ hoặc Không có MVĐ -->
+          <select id="trackingFilterSelect" onchange="setTrackingFilter(this.value)"
+                  title="Lọc đơn có mã vận đơn hoặc không có mã vận đơn (hủy trước gửi)"
+                  class="text-[11px] font-bold bg-white border border-blue-300 text-blue-950 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-blue-500">
+            <option value="all">🔖 Tất cả MVĐ</option>
+            <option value="has_track">✅ Có mã vận đơn</option>
+            <option value="no_track">❌ Không có MVĐ (Hủy trước gửi)</option>
+          </select>
+
           <!-- Sắp xếp theo ngày (Gộp 4 nút rời thành 1 menu thả gọn gàng + vẫn bấm trực tiếp trên tiêu đề cột được) -->
           <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
             <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
@@ -665,15 +683,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </label>
           </div>
 
-          <!-- Lọc mốc ngày -->
-          <select id="recvDateFilterSelect" onchange="setRecvDateFilter(this.value)"
-                  title="Lọc nhanh theo mốc thời gian"
-                  class="text-[11px] font-bold bg-white border border-slate-300 text-emerald-900 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-emerald-500">
-            <option value="all">🕒 Mọi thời gian</option>
-            <option value="today">⚡ Về hôm nay</option>
-            <option value="yesterday">Hôm qua</option>
-            <option value="7days">7 ngày qua</option>
-          </select>
+          <!-- Lọc mốc ngày & Khoảng ngày tùy chọn (Từ ngày - Đến ngày) -->
+          <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5 gap-1">
+            <select id="dateFilterTypeSelect" onchange="setDateFilterType(this.value)"
+                    title="Chọn mốc ngày cần lọc: Bất kỳ mốc nào, Ngày về kho, Ngày hoàn/hủy, hoặc Ngày gửi đi"
+                    class="text-[10.5px] font-bold text-slate-700 bg-transparent outline-none cursor-pointer">
+              <option value="any">📅 Lọc: Mọi mốc ngày</option>
+              <option value="recvDate">📥 Ngày về kho</option>
+              <option value="returnDate">↩️ Ngày hoàn/hủy</option>
+              <option value="shipDate">🚚 Ngày gửi đi</option>
+            </select>
+            <select id="recvDateFilterSelect" onchange="setRecvDateFilter(this.value)"
+                    title="Lọc nhanh theo mốc hoặc chọn khoảng ngày cụ thể"
+                    class="text-[11px] font-bold bg-transparent text-emerald-900 outline-none cursor-pointer pl-1 border-l border-slate-200">
+              <option value="all">🕒 Mọi thời gian</option>
+              <option value="today">⚡ Hôm nay</option>
+              <option value="yesterday">Hôm qua</option>
+              <option value="7days">7 ngày qua</option>
+              <option value="30days">30 ngày qua</option>
+              <option value="custom">📆 Khoảng ngày...</option>
+            </select>
+            <!-- Khung chọn Từ ngày - Đến ngày -->
+            <div id="customDateRangeBox" class="hidden items-center gap-1 pl-1 border-l border-slate-200">
+              <input type="date" id="customDateFrom" onchange="applyCustomDateRange()"
+                     title="Từ ngày" class="text-[10.5px] border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" />
+              <span class="text-slate-400 text-[10px]">➔</span>
+              <input type="date" id="customDateTo" onchange="applyCustomDateRange()"
+                     title="Đến ngày" class="text-[10.5px] border border-slate-300 rounded px-1 py-0.2 outline-none text-slate-800" />
+              <button type="button" onclick="clearCustomDateRange()" class="text-rose-500 hover:text-rose-700 text-xs px-1 font-bold cursor-pointer" title="Xóa lọc khoảng ngày">✕</button>
+            </div>
+          </div>
 
           <!-- Phân trang Siêu Mượt nằm gọn ngay bên phải -->
           <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
@@ -1105,6 +1144,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <!-- Footer -->
       <div class="p-3 bg-slate-100 border-t border-slate-200 flex justify-end">
         <button type="button" onclick="closeCellActionModal()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition cursor-pointer">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Popover Xem Chi Tiết Ô (Ấn 1 lần để xem đầy đủ 100% không bị che khuất) -->
+  <div id="cellDetailPopover"
+       class="fixed z-50 hidden bg-slate-900/95 text-white backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl p-3.5 max-w-sm sm:max-w-md w-[360px] transition-all transform select-text"
+       style="top: 0; left: 0;"
+       onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/80">
+      <div class="flex items-center gap-1.5 min-w-0 pr-2">
+        <span class="text-amber-400 text-sm">📌</span>
+        <span id="popoverCellTitle" class="text-xs font-extrabold text-amber-300 truncate">Chi tiết thông tin ô</span>
+      </div>
+      <button type="button" onclick="closeCellDetailPopover()" class="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer" title="Đóng">✕</button>
+    </div>
+    <div class="text-[12px] text-slate-100 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 max-h-56 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed font-sans" id="popoverCellContent"></div>
+    <div class="flex items-center justify-between pt-2.5 mt-2.5 border-t border-slate-800/80 text-[11px]">
+      <span class="text-slate-400 text-[10.5px]">💡 Nhấp đúp chuột vào ô để sửa</span>
+      <div class="flex items-center gap-1.5">
+        <button type="button" id="popoverCopyBtn" onclick="copyCellDetailContent()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded font-bold transition flex items-center gap-1 cursor-pointer">
+          <span>📋</span> <span id="popoverCopyText">Sao chép</span>
+        </button>
+        <button type="button" id="popoverEditBtn" onclick="triggerEditFromPopover()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold transition flex items-center gap-1 shadow-sm cursor-pointer">
+          <span>✏️</span> <span>Chỉnh sửa</span>
+        </button>
       </div>
     </div>
   </div>
@@ -2849,7 +2914,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // Tập hợp toàn bộ tên cột từ 10 dòng đầu để không bao giờ bị sót cột
       const keySet = new Set();
-      rawRows.slice(0, 10).forEach(r => Object.keys(r || {}).forEach(k => keySet.add(k)));
+      rawRows.forEach(r => { if (r && typeof r === "object") Object.keys(r).forEach(k => keySet.add(k)); });
       const keys = Array.from(keySet);
 
       function findKeyExactOrIncludes(exactList, includePatterns = [], excludePatterns = []) {
@@ -3065,7 +3130,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Lý do / Trạng thái đơn TikTok & Loại đơn (Nguồn phát sinh)
         // Đặc biệt: Với file TikTok qua Salework, giữ nguyên trạng thái gốc "THẤT THU" vì chỉ dựa vào chữ này chưa đủ kết luận đơn thuộc Giao không thành công hay Trả hàng/Hoàn tiền!
         let rawNote = noteKey ? String(row[noteKey] || '').trim() : '';
-        let buyerComment = buyerNoteKey ? String(row[buyerNoteKey] || '').trim() : '';
+        let buyerComment = extractBuyerNote(row);
         if (/^(không|khong|none|\-)$/i.test(removeVietnameseTones(buyerComment))) buyerComment = '';
         const rawNoteNorm = removeVietnameseTones(rawNote).toLowerCase();
         let detectedOrderType = 'THẤT THU';
@@ -3297,7 +3362,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!(await requireUnlocked('Nhập Dữ Liệu Đơn Hàng'))) return;
       if (!rawRows || !rawRows.length) return;
       const keySet = new Set();
-      rawRows.slice(0, 10).forEach(r => Object.keys(r || {}).forEach(k => keySet.add(k)));
+      rawRows.forEach(r => { if (r && typeof r === "object") Object.keys(r).forEach(k => keySet.add(k)); });
       const keys = Array.from(keySet);
 
       function findKey(patterns, excludePatterns = []) {
@@ -3508,7 +3573,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const cancelReasonText = cancelReasonColKey ? String(row[cancelReasonColKey] || '').trim() : '';
 
         // Trích xuất Ghi chú của Người mua (tách riêng thành 1 cột độc lập)
-        let buyerComment = buyerNoteKey ? String(row[buyerNoteKey] || '').trim() : '';
+        let buyerComment = extractBuyerNote(row);
         if (!buyerComment) {
           const altBuyerKeys = ['Ghi chú của Người mua khi trả hàng', 'Nhận xét từ Người mua', 'Ghi chú của khách', 'Ghi chú của Người mua khi đặt hàng', 'Ghi chú'];
           for (const abk of altBuyerKeys) {
@@ -3884,6 +3949,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             recvDate: '',
             platform: orderData.platform || 'Shopee',
             orderType: orderData.orderType || (orderData.platform === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền'),
+            preOrder: orderData.preOrder || 'ÄÆ¡n thÆ°á»ng',
+            deadline: orderData.deadline || '',
             orderId: orderData.orderId || '',
             track: cleanTrack || orderData.track || '',
             altTrack: orderData.altTrack || '',
@@ -4386,7 +4453,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.1';
+    const APP_VERSION_NUMBER = '1.3.2';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6751,12 +6818,292 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         .replace(/>/g, '&gt;');
     }
 
+    // =========================================================================
+    // TÍNH NĂNG MỚI: TRÍCH XUẤT GHI CHÚ NGƯỜI MUA ĐA NGUỒN TỪ FILE SHOPEE & TIKTOK
+    // =========================================================================
+    function extractBuyerNote(r) {
+      if (!r || typeof r !== 'object') return '';
+      const directList = [
+        'Ghi chú của Người mua khi trả hàng',
+        'Nhận xét từ Người mua',
+        'Ghi chú của Người mua khi đặt hàng',
+        'Ghi chú của khách',
+        'Lưu ý từ người mua',
+        'Ghi chú của người mua',
+        'Ghi chú người mua',
+        'Ghi chú khách hàng',
+        'Lời nhắn từ người mua',
+        'Buyer Message',
+        'Customer Note',
+        'Buyer Note'
+      ];
+      for (const dl of directList) {
+        if (r[dl] !== undefined && r[dl] !== null) {
+          const v = String(r[dl]).trim();
+          if (v && !/^(không|khong|none|\-)$/i.test(removeVietnameseTones(v))) return v;
+        }
+      }
+      for (const k in r) {
+        const kn = removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (
+          (kn.includes('nhanxet') && kn.includes('nguoimua')) ||
+          (kn.includes('ghichu') && (kn.includes('nguoimua') || kn.includes('khach'))) ||
+          kn === 'buyermessage' || kn === 'customernote' || kn === 'buyernote'
+        ) {
+          if (kn.includes('nguoiban') || kn.includes('tien') || kn.includes('phi') || kn.includes('gia') || kn.includes('lydo') || kn.includes('lido')) continue;
+          const v = String(r[k] || '').trim();
+          if (v && !/^(không|khong|none|\-)$/i.test(removeVietnameseTones(v))) return v;
+        }
+      }
+      return '';
+    }
+
+    // =========================================================================
+    // TÍNH NĂNG MỚI: BẤM 1 LẦN XEM ĐẦY ĐỦ THÔNG TIN Ô — NHẤP ĐÚP (2 LẦN) CHỈNH SỬA
+    // =========================================================================
+    let activePopoverCellKey = null;
+    let singleClickTimer = null;
+
+    function closeCellDetailPopover() {
+      const pop = document.getElementById('cellDetailPopover');
+      if (pop) pop.classList.add('hidden');
+      activePopoverCellKey = null;
+    }
+
+    function showCellDetailPopover(targetEl, labelName, textVal, cellKey, orderIdx, fieldName) {
+      const pop = document.getElementById('cellDetailPopover');
+      if (!pop || !targetEl) return;
+      activePopoverCellKey = cellKey;
+
+      const titleEl = document.getElementById('popoverCellTitle');
+      const contentEl = document.getElementById('popoverCellContent');
+      const copyText = document.getElementById('popoverCopyText');
+      if (copyText) copyText.textContent = 'Sao chép';
+      if (titleEl) titleEl.textContent = labelName ? `📌 ${labelName}` : 'Chi tiết thông tin ô';
+      if (contentEl) contentEl.textContent = textVal ? textVal : '(Ô này hiện đang để trống)';
+
+      pop.classList.remove('hidden');
+      const rect = targetEl.getBoundingClientRect();
+      const popWidth = Math.min(360, window.innerWidth - 30);
+      const popHeight = 180;
+
+      let left = rect.left;
+      if (left + popWidth > window.innerWidth - 15) {
+        left = window.innerWidth - popWidth - 15;
+      }
+      if (left < 15) left = 15;
+
+      let top = rect.bottom + 6;
+      if (top + popHeight > window.innerHeight - 15) {
+        top = rect.top - popHeight - 6;
+      }
+      if (top < 15) top = 15;
+
+      pop.style.left = `${left}px`;
+      pop.style.top = `${top}px`;
+      pop.style.width = `${popWidth}px`;
+    }
+
+    function copyCellDetailContent() {
+      const contentEl = document.getElementById('popoverCellContent');
+      const copyText = document.getElementById('popoverCopyText');
+      if (contentEl) {
+        const text = contentEl.textContent || '';
+        navigator.clipboard.writeText(text).then(() => {
+          if (copyText) {
+            copyText.textContent = 'Đã sao chép! ✓';
+            setTimeout(() => { if (copyText) copyText.textContent = 'Sao chép'; }, 1800);
+          }
+        });
+      }
+    }
+
+    function triggerEditFromPopover() {
+      if (!activePopoverCellKey) return;
+      const key = activePopoverCellKey;
+      closeCellDetailPopover();
+      enterCellInlineEdit(key);
+    }
+
+    function handleCellClick(e, cellKey, labelName, textVal, orderIdx, fieldName, targetWrapper) {
+      if (e.target && e.target.classList && e.target.classList.contains('cell-edit-input')) return;
+      if (cellLocks && cellLocks[cellKey]) {
+        promptUnlockSingleCell(cellKey, labelName);
+        return;
+      }
+      if (singleClickTimer) clearTimeout(singleClickTimer);
+      singleClickTimer = setTimeout(() => {
+        let latestVal = textVal;
+        if (orders[orderIdx] && orders[orderIdx][fieldName] !== undefined) {
+          latestVal = orders[orderIdx][fieldName];
+        }
+        showCellDetailPopover(targetWrapper, labelName, latestVal, cellKey, orderIdx, fieldName);
+        singleClickTimer = null;
+      }, 230);
+    }
+
+    function handleCellDblClick(e, cellKey, targetWrapper) {
+      if (singleClickTimer) {
+        clearTimeout(singleClickTimer);
+        singleClickTimer = null;
+      }
+      closeCellDetailPopover();
+      if (cellLocks && cellLocks[cellKey]) {
+        promptUnlockSingleCell(cellKey, 'Ô đang khóa');
+        return;
+      }
+      enterCellInlineEdit(cellKey, targetWrapper);
+    }
+
+    function enterCellInlineEdit(cellKey, targetWrapper) {
+      if (!targetWrapper) {
+        targetWrapper = document.querySelector(`[data-cell-wrapper="${cellKey}"]`);
+      }
+      if (!targetWrapper) return;
+      const viewSpan = targetWrapper.querySelector('.cell-view-text');
+      const inputEl = targetWrapper.querySelector('.cell-edit-input');
+      if (viewSpan && inputEl) {
+        viewSpan.classList.add('hidden');
+        inputEl.classList.remove('hidden');
+        inputEl.focus();
+        inputEl.select();
+      }
+    }
+
+    function saveAndExitCellEdit(cellKey, inputEl, onBlurJs) {
+      const targetWrapper = inputEl.closest('[data-cell-wrapper]');
+      const val = inputEl.value.trim();
+      if (targetWrapper) {
+        const viewSpan = targetWrapper.querySelector('.cell-view-text');
+        if (viewSpan) {
+          viewSpan.textContent = val || '-';
+          if (!val) {
+            viewSpan.innerHTML = `<span class="text-slate-300 italic font-normal">${inputEl.placeholder || '-'}</span>`;
+          }
+          viewSpan.classList.remove('hidden');
+        }
+      }
+      inputEl.classList.add('hidden');
+      if (onBlurJs) {
+        try {
+          new Function('inputEl', onBlurJs)(inputEl);
+        } catch (e) {}
+      }
+    }
+
+    function handleCellEditKeyDown(e, cellKey, inputEl) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        inputEl.blur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        const [oIdx, fName] = cellKey.split(':');
+        if (orders[oIdx] && orders[oIdx][fName] !== undefined) {
+          inputEl.value = orders[oIdx][fName] || '';
+        }
+        inputEl.blur();
+      }
+    }
+
+    document.addEventListener('click', function(e) {
+      const pop = document.getElementById('cellDetailPopover');
+      if (pop && !pop.classList.contains('hidden')) {
+        if (!pop.contains(e.target) && !e.target.closest('[data-cell-wrapper]')) {
+          closeCellDetailPopover();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeCellDetailPopover();
+      }
+    });
+
+    // =========================================================================
+    // BỘ LỌC MỚI: HÀNG ĐẶT TRƯỚC / ĐƠN THƯỜNG & ĐƠN CÓ MVĐ / KHÔNG CÓ MVĐ & KHOẢNG NGÀY
+    // =========================================================================
+    let currentPreOrderFilter = 'all'; // 'all' | 'Hàng đặt trước' | 'Đơn thường'
+    let currentTrackingFilter = 'all'; // 'all' | 'has_track' | 'no_track'
+    let currentDateFilterType = 'any'; // 'any' | 'recvDate' | 'returnDate' | 'shipDate'
+    let currentCustomDateFrom = '';
+    let currentCustomDateTo = '';
+
+    function setPreOrderFilter(filterVal) {
+      currentPreOrderFilter = filterVal || 'all';
+      currentPage = 1;
+      const sel = document.getElementById('preOrderFilterSelect');
+      if (sel && sel.value !== currentPreOrderFilter) sel.value = currentPreOrderFilter;
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function setTrackingFilter(filterVal) {
+      currentTrackingFilter = filterVal || 'all';
+      currentPage = 1;
+      const sel = document.getElementById('trackingFilterSelect');
+      if (sel && sel.value !== currentTrackingFilter) sel.value = currentTrackingFilter;
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function setDateFilterType(filterVal) {
+      currentDateFilterType = filterVal || 'any';
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function applyCustomDateRange() {
+      const fromEl = document.getElementById('customDateFrom');
+      const toEl = document.getElementById('customDateTo');
+      currentCustomDateFrom = fromEl ? fromEl.value : '';
+      currentCustomDateTo = toEl ? toEl.value : '';
+      if (currentCustomDateFrom || currentCustomDateTo) {
+        currentRecvDateFilter = 'custom';
+        const sel = document.getElementById('recvDateFilterSelect');
+        if (sel) sel.value = 'custom';
+      }
+      currentPage = 1;
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function clearCustomDateRange() {
+      currentCustomDateFrom = '';
+      currentCustomDateTo = '';
+      currentRecvDateFilter = 'all';
+      const fromEl = document.getElementById('customDateFrom');
+      const toEl = document.getElementById('customDateTo');
+      const sel = document.getElementById('recvDateFilterSelect');
+      const box = document.getElementById('customDateRangeBox');
+      if (fromEl) fromEl.value = '';
+      if (toEl) toEl.value = '';
+      if (sel) sel.value = 'all';
+      if (box) {
+        box.classList.add('hidden');
+        box.classList.remove('inline-flex');
+      }
+      currentPage = 1;
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function escapeJs(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+    }
+
     function renderCellInput(cellKey, labelName, val, extraClass, placeholder, onInputJs, typeAttr = 'text', listId = '', onBlurJs = '', onFocusJs = '') {
       const locked = Boolean(cellLocks[cellKey]);
       if (locked) {
         return `
           <div class="relative flex items-center justify-between px-1.5 py-1 bg-slate-100/90 rounded cursor-pointer group"
-               title="Ô này đang khóa mật khẩu (Chỉ xem). Bấm vào hoặc Chuột phải để nhập mật khẩu sửa!"
+               title="Ô này đang khóa mật khẩu (Chỉ xem). Bấm 1 lần hoặc Chuột phải để mở khóa!"
                onclick="promptUnlockSingleCell('${cellKey}','${labelName}')"
                oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')">
             <span class="${extraClass} truncate flex-1">${escapeAttr(val)}</span>
@@ -6765,23 +7112,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         `;
       }
       const listAttr = listId ? `list="${listId}"` : '';
-      const blurAttr = onBlurJs ? `onblur="${onBlurJs}"` : '';
-      const focusAttr = onFocusJs ? `onfocus="${onFocusJs}"` : '';
+      const [orderIdxStr, fieldName] = cellKey.split(':');
+      const orderIdxNum = Number(orderIdxStr);
+      const safeVal = String(val || '');
+
       return `
-        <input type="${typeAttr}"
-               data-cell-key="${cellKey}"
-               class="cell-input ${extraClass}"
-               value="${escapeAttr(val)}"
-               placeholder="${placeholder}"
-               ${listAttr}
-               ${blurAttr}
-               ${focusAttr}
-               onkeydown="handleCellKeyDown(event, this, '${cellKey}')"
-               title="Enter: Qua ô tiếp theo | Mũi tên Lên/Xuống: Nhảy dòng | Chuột phải: Khóa ô"
-               oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')"
-               oninput="${onInputJs}" />
+        <div data-cell-wrapper="${cellKey}"
+             class="cell-wrapper relative w-full flex items-center px-1.5 py-0.5 rounded cursor-pointer hover:bg-amber-50/70 border border-transparent hover:border-amber-300/60 transition group select-none min-h-[26px]"
+             onclick="handleCellClick(event,'${cellKey}','${escapeJs(labelName)}','${escapeJs(safeVal)}',${orderIdxNum},'${fieldName}',this)"
+             ondblclick="handleCellDblClick(event,'${cellKey}',this)"
+             oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')"
+             title="Bấm 1 lần: Xem đầy đủ | Nhấp đúp (2 lần): Chỉnh sửa | Chuột phải: Khóa ô">
+          <span class="cell-view-text ${extraClass} block truncate w-full pointer-events-none">
+            ${escapeAttr(safeVal) || `<span class="text-slate-300 italic font-normal">${placeholder || '-'}</span>`}
+          </span>
+          <input type="${typeAttr}"
+                 data-cell-key="${cellKey}"
+                 class="cell-edit-input hidden w-full px-1.5 py-0.5 text-xs bg-white border-2 border-blue-500 rounded shadow-sm outline-none ${extraClass}"
+                 value="${escapeAttr(safeVal)}"
+                 placeholder="${placeholder}"
+                 ${listAttr}
+                 onblur="saveAndExitCellEdit('${cellKey}',this,'${escapeJs(onBlurJs)}')"
+                 onkeydown="handleCellEditKeyDown(event,'${cellKey}',this)"
+                 oninput="${onInputJs}" />
+        </div>
       `;
     }
+
 
     function renderAll(rebuildSummaryImmediately = true) {
       const kw = document.getElementById('searchInput').value.trim();
@@ -6809,17 +7166,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentFilterTab === 'overdue' && getDeadlineStatus(order) !== 'overdue' && !isOrderOverdue(order, 7)) return false;
         if (currentFilterTab === 'lost' && order.status !== 'Bị mất' && order.status !== 'Hư hỏng') return false;
 
-        // Arrival / Active Date Filtering
+        // Arrival / Active Date Filtering (Hỗ trợ cả mốc nhanh & Khoảng ngày tùy chọn Từ ngày - Đến ngày)
         if (currentRecvDateFilter !== 'all') {
-          const targetDateVal = String(order[activeFilterDateField] || '').trim();
-          if (!targetDateVal) return false;
-          if (currentRecvDateFilter === 'today' && !targetDateVal.startsWith(todayDateStr)) return false;
-          if (currentRecvDateFilter === 'yesterday' && !targetDateVal.startsWith(yesterdayDateStr)) return false;
-          if (currentRecvDateFilter === '7days') {
-            const p = parseFullDate(targetDateVal);
-            if (!p) return false;
-            const diffDays = Math.floor((now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
-            if (diffDays < 0 || diffDays > 7) return false;
+          if (currentRecvDateFilter === 'custom') {
+            const checkOrderDateInRange = (dateStr) => {
+              if (!dateStr) return false;
+              const p = parseFullDate(dateStr);
+              if (!p) return false;
+              const ymd = p.getFullYear() + '-' + String(p.getMonth() + 1).padStart(2, '0') + '-' + String(p.getDate()).padStart(2, '0');
+              if (currentCustomDateFrom && ymd < currentCustomDateFrom) return false;
+              if (currentCustomDateTo && ymd > currentCustomDateTo) return false;
+              return true;
+            };
+
+            if (currentDateFilterType === 'recvDate') {
+              if (!checkOrderDateInRange(order.recvDate)) return false;
+            } else if (currentDateFilterType === 'returnDate') {
+              if (!checkOrderDateInRange(order.returnDate)) return false;
+            } else if (currentDateFilterType === 'shipDate') {
+              if (!checkOrderDateInRange(order.shipDate)) return false;
+            } else {
+              const inRecv = checkOrderDateInRange(order.recvDate);
+              const inRet = checkOrderDateInRange(order.returnDate);
+              const inShip = checkOrderDateInRange(order.shipDate);
+              if (!inRecv && !inRet && !inShip) return false;
+            }
+          } else {
+            const targetDateVal = String(order[activeFilterDateField] || '').trim();
+            if (!targetDateVal) return false;
+            if (currentRecvDateFilter === 'today' && !targetDateVal.startsWith(todayDateStr)) return false;
+            if (currentRecvDateFilter === 'yesterday' && !targetDateVal.startsWith(yesterdayDateStr)) return false;
+            if (currentRecvDateFilter === '7days') {
+              const p = parseFullDate(targetDateVal);
+              if (!p) return false;
+              const diffDays = Math.floor((now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
+              if (diffDays < 0 || diffDays > 7) return false;
+            }
+            if (currentRecvDateFilter === '30days') {
+              const p = parseFullDate(targetDateVal);
+              if (!p) return false;
+              const diffDays = Math.floor((now.getTime() - p.getTime()) / (1000 * 60 * 60 * 24));
+              if (diffDays < 0 || diffDays > 30) return false;
+            }
           }
         }
 
@@ -6828,6 +7216,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Order Type Filtering (Giao không thành công / Trả hàng/Hoàn tiền / Đơn hủy / THẤT THU)
         if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) return false;
+
+        // Pre-order Filter (Hàng đặt trước / Đơn thường)
+        if (currentPreOrderFilter !== 'all') {
+          const pNorm = removeVietnameseTones(order.preOrder || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isPre = (order.preOrder === 'Hàng đặt trước' || pNorm.includes('dattruoc') || pNorm.includes('preorder'));
+          const fNorm = removeVietnameseTones(currentPreOrderFilter || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const wantsPre = (currentPreOrderFilter === 'pre_order' || currentPreOrderFilter === 'Hàng đặt trước' || fNorm.includes('dattruoc') || fNorm.includes('preorder'));
+          const wantsNormal = (currentPreOrderFilter === 'normal' || currentPreOrderFilter === 'Đơn thường' || fNorm.includes('thuong') || fNorm.includes('normal'));
+          if (wantsPre && !isPre) return false;
+          if (wantsNormal && isPre) return false;
+        }
+
+        // Tracking Code Filter (Có mã vận đơn / Không có mã vận đơn)
+        if (currentTrackingFilter !== 'all') {
+          const hasTrack = Boolean(order.track && String(order.track).trim() !== '' && String(order.track).trim() !== '-');
+          if (currentTrackingFilter === 'has_track' && !hasTrack) return false;
+          if (currentTrackingFilter === 'no_track' && hasTrack) return false;
+        }
 
         // Keyword Search Filter
         const matched = isOrderMatch(order, kw);
@@ -7308,6 +7714,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) {
           return;
         }
+        if (currentPreOrderFilter !== 'all') {
+          const pNorm = removeVietnameseTones(order.preOrder || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isPre = (order.preOrder === 'Hàng đặt trước' || pNorm.includes('dattruoc') || pNorm.includes('preorder'));
+          const fNorm = removeVietnameseTones(currentPreOrderFilter || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const wantsPre = (currentPreOrderFilter === 'pre_order' || currentPreOrderFilter === 'Hàng đặt trước' || fNorm.includes('dattruoc') || fNorm.includes('preorder'));
+          const wantsNormal = (currentPreOrderFilter === 'normal' || currentPreOrderFilter === 'Đơn thường' || fNorm.includes('thuong') || fNorm.includes('normal'));
+          if (wantsPre && !isPre) return;
+          if (wantsNormal && isPre) return;
+        }
+        if (currentTrackingFilter !== 'all') {
+          const hasTrack = Boolean(order.track && String(order.track).trim() !== '' && String(order.track).trim() !== '-');
+          if (currentTrackingFilter === 'has_track' && !hasTrack) return;
+          if (currentTrackingFilter === 'no_track' && hasTrack) return;
+        }
+
 
         const p = Number(order.price) || 0;
         totalPrice += p;

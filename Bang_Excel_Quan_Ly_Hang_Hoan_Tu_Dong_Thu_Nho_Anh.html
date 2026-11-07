@@ -144,7 +144,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.2.6
+          🚀 Phiên bản v1.2.7
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -451,7 +451,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.6</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.7</span>
               </div>
             </div>
           </div>
@@ -589,6 +589,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <option value="Khác">📦 Sàn khác</option>
           </select>
 
+          <!-- Lọc Loại đơn (Nguồn phát sinh) -->
+          <select id="orderTypeFilterSelect" onchange="setOrderTypeFilter(this.value)"
+                  title="Lọc theo Loại đơn (Nguồn phát sinh: Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU)"
+                  class="text-[11px] font-bold bg-white border border-indigo-300 text-indigo-900 rounded-md px-2 py-1 outline-none cursor-pointer hover:border-indigo-500">
+            <option value="all">📂 Tất cả loại đơn</option>
+            <option value="Giao không thành công">🚚 Giao không thành công</option>
+            <option value="Trả hàng/Hoàn tiền">↩️ Trả hàng/Hoàn tiền</option>
+            <option value="Đơn hủy">🚫 Đơn hủy</option>
+            <option value="THẤT THU">⚫ THẤT THU (Gốc Salework)</option>
+          </select>
+
           <!-- Sắp xếp theo ngày (Gộp 4 nút rời thành 1 menu thả gọn gàng + vẫn bấm trực tiếp trên tiêu đề cột được) -->
           <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1.5 py-0.5">
             <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
@@ -660,6 +671,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <span>Ngày & Giờ Về Kho</span> <span id="thSortIcon_recvDate" class="text-[10px] text-emerald-200">⇅</span>
             </th>
             <th class="min-w-[105px] w-28 !bg-orange-950 py-1.5">Sàn TMĐT</th>
+            <th class="min-w-[140px] w-36 !bg-indigo-950 py-1.5" title="Nguồn phát sinh đơn: Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU (Gốc Salework)">Loại Đơn</th>
             <th class="w-32 py-1.5">Mã Đơn Hàng</th>
             <th class="w-32 py-1.5">Mã Vận Đơn</th>
             <th class="w-28 py-1.5">Đơn Vị Vận Chuyển</th>
@@ -669,7 +681,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <th class="w-14 py-1.5">Số Lượng</th>
             <th class="w-20 no-print py-1.5" title="Thao tác thêm hoặc xóa sản phẩm trong cùng 1 đơn">Thao Tác SP</th>
             <th class="w-28 py-1.5">Tổng Giá Trị</th>
-            <th class="w-28 py-1.5">Trạng Thái</th>
+            <th class="min-w-[115px] w-28 !bg-emerald-950 py-1.5" title="Theo dõi riêng bằng kết quả quét kho: Chưa nhận ➔ Đã nhận (sau khi quét kiện về kho) | Bị mất">Đã Nhận Thực Tế</th>
             <th class="w-24 py-1.5" title="Bấm vào ô rồi Ctrl+V để dán ảnh đơn hàng">Ảnh Đơn Hàng</th>
             <th class="w-44 py-1.5">Lý Do Hoàn / Ghi Chú</th>
             <th class="w-10 no-print py-1.5">Xóa</th>
@@ -678,7 +690,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <tbody id="orderTableBody"></tbody>
         <tfoot>
           <tr class="bg-slate-100 font-bold text-xs border-t-2 border-slate-800">
-            <td colspan="12" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
+            <td colspan="13" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
             <td id="footTotalQty" class="text-center py-2.5 text-slate-900 text-sm">0</td>
             <td class="no-print"></td>
             <td id="footTotalPrice" class="text-right py-2.5 px-2 text-slate-900 text-sm">0 đ</td>
@@ -1514,6 +1526,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <tr>
                   <th class="!bg-slate-800 w-10">STT</th>
                   <th class="!bg-slate-800 w-24">Sàn</th>
+                  <th class="!bg-indigo-950 w-32">Loại Đơn</th>
                   <th class="!bg-slate-800 text-left px-2 w-32">Mã Vận Đơn</th>
                   <th class="!bg-slate-800 text-left px-2 w-32">Mã Đơn Hàng</th>
                   <th class="!bg-slate-800 text-left px-2">Tên Sản Phẩm</th>
@@ -1891,12 +1904,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         flat.push({
           'STT': i + 1,
           'Sàn TMĐT': getOrderPlatform(o),
+          'Loại Đơn (Nguồn Phát Sinh)': getOrderType(o),
           'Mã Vận Đơn': o.track || '',
           'Mã Đơn Hàng': o.orderId || '',
           'Đơn Vị Vận Chuyển': o.carrier || '',
           'Ngày Bấm Hoàn': o.returnDate || o.shipDate || '',
           'Số Ngày Đã Chờ': getOrderAgeText(o),
           'Giá Trị Đơn (VNĐ)': Number(o.price) || 0,
+          'Đã Nhận Thực Tế': o.status === 'Hàng đã trả' ? 'Đã nhận' : o.status === 'Bị mất' ? 'Bị mất' : 'Chưa nhận',
           'Sản Phẩm Trong Đơn': (o.items || []).map(x => `${x.product} (${x.color}/${x.size} x${x.qty})`).join('; '),
           'Ghi Chú': 'Quá 7 ngày chưa về kho - Đề nghị kiểm tra và bồi thường'
         });
@@ -2204,6 +2219,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (match.platform && (forceOverwrite || !order.platform || order.platform === 'Shopee')) {
         if (order.platform !== match.platform) {
           order.platform = match.platform;
+          changed = true;
+        }
+      }
+      if (match.orderType && (forceOverwrite || !order.orderType)) {
+        if (order.orderType !== match.orderType) {
+          order.orderType = match.orderType;
           changed = true;
         }
       }
@@ -2666,6 +2687,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
           const rows = readWorkbookRowsFromBuffer(buf, isCsv);
           if (rows && rows.length > 0) {
+            rows.forEach(r => {
+              if (r && typeof r === 'object') r.__sourceFileName = file.name || '';
+            });
             combinedRows = combinedRows.concat(rows);
           }
         } catch (err) {
@@ -2897,15 +2921,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         if (!rawReturnDate && rawShipDate) rawReturnDate = rawShipDate;
 
-        // Lý do / Trạng thái đơn TikTok
+        // Lý do / Trạng thái đơn TikTok & Loại đơn (Nguồn phát sinh)
+        // Đặc biệt: Với file TikTok qua Salework, giữ nguyên trạng thái gốc "THẤT THU" vì chỉ dựa vào chữ này chưa đủ kết luận đơn thuộc Giao không thành công hay Trả hàng/Hoàn tiền!
         let rawNote = noteKey ? String(row[noteKey] || '').trim() : '';
-        if (rawStatusText) {
-          if (rawOrderStNorm === 'that thu') {
-            rawNote = rawNote ? `THẤT THU | ${rawNote}` : 'THẤT THU (Hoàn về kho)';
-          } else if (rawOrderStNorm === 'huy' || rawOrderStNorm.includes('da huy')) {
-            const cancelTag = rawTrack ? 'Đơn HỦY (Đã có MVĐ)' : 'Đơn HỦY trước khi gửi (File gốc không có MVĐ)';
-            rawNote = rawNote ? `${cancelTag} | ${rawNote}` : cancelTag;
+        const rawNoteNorm = removeVietnameseTones(rawNote).toLowerCase();
+        let detectedOrderType = 'THẤT THU';
+        if (rawOrderStNorm === 'that thu' || rawOrderStNorm.includes('that thu')) {
+          detectedOrderType = 'THẤT THU';
+          rawNote = rawNote ? `THẤT THU | ${rawNote}` : 'THẤT THU (Trạng thái gốc Salework - Cần theo dõi hàng về)';
+        } else if (rawOrderStNorm.includes('giao') && (rawOrderStNorm.includes('that bai') || rawOrderStNorm.includes('khong thanh'))) {
+          detectedOrderType = 'Giao không thành công';
+        } else if (rawOrderStNorm.includes('tra hang') || rawOrderStNorm.includes('hoan tien') || rawOrderStNorm.includes('return') || rawOrderStNorm.includes('refund')) {
+          detectedOrderType = 'Trả hàng/Hoàn tiền';
+        } else if (rawOrderStNorm === 'huy' || rawOrderStNorm.includes('da huy') || rawOrderStNorm.includes('cancel')) {
+          if (rawNoteNorm.includes('giao hang that bai') || rawNoteNorm.includes('giao khong thanh cong')) {
+            detectedOrderType = 'Giao không thành công';
+          } else {
+            detectedOrderType = 'Đơn hủy';
           }
+          const cancelTag = rawTrack ? 'Đơn HỦY (Đã có MVĐ)' : 'Đơn HỦY trước khi gửi (File gốc không có MVĐ)';
+          rawNote = rawNote ? `${cancelTag} | ${rawNote}` : cancelTag;
         }
 
         // Phân tích Tên sản phẩm (GIỮ NGUYÊN " - Premium Cao Cấp"), Màu sắc, Size
@@ -2947,6 +2982,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
           tempMap.set(groupKey, {
             platform: 'TikTok Shop',
+            orderType: detectedOrderType,
             orderId: rawOrderId,
             track: rawTrack,
             altTrack: '',
@@ -3051,6 +3087,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               returnDate: orderData.returnDate || orderData.shipDate || today,
               recvDate: '',
               platform: 'TikTok Shop',
+              orderType: orderData.orderType || 'THẤT THU',
               orderId: orderData.orderId || '',
               track: cleanTrack || orderData.track || '',
               altTrack: '',
@@ -3295,7 +3332,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Xây dựng Lý do hoàn / Ghi chú chi tiết từ các cột Shopee / TikTok / Salework
         let noteParts = [];
-        const returnShipSt = returnShipmentStatusKey ? String(row[returnShipmentStatusKey] || '').trim() : '';
+        const returnShipStRaw = returnShipmentStatusKey ? String(row[returnShipmentStatusKey] || '').trim() : '';
+        const returnShipSt = /^(không|khong|none|\-)$/i.test(removeVietnameseTones(returnShipStRaw)) ? '' : returnShipStRaw;
         const returnMethod = returnMethodKey ? String(row[returnMethodKey] || '').trim() : '';
         const mainReason = noteKey ? String(row[noteKey] || '').trim() : '';
         const buyerComment = buyerNoteKey ? String(row[buyerNoteKey] || '').trim() : '';
@@ -3419,10 +3457,57 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         }
 
+        // Nhận diện chính xác Loại Đơn (Nguồn phát sinh: Trả hàng/Hoàn tiền | Giao không thành công | Đơn hủy | THẤT THU)
+        // Thứ tự ưu tiên:
+        // 1. Nếu tên file chỉ rõ nguồn xuất (return_refund / failed_delivery / cancelled) -> lấy chuẩn theo loại file xuất
+        // 2. Nếu không có tên file (dán nhanh / file tổng hợp) -> xét theo cột Trạng thái & Lý do của từng dòng
+        const srcFileNorm = String(row.__sourceFileName || '').toLowerCase();
+        const stNormForType = removeVietnameseTones(rawStatusText).toLowerCase();
+        const retStNormForType = returnStatusKey ? removeVietnameseTones(String(row[returnStatusKey] || '')).toLowerCase() : '';
+        const cancelNormForType = removeVietnameseTones(`${cancelReasonText} ${mainReason} ${rawNote}`).toLowerCase();
+        const hasReturnQtyColVal = returnQtyKey && (parseInt(String(row[returnQtyKey] || '').replace(/[^\d]/g, ''), 10) || 0) > 0;
+
+        let detectedOrderType = 'Trả hàng/Hoàn tiền';
+        if (stNormForType === 'that thu' || stNormForType.includes('that thu')) {
+          detectedOrderType = 'THẤT THU';
+        } else if (srcFileNorm.includes('failed_delivery')) {
+          detectedOrderType = 'Giao không thành công';
+        } else if (srcFileNorm.includes('return_refund')) {
+          detectedOrderType = 'Trả hàng/Hoàn tiền';
+        } else if (srcFileNorm.includes('cancel')) {
+          if (cancelNormForType.includes('giao hang that bai') || cancelNormForType.includes('giao khong thanh cong')) {
+            detectedOrderType = 'Giao không thành công';
+          } else {
+            detectedOrderType = 'Đơn hủy';
+          }
+        } else if (
+          cancelNormForType.includes('giao hang that bai') ||
+          cancelNormForType.includes('giao khong thanh cong') ||
+          cancelNormForType.includes('failed delivery') ||
+          stNormForType.includes('that bai') ||
+          stNormForType.includes('khong thanh')
+        ) {
+          detectedOrderType = 'Giao không thành công';
+        } else if (
+          (retStNormForType && retStNormForType !== 'khong' && retStNormForType !== 'none') ||
+          hasReturnQtyColVal ||
+          (returnMethod && removeVietnameseTones(returnMethod).toLowerCase() !== 'khong') ||
+          (returnShipSt && removeVietnameseTones(returnShipSt).toLowerCase() !== 'khong')
+        ) {
+          detectedOrderType = 'Trả hàng/Hoàn tiền';
+        } else if (
+          stNormForType.includes('huy') ||
+          stNormForType.includes('cancel') ||
+          Boolean(cancelReasonText)
+        ) {
+          detectedOrderType = 'Đơn hủy';
+        }
+
         const existedBefore = tempMap.has(groupKey);
         if (!existedBefore) {
           tempMap.set(groupKey, {
             platform: detectedPlatform,
+            orderType: detectedOrderType,
             orderId: rawOrderId,
             track: rawTrack,
             altTrack: rawAltTrack,
@@ -3521,6 +3606,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               returnDate: orderData.returnDate || orderData.shipDate || today,
               recvDate: '',
               platform: orderData.platform || 'Shopee',
+              orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
               orderId: orderData.orderId || '',
               track: cleanTrack || orderData.track || '',
               altTrack: cleanAltTrack || orderData.altTrack || '',
@@ -3602,6 +3688,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             returnDate: orderData.returnDate || orderData.shipDate || today,
             recvDate: '',
             platform: orderData.platform || 'Shopee',
+            orderType: orderData.orderType || (orderData.platform === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền'),
             orderId: orderData.orderId || '',
             track: cleanTrack || orderData.track || '',
             altTrack: orderData.altTrack || '',
@@ -3695,7 +3782,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (countEl) countEl.textContent = list.length;
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400 italic">Hiện tại bộ nhớ tra cứu đang trống (0 đơn). Hãy chọn file Excel Shopee hoặc TikTok ở trên để nạp đơn mới!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-6 text-slate-400 italic">Hiện tại bộ nhớ tra cứu đang trống (0 đơn). Hãy chọn file Excel Shopee hoặc TikTok ở trên để nạp đơn mới!</td></tr>`;
         return;
       }
 
@@ -3705,10 +3792,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const platBadge = plat === 'TikTok Shop'
           ? `<span class="px-1.5 py-0.5 rounded bg-slate-900 text-white font-bold text-[10px]">⚫ TikTok</span>`
           : `<span class="px-1.5 py-0.5 rounded bg-orange-100 text-[#ee4d2d] border border-orange-300 font-bold text-[10px]">🟠 Shopee</span>`;
+        const oType = it.orderType || (plat === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền');
+        const oTypeBadge = oType === 'Giao không thành công'
+          ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">🚚 Giao KTC</span>`
+          : oType === 'Đơn hủy'
+          ? `<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 font-bold text-[10px]">🚫 Đơn hủy</span>`
+          : oType === 'THẤT THU'
+          ? `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-slate-600 font-bold text-[10px]">⚫ THẤT THU</span>`
+          : `<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-[10px]">↩️ Trả/Hoàn</span>`;
         return `
           <tr class="hover:bg-slate-50">
             <td class="text-center font-bold text-slate-500">${idx + 1}</td>
             <td class="text-center">${platBadge}</td>
+            <td class="text-center">${oTypeBadge}</td>
             <td class="px-2 font-mono font-bold text-purple-900">${escapeAttr(it.track || '---')}</td>
             <td class="px-2 font-mono text-slate-700">${escapeAttr(it.orderId || '---')}</td>
             <td class="px-2 font-semibold text-slate-900">${escapeAttr(firstItem.product || '---')}</td>
@@ -4084,6 +4180,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let currentFilterTab = 'all'; // 'all' | 'waiting' | 'returned' | 'overdue' | 'lost'
     let currentRecvDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | '7days'
     let currentPlatformFilter = 'all'; // 'all' | 'Shopee' | 'TikTok Shop' | 'Lazada' | 'Khác'
+    let currentOrderTypeFilter = 'all'; // 'all' | 'Giao không thành công' | 'Trả hàng/Hoàn tiền' | 'Đơn hủy' | 'THẤT THU'
     let currentDateSort = 'default'; // 'default' | 'shipDate_desc' | 'shipDate_asc' | 'returnDate_desc' | 'returnDate_asc' | 'recvDate_desc' | 'recvDate_asc'
     let currentPage = 1;
     let pageSize = 50; // 50 đơn / trang giúp bảng siêu mượt kể cả khi có hàng nghìn đơn và nhiều ảnh
@@ -4092,7 +4189,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.2.6';
+    const APP_VERSION_NUMBER = '1.2.7';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -4131,9 +4228,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới trong phiên bản ${curVer}:\n` +
-        `1. Tách Riêng Cơ Chế Nhập Dữ Liệu 2 Sàn (🟠 Nạp Đơn Shopee & ⚫ Nạp Đơn TikTok / Salework): Mỗi sàn có nút nạp và bộ đọc cột Excel chuyên biệt.\n` +
-        `2. Giữ Nguyên 100% Chữ "Premium Cao Cấp" Của Đơn TikTok: Tách sạch Màu sắc & Size nhưng vẫn giữ nguyên hậu tố " - Premium Cao Cấp" trong Tên sản phẩm để phân biệt rõ bản thường và bản cao cấp.\n` +
-        `3. Chuẩn Hóa Mã Vận Đơn & Giá Trị Hàng Hóa TikTok: Tự động lấy 100% Mã vận đơn cột [R], lưu đủ 4 mức giá (Cột Z/K, Cột AM, Cột AO/G, Cột L) và cho phép chuyển đổi cột Giá Trị Hàng Hóa tức thì ngay trên giao diện.`
+        `1. Thêm Cột "Loại Đơn" (Nguồn Phát Sinh): Tự động phân loại rõ 4 nhóm: 🚚 Giao không thành công, ↩️ Trả hàng/Hoàn tiền, 🚫 Đơn hủy, và giữ nguyên trạng thái gốc ⚫ THẤT THU cho file TikTok xuất qua Salework.\n` +
+        `2. Cột "Đã Nhận Thực Tế" Theo Dõi Riêng Bằng Kết Quả Quét Kho: Một đơn thuộc "Giao không thành công", "Trả hàng/Hoàn tiền" hoặc "THẤT THU" mặc định ở [🟡 Chưa nhận], và tự động chuyển thành [🟢 Đã nhận] ngay khi bạn quét mã vạch kiện hàng về kho (cột Loại Đơn vẫn giữ nguyên).\n` +
+        `3. Bộ Lọc Nhanh Theo Loại Đơn: Lọc riêng từng nhóm nguồn phát sinh ngay trên thanh công cụ.`
       );
     }
 
@@ -4275,6 +4372,75 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!orders[orderIdx]) return;
       orders[orderIdx].platform = val;
       addAuditLog('🛍️ ĐỔI SÀN TMĐT', `Đơn #${orderIdx + 1} (${orders[orderIdx].orderId || orders[orderIdx].track}) đổi sang sàn [${val}]`);
+      saveOrders();
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    const ORDER_TYPE_OPTIONS = [
+      'Giao không thành công',
+      'Trả hàng/Hoàn tiền',
+      'Đơn hủy',
+      'THẤT THU'
+    ];
+
+    function getOrderType(order) {
+      if (!order) return 'Trả hàng/Hoàn tiền';
+      if (order.orderType && ORDER_TYPE_OPTIONS.includes(order.orderType)) {
+        return order.orderType;
+      }
+      if (order.orderType) return order.orderType;
+      const noteRaw = String(order.note || '');
+      const noteNorm = removeVietnameseTones(noteRaw).toLowerCase();
+      const plat = getOrderPlatform(order);
+      if (noteNorm.includes('that thu') || noteRaw.includes('THẤT THU')) {
+        return 'THẤT THU';
+      }
+      if (
+        noteNorm.includes('giao hang that bai') ||
+        noteNorm.includes('giao khong thanh cong') ||
+        noteNorm.includes('khong nhan') ||
+        noteNorm.includes('khong nghe may') ||
+        noteNorm.includes('tu choi nhan') ||
+        noteNorm.includes('failed delivery')
+      ) {
+        return 'Giao không thành công';
+      }
+      if (
+        noteNorm.includes('tra hang') ||
+        noteNorm.includes('hoan tien') ||
+        noteNorm.includes('khieu nai') ||
+        noteNorm.includes('chap thuan') ||
+        noteNorm.includes('doi y') ||
+        noteNorm.includes('be vo')
+      ) {
+        return 'Trả hàng/Hoàn tiền';
+      }
+      if (noteNorm.includes('don huy') || noteNorm.includes('da huy') || noteNorm.startsWith('huy')) {
+        return 'Đơn hủy';
+      }
+      if (plat === 'TikTok Shop') {
+        return 'THẤT THU';
+      }
+      return 'Trả hàng/Hoàn tiền';
+    }
+
+    function setOrderTypeFilter(filterVal) {
+      currentOrderTypeFilter = filterVal || 'all';
+      currentPage = 1;
+      const sel = document.getElementById('orderTypeFilterSelect');
+      if (sel && sel.value !== currentOrderTypeFilter) {
+        sel.value = currentOrderTypeFilter;
+      }
+      renderAll();
+      recalcTotalsAndSummary();
+    }
+
+    function updateOrderType(orderIdx, val) {
+      if (!orders[orderIdx]) return;
+      const oldType = getOrderType(orders[orderIdx]);
+      orders[orderIdx].orderType = val;
+      addAuditLog('📂 ĐỔI LOẠI ĐƠN', `Đơn #${orderIdx + 1} (${orders[orderIdx].orderId || orders[orderIdx].track || 'Chưa có mã'}): [${oldType}] ➔ [${val}]`);
       saveOrders();
       renderAll();
       recalcTotalsAndSummary();
@@ -5759,7 +5925,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!kw) return false;
       const itemsText = (order.items || []).map(it => `${it.product} ${it.color} ${it.size}`).join(' ');
       const plat = getOrderPlatform(order);
-      const hay = `${plat} ${order.orderId} ${order.track} ${order.altTrack || ''} ${order.carrier} ${order.shipDate} ${order.returnDate} ${order.recvDate} ${order.note} ${itemsText}`.toLowerCase();
+      const oType = getOrderType(order);
+      const hay = `${plat} ${oType} ${order.orderId} ${order.track} ${order.altTrack || ''} ${order.carrier} ${order.shipDate} ${order.returnDate} ${order.recvDate} ${order.note} ${itemsText}`.toLowerCase();
       return hay.includes(kw.toLowerCase());
     }
 
@@ -5869,11 +6036,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!(await requireUnlocked('Thêm Đơn Mới'))) return;
       const today = new Date().toLocaleDateString('vi-VN');
       const defaultPlat = currentPlatformFilter !== 'all' ? currentPlatformFilter : 'Shopee';
+      const defaultOrderType = currentOrderTypeFilter !== 'all'
+        ? currentOrderTypeFilter
+        : (defaultPlat === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền');
       orders.push({
         shipDate: '',
         returnDate: today,
         recvDate: '',
         platform: defaultPlat,
+        orderType: defaultOrderType,
         orderId: '',
         track: '',
         carrier: 'SPX Express',
@@ -5899,6 +6070,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         returnDate: src.returnDate || today,
         recvDate: '',
         platform: src.platform || getOrderPlatform(src),
+        orderType: src.orderType || getOrderType(src),
         orderId: '',
         track: '',
         carrier: src.carrier || 'SPX Express',
@@ -6192,6 +6364,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Platform Filtering (Shopee / TikTok Shop / Lazada / Khác)
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) return false;
 
+        // Order Type Filtering (Giao không thành công / Trả hàng/Hoàn tiền / Đơn hủy / THẤT THU)
+        if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) return false;
+
         // Keyword Search Filter
         const matched = isOrderMatch(order, kw);
         if (kw && filterOnly && !matched) return false;
@@ -6333,6 +6508,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                    <option value="Khác" ${curPlatform === 'Khác' ? 'selected' : ''}>📦 Khác</option>
                  </select>`;
 
+            const curOrderType = getOrderType(order);
+            const orderTypeLocked = Boolean(cellLocks[`${orderIdx}:orderType`]);
+            const orderTypeClassMap = {
+              'Giao không thành công': 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100',
+              'Trả hàng/Hoàn tiền': 'bg-indigo-50 text-indigo-800 border-indigo-300 hover:bg-indigo-100',
+              'Đơn hủy': 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100',
+              'THẤT THU': 'bg-slate-800 text-amber-300 border-slate-600 hover:bg-slate-700'
+            };
+            const curTypeStyle = orderTypeClassMap[curOrderType] || orderTypeClassMap['Trả hàng/Hoàn tiền'];
+            const orderTypeCellHtml = orderTypeLocked
+              ? `<div onclick="promptUnlockSingleCell('${orderIdx}:orderType','Loại đơn #${orderIdx+1}')"
+                      oncontextmenu="handleCellContextMenu(event,'${orderIdx}:orderType','Loại đơn #${orderIdx+1}')"
+                      title="Ô Loại đơn đang khóa. Bấm để mở khóa!"
+                      class="flex items-center justify-center gap-1 px-1.5 py-1 rounded cursor-pointer font-bold text-[11px] ${curTypeStyle}">
+                   <span>${escapeAttr(curOrderType)}</span>
+                   <span class="text-[10px] text-rose-500">🔒</span>
+                 </div>`
+              : `<select class="w-full text-center font-bold text-[10.5px] py-0.5 px-1 rounded border outline-none cursor-pointer transition shadow-2xs h-6.5 ${curTypeStyle}"
+                        title="Loại đơn (Nguồn phát sinh: Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU)"
+                        oncontextmenu="handleCellContextMenu(event,'${orderIdx}:orderType','Loại đơn #${orderIdx+1}')"
+                        onchange="updateOrderType(${orderIdx}, this.value)">
+                   <option value="Giao không thành công" ${curOrderType === 'Giao không thành công' ? 'selected' : ''}>🚚 Giao không thành công</option>
+                   <option value="Trả hàng/Hoàn tiền" ${curOrderType === 'Trả hàng/Hoàn tiền' ? 'selected' : ''}>↩️ Trả hàng/Hoàn tiền</option>
+                   <option value="Đơn hủy" ${curOrderType === 'Đơn hủy' ? 'selected' : ''}>🚫 Đơn hủy</option>
+                   <option value="THẤT THU" ${curOrderType === 'THẤT THU' ? 'selected' : ''}>⚫ THẤT THU (Salework)</option>
+                 </select>`;
+
             // Highlight cells of the active sorted column
             const isShipSortActive = currentDateSort.startsWith('shipDate');
             const isReturnSortActive = currentDateSort.startsWith('returnDate');
@@ -6355,6 +6557,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <td rowspan="${span}" class="${returnTdClass}">${renderCellInput(`${orderIdx}:returnDate`, `Ngày bấm hoàn đơn #${orderIdx+1}`, order.returnDate, 'text-center font-semibold text-amber-900', 'Gõ 25/10...', `updateOrderField(${orderIdx},'returnDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'returnDate',this)`)}</td>
               <td rowspan="${span}" class="${recvTdClass}">${renderCellInput(`${orderIdx}:recvDate`, `Ngày & Giờ về kho đơn #${orderIdx+1}`, order.recvDate, 'text-center font-semibold text-emerald-800 text-[11px]', 'dd/mm/yyyy hh:mm:ss', `updateOrderField(${orderIdx},'recvDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'recvDate',this)`)}</td>
               <td rowspan="${span}" class="text-center min-w-[110px] px-1">${platformCellHtml}</td>
+              <td rowspan="${span}" class="text-center min-w-[140px] px-1">${orderTypeCellHtml}</td>
               <td rowspan="${span}">${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
               <td rowspan="${span}">${renderCellInput(`${orderIdx}:track`, `Mã vận đơn #${orderIdx+1}`, order.track, 'text-center font-mono font-semibold text-blue-700', 'Nhập MVĐ + Enter...', `handleTrackingChange(${orderIdx},this.value,false)`, 'text', '', `handleTrackingChange(${orderIdx},this.value,true)`)}</td>
               <td rowspan="${span}">${carrierCellHtml}</td>
@@ -6394,20 +6597,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (isFirst) {
             const statusLocked = Boolean(cellLocks[`${orderIdx}:status`]);
             const statusHtml = statusLocked
-              ? `<div onclick="promptUnlockSingleCell('${orderIdx}:status','Trạng thái Đơn #${orderIdx+1}')"
-                      oncontextmenu="handleCellContextMenu(event,'${orderIdx}:status','Trạng thái Đơn #${orderIdx+1}')"
-                      title="Ô Trạng thái này đang khóa mật khẩu (Chỉ xem). Bấm vào để nhập mật khẩu mở khóa!"
+              ? `<div onclick="promptUnlockSingleCell('${orderIdx}:status','Đã nhận thực tế Đơn #${orderIdx+1}')"
+                      oncontextmenu="handleCellContextMenu(event,'${orderIdx}:status','Đã nhận thực tế Đơn #${orderIdx+1}')"
+                      title="Ô Đã Nhận Thực Tế này đang khóa mật khẩu (Chỉ xem). Bấm vào để nhập mật khẩu mở khóa!"
                       class="status-select ${statusClass} flex items-center justify-center gap-1 cursor-pointer">
-                   <span>${order.status === 'Hàng đã trả' ? '🟢 Hàng đã trả' : order.status === 'Bị mất' ? '🔴 Bị mất' : '🟡 Chưa trả'}</span>
+                   <span>${order.status === 'Hàng đã trả' ? '🟢 Đã nhận (Về kho)' : order.status === 'Bị mất' ? '🔴 Bị mất' : '🟡 Chưa nhận'}</span>
                    <span class="text-xs">🔒</span>
                  </div>`
               : `<select class="status-select ${statusClass}"
-                         title="Nhấp Chuột phải vào ô này để khóa mật khẩu riêng ô Trạng thái này"
-                         oncontextmenu="handleCellContextMenu(event,'${orderIdx}:status','Trạng thái Đơn #${orderIdx+1}')"
+                         title="Theo dõi riêng bằng kết quả quét kho: Chưa nhận ➔ Đã nhận (sau khi quét kiện về kho) | Bị mất"
+                         oncontextmenu="handleCellContextMenu(event,'${orderIdx}:status','Đã nhận thực tế Đơn #${orderIdx+1}')"
                          onchange="updateStatus(${orderIdx}, this)">
-                  <option value="Hàng đã trả" ${order.status === 'Hàng đã trả' ? 'selected' : ''}>🟢 Hàng đã trả</option>
-                  <option value="Chưa trả" ${order.status === 'Chưa trả' ? 'selected' : ''}>🟡 Chưa trả</option>
-                  <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất</option>
+                  <option value="Hàng đã trả" ${order.status === 'Hàng đã trả' ? 'selected' : ''}>🟢 Đã nhận (Về kho)</option>
+                  <option value="Chưa trả" ${order.status === 'Chưa trả' ? 'selected' : ''}>🟡 Chưa nhận (Chờ về)</option>
+                  <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
                 </select>`;
 
             html += `
@@ -6445,7 +6648,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
              </div>`
           : `<div class="py-8 text-center text-slate-500 text-xs font-semibold">Không có đơn hàng nào khớp với bộ lọc hiện tại.</div>`;
-        html = `<tr><td colspan="18" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
+        html = `<tr><td colspan="19" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
 
       tbody.innerHTML = html;
@@ -6482,8 +6685,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const productMap = new Map();
 
       orders.forEach((order, idx) => {
-        // Khi đang lọc theo sàn (Shopee / TikTok...), các thẻ thống kê & bảng kế toán chỉ tính riêng sàn đó!
+        // Khi đang lọc theo sàn (Shopee / TikTok...) hoặc Loại đơn, các thẻ thống kê & bảng kế toán tính theo bộ lọc đang chọn!
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) {
+          return;
+        }
+        if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) {
           return;
         }
 
@@ -6781,6 +6987,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Ngày Khách Bấm Hoàn / Hủy': o.returnDate,
             'Ngày & Giờ Hàng Về Kho': o.recvDate,
             'Sàn TMĐT': getOrderPlatform(o),
+            'Loại Đơn (Nguồn Phát Sinh)': getOrderType(o),
             'Mã Đơn Hàng': o.orderId,
             'Mã Vận Đơn': o.track,
             'Đơn Vị Vận Chuyển': o.carrier,
@@ -6789,7 +6996,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Size': it.size,
             'Số Lượng': Number(it.qty) || 0,
             'Tổng Giá Trị Đơn (VNĐ)': itemIdx === 0 ? (Number(o.price) || 0) : 0,
-            'Trạng Thái Hàng Hoàn': o.status,
+            'Đã Nhận Thực Tế (Quét Kho)': o.status === 'Hàng đã trả' ? 'Đã nhận (Hàng đã trả)' : o.status === 'Bị mất' ? 'Bị mất (Khiếu nại)' : 'Chưa nhận (Chờ về)',
             'Lý Do Hoàn / Ghi Chú': o.note
           });
           currentRowIdx++;
@@ -6797,7 +7004,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         if (span > 1) {
           const endRow = currentRowIdx - 1;
-          [1, 2, 3, 4, 5, 6, 7, 12, 13, 14].forEach(colIdx => {
+          [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15].forEach(colIdx => {
             merges.push({ s: { r: startRow, c: colIdx }, e: { r: endRow, c: colIdx } });
           });
         }

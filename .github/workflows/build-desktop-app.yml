@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.6
+          name: QuanLyHangHoan-Windows-Installer-v1.2.7
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,22 +66,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.6
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.6 (Tách Riêng Cơ Chế Nạp Đơn Shopee & TikTok, Giữ Nguyên Chữ Premium Cao Cấp, Chuẩn Hóa Mã Vận Đơn & Giá Trị Hàng Hóa)"
+          tag_name: v1.2.7
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.7 (Thêm Cột Loại Đơn Phân Biệt Nguồn Phát Sinh, Cột Đã Nhận Thực Tế Theo Dõi Quét Kho, Giữ Trạng Thái Gốc THẤT THU Cho TikTok/Salework)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.6
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.7
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.6`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.6.exe`)
-            - **Điểm nâng cấp & tối ưu trong v1.2.6**:
-              1. 🛍️ **Tách riêng hoàn toàn cơ chế nhập dữ liệu của 2 sàn (`🟠 Nạp Đơn Shopee` & `⚫ Nạp Đơn TikTok / Salework`)**:
-                 - Thêm 2 nút nạp riêng biệt ngay trên thanh công cụ chính (`📥 Nạp Đơn Shopee` và `📥 Nạp Đơn TikTok`), trong menu `📂 Nhập / Xuất Dữ Liệu`, và 2 tab cơ chế riêng biệt trong cửa sổ nạp đơn.
-              2. 🏷️ **Giữ nguyên 100% chữ `Premium Cao Cấp` trong Tên sản phẩm của đơn TikTok / Salework**:
-                 - Tách sạch `Màu sắc` (VD: `Nâu`, `Xanh Than Mori`) và `Size` (VD: `XL`, `L`) sang đúng cột riêng nhưng **giữ nguyên hậu tố `- Premium Cao Cấp`** ở cuối Tên sản phẩm để phân biệt rõ ràng dòng thường và dòng `Premium Cao Cấp` trên cả bảng đơn hàng lẫn bảng tổng kết tồn kho bên dưới.
-              3. 💰 **Chuẩn hóa Giá Trị Hàng Hóa TikTok & Cho phép đổi cột giá tức thì**:
-                 - Mặc định lấy chuẩn cột **`[Z] Tổng giá trị / [K] Giá sàn TMĐT`** và tích hợp thanh chọn nhanh **4 cột giá TikTok / Salework** (`Cột [Z] Tổng giá trị`, `Cột [AM] Tổng tiền hàng sau chiết khấu`, `Cột [AO] Tổng tiền hàng / Giá gốc Salework`, `Cột [L] Doanh thu ước tính`). Khi đổi lựa chọn, toàn bộ đơn TikTok trên bảng tự động cập nhật lại cột `Tổng Giá Trị` ngay lập tức.
-              4. 📦 **Tự động lấy 100% Mã vận đơn cột `[R]` & Hỗ trợ lọc đơn HỦY chưa gửi hàng**:
-                 - Tự động điền chuẩn 100% Mã vận đơn (`8626...`, `TTVN...`) từ cột `[R] Mã vận đơn` của file TikTok/Salework và luôn ghi đè cập nhật thông tin mới khi nạp lại file. Có thêm tùy chọn tự động bỏ qua các đơn khách bấm `HỦY` trước khi gửi hàng (vốn để trống cột Mã vận đơn trong file Excel gốc).
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.7`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.7.exe`)
+            - **Điểm nâng cấp & tối ưu trong v1.2.7**:
+              1. 📂 **Thêm cột `"Loại Đơn"` phân biệt rõ nguồn phát sinh của từng đơn hàng**:
+                 - **`🚚 Giao không thành công`**: Đơn giao thất bại, cần theo dõi hàng quay về kho (tự động nhận diện từ file `Order.failed_delivery...` hoặc lý do hủy giao thất bại).
+                 - **`↩️ Trả hàng/Hoàn tiền`**: Đơn có yêu cầu trả hàng hoặc hoàn tiền (tự động nhận diện từ file `Order.return_refund...` hoặc có trạng thái/phương án trả hàng hoàn tiền).
+                 - **`🚫 Đơn hủy`**: Đơn bị hủy (tự động nhận diện từ file `Order.cancelled...` hoặc đơn trạng thái `HỦY`).
+                 - **`⚫ THẤT THU (Salework)`**: Giữ nguyên trạng thái gốc **`THẤT THU`** đối với file TikTok xuất qua Salework (vì chỉ dựa vào chữ `THẤT THU` của Salework chưa đủ để tự kết luận đơn thuộc nhóm nào), đồng thời cho phép bấm chọn đổi nhóm ngay trên dòng bất cứ lúc nào.
+              2. 🟢 **Cột `"Đã Nhận Thực Tế"` theo dõi độc lập bằng kết quả quét kho**:
+                 - Khi mới nạp đơn (`Giao không thành công`, `Trả hàng/Hoàn tiền`, `THẤT THU`, `Đơn hủy`), cột **`Đã Nhận Thực Tế`** mặc định ở trạng thái **`🟡 Chưa nhận (Chờ về)`**.
+                 - Ngay khi bạn quét mã vạch kiện hàng về kho, cột **`Đã Nhận Thực Tế`** tự động chuyển sang **`🟢 Đã nhận (Về kho)`** kèm ngày giờ thực tế, trong khi cột **`Loại Đơn`** vẫn giữ nguyên 100% nguồn phát sinh ban đầu.
+              3. 🔍 **Thêm bộ lọc nhanh theo `Loại Đơn` trên thanh công cụ**:
+                 - Lọc riêng từng nhóm `Giao không thành công`, `Trả hàng/Hoàn tiền`, `Đơn hủy`, hoặc `THẤT THU (Gốc Salework)` chỉ với 1 cú nhấp chuột.
           files: |
             dist/*.exe
         env:

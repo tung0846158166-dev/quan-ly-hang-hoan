@@ -97,6 +97,59 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .row-match {
       background-color: #fef08a !important;
     }
+
+    /* v1.4.0: HIỆU ỨNG NHÁY XANH NỔI BẬT KHI QUÉT TRÚNG ĐƠN TỪ ĐIỆN THOẠI / PC */
+    @keyframes scanRowFlashGreenAnim {
+      0% {
+        background-color: #10b981 !important;
+        box-shadow: inset 0 0 0 3px #047857, 0 4px 22px rgba(16, 185, 129, 0.7) !important;
+        transform: scale(1.008);
+      }
+      18% {
+        background-color: #34d399 !important;
+        box-shadow: inset 0 0 0 3px #059669, 0 4px 25px rgba(16, 185, 129, 0.8) !important;
+      }
+      36% {
+        background-color: #a7f3d0 !important;
+        box-shadow: inset 0 0 0 2px #10b981, 0 2px 12px rgba(16, 185, 129, 0.4) !important;
+        transform: scale(1);
+      }
+      54% {
+        background-color: #10b981 !important;
+        box-shadow: inset 0 0 0 3px #047857, 0 4px 22px rgba(16, 185, 129, 0.7) !important;
+        transform: scale(1.008);
+      }
+      72% {
+        background-color: #6ee7b7 !important;
+        box-shadow: inset 0 0 0 2px #059669, 0 3px 15px rgba(16, 185, 129, 0.5) !important;
+        transform: scale(1);
+      }
+      88% {
+        background-color: #a7f3d0 !important;
+        box-shadow: inset 0 0 0 2px #10b981, 0 2px 10px rgba(16, 185, 129, 0.3) !important;
+      }
+      100% {
+        background-color: inherit;
+        box-shadow: none;
+        transform: scale(1);
+      }
+    }
+    .scan-flash-green {
+      animation: scanRowFlashGreenAnim 2.8s ease-in-out !important;
+      position: relative;
+      z-index: 25;
+    }
+    .scan-flash-green > td {
+      background-color: rgba(16, 185, 129, 0.22) !important;
+      border-top: 2.5px solid #059669 !important;
+      border-bottom: 2.5px solid #059669 !important;
+    }
+    .scan-flash-green > td:first-child {
+      border-left: 4.5px solid #047857 !important;
+    }
+    .scan-flash-green > td:last-child {
+      border-right: 4.5px solid #047857 !important;
+    }
     .order-group-border td {
       border-top: 2px solid #94a3b8 !important;
     }
@@ -172,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.9
+          🚀 Phiên bản v1.4.0
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -519,7 +572,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.3.9</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.4.0</span>
               </div>
             </div>
           </div>
@@ -5448,7 +5501,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.9';
+    const APP_VERSION_NUMBER = '1.4.0';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8561,6 +8614,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // 3. Pagination slice for smooth 60fps rendering on 500 - 2,000+ orders
       const totalFiltered = filteredEntries.length;
+      window.lastFilteredEntries = filteredEntries;
       const effectivePageSize = pageSize > 0 ? pageSize : Math.max(totalFiltered, 1);
       totalFilteredPages = Math.max(1, Math.ceil(totalFiltered / effectivePageSize));
       if (currentPage > totalFilteredPages) currentPage = totalFilteredPages;
@@ -8842,7 +8896,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Generate the single order row
         html += `
-          <tr class="${rowBgClass} border-b border-slate-200 transition-colors" onfocusin="activePhotoOrderIndex=${orderIdx}">
+          <tr id="order_row_${orderIdx}" data-order-idx="${orderIdx}" class="${rowBgClass} border-b border-slate-200 transition-colors" onfocusin="activePhotoOrderIndex=${orderIdx}">
             <td class="text-center font-bold text-slate-700 bg-slate-50/60">${sttDisplay}${overdueTag}</td>
             <td class="text-center font-bold text-xs ${matched ? 'text-orange-800' : 'text-slate-300'}">
               ${matched ? '🔍 KHỚP' : ''}
@@ -10575,6 +10629,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       saveOrders();
       renderAll();
+      if (typeof highlightAndFlashOrderRow === 'function' && targetIdx !== -1) {
+        highlightAndFlashOrderRow(targetIdx, { isDuplicate: false, source: 'pc_cam' });
+      }
       return { index: targetIdx, isNew: isNew, order: orders[targetIdx] };
     }
 
@@ -10599,6 +10656,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       }
     });
+
+    // v1.4.0: Bắt phím Enter trên ô tìm kiếm để nháy xanh khi quét bằng súng quét mã vạch PC
+    const searchInpEl = document.getElementById('searchInput');
+    if (searchInpEl) {
+      searchInpEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          const val = this.value.trim();
+          if (val) {
+            const clean = extractCleanTrackingCode(val) || val.toUpperCase();
+            const matchIdx = orders.findIndex(o => {
+              const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
+              const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
+              const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
+              const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
+              const oid = String(o.orderId || '').trim().toUpperCase();
+              return (tr && tr === clean) || (altTr && altTr === clean) || (retTr && retTr === clean) || (fwdTr && fwdTr === clean) || (oid && oid === clean);
+            });
+            if (matchIdx !== -1) {
+              highlightAndFlashOrderRow(matchIdx, { source: 'search_enter' });
+            }
+          }
+        }
+      });
+    }
 
     // Keep suggestion box anchored to the input cell whenever the window or table scrolls!
     window.addEventListener('scroll', updateSmartSuggestPosition, true);
@@ -11296,6 +11377,154 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       list.insertAdjacentHTML('afterbegin', `<div class="py-0.5 border-b border-slate-800 flex justify-between"><span>${escapeAttr(text)}</span><span class="text-slate-400 ml-2">${nowStr}</span></div>`);
     }
 
+    // v1.4.0: HỆ THỐNG FLOATING TOAST THÔNG BÁO HIỆN ĐẠI
+    function showAppToast(msg, type = 'success', duration = 3200) {
+      try {
+        let toastContainer = document.getElementById('appGlobalToastContainer');
+        if (!toastContainer) {
+          toastContainer = document.createElement('div');
+          toastContainer.id = 'appGlobalToastContainer';
+          toastContainer.className = 'fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none max-w-md';
+          document.body.appendChild(toastContainer);
+        }
+        const toast = document.createElement('div');
+        const bgColors = {
+          success: 'bg-emerald-900/95 text-white border-emerald-500 shadow-emerald-950/50',
+          warning: 'bg-amber-900/95 text-white border-amber-500 shadow-amber-950/50',
+          info: 'bg-blue-900/95 text-white border-blue-500 shadow-blue-950/50',
+          error: 'bg-rose-900/95 text-white border-rose-500 shadow-rose-950/50'
+        };
+        const colorClass = bgColors[type] || bgColors.success;
+        toast.className = `px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold border flex items-center gap-2 transform transition-all duration-300 translate-y-3 opacity-0 ${colorClass}`;
+        toast.innerHTML = msg;
+        toastContainer.appendChild(toast);
+
+        requestAnimationFrame(() => {
+          toast.classList.remove('translate-y-3', 'opacity-0');
+          toast.classList.add('translate-y-0', 'opacity-100');
+        });
+
+        setTimeout(() => {
+          toast.classList.remove('translate-y-0', 'opacity-100');
+          toast.classList.add('translate-y-3', 'opacity-0');
+          setTimeout(() => toast.remove(), 320);
+        }, duration);
+      } catch (e) {
+        console.log('Toast:', msg);
+      }
+    }
+    const showToast = showAppToast;
+
+    // v1.4.0: TỰ ĐỘNG CHUYỂN TAB TUẦN, ĐỊNH VỊ PHÂN TRANG VÀ NHÁY XANH NỔI BẬT KHI QUÉT TRÚNG ĐƠN TỪ ĐT/PC
+    function highlightAndFlashOrderRow(orderIdx, options = {}) {
+      if (typeof orderIdx !== 'number' || orderIdx < 0 || orderIdx >= orders.length) return;
+      const targetOrder = orders[orderIdx];
+      if (!targetOrder) return;
+
+      const isDup = Boolean(options.isDuplicate);
+      const targetWeek = getOrderImportWeek(targetOrder);
+
+      // 1. Tự động chuyển Tab tuần nếu đơn hàng thuộc tuần khác
+      let switchedWeek = false;
+      if (currentImportWeekFilter !== 'all' && currentImportWeekFilter !== targetWeek) {
+        currentImportWeekFilter = targetWeek;
+        try {
+          localStorage.setItem(SAVED_ACTIVE_WEEK_KEY, targetWeek);
+        } catch (e) {}
+        switchedWeek = true;
+      }
+
+      // 2. Mở rộng bộ lọc nếu đơn hàng đang bị ẩn bởi bộ lọc hiện tại
+      let filterRelaxed = false;
+
+      // Xóa từ khóa tìm kiếm nếu không khớp với đơn này
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput && searchInput.value.trim() && !isOrderMatch(targetOrder, searchInput.value.trim())) {
+        searchInput.value = '';
+        filterRelaxed = true;
+      }
+
+      // Nếu đang lọc trạng thái (Chưa nhận, Đã nhận, Quá hạn...) mà đơn không khớp -> Chuyển về 'all'
+      if (currentFilterTab !== 'all') {
+        const matchesTab = (
+          (currentFilterTab === 'waiting' && isOrderPending(targetOrder)) ||
+          (currentFilterTab === 'returned' && isOrderReceived(targetOrder)) ||
+          (currentFilterTab === 'unneeded' && isOrderUnneeded(targetOrder)) ||
+          (currentFilterTab === 'upcoming' && getDeadlineStatus(targetOrder) === 'upcoming') ||
+          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 7))) ||
+          (currentFilterTab === 'lost' && (targetOrder.status === 'Bị mất' || targetOrder.status === 'Hư hỏng'))
+        );
+        if (!matchesTab) {
+          currentFilterTab = 'all';
+          document.querySelectorAll('#pipelineTabs button').forEach(b => {
+            b.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
+          });
+          const allBtn = document.getElementById('tabBtn_all');
+          if (allBtn) allBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-900 text-white shadow-2xs cursor-pointer';
+          filterRelaxed = true;
+        }
+      }
+
+      // Nếu lọc riêng Sàn Shopee / TikTok mà đơn thuộc sàn khác -> Chuyển về 'all'
+      if (currentPlatformFilter !== 'all' && getOrderPlatform(targetOrder) !== currentPlatformFilter) {
+        currentPlatformFilter = 'all';
+        if (typeof updatePlatformSwitcherUI === 'function') updatePlatformSwitcherUI();
+        filterRelaxed = true;
+      }
+
+      // Nếu lọc ngày nhận -> Chuyển về 'all'
+      if (currentRecvDateFilter !== 'all') {
+        currentRecvDateFilter = 'all';
+        const dateSel = document.getElementById('recvDateFilterSelect');
+        if (dateSel) dateSel.value = 'all';
+        filterRelaxed = true;
+      }
+
+      // Cập nhật lại thanh Tab tuần và thống kê
+      renderWeeklyImportTabs();
+      recalcTotalsAndSummary();
+      renderCategorySummaryTable();
+
+      // Render lại bảng để có danh sách filteredEntries mới nhất
+      renderAll(false);
+
+      // 3. Tính toán trang phân trang chứa đơn hàng này
+      const filteredPos = (window.lastFilteredEntries || []).findIndex(e => e.originalIndex === orderIdx);
+      if (filteredPos !== -1 && pageSize > 0) {
+        const targetPage = Math.floor(filteredPos / pageSize) + 1;
+        if (currentPage !== targetPage) {
+          currentPage = targetPage;
+          renderAll(false);
+        }
+      }
+
+      // 4. Cuộn mượt và kích hoạt hiệu ứng NHÁY XANH NỔI BẬT (Green Flash Pulse)
+      setTimeout(() => {
+        const rowEl = document.getElementById('order_row_' + orderIdx);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          rowEl.classList.remove('scan-flash-green');
+          void rowEl.offsetWidth; // Force CSS reflow
+          rowEl.classList.add('scan-flash-green');
+          setTimeout(() => {
+            rowEl.classList.remove('scan-flash-green');
+          }, 3200);
+        }
+      }, 70);
+
+      // 5. Hiển thị thông báo Toast nổi bật
+      const weekInfo = getWeekInfoFromKey(targetWeek);
+      const weekName = weekInfo.label || targetWeek;
+      const orderCode = targetOrder.track || targetOrder.orderId || ('Đơn #' + (orderIdx + 1));
+      if (isDup) {
+        showToast(`⚠️ [QUÉT LẠI] Đơn #${orderIdx + 1} (${orderCode}) đã trả từ trước — Đang nhấp nháy định vị tại ${weekName}!`, 'warning');
+      } else if (switchedWeek) {
+        showToast(`⚡ [ĐIỆN THOẠI KHỚP ĐƠN] Đã tự chuyển sang [${weekName}] & nhấp nháy xanh Đơn #${orderIdx + 1} (${orderCode})!`, 'success');
+      } else {
+        showToast(`✨ [ĐIỆN THOẠI KHỚP ĐƠN] Đang nháy xanh Đơn #${orderIdx + 1} (${orderCode})!`, 'success');
+      }
+    }
+
     function handleIncomingPhoneBarcode(rawCode, requestId = '', photoDataUrl = '', clientRoom = '') {
       if (!rawCode) return;
       const cleanCode = extractCleanTrackingCode(rawCode);
@@ -11357,12 +11586,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           // ALREADY RETURNED! Duplicate scan
           if (photoDataUrl) {
             saveOrders();
-            renderAll();
           }
           addAuditLog('⚠️ QUÉT ĐT TRÙNG LẶP', `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} ĐÃ TRẢ từ trước!`);
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
           playScanDuplicateTone(); recordCodeToActiveSession(cleanCode, existingIdx, true);
           sendAckToPhone(existingIdx + 1, cleanCode, '⚠️ ĐÃ TRẢ TỪ TRƯỚC (QUÉT TRÙNG)', 'duplicate', true, requestId, clientRoom);
+          highlightAndFlashOrderRow(existingIdx, { isDuplicate: true, source: 'phone' });
           return;
         }
 
@@ -11381,10 +11610,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         activePhotoOrderIndex = existingIdx;
         addAuditLog('📱 QUÉT ĐT ĐỐI SOÁT', `Quét mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} tự động khớp thông tin & chuyển sang [🟢 Hàng đã trả]`);
         appendPhoneLiveLog(`✅ Khớp Đơn #${existingIdx + 1} (${cleanCode}) ➔ [🟢 Hàng đã trả]`);
-        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, typeof existingIdx !== "undefined" ? existingIdx : targetIdx, false);
+        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, existingIdx, false);
         sendAckToPhone(existingIdx + 1, cleanCode, 'ĐÃ KHỚP ĐƠN #' + (existingIdx + 1) + ' (Hàng đã trả)', 'success', false, requestId, clientRoom);
         saveOrders();
-        renderAll();
+        highlightAndFlashOrderRow(existingIdx, { isDuplicate: false, source: 'phone' });
         return;
       }
 
@@ -11407,10 +11636,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         addAuditLog('📱 QUÉT ĐT ĐIỀN MÃ', `Điền MVĐ [${cleanCode}] (${autoCarrier}) vào Đơn #${targetIdx + 1}`);
         appendPhoneLiveLog(`🎯 Đã điền [${cleanCode}] (${autoCarrier}) vào Đơn #${targetIdx + 1}`);
-        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, typeof existingIdx !== "undefined" ? existingIdx : targetIdx, false);
+        playScanSuccessTone(); recordCodeToActiveSession(cleanCode, targetIdx, false);
         sendAckToPhone(targetIdx + 1, cleanCode, 'ĐÃ ĐIỀN VÀO ĐƠN #' + (targetIdx + 1), 'success', false, requestId, clientRoom);
         saveOrders();
-        renderAll();
+        highlightAndFlashOrderRow(targetIdx, { isDuplicate: false, source: 'phone' });
         return;
       }
 

@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.3.9
+          name: QuanLyHangHoan-Windows-Installer-v1.4.0
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,14 +67,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.3.9
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.3.9 (Hộp Thoại In-App Thêm Tab Tuần 1-Click Chuẩn Xác 100% Cho Cả Desktop App & Web, Ghi Nhớ Tab Tuần & Lưu Trữ An Toàn)"
+          tag_name: v1.4.0
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.4.0 (Hộp Thoại In-App Thêm Tab Tuần 1-Click Chuẩn Xác 100% Cho Cả Desktop App & Web, Ghi Nhớ Tab Tuần & Lưu Trữ An Toàn)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.3.9
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.4.0
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.3.9`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.3.9.exe`)
-            - **Các tính năng đột phá mới trong phiên bản v1.3.9**:
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.4.0`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.4.0.exe`)
+            - **Các tính năng đột phá mới trong phiên bản v1.4.0**:
               1. 📅 **Tab Phân Chia Số Lượng Đơn Theo Tuần Nạp File Excel (Weekly Import Tabs)**:
                  - Tự động chia nhỏ số lượng đơn hàng theo từng tuần dựa trên **thời gian nạp file Excel vào máy tính** (không bị phụ thuộc vào ngày đặt hàng cũ).
                  - Tự động sinh các tab tuần: `🌐 Tất cả các tuần`, `📅 Tuần 45 (02/11 - 08/11)`, `📅 Tuần 44`, kèm số lượng đơn và sản phẩm của từng tuần.

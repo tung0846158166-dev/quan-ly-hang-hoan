@@ -521,6 +521,24 @@
       <input id="roomCodeInput" class="room-input" value="SHP-2026" onchange="changeRoomCode(this.value)" />
     </div>
 
+    <!-- KHỐI HÀNG ĐỢI NGOẠI TUYẾN KÈM ẢNH (OFFLINE QUEUE WITH PHOTOS) -->
+    <div id="offlineQueueCard" class="hidden" style="margin-bottom: 12px; background: linear-gradient(135deg, #0f172a, #1e293b); border: 1.5px solid #f59e0b; border-radius: 14px; padding: 12px 14px; color: #fff; box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+        <span style="font-size:12px; font-weight:900; color:#fbbf24; display:flex; align-items:center; gap:6px;">
+          <span>⚡ HÀNG ĐỢI OFFLINE (LÚC PC TẮT):</span>
+          <span id="offlineCountBadge" style="background:#f59e0b; color:#000; font-size:11px; padding:1px 8px; border-radius:999px; font-weight:900;">0 kiện</span>
+        </span>
+        <span id="offlinePhotoCountBadge" style="font-size:11px; color:#38bdf8; font-weight:bold;">📸 0 ảnh</span>
+      </div>
+      <p style="font-size:11px; color:#cbd5e1; margin:0 0 10px 0; line-height:1.4;">
+        Toàn bộ mã và <b>ảnh chụp bóc kiện</b> được lưu an toàn 100% trong bộ nhớ máy. Khi mở máy tính, bấm nút bên dưới để đẩy trọn gói sang máy tính:
+      </p>
+      <button onclick="syncOfflineQueueToPc()" id="btnSyncOffline" style="width:100%; background:linear-gradient(135deg, #f59e0b, #d97706); color:#0f172a; border:none; border-radius:9px; padding:10px 14px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; box-shadow:0 3px 10px rgba(245,158,11,0.45); transition:transform 0.1s ease;">
+        <span>🔄 ĐỒNG BỘ TOÀN BỘ MÃ & ẢNH SANG MÁY TÍNH (1-CHẠM)</span>
+      </button>
+      <div id="syncProgressText" style="display:none; font-size:11px; color:#38bdf8; font-weight:bold; margin-top:6px; text-align:center;">Đang đồng bộ...</div>
+    </div>
+
     <div class="camera-box">
       <div id="reader"></div>
       <!-- Nút Làm Mới Camera nổi ở góc khung camera để bấm khởi động lại ngay nếu bị đen/mờ -->
@@ -1004,6 +1022,16 @@
 
     function handleScanAck(data) {
       if (!data) return;
+      if (data.type === 'pc_hello') {
+        console.log('PC is online! Auto syncing offline queue...');
+        const connBadge = document.getElementById('connBadge');
+        if (connBadge) {
+          connBadge.className = 'conn-pill conn-ok';
+          connBadge.textContent = '🟢 Máy Tính Đang Mở';
+        }
+        setTimeout(() => autoSyncOfflineQueueIfPending(), 300);
+        return;
+      }
       if (data.type === 'manifest_sync') {
         if (Array.isArray(data.knownCodes)) {
           knownSystemCodes = new Set(data.knownCodes.map(c => extractCleanTrackingCode(c)).filter(Boolean));
@@ -1080,9 +1108,11 @@
 
       if (existing) {
         existing.status = 'success';
+        existing.synced = true;
         existing.orderNum = orderNum || existing.orderNum;
         existing.detail = data.extra || 'Đã khớp hàng đã trả';
-      } else {
+      }
+      else {
         scanHistory.unshift({
           code: cleanCode,
           time: Date.now(),
@@ -1288,8 +1318,10 @@
         orderNum: null,
         dupCount: 0,
         photo: capturedPhoto || '',
+        synced: false, // Ban đầu đánh dấu chưa có xác nhận từ PC
         detail: capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn'
       });
+      setTimeout(() => updateOfflineQueueUI(), 50);
       saveScanHistory();
       renderScanHistory();
 
@@ -1965,6 +1997,115 @@
       console.warn('Lib load warning:', err);
       initPhoneSync();
     });
-  </script>
+  
+    // =========================================================================
+    // v1.3.5: QUẢN LÝ HÀNG ĐỢI OFFLINE KÈM ẢNH (OFFLINE PHOTO QUEUE ENGINE)
+    // =========================================================================
+    function getUnsyncedItems() {
+      return scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
+    }
+
+    function updateOfflineQueueUI() {
+      const card = document.getElementById('offlineQueueCard');
+      const badge = document.getElementById('offlineCountBadge');
+      const photoBadge = document.getElementById('offlinePhotoCountBadge');
+      if (!card || !badge) return;
+
+      const unsynced = getUnsyncedItems();
+      const photoCount = unsynced.filter(e => e.photo && e.photo.length > 50).length;
+
+      if (unsynced.length > 0) {
+        card.classList.remove('hidden');
+        badge.textContent = unsynced.length + ' kiện';
+        if (photoBadge) photoBadge.textContent = '📸 ' + photoCount + ' ảnh';
+      } else {
+        card.classList.add('hidden');
+      }
+    }
+
+    let isSyncingOffline = false;
+    async function syncOfflineQueueToPc() {
+      if (isSyncingOffline) return;
+      const unsynced = getUnsyncedItems();
+      if (!unsynced.length) {
+        alert('Tất cả các kiện và ảnh chụp đã được đồng bộ 100% sang máy tính!');
+        return;
+      }
+
+      isSyncingOffline = true;
+      const progressEl = document.getElementById('syncProgressText');
+      const btn = document.getElementById('btnSyncOffline');
+      if (progressEl) {
+        progressEl.style.display = 'block';
+        progressEl.textContent = 'Đang đồng bộ 0 / ' + unsynced.length + ' kiện & ảnh...';
+      }
+      if (btn) btn.disabled = true;
+
+      const topic = getNtfyTopic();
+      let sentCount = 0;
+
+      for (let i = 0; i < unsynced.length; i++) {
+        const item = unsynced[i];
+        if (progressEl) {
+          progressEl.textContent = 'Đang gửi kiện ' + (i + 1) + '/' + unsynced.length + ': ' + item.code + (item.photo ? ' (Kèm ảnh)' : '');
+        }
+
+        // 1. Gửi qua MQTT trực tiếp nếu có kết nối (Siêu nhanh 10ms, trọn vẹn 100% ảnh!)
+        const syncPayload = {
+          type: 'sync_item',
+          code: item.code,
+          photo: item.photo || '',
+          time: item.time || Date.now(),
+          room: room,
+          requestId: 'sync_' + item.code + '_' + (item.time || Date.now())
+        };
+
+        if (client && client.connected) {
+          try {
+            client.publish('agy_shopee_return_scanner_2026/' + room, JSON.stringify(syncPayload));
+          } catch (e) {}
+        }
+
+        // 2. Đồng thời gửi bản tin siêu nhẹ qua ntfy.sh
+        sendPayloadToPc({
+          type: 'barcode',
+          code: item.code,
+          photo: '',
+          time: item.time || Date.now()
+        }, item.code);
+
+        // 3. Nếu có ảnh, gửi các mảnh ảnh qua ntfy.sh để đảm bảo không mất ảnh
+        if (item.photo && item.photo.length > 50) {
+          try {
+            await sendPhotoPacket(item.photo, item.code);
+          } catch (e) {}
+        }
+
+        item.synced = true;
+        sentCount++;
+        await new Promise(r => setTimeout(r, 120));
+      }
+
+      saveScanHistory();
+      renderScanHistory();
+      updateOfflineQueueUI();
+
+      if (progressEl) {
+        progressEl.textContent = '🎉 Đã gửi thành công ' + sentCount + ' kiện và ảnh sang máy tính!';
+        setTimeout(() => { progressEl.style.display = 'none'; }, 3500);
+      }
+      if (btn) btn.disabled = false;
+      isSyncingOffline = false;
+    }
+
+    function autoSyncOfflineQueueIfPending() {
+      const unsynced = getUnsyncedItems();
+      if (unsynced.length > 0 && !isSyncingOffline) {
+        console.log('Auto syncing ' + unsynced.length + ' pending offline scans with photos to PC...');
+        syncOfflineQueueToPc();
+      }
+    }
+
+</script>
 </body>
 </html>

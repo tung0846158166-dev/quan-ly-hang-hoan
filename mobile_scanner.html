@@ -1547,17 +1547,17 @@
     }
 
     // Kiểm tra xem luồng video camera có bị đen / bị ngắt sau khi tắt màn hình bật lại không
+    let lastVideoTime = -1;
+    let videoStallCount = 0;
+
     async function checkAndRecoverCamera() {
       if (document.visibilityState !== 'visible') return;
       if (!wasCameraActive || isCameraStarting) return;
 
-      const overlay = document.getElementById('cameraStartOverlay');
-      if (overlay && !overlay.classList.contains('hidden')) return;
-
       const videoEl = document.querySelector('#reader video');
       let isDead = false;
 
-      if (!videoEl || !videoEl.srcObject) {
+      if (!videoEl || !videoEl.srcObject || !html5QrCode) {
         isDead = true;
       } else {
         const tracks = videoEl.srcObject.getVideoTracks();
@@ -1579,27 +1579,29 @@
       }
 
       if (isDead) {
-        console.log('Phát hiện Camera bị ngắt sau khi bật lại màn hình -> Tự động khởi động lại Camera...');
-        await safelyStopAndClearScanner();
-        await new Promise(r => setTimeout(r, 250));
-        await startCameraScanner(true);
+        console.log('Phát hiện Camera bị ngắt / bị đen sau khi bật lại màn hình -> Khởi động lại Camera...');
+        await forceRestartCamera();
       } else {
         requestScreenWakeLock();
       }
     }
 
-    // Khi tắt màn hình điện thoại (hidden) -> Giải phóng camera gọn gàng; Khi bật lại màn hình (visible) -> Tự động bật lại camera + nối lại máy tính!
+    // Khi tắt màn hình điện thoại (hidden) -> Giải phóng track ngay lập tức; Khi bật lại màn hình (visible) -> Tự động bật lại camera!
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState === 'hidden') {
-        if (wasCameraActive && html5QrCode) {
-          await safelyStopAndClearScanner();
-        }
+        try {
+          const videoEl = document.querySelector('#reader video');
+          if (videoEl && videoEl.srcObject) {
+            videoEl.srcObject.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+            videoEl.srcObject = null;
+          }
+        } catch (e) {}
       } else if (document.visibilityState === 'visible') {
         initPhoneSync();
         if (wasCameraActive) {
           setTimeout(() => {
-            startCameraScanner(true);
-          }, 300);
+            forceRestartCamera().catch(() => {});
+          }, 500);
         }
       }
     });
@@ -1607,28 +1609,50 @@
     window.addEventListener('pageshow', (event) => {
       if (document.visibilityState === 'visible' && wasCameraActive) {
         initPhoneSync();
-        setTimeout(() => checkAndRecoverCamera(), 350);
+        setTimeout(() => checkAndRecoverCamera(), 500);
       }
     });
 
     window.addEventListener('focus', () => {
       if (document.visibilityState === 'visible' && wasCameraActive) {
-        setTimeout(() => checkAndRecoverCamera(), 350);
+        setTimeout(() => checkAndRecoverCamera(), 500);
       }
     });
 
-    // Bộ tuần tra tự động mỗi 2.5 giây: Nếu màn hình đang mở mà luồng camera bị đơ/đen thì tự phục hồi ngay
+    // Chạm vào bất kỳ điểm nào trên khung quét để tự động phục hồi Camera nếu màn hình bị tối/đen
+    const scannerBox = document.getElementById('scannerWrapper') || document.getElementById('reader');
+    if (scannerBox) {
+      scannerBox.addEventListener('click', (e) => {
+        const videoEl = document.querySelector('#reader video');
+        if (!videoEl || videoEl.paused || !videoEl.srcObject || !html5QrCode) {
+          forceRestartCamera().catch(() => {});
+        }
+      });
+    }
+
+    // Bộ tuần tra tự động mỗi 1.8 giây: Nếu màn hình đang mở mà khung hình camera bị đứng/đen thì phục hồi ngay
     setInterval(() => {
       if (document.visibilityState === 'visible' && wasCameraActive && !isCameraStarting) {
         const videoEl = document.querySelector('#reader video');
         if (videoEl && videoEl.srcObject) {
           const tracks = videoEl.srcObject.getVideoTracks();
-          if (!tracks.length || tracks[0].readyState === 'ended') {
+          if (!tracks.length || tracks[0].readyState === 'ended' || videoEl.paused) {
             checkAndRecoverCamera();
+          } else {
+            if (videoEl.currentTime === lastVideoTime && videoEl.currentTime > 0) {
+              videoStallCount++;
+              if (videoStallCount >= 2) {
+                videoStallCount = 0;
+                checkAndRecoverCamera();
+              }
+            } else {
+              lastVideoTime = videoEl.currentTime;
+              videoStallCount = 0;
+            }
           }
         }
       }
-    }, 2500);
+    }, 1800);
 
     function loadImageElement(file) {
       return new Promise((resolve, reject) => {

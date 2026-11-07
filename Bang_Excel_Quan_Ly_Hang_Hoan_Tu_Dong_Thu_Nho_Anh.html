@@ -11090,21 +11090,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const known = [];
         const returned = [];
         (orders || []).forEach(o => {
-          const tr = extractCleanTrackingCode(o.track);
-          if (tr) {
-            known.push(tr);
-            if (o.status === 'Hàng đã trả') returned.push(tr);
-          }
-          const altTr = extractCleanTrackingCode(o.altTrack);
-          if (altTr) {
-            known.push(altTr);
-            if (o.status === 'Hàng đã trả') returned.push(altTr);
-          }
-          const ord = String(o.orderId || '').trim().toUpperCase();
-          if (ord) {
-            known.push(ord);
-            if (o.status === 'Hàng đã trả') returned.push(ord);
-          }
+          const codes = [
+            extractCleanTrackingCode(o.track),
+            extractCleanTrackingCode(o.altTrack),
+            extractCleanTrackingCode(o.returnTrack),
+            extractCleanTrackingCode(o.forwardTrack),
+            String(o.orderId || '').trim().toUpperCase(),
+            String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase()
+          ].filter(Boolean);
+
+          const isReturned = (o.status === 'Hàng đã trả');
+          codes.forEach(c => {
+            known.push(c);
+            if (isReturned) returned.push(c);
+          });
         });
         const msg = JSON.stringify({
           type: 'manifest_sync',

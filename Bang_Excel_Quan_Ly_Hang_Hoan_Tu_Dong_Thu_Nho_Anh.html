@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
@@ -149,7 +149,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.3.2
+          🚀 Phiên bản v1.3.3
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -2354,9 +2354,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const o = shopeeOrderDb[k];
         const ot = extractCleanTrackingCode(o.track || '');
         const oAlt = extractCleanTrackingCode(o.altTrack || '');
+        const oRet = extractCleanTrackingCode(o.returnTrack || '');
+        const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
+        const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
         const oi = String(o.orderId || '').trim().toUpperCase().replace(/[\*\s]/g, '');
         if (ot && ot === clean) return o;
         if (oAlt && oAlt === clean) return o;
+        if (oRet && oRet === clean) return o;
+        if (oFwd && oFwd === clean) return o;
+        if (oClaim && oClaim === clean) return o;
         if (oi && oi === clean) return o;
       }
       return null;
@@ -2469,6 +2475,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           order.buyerNote = match.buyerNote;
           changed = true;
         }
+      }
+      if (match.forwardCarrier && (forceOverwrite || !order.forwardCarrier)) {
+        if (order.forwardCarrier !== match.forwardCarrier) {
+          order.forwardCarrier = match.forwardCarrier;
+          changed = true;
+        }
+      }
+      if (match.returnCarrier && (forceOverwrite || !order.returnCarrier)) {
+        if (order.returnCarrier !== match.returnCarrier) {
+          order.returnCarrier = match.returnCarrier;
+          changed = true;
+        }
+      }
+      if (match.rawDetails) {
+        order.rawDetails = Object.assign({}, order.rawDetails || {}, match.rawDetails);
+        changed = true;
       }
       if (match.items && match.items.length > 0) {
         const curFirst = order.items && order.items[0];
@@ -3411,7 +3433,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         'note'
       ]);
       const returnShipmentStatusKey = findKey(['trangthaitrahang'], ['trangthaitrahanghoantien']);
-      const returnMethodKey = findKey(['phuongan']);
+      const returnMethodKey = findKey(['phuongan', 'phuonganhoantien']);
+      const claimIdKey = findKey(['masokhieunai', 'makhieunai', 'claimid', 'returnid']);
+      const buyerKey = findKey(['nguoimua', 'buyer', 'buyerusername', 'username', 'khachhang', 'tenkhachhang'], ['nguoiban']);
+      const orderDateKey = findKey(['ngaydathang', 'thoidiemdathang', 'ngaydat', 'orderdate']);
+      const claimTimeKey = findKey(['thoigiankhieunai', 'thoidiemkhieunai', 'claimtime']);
+      const isFullReturnKey = findKey(['trahanghoantientoanbodonhang', 'isallreturn']);
+      const returnSuccessTimeKey = findKey(['thoigianhoantrahangthanhcong', 'ngayhoantrathanhcong', 'thoigiangiaohangthanhcong']);
+      const deliveryAddressKey = findKey(['diachinhanhang', 'deliveryaddress']);
+      const returnAddressKey = findKey(['diachilayhanghoantra', 'returnaddress']);
+      const sellerResponseDueKey = findKey(['nguoibancanphanhoitruoc', 'hancanxuly', 'thoihanphanhoi']);
+      const claimReasonKey = findKey(['lidokhieunai', 'lydokhieunai']);
+      const sellerNoteKey = findKey(['ghichucuanguoiban']);
+      const compensationKey = findKey(['sotiendenbu', 'denbu']);
+      const orderHandlingTypeKey = findKey(['loaixulydonhang', 'xulydonhang']);
+      const totalValueKey = findKey(['tonggiatri', 'tonggiatridonhang', 'totalamount']);
+      const paymentMethodKey = findKey(['phuongthucthanhtoan', 'paymentmethod']);
+      const buyerOrderNoteKey = findKey(['ghichucuanguoimuakhidathang']);
+      const revenueKey = findKey(['doanhthu', 'revenue']);
+      const forwardShippingFeeKey = findKey(['phivanchuyenchieugiao']);
+      const returnShippingFeeKey = findKey(['phivanchuyenchieuhoantra']);
+      const refundAmountKey = findKey(['tongsotienhoantra', 'sotienhoantra', 'refundamount']);
+      const refundTimeKey = findKey(['thoigianhoantien', 'ngayhoantien', 'refundtime']);
       // Ưu tiên cột Số lượng Hoàn (trong file Trả hàng/Hoàn tiền Shopee) hoặc Số lượng sản phẩm được hoàn trả, nếu trống hoặc = 0 mới lấy cột Số lượng đặt
       const returnQtyKey = findKey(['soluonghoan', 'soluongsanphamduochoantra']);
       const orderQtyKey = findKey(['soluong', 'quantity', 'sl', 'soluongmathang', 'itemquantity', 'qty'], ['soluonghoan', 'soluongsanphamduochoantra', 'tongsoluong']);
@@ -3480,16 +3523,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const rawRetSt = returnStatusKey ? removeVietnameseTones(String(row[returnStatusKey] || '')).toLowerCase() : '';
           const retQtyVal = returnQtyKey ? (parseInt(String(row[returnQtyKey] || '').replace(/[^\d]/g, ''), 10) || 0) : 0;
 
-          // Người mua tự hủy yêu cầu trả hàng/hoàn tiền -> không có hàng hoàn về
-          if (rawRetSt.includes('yeu cau cua nguoi mua da huy') || rawRetSt.includes('da huy yeu cau')) {
-            skippedSuccessCount++;
-            lastSkippedRow = true;
-            return;
-          }
+          // Giữ 100% dữ liệu gốc trong file Excel (kể cả yêu cầu đã hủy) để đối soát & xem chi tiết đầy đủ 289 dòng
 
           if (rawOrderSt) {
             const isDelivered = rawOrderSt.includes('thanh cong') || rawOrderSt.includes('da giao') || rawOrderSt.includes('hoan thanh') || rawOrderSt.includes('delivered') || rawOrderSt.includes('completed');
-            const hasActiveReturnClaim = Boolean(rawRetSt && !rawRetSt.includes('da huy')) || retQtyVal > 0;
+            const hasActiveReturnClaim = Boolean(rawRetSt) || retQtyVal > 0;
             const isReturnOrCancel = hasActiveReturnClaim || rawOrderSt.includes('hoan') || rawOrderSt.includes('huy') || rawOrderSt.includes('tra') || rawOrderSt.includes('that thu') || rawOrderSt.includes('that bai') || rawOrderSt.includes('khong thanh') || rawOrderSt.includes('cancel') || rawOrderSt.includes('return') || rawOrderSt.includes('refund');
             if (isDelivered && !isReturnOrCancel) {
               skippedSuccessCount++;
@@ -3672,8 +3710,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         // Carrier extraction & normalization (ưu tiên ĐVVC trả hàng nếu có, sau đó đến ĐVVC giao hàng)
-        const rawCarrierFromExcel = (returnCarrierKey && String(row[returnCarrierKey] || '').trim()) || (forwardCarrierKey && String(row[forwardCarrierKey] || '').trim()) || '';
-        let carrier = detectCarrierByTrackingCode(rawTrack) || rawCarrierFromExcel || 'SPX Express';
+        const rawReturnCarrier = returnCarrierKey ? String(row[returnCarrierKey] || '').trim() : '';
+        const rawForwardCarrier = forwardCarrierKey ? String(row[forwardCarrierKey] || '').trim() : '';
+        const rawCarrierFromExcel = rawReturnCarrier || rawForwardCarrier || '';
+        let carrier = rawReturnCarrier || detectCarrierByTrackingCode(rawReturnTrack) || rawForwardCarrier || detectCarrierByTrackingCode(rawForwardTrack) || 'SPX Express';
         if (rawCarrierFromExcel) {
           const cUpper = removeVietnameseTones(rawCarrierFromExcel).toUpperCase();
           if (cUpper.includes('J&T') || cUpper.includes('JT')) carrier = 'J&T Express';
@@ -3753,21 +3793,58 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const existedBefore = tempMap.has(groupKey);
         if (!existedBefore) {
+          const rawDetailsObj = {
+            claimId: claimIdKey ? String(row[claimIdKey] || '').trim() : '',
+            buyerUsername: buyerKey ? String(row[buyerKey] || '').trim() : '',
+            orderDate: orderDateKey ? String(row[orderDateKey] || '').trim() : '',
+            claimTime: claimTimeKey ? String(row[claimTimeKey] || '').trim() : '',
+            returnStatus: returnStatusKey ? String(row[returnStatusKey] || '').trim() : '',
+            isFullReturn: isFullReturnKey ? String(row[isFullReturnKey] || '').trim() : '',
+            returnMethod: returnMethodKey ? String(row[returnMethodKey] || '').trim() : '',
+            returnReason: noteKey ? String(row[noteKey] || '').trim() : '',
+            buyerReturnNote: buyerComment,
+            refundAmount: refundAmountKey ? parseMoneyCellValue(row[refundAmountKey]) : 0,
+            refundTime: refundTimeKey ? String(row[refundTimeKey] || '').trim() : '',
+            returnShippingStatus: returnShipmentStatusKey ? String(row[returnShipmentStatusKey] || '').trim() : '',
+            returnCarrier: rawReturnCarrier,
+            returnTrack: rawReturnTrack,
+            returnSuccessTime: returnSuccessTimeKey ? String(row[returnSuccessTimeKey] || '').trim() : '',
+            deliveryAddress: deliveryAddressKey ? String(row[deliveryAddressKey] || '').trim() : '',
+            returnAddress: returnAddressKey ? String(row[returnAddressKey] || '').trim() : '',
+            sellerResponseDue: sellerResponseDueKey ? String(row[sellerResponseDueKey] || '').trim() : '',
+            claimReason: claimReasonKey ? String(row[claimReasonKey] || '').trim() : '',
+            sellerNote: sellerNoteKey ? String(row[sellerNoteKey] || '').trim() : '',
+            compensation: compensationKey ? parseMoneyCellValue(row[compensationKey]) : 0,
+            forwardCarrier: rawForwardCarrier,
+            orderHandlingType: orderHandlingTypeKey ? String(row[orderHandlingTypeKey] || '').trim() : '',
+            forwardTrack: rawForwardTrack,
+            totalValue: totalValueKey ? parseMoneyCellValue(row[totalValueKey]) : 0,
+            paymentMethod: paymentMethodKey ? String(row[paymentMethodKey] || '').trim() : '',
+            buyerOrderNote: buyerOrderNoteKey ? String(row[buyerOrderNoteKey] || '').trim() : '',
+            revenue: revenueKey ? parseMoneyCellValue(row[revenueKey]) : 0,
+            forwardShippingFee: forwardShippingFeeKey ? parseMoneyCellValue(row[forwardShippingFeeKey]) : 0,
+            returnShippingFee: returnShippingFeeKey ? parseMoneyCellValue(row[returnShippingFeeKey]) : 0
+          };
+
           tempMap.set(groupKey, {
             platform: detectedPlatform,
             orderType: detectedOrderType,
             preOrder: rawPreOrder,
+            deadline: (sellerResponseDueKey && String(row[sellerResponseDueKey] || '').trim()) || '',
             orderId: rawOrderId,
             track: rawTrack,
             altTrack: rawAltTrack,
             forwardTrack: rawForwardTrack,
             returnTrack: rawReturnTrack,
             carrier: carrier,
+            forwardCarrier: rawForwardCarrier,
+            returnCarrier: rawReturnCarrier,
             price: rawPrice,
             shipDate: rawShipDate,
             returnDate: rawReturnDate,
             note: rawNote,
             buyerNote: buyerComment,
+            rawDetails: rawDetailsObj,
             items: []
           });
           addedCount++;
@@ -3811,6 +3888,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (cleanTrack) shopeeOrderDb[cleanTrack] = orderData;
           shopeeOrderDb[orderData.track.toUpperCase()] = orderData;
         }
+        if (orderData.returnTrack) {
+          const cleanRet = extractCleanTrackingCode(orderData.returnTrack);
+          if (cleanRet) shopeeOrderDb[cleanRet] = orderData;
+          shopeeOrderDb[orderData.returnTrack.toUpperCase()] = orderData;
+        }
+        if (orderData.forwardTrack) {
+          const cleanFwd = extractCleanTrackingCode(orderData.forwardTrack);
+          if (cleanFwd) shopeeOrderDb[cleanFwd] = orderData;
+          shopeeOrderDb[orderData.forwardTrack.toUpperCase()] = orderData;
+        }
+        if (orderData.rawDetails?.claimId) {
+          const cleanClaim = String(orderData.rawDetails.claimId).trim().toUpperCase();
+          if (cleanClaim) shopeeOrderDb[cleanClaim] = orderData;
+        }
         if (orderData.altTrack) {
           const cleanAlt = extractCleanTrackingCode(orderData.altTrack);
           if (cleanAlt) shopeeOrderDb[cleanAlt] = orderData;
@@ -3839,9 +3930,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const existingIdx = orders.findIndex(o => {
             const oTrack = extractCleanTrackingCode(o.track || '');
             const oAlt = extractCleanTrackingCode(o.altTrack || '');
+            const oRet = extractCleanTrackingCode(o.returnTrack || '');
+            const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
+            const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
             const oId = String(o.orderId || '').trim().toUpperCase();
-            return (cleanTrack && ((oTrack && cleanTrack === oTrack) || (oAlt && cleanTrack === oAlt))) ||
+
+            const cRet = extractCleanTrackingCode(orderData.returnTrack || '');
+            const cFwd = extractCleanTrackingCode(orderData.forwardTrack || '');
+            const cClaim = String(orderData.claimId || orderData.rawDetails?.claimId || '').trim().toUpperCase();
+
+            return (cleanTrack && ((oTrack && cleanTrack === oTrack) || (oAlt && cleanTrack === oAlt) || (oRet && cleanTrack === oRet) || (oFwd && cleanTrack === oFwd))) ||
                    (cleanAltTrack && ((oTrack && cleanAltTrack === oTrack) || (oAlt && cleanAltTrack === oAlt))) ||
+                   (cRet && ((oRet && cRet === oRet) || (oTrack && cRet === oTrack))) ||
+                   (cFwd && ((oFwd && cFwd === oFwd) || (oTrack && cFwd === oTrack))) ||
+                   (cClaim && oClaim && cClaim === oClaim) ||
                    (cleanOrderId && oId && cleanOrderId === oId);
           });
 
@@ -3864,17 +3966,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               platform: orderData.platform || 'Shopee',
               orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
               preOrder: orderData.preOrder || 'Đơn thường',
+              deadline: orderData.deadline || '',
               orderId: orderData.orderId || '',
               track: cleanTrack || orderData.track || '',
               altTrack: cleanAltTrack || orderData.altTrack || '',
               forwardTrack: orderData.forwardTrack || '',
               returnTrack: orderData.returnTrack || '',
               carrier: orderData.carrier || 'SPX Express',
+              forwardCarrier: orderData.forwardCarrier || '',
+              returnCarrier: orderData.returnCarrier || '',
               price: orderData.price || 0,
-              status: (orderData.orderType === 'Đơn hủy' && (!cleanTrack && !orderData.track)) ? 'Không cần nhận' : 'Chưa trả',
+              status: (orderData.orderType === 'Đơn hủy' && (!cleanTrack && !orderData.track)) ? 'Không cần nhận' : (orderData.rawDetails?.returnStatus?.includes('hủy') ? 'Không cần nhận' : 'Chưa trả'),
               photo: '',
               note: orderData.note || '',
               buyerNote: orderData.buyerNote || '',
+              rawDetails: orderData.rawDetails ? Object.assign({}, orderData.rawDetails) : undefined,
               items: (orderData.items && orderData.items.length)
                 ? JSON.parse(JSON.stringify(orderData.items))
                 : [{ product: '', color: '', size: '', qty: 1 }]
@@ -3927,8 +4033,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const existingIdx = orders.findIndex(o => {
           const oTrack = extractCleanTrackingCode(o.track || '');
+          const oAlt = extractCleanTrackingCode(o.altTrack || '');
+          const oRet = extractCleanTrackingCode(o.returnTrack || '');
+          const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
+          const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
           const oId = String(o.orderId || '').trim().toUpperCase();
-          return (cleanTrack && oTrack && cleanTrack === oTrack) || (cleanOrderId && oId && cleanOrderId === oId);
+
+          const cRet = extractCleanTrackingCode(orderData.returnTrack || '');
+          const cFwd = extractCleanTrackingCode(orderData.forwardTrack || '');
+          const cClaim = String(orderData.claimId || orderData.rawDetails?.claimId || '').trim().toUpperCase();
+
+          return (cleanTrack && ((oTrack && cleanTrack === oTrack) || (oAlt && cleanTrack === oAlt) || (oRet && cleanTrack === oRet) || (oFwd && cleanTrack === oFwd))) ||
+                 (cRet && ((oRet && cRet === oRet) || (oTrack && cRet === oTrack))) ||
+                 (cFwd && ((oFwd && cFwd === oFwd) || (oTrack && cFwd === oTrack))) ||
+                 (cClaim && oClaim && cClaim === oClaim) ||
+                 (cleanOrderId && oId && cleanOrderId === oId);
         });
 
         if (existingIdx !== -1) {
@@ -3949,18 +4068,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             recvDate: '',
             platform: orderData.platform || 'Shopee',
             orderType: orderData.orderType || (orderData.platform === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền'),
-            preOrder: orderData.preOrder || 'ÄÆ¡n thÆ°á»ng',
+            preOrder: orderData.preOrder || 'Đơn thường',
             deadline: orderData.deadline || '',
             orderId: orderData.orderId || '',
             track: cleanTrack || orderData.track || '',
             altTrack: orderData.altTrack || '',
+            forwardTrack: orderData.forwardTrack || '',
+            returnTrack: orderData.returnTrack || '',
             carrier: orderData.carrier || 'SPX Express',
+            forwardCarrier: orderData.forwardCarrier || '',
+            returnCarrier: orderData.returnCarrier || '',
             price: orderData.price || 0,
             priceModes: orderData.priceModes ? Object.assign({}, orderData.priceModes) : undefined,
-            status: 'Chưa trả',
+            status: (orderData.orderType === 'Đơn hủy' && (!cleanTrack && !orderData.track)) ? 'Không cần nhận' : (orderData.rawDetails?.returnStatus?.includes('hủy') ? 'Không cần nhận' : 'Chưa trả'),
             photo: '',
             note: orderData.note || '',
             buyerNote: orderData.buyerNote || '',
+            rawDetails: orderData.rawDetails ? Object.assign({}, orderData.rawDetails) : undefined,
             items: (orderData.items && orderData.items.length)
               ? JSON.parse(JSON.stringify(orderData.items))
               : [{ product: '', color: '', size: '', qty: 1 }]
@@ -4453,7 +4577,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.3.2';
+    const APP_VERSION_NUMBER = '1.3.3';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6402,7 +6526,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const plat = getOrderPlatform(order);
       const oType = getOrderType(order);
       const preOrderText = order.preOrder || 'Đơn thường';
-      const hay = `${plat} ${oType} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${itemsText}`.toLowerCase();
+      const claimText = `${order.rawDetails?.claimId || ''} ${order.claimId || ''} ${order.buyerUsername || ''} ${order.rawDetails?.buyerUsername || ''}`;
+      const hay = `${plat} ${oType} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${itemsText}`.toLowerCase();
       const kwLower = kwTrim.toLowerCase();
       const kwNorm = removeVietnameseTones(kwTrim).toLowerCase();
       const hayNorm = removeVietnameseTones(hay).toLowerCase();
@@ -7453,28 +7578,62 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" class="px-1 py-0.5 text-center text-[10px] text-slate-400 italic hover:text-blue-600 cursor-pointer select-none" title="Bấm để thêm ngày hạn xử lý sàn">+ Thêm hạn</div>`;
         }
 
-        // Format Tracking Cell (Proposal 1: Priority returnTrack, show forwardTrack)
+        // Format Tracking Cell: Hiển thị chuẩn xác cả Mã vận đơn Hoàn và Mã vận đơn Giao
         let trackCellHtml = '';
-        if (order.returnTrack) {
+        const curRetTrack = order.returnTrack || '';
+        const curFwdTrack = order.forwardTrack || (order.track && order.track !== curRetTrack ? order.track : '');
+
+        if (curRetTrack && curFwdTrack && curRetTrack !== curFwdTrack) {
           trackCellHtml = `
-            <div class="flex flex-col items-center justify-center leading-tight">
-              <div class="flex items-center gap-1 font-mono font-bold text-emerald-800 text-[11px] select-all" title="Mã Vận Đơn Trả Hàng (Ưu tiên đối soát khi nhận kiện)">
-                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1 py-0.2 rounded font-extrabold uppercase">Hoàn</span>
-                <span>${escapeAttr(order.returnTrack)}</span>
+            <div class="flex flex-col items-center justify-center leading-tight py-0.5" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:track','Mã vận đơn Đơn #${orderIdx+1}')">
+              <div class="flex items-center gap-1 font-mono font-bold text-emerald-800 text-[11px] select-all cursor-pointer hover:underline"
+                   onclick="copyTextToClipboard('${escapeAttr(curRetTrack)}', 'Đã sao chép MVĐ Hoàn: ${escapeAttr(curRetTrack)}')"
+                   title="Mã Vận Đơn Trả Hàng (Kiện hoàn khách gửi về) - Bấm để copy">
+                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1 py-0.2 rounded font-extrabold uppercase">↩️ Hoàn</span>
+                <span>${escapeAttr(curRetTrack)}</span>
               </div>
-              <div class="text-[9.5px] text-slate-500 font-mono select-all mt-0.5" title="Mã Vận Đơn Chiều Giao: ${escapeAttr(order.track || order.forwardTrack || '-')}">
-                🚚 Giao: ${escapeAttr(order.track || order.forwardTrack || '-')}
+              <div class="flex items-center gap-1 text-[9.5px] text-slate-500 font-mono select-all mt-0.5 cursor-pointer hover:underline"
+                   onclick="copyTextToClipboard('${escapeAttr(curFwdTrack)}', 'Đã sao chép MVĐ Giao: ${escapeAttr(curFwdTrack)}')"
+                   title="Mã Vận Đơn Giao Hàng (Chiều gửi đi ban đầu) - Bấm để copy">
+                <span class="text-slate-400">🚚 Giao:</span>
+                <span class="text-slate-600 font-semibold">${escapeAttr(curFwdTrack)}</span>
+              </div>
+            </div>
+          `;
+        } else if (curRetTrack) {
+          trackCellHtml = `
+            <div class="flex flex-col items-center justify-center leading-tight py-0.5" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:track','Mã vận đơn Đơn #${orderIdx+1}')">
+              <div class="flex items-center gap-1 font-mono font-bold text-emerald-800 text-[11px] select-all cursor-pointer hover:underline"
+                   onclick="copyTextToClipboard('${escapeAttr(curRetTrack)}', 'Đã sao chép MVĐ Hoàn')"
+                   title="Mã Vận Đơn Trả Hàng - Bấm để copy">
+                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1 py-0.2 rounded font-extrabold uppercase">↩️ Hoàn</span>
+                <span>${escapeAttr(curRetTrack)}</span>
+              </div>
+            </div>
+          `;
+        } else if (curFwdTrack) {
+          trackCellHtml = `
+            <div class="flex flex-col items-center justify-center leading-tight py-0.5" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:track','Mã vận đơn Đơn #${orderIdx+1}')">
+              <div class="flex items-center gap-1 font-mono font-semibold text-blue-700 text-[11px] select-all cursor-pointer hover:underline"
+                   onclick="copyTextToClipboard('${escapeAttr(curFwdTrack)}', 'Đã sao chép MVĐ Giao')"
+                   title="Mã Vận Đơn Giao Hàng - Bấm để copy">
+                <span class="bg-blue-100 text-blue-800 text-[9px] px-1 py-0.2 rounded font-extrabold uppercase">🚚 Giao</span>
+                <span>${escapeAttr(curFwdTrack)}</span>
               </div>
             </div>
           `;
         } else {
-          const forwardSub = (order.forwardTrack && order.track && order.forwardTrack !== order.track)
-            ? `<div class="text-[9.5px] text-slate-500 font-mono select-all mt-0.5" title="Mã VĐ Chiều Giao Ban Đầu: ${escapeAttr(order.forwardTrack)}">🚚 Giao: ${escapeAttr(order.forwardTrack)}</div>`
-            : '';
-          trackCellHtml = `
-            ${renderCellInput(`${orderIdx}:track`, `Mã vận đơn #${orderIdx+1}`, order.track, 'text-center font-mono font-semibold text-blue-700', 'Nhập MVĐ + Enter...', `handleTrackingChange(${orderIdx},this.value,false)`, 'text', '', `handleTrackingChange(${orderIdx},this.value,true)`)}
-            ${forwardSub}
-          `;
+          trackCellHtml = renderCellInput(
+            `${orderIdx}:track`,
+            `Mã vận đơn #${orderIdx+1}`,
+            order.track,
+            'text-center font-mono text-slate-400 text-[10.5px]',
+            'Chưa có MVĐ (Hủy trước gửi)...',
+            `handleTrackingChange(${orderIdx},this.value,false)`,
+            'text',
+            '',
+            `handleTrackingChange(${orderIdx},this.value,true)`
+          );
         }
 
         // Summary of items in order
@@ -7533,7 +7692,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 </div>
                 <button type="button" onclick="toggleOrderItemsDrawer(${orderIdx})" class="px-2 py-0.5 rounded text-[10.5px] font-bold ${drawerBtnClass} transition whitespace-nowrap shadow-2xs cursor-pointer flex items-center gap-1">
                   <span>${drawerChevron}</span>
-                  <span>Chi tiết (${items.length})</span>
+                  <span>👁️ Chi tiết (${items.length})</span>
                 </button>
               </div>
             </td>
@@ -7670,6 +7829,97 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 ${itemRows}
               </tbody>
             </table>
+          </div>
+
+          <!-- PHẦN MỚI: TOÀN BỘ DỮ LIỆU ĐỐI SOÁT CHI TIẾT TỪ FILE EXCEL -->
+          <div class="mt-3 pt-3 border-t border-indigo-200/80">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold text-slate-800 uppercase tracking-wide">📋 Dữ Liệu Đối Soát Toàn Diện Từ File Excel</span>
+                <span class="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-bold">100% dữ liệu gốc không bị thiếu</span>
+              </div>
+              <div class="text-[10.5px] text-slate-500 italic">Bấm vào bất kỳ mã nào để sao chép nhanh</div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 text-[11px]">
+              <!-- Cột 1: Thông tin Đơn & Khiếu nại -->
+              <div class="bg-white rounded-lg p-2.5 border border-indigo-100 shadow-2xs space-y-1.5">
+                <div class="font-bold text-indigo-900 border-b border-indigo-50 pb-1 flex items-center justify-between">
+                  <span>🏷️ Đơn Hàng & Khiếu Nại</span>
+                  <span class="text-[9.5px] bg-slate-100 text-slate-700 px-1 rounded font-semibold">${escapeAttr(order.platform || 'Shopee')}</span>
+                </div>
+                <div><span class="text-slate-500">Mã đơn hàng:</span> <b class="font-mono text-slate-900 select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.orderId || '')}', 'Đã chép Mã đơn')">${escapeAttr(order.orderId || '-')}</b></div>
+                <div><span class="text-slate-500">Mã khiếu nại:</span> <b class="font-mono text-indigo-800 select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.rawDetails?.claimId || '')}', 'Đã chép Mã khiếu nại')">${escapeAttr(order.rawDetails?.claimId || '-')}</b></div>
+                <div><span class="text-slate-500">Người mua:</span> <b class="text-slate-800">${escapeAttr(order.rawDetails?.buyerUsername || '-')}</b></div>
+                <div><span class="text-slate-500">Ngày đặt hàng:</span> <span class="text-slate-700 font-medium">${escapeAttr(order.rawDetails?.orderDate || order.shipDate || '-')}</span></div>
+                <div><span class="text-slate-500">Thời gian khiếu nại:</span> <span class="text-slate-700 font-medium">${escapeAttr(order.rawDetails?.claimTime || order.returnDate || '-')}</span></div>
+                <div><span class="text-slate-500">Hạn cần phản hồi:</span> <b class="text-amber-700">${escapeAttr(order.deadline || order.rawDetails?.sellerResponseDue || '-')}</b></div>
+              </div>
+
+              <!-- Cột 2: Vận chuyển 2 chiều -->
+              <div class="bg-white rounded-lg p-2.5 border border-indigo-100 shadow-2xs space-y-1.5">
+                <div class="font-bold text-emerald-900 border-b border-emerald-50 pb-1 flex items-center justify-between">
+                  <span>🚚 Vận Chuyển 2 Chiều</span>
+                  <span class="text-[9.5px] bg-emerald-50 text-emerald-800 px-1 rounded font-semibold">Đối soát kiện</span>
+                </div>
+                <div>
+                  <span class="text-slate-500">↩️ MVĐ Trả hàng (Hoàn):</span><br>
+                  <b class="font-mono text-emerald-800 text-[11.5px] select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.returnTrack || order.rawDetails?.returnTrack || '')}', 'Đã chép MVĐ Hoàn')">${escapeAttr(order.returnTrack || order.rawDetails?.returnTrack || '-')}</b>
+                  <span class="text-[10px] text-slate-500 font-medium">(${escapeAttr(order.returnCarrier || order.rawDetails?.returnCarrier || order.carrier || 'SPX Express')})</span>
+                </div>
+                <div><span class="text-slate-500">Trạng thái trả hàng:</span> <span class="font-semibold text-emerald-700">${escapeAttr(order.rawDetails?.returnShippingStatus || '-')}</span></div>
+                <div><span class="text-slate-500">Thời gian trả thành công:</span> <span class="text-slate-700 font-medium">${escapeAttr(order.rawDetails?.returnSuccessTime || '-')}</span></div>
+                <div class="pt-1 border-t border-slate-100">
+                  <span class="text-slate-500">🚚 MVĐ Giao ban đầu:</span><br>
+                  <b class="font-mono text-blue-800 text-[11px] select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.forwardTrack || order.rawDetails?.forwardTrack || '')}', 'Đã chép MVĐ Giao')">${escapeAttr(order.forwardTrack || order.rawDetails?.forwardTrack || (order.track !== order.returnTrack ? order.track : '-') || '-')}</b>
+                  <span class="text-[10px] text-slate-500 font-medium">(${escapeAttr(order.forwardCarrier || order.rawDetails?.forwardCarrier || 'Nhanh')})</span>
+                </div>
+                <div class="text-[10px] text-slate-500 truncate" title="${escapeAttr(order.rawDetails?.deliveryAddress || '')}"><span class="font-medium">Địa chỉ giao:</span> ${escapeAttr(order.rawDetails?.deliveryAddress || '-')}</div>
+              </div>
+
+              <!-- Cột 3: Tài chính & Phương án -->
+              <div class="bg-white rounded-lg p-2.5 border border-indigo-100 shadow-2xs space-y-1.5">
+                <div class="font-bold text-purple-900 border-b border-purple-50 pb-1 flex items-center justify-between">
+                  <span>💰 Tài Chính & Phương Án</span>
+                  <span class="text-[9.5px] bg-purple-50 text-purple-800 px-1 rounded font-semibold">${escapeAttr(order.preOrder || 'Đơn thường')}</span>
+                </div>
+                <div><span class="text-slate-500">Phương án:</span> <b class="text-purple-800">${escapeAttr(order.rawDetails?.returnMethod || order.orderType || '-')}</b></div>
+                <div><span class="text-slate-500">Trạng thái sàn:</span> <span class="font-semibold text-slate-800">${escapeAttr(order.rawDetails?.returnStatus || '-')}</span></div>
+                <div><span class="text-slate-500">Tổng tiền hoàn trả:</span> <b class="text-rose-700 text-xs">${formatMoney(order.rawDetails?.refundAmount || order.price || 0)}</b></div>
+                <div><span class="text-slate-500">Tổng giá trị đơn:</span> <b class="text-slate-900">${formatMoney(order.rawDetails?.totalValue || order.price || 0)}</b></div>
+                <div><span class="text-slate-500">Doanh thu ước tính:</span> <span class="text-slate-700 font-medium">${formatMoney(order.rawDetails?.revenue || 0)}</span></div>
+                <div><span class="text-slate-500">Phí ship Giao / Hoàn:</span> <span class="text-slate-600 font-medium">${formatMoney(order.rawDetails?.forwardShippingFee || 0)} / ${formatMoney(order.rawDetails?.returnShippingFee || 0)}</span></div>
+                <div><span class="text-slate-500">Thanh toán:</span> <span class="text-slate-700">${escapeAttr(order.rawDetails?.paymentMethod || '-')}</span></div>
+              </div>
+
+              <!-- Cột 4: Lý do & Ghi chú -->
+              <div class="bg-white rounded-lg p-2.5 border border-indigo-100 shadow-2xs space-y-1.5">
+                <div class="font-bold text-amber-900 border-b border-amber-50 pb-1 flex items-center justify-between">
+                  <span>📝 Lý Do & Ghi Chú</span>
+                  <span class="text-[9.5px] bg-amber-50 text-amber-800 px-1 rounded font-semibold">Khách & Shop</span>
+                </div>
+                <div>
+                  <span class="text-slate-500">Lí do Trả hàng/Hoàn tiền:</span>
+                  <div class="font-semibold text-slate-800 mt-0.5 bg-amber-50/70 p-1.5 rounded border border-amber-200/50 leading-tight">${escapeAttr(order.rawDetails?.returnReason || order.note || '-')}</div>
+                </div>
+                <div>
+                  <span class="text-slate-500">Ghi chú người mua khi trả:</span>
+                  <div class="text-slate-800 italic mt-0.5 bg-slate-50 p-1.5 rounded border border-slate-200 leading-tight">${escapeAttr(order.rawDetails?.buyerReturnNote || order.buyerNote || '-')}</div>
+                </div>
+                ${order.rawDetails?.buyerOrderNote ? `
+                  <div>
+                    <span class="text-slate-500">Ghi chú khi đặt hàng:</span>
+                    <div class="text-slate-700 italic mt-0.5 text-[10.5px] leading-tight">${escapeAttr(order.rawDetails.buyerOrderNote)}</div>
+                  </div>
+                ` : ''}
+                ${order.rawDetails?.sellerNote ? `
+                  <div>
+                    <span class="text-slate-500">Ghi chú người bán:</span>
+                    <div class="text-slate-700 text-[10.5px] leading-tight">${escapeAttr(order.rawDetails.sellerNote)}</div>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -9031,9 +9281,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let targetIdx = -1;
       if (track || orderId) {
         targetIdx = orders.findIndex(o => {
-          const tMatch = track && String(o.track || '').trim().toUpperCase() === track.toUpperCase();
+          const tClean = track ? (extractCleanTrackingCode(track) || track.toUpperCase()) : '';
+          const tMatch = tClean && (
+            (extractCleanTrackingCode(o.track || '') || String(o.track || '').toUpperCase()) === tClean ||
+            (extractCleanTrackingCode(o.returnTrack || '') || String(o.returnTrack || '').toUpperCase()) === tClean ||
+            (extractCleanTrackingCode(o.forwardTrack || '') || String(o.forwardTrack || '').toUpperCase()) === tClean ||
+            (extractCleanTrackingCode(o.altTrack || '') || String(o.altTrack || '').toUpperCase()) === tClean
+          );
           const oMatch = orderId && String(o.orderId || '').trim().toUpperCase() === orderId.toUpperCase();
-          return tMatch || oMatch;
+          const claimMatch = tClean && String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase() === tClean;
+          return tMatch || oMatch || claimMatch;
         });
       }
 
@@ -9688,8 +9945,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         targetIdx = orders.findIndex(o => {
           const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
           const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
+          const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
+          const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
+          const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
           const oid = String(o.orderId || '').trim().toUpperCase();
-          return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (oid && oid === cleanCode);
+          return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
         });
       }
       if (targetIdx === -1 && activePhotoOrderIndex !== null && orders[activePhotoOrderIndex]) {
@@ -9833,8 +10093,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const existingIdx = orders.findIndex(o => {
         const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
         const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
+        const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
+        const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
+        const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
         const oid = String(o.orderId || '').trim().toUpperCase();
-        return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (oid && oid === cleanCode);
+        return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
       });
 
       if (mode === 'smart_auto' && existingIdx !== -1) {

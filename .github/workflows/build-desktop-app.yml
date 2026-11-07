@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.3.2
+          name: QuanLyHangHoan-Windows-Installer-v1.3.3
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,31 +66,27 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.3.2
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.3.2 (Ghi Chú Người Mua, Click 1 Lần Xem Chi Tiết / 2 Lần Chỉnh Sửa, Bộ Lọc Đặt Trước & Khoảng Ngày & MVĐ)"
+          tag_name: v1.3.3
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.3.3 (Tách Chuẩn Mã Vận Đơn Giao & Hoàn, Nạp Đủ 100% Dữ Liệu Excel, Bảng Đối Soát Chi Tiết Toàn Diện)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.3.2
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.3.3
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.3.2`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.3.2.exe`)
-            - **Các tính năng mới nổi bật trong phiên bản v1.3.2**:
-              1. 📝 **Trích Xuất Chuẩn Xác Cột Ghi Chú Người Mua Đa Nguồn**:
-                 - Tự động nhận diện và trích xuất ghi chú từ mọi định dạng file: Shopee Trả hàng (`Ghi chú của Người mua khi trả hàng`), Shopee Đơn hủy (`Nhận xét từ Người mua`), Salework / TikTok (`Ghi chú của khách`).
-                 - Tách riêng thành một cột độc lập `"Ghi Chú Người Mua"`, không bị hòa lẫn vào lý do hoàn hoặc các cột số tiền/phí sàn.
-              2. 🔍 **Tương Tác 2 Cấp Độ Cho Toàn Bộ Các Ô: Click 1 Lần Xem Chi Tiết — Click 2 Lần (Double Click) Chỉnh Sửa**:
-                 - Click 1 lần: Mở khung nổi Popover hiển thị 100% nội dung đầy đủ không bị cắt ngắn (tên sản phẩm dài, mã đơn, ghi chú người mua, lý do...), kèm nút "📋 Sao chép" và nút "✏️ Sửa".
-                 - Click 2 lần: Kích hoạt trực tiếp ô nhập liệu inline để sửa nội dung và lưu tức thì.
-              3. ⭐ **Bộ Lọc Hàng Đặt Trước vs Đơn Thường**:
-                 - Tùy chọn lọc: `⭐ Hàng đặt trước` (Pre-order) hoặc `⚡ Đơn thường`.
-                 - Bảng chính và bảng tổng kết số liệu bên dưới tự động đồng bộ theo lựa chọn.
-              4. 📆 **Bộ Lọc Khoảng Ngày Tùy Chọn Linh Hoạt (Từ Ngày ➔ Đến Ngày)**:
-                 - Chọn mốc ngày cần lọc: `📥 Ngày về kho`, `↩️ Ngày hoàn/hủy`, `🚚 Ngày gửi đi` hoặc `📅 Mọi mốc ngày`.
-                 - Nhập khoảng ngày linh hoạt từ ngày đến ngày với nút xóa lọc nhanh `✕`.
-              5. 🔖 **Bộ Lọc Đơn Có Mã Vận Đơn & Không Có Mã Vận Đơn**:
-                 - `✅ Có mã vận đơn`: Đơn đã được bàn giao vận chuyển và có mã tracking.
-                 - `❌ Không có MVĐ (Hủy trước gửi)`: Đơn khách hủy trước khi bàn giao vận chuyển.
-              6. 📊 **Làm Rõ Số Đơn và Lượt Mặt Hàng Ở Bảng Tổng Kết (1052 đơn vs 1191 lượt SP)**:
-                 - Hiển thị rõ: `1052 đơn (1191 lượt SP)` với tooltip giải thích cụ thể: 1052 mã đơn hàng duy nhất, 1191 lượt mặt hàng do có đơn đặt từ 2 sản phẩm trở lên. Cột Tổng SL hoàn ở cả 2 bảng khớp tuyệt đối `1254 SP`.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.3.3`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.3.3.exe`)
+            - **Các cải tiến đột phá trong phiên bản v1.3.3**:
+              1. 🚚↩️ **Tách Biệt Chuẩn Xác Mã Vận Đơn Giao Hàng & Mã Vận Đơn Trả Hàng**:
+                 - Hiển thị trực quan 2 badge riêng biệt: `↩️ Hoàn: [Mã vận đơn trả hàng]` (xanh ngọc, ưu tiên đối soát kiện khách gửi về kho) và `🚚 Giao: [Mã vận đơn giao hàng]` (xám đậm, mã gửi đi ban đầu).
+                 - Cả 2 mã vận đơn cùng với Mã khiếu nại và Mã đơn hàng đều được gắn nút 1-click sao chép và tự động khớp tức thì khi quét mã vạch (camera điện thoại / PC / súng quét) hoặc tìm kiếm nhanh.
+              2. 📥 **Nạp Đầy Đủ 100% Dữ Liệu File Excel (Khắc Phục Hoàn Toàn Bỏ Sót Đơn)**:
+                 - Giữ lại toàn bộ các đơn thuộc diện `"Yêu cầu của Người mua đã hủy"`, gắn cờ trạng thái chuẩn `Không cần nhận` để không làm rối danh sách chờ hàng về kho.
+                 - Tự động gộp các dòng sản phẩm thứ 2, thứ 3 vào đúng đơn hàng nhiều sản phẩm theo quy tắc `"Một đơn một dòng tổng, bấm để xem từng sản phẩm"`, đảm bảo xử lý đủ 289/289 dòng (250 đơn duy nhất + 39 dòng mặt hàng kèm theo).
+              3. 👁️ **Bảng Dữ Liệu Đối Soát Toàn Diện Khi Xem Chi Tiết Đơn Hàng**:
+                 - Bảng chính giữ nguyên thiết kế 1 đơn 1 dòng tổng tinh gọn, mượt mà 60fps.
+                 - Khi bấm `👁️ Chi tiết` (hoặc click icon con mắt), mở rộng Drawer hiển thị toàn diện 100% các cột từ file Excel được nhóm khoa học thành 4 thẻ:
+                   * 🏷️ **Đơn Hàng & Khiếu Nại**: Mã khiếu nại, Người mua, Ngày đặt, Giờ khiếu nại, Trạng thái trả hàng/hoàn tiền, Trả hàng toàn bộ, Phương án giải quyết.
+                   * 🚚 **Vận Chuyển 2 Chiều**: Chiều trả (ĐVVC, Mã VĐ hoàn, Thời gian hoàn trả thành công), Chiều giao (ĐVVC, Mã VĐ giao ban đầu, Địa chỉ nhận hàng).
+                   * 💰 **Tài Chính & Phương Án**: Tiền hoàn trả, Thời gian hoàn tiền, Tổng giá trị đơn hàng, Phương thức thanh toán, Doanh thu, Phí ship 2 chiều, Đền bù.
+                   * 📝 **Lý Do & Ghi Chú Chi Tiết**: Lí do khiếu nại, Ghi chú người mua khi trả hàng, Ghi chú người mua khi đặt hàng, Ghi chú người bán, Hạn cần phản hồi.
           files: |
             dist/*.exe
         env:

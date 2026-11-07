@@ -225,7 +225,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.5.0
+          🚀 Phiên bản v1.5.1
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -580,7 +580,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.0</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.5.1</span>
               </div>
             </div>
           </div>
@@ -1448,7 +1448,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <span>🕒</span>
             <span>LỊCH SỬ THỜI GIAN CHỈNH SỬA Ô NÀY</span>
           </div>
-          <span id="cellModalHistoryCount" class="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">0 lần sửa</span>
+          <div class="flex items-center gap-1.5">
+            <span id="cellModalHistoryCount" class="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">0 lần sửa</span>
+            <button type="button" id="btnDeleteCellHistory" onclick="clearCurrentCellHistory()" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full transition cursor-pointer hidden" title="Xóa toàn bộ lịch sử chỉnh sửa của riêng ô này">
+              🗑️ Xóa Lịch Sử Ô Này
+            </button>
+          </div>
         </div>
         <div id="cellModalHistoryList" class="space-y-2"></div>
       </div>
@@ -2479,7 +2484,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }),
           photos: Array.from(photoMemoryCache.entries()).map(([id, data]) => ({ id, data })),
           catalog: catalogItems,
-          accountantStock: accountantStock
+          accountantStock: accountantStock,
+          cellLocks: cellLocks,
+          cellEditHistory: cellEditHistory
         };
 
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -2548,6 +2555,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (data.accountantStock && typeof data.accountantStock === 'object') {
             accountantStock = data.accountantStock;
             saveAccountantStock();
+          }
+
+          if (data.cellEditHistory && typeof data.cellEditHistory === 'object') {
+            cellEditHistory = data.cellEditHistory;
+            saveCellEditHistory();
+          } else {
+            cellEditHistory = {};
+            saveCellEditHistory();
           }
 
           saveOrders();
@@ -5623,7 +5638,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.5.0';
+    const APP_VERSION_NUMBER = '1.5.1';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6677,6 +6692,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const history = cellEditHistory[cellKey] || [];
       if (historyCountEl) historyCountEl.textContent = `${history.length} lần chỉnh sửa`;
+      const delHistBtn = document.getElementById('btnDeleteCellHistory');
+      if (delHistBtn) {
+        if (history.length > 0) delHistBtn.classList.remove('hidden');
+        else delHistBtn.classList.add('hidden');
+      }
 
       if (historyListEl) {
         if (!history.length) {
@@ -6724,6 +6744,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function closeCellActionModal() {
       const modal = document.getElementById('cellActionModal');
       if (modal) modal.classList.add('hidden');
+    }
+
+    function clearCurrentCellHistory() {
+      const cellKey = currentModalCellKey;
+      const labelName = currentModalLabelName;
+      if (!cellKey || !cellEditHistory[cellKey] || !cellEditHistory[cellKey].length) return;
+      if (!confirm(`Bạn có chắc chắn muốn xóa toàn bộ lịch sử chỉnh sửa của ô [${labelName || cellKey}]?`)) return;
+      delete cellEditHistory[cellKey];
+      saveCellEditHistory();
+      addAuditLog('🗑️ XÓA LỊCH SỬ Ô', `Đã xóa lịch sử chỉnh sửa của ô [${labelName || cellKey}]`);
+      openCellActionModal(cellKey, labelName);
+      if (typeof showToast === 'function') {
+        showToast(`Đã xóa lịch sử chỉnh sửa của ô [${labelName || cellKey}]!`, 'info');
+      }
     }
 
     async function actionUnlockCurrentModalCell() {
@@ -8048,6 +8082,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       cellLocks = updatedLocks;
       saveCellLocks();
+
+      // Shift cellEditHistory for rows after newIdx
+      const updatedHistory = {};
+      Object.keys(cellEditHistory).forEach(k => {
+        const parts = k.split(':');
+        const idx = parseInt(parts[0], 10);
+        if (!isNaN(idx) && idx >= newIdx) {
+          parts[0] = String(idx + 1);
+          updatedHistory[parts.join(':')] = cellEditHistory[k];
+        } else {
+          updatedHistory[k] = cellEditHistory[k];
+        }
+      });
+      cellEditHistory = updatedHistory;
+      saveCellEditHistory();
+
       saveOrders();
       renderAll();
       setTimeout(() => {
@@ -8072,6 +8122,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       cellLocks = updatedLocks;
       saveCellLocks();
+    }
+
+    function shiftCellEditHistoryAfterOrderDelete(deletedOrderIdx) {
+      const updatedHistory = {};
+      Object.keys(cellEditHistory).forEach(k => {
+        const parts = k.split(':');
+        const idx = parseInt(parts[0], 10);
+        if (isNaN(idx) || idx === deletedOrderIdx) return;
+        if (idx > deletedOrderIdx) {
+          parts[0] = String(idx - 1);
+          updatedHistory[parts.join(':')] = cellEditHistory[k];
+        } else {
+          updatedHistory[k] = cellEditHistory[k];
+        }
+      });
+      cellEditHistory = updatedHistory;
+      saveCellEditHistory();
     }
 
     async function deleteOrder(orderIdx) {
@@ -8099,6 +8166,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       orders.splice(orderIdx, 1);
       shiftCellLocksAfterOrderDelete(orderIdx);
+      shiftCellEditHistoryAfterOrderDelete(orderIdx);
       saveOrders();
       renderAll();
     }
@@ -8123,6 +8191,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {}
       cellLocks = {};
       saveCellLocks();
+      cellEditHistory = {};
+      saveCellEditHistory();
       accountantStock = {};
       saveAccountantStock();
       shopeeOrderDb = {};
@@ -8134,8 +8204,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderShopeeDbTable();
       applyLockUI();
       renderAll();
-      addAuditLog('🗑️ XÓA SẠCH TOÀN BỘ ĐƠN', `Chủ Shop đã xóa sạch toàn bộ ${currentCount} đơn hàng hiện tại để làm mới bảng về 0 đơn`);
-      alert(`✅ ĐÃ XÓA SẠCH TOÀN BỘ ĐƠN HÀNG HIỆN TẠI (ĐÃ XÓA ${currentCount} ĐƠN VỀ 0 ĐƠN)!\n\n• Toàn bộ bảng chính, bảng thống kê kho và bộ nhớ tra cứu đã được làm mới hoàn toàn.\n• Đã lưu đồng bộ trạng thái bảng trống lên ổ cứng máy tính.\n• Bây giờ bạn có thể nạp file Shopee hoặc TikTok Shop mới vào bảng!`);
+      addAuditLog('🗑️ XÓA SẠCH TOÀN BỘ ĐƠN', `Chủ Shop đã xóa sạch toàn bộ ${currentCount} đơn hàng hiện tại cùng toàn bộ lịch sử chỉnh sửa ô để làm mới bảng về 0 đơn`);
+      if (typeof addAppNotification === 'function') {
+        addAppNotification({
+          type: 'excel_import',
+          title: '🗑️ Xóa Sạch Đơn & Lịch Sử Ô',
+          detail: `Đã xóa sạch ${currentCount} đơn hàng cũ cùng toàn bộ lịch sử chỉnh sửa ô để làm mới bảng về 0 đơn.`,
+          code: '',
+          orderIdx: null
+        });
+      }
+      alert(`✅ ĐÃ XÓA SẠCH TOÀN BỘ ĐƠN HÀNG HIỆN TẠI (ĐÃ XÓA ${currentCount} ĐƠN VỀ 0 ĐƠN)!\n\n• Toàn bộ bảng chính, bảng thống kê kho, lịch sử chỉnh sửa ô và bộ nhớ tra cứu đã được làm mới sạch sẽ hoàn toàn.\n• Đã lưu đồng bộ trạng thái bảng trống lên ổ cứng máy tính.\n• Bây giờ bạn có thể nạp file Shopee hoặc TikTok Shop mới vào bảng!`);
     }
 
     function compressAndSaveImage(file, orderIdx) {
@@ -11872,6 +11951,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (newVal !== null) {
         o.platformStatus = newVal.trim();
         addAuditLog('🔄 ĐỔI TRẠNG THÁI SÀN', `Đơn #${orderIdx + 1} (${o.orderId || o.track}): [${cur}] ➔ [${o.platformStatus}]`);
+        if (typeof recordCellEditHistory === 'function') {
+          recordCellEditHistory(`${orderIdx}:platformStatus`, `Trạng thái sàn Đơn #${orderIdx + 1}`, cur, o.platformStatus, 'Đổi trạng thái sàn');
+        }
         saveOrders();
         renderAll(false);
       }

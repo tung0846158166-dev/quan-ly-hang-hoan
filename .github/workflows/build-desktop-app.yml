@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.5.0
+          name: QuanLyHangHoan-Windows-Installer-v1.5.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,28 +67,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.5.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.5.0 (Cột Trạng Thái Sàn, Trung Tâm Thông Báo & Tra Cứu Theo Mã Đơn/MVĐ, Định Vị Đơn 1-Click)"
+          tag_name: v1.5.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.5.1 (Khắc Phục Xóa Sạch Lịch Sử Sửa Ô Khi Reset Bảng Đơn, Nút Xóa Lịch Sử Ô Chủ Động 1-Click)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.5.0
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.5.1
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.5.0`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.5.0.exe`)
-            - **Các tính năng mới nổi bật trong phiên bản v1.5.0**:
-              1. 📊 **Bổ Sung Cột 'Trạng Thái Sàn' (Marketplace Status Column)**:
-                 - Cột dữ liệu mới hiển thị trực quan trạng thái từ Shopee/TikTok (Chờ bạn xác nhận, Đã hoàn tiền cho Người mua, Giao hàng hoàn trả thành công, Đang chuyển hoàn, Đơn hủy...).
-                 - Tự động nhận diện và gắn huy hiệu màu sắc thông minh (cảnh báo cam, thành công xanh...). Bấm đúp để chỉnh sửa nhanh.
-                 - Khi nạp các file Excel gối đầu ngày, hệ thống tự động cập nhật trạng thái sàn mới nhất mà vẫn bảo lưu 100% tình trạng nhận hàng kho thực tế của bạn.
-              2. 🔔 **Bảng Thông Báo & Lịch Sử Cập Nhật Đơn Hàng (Notification Center)**:
-                 - Nút chuông thông báo nổi bật màu hổ phách trên thanh tiêu đề kèm huy hiệu đếm số thông báo mới.
-                 - Tự động ghi nhận cả 2 nguồn thông tin quan trọng:
-                   * Lượt quét đơn từ xa bằng điện thoại: Khớp đơn, cảnh báo quét trùng lặp, mã lạ chưa có trên hệ thống.
-                   * Lượt nạp file Excel: Ghi rõ danh sách các đơn trùng lặp vừa được cập nhật trạng thái sàn hoặc bổ sung mã vận đơn hoàn mới.
-              3. 🔍 **Ô Tìm Kiếm Nhanh Bên Trong Bảng Thông Báo**:
-                 - Nhập Mã đơn hàng hoặc Mã vận đơn (MVĐ) để xem ngay lịch sử cập nhật của đơn cần xem siêu tốc.
-                 - Hỗ trợ các tab phân loại: Tất Cả, 📱 Quét ĐT, 🔄 Cập Nhật Excel, ⚠️ Trùng & Cảnh Báo.
-              4. 🎯 **Nút '🎯 Định Vị Đơn' 1-Click**:
-                 - Bấm trực tiếp trên từng mục thông báo để đóng modal, tự động chuyển sang đúng Tab tuần của đơn đó và kích hoạt hiệu ứng nháy xanh nổi bật định vị đơn hàng trên bảng.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.5.1`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.5.1.exe`)
+            - **Các cải tiến & sửa lỗi mới nhất trong phiên bản v1.5.1**:
+              1. 🧹 **Xóa Sạch Triệt Để Lịch Sử Chỉnh Sửa Ô Khi Bấm Xóa Hết Đơn Hiện Tại**:
+                 - Khi bấm "🗑️ Xóa Hết Đơn Hiện Tại" để nạp file mới, toàn bộ lịch sử chỉnh sửa ô cũ (`cellEditHistory`) được làm sạch 100% về 0.
+                 - Các đơn hàng mới nạp hoặc tạo thêm sau đó hoàn toàn không còn mang vết lịch sử cũ của các đơn đã xóa.
+                 - Tự động tịnh tiến đồng bộ lịch sử ô khi xóa từng đơn hàng (`deleteOrder`) hoặc chèn dòng đơn mới (`insertOrderRowAt`).
+              2. 🗑️ **Nút 'Xóa Lịch Sử Ô Này' Chủ Động Trong Modal Chi Tiết**:
+                 - Khi mở xem lịch sử chỉnh sửa ô (chuột phải hoặc bấm vào ô), xuất hiện nút **`🗑️ Xóa Lịch Sử Ô Này`** để bạn chủ động xóa lịch sử riêng của ô đó bất cứ lúc nào.
+              3. 📊 **Cột 'Trạng Thái Sàn' (Marketplace Status)**:
+                 - Cột dữ liệu riêng biệt hiển thị trạng thái từ Shopee/TikTok (Chờ xác nhận, Đã hoàn tiền, Giao hàng hoàn trả thành công, Đang chuyển hoàn...) với huy hiệu màu sắc trực quan, tự động cập nhật khi nạp file gối đầu.
+              4. 🔔 **Trung Tâm Thông Báo & Lịch Sử Cập Nhật Đơn Hàng**:
+                 - Nút chuông thông báo nổi bật kèm ô tìm kiếm siêu tốc theo Mã đơn / MVĐ và nút `🎯 Định Vị Đơn` 1-Click tự động nhảy Tab tuần và nháy xanh đơn hàng.
           files: |
             dist/*.exe
         env:

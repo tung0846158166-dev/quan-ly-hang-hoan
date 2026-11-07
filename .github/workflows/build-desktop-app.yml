@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.7
+          name: QuanLyHangHoan-Windows-Installer-v1.2.8
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,24 +66,28 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.7
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.7 (Thêm Cột Loại Đơn Phân Biệt Nguồn Phát Sinh, Cột Đã Nhận Thực Tế Theo Dõi Quét Kho, Giữ Trạng Thái Gốc THẤT THU Cho TikTok/Salework)"
+          tag_name: v1.2.8
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.8 (Tách Riêng Cột Ghi Chú Người Mua, Xuất File Đơn Đã Về Kho)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.7
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.8
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.7`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.7.exe`)
-            - **Điểm nâng cấp & tối ưu trong v1.2.7**:
-              1. 📂 **Thêm cột `"Loại Đơn"` phân biệt rõ nguồn phát sinh của từng đơn hàng**:
-                 - **`🚚 Giao không thành công`**: Đơn giao thất bại, cần theo dõi hàng quay về kho (tự động nhận diện từ file `Order.failed_delivery...` hoặc lý do hủy giao thất bại).
-                 - **`↩️ Trả hàng/Hoàn tiền`**: Đơn có yêu cầu trả hàng hoặc hoàn tiền (tự động nhận diện từ file `Order.return_refund...` hoặc có trạng thái/phương án trả hàng hoàn tiền).
-                 - **`🚫 Đơn hủy`**: Đơn bị hủy (tự động nhận diện từ file `Order.cancelled...` hoặc đơn trạng thái `HỦY`).
-                 - **`⚫ THẤT THU (Salework)`**: Giữ nguyên trạng thái gốc **`THẤT THU`** đối với file TikTok xuất qua Salework (vì chỉ dựa vào chữ `THẤT THU` của Salework chưa đủ để tự kết luận đơn thuộc nhóm nào), đồng thời cho phép bấm chọn đổi nhóm ngay trên dòng bất cứ lúc nào.
-              2. 🟢 **Cột `"Đã Nhận Thực Tế"` theo dõi độc lập bằng kết quả quét kho**:
-                 - Khi mới nạp đơn (`Giao không thành công`, `Trả hàng/Hoàn tiền`, `THẤT THU`, `Đơn hủy`), cột **`Đã Nhận Thực Tế`** mặc định ở trạng thái **`🟡 Chưa nhận (Chờ về)`**.
-                 - Ngay khi bạn quét mã vạch kiện hàng về kho, cột **`Đã Nhận Thực Tế`** tự động chuyển sang **`🟢 Đã nhận (Về kho)`** kèm ngày giờ thực tế, trong khi cột **`Loại Đơn`** vẫn giữ nguyên 100% nguồn phát sinh ban đầu.
-              3. 🔍 **Thêm bộ lọc nhanh theo `Loại Đơn` trên thanh công cụ**:
-                 - Lọc riêng từng nhóm `Giao không thành công`, `Trả hàng/Hoàn tiền`, `Đơn hủy`, hoặc `THẤT THU (Gốc Salework)` chỉ với 1 cú nhấp chuột.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.8`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.8.exe`)
+            - **Điểm nâng cấp & tối ưu trong v1.2.8**:
+              1. 📝 **Tách riêng cột `"Ghi Chú Người Mua"` độc lập với `"Lý Do Hoàn"`**:
+                 - **`Lý Do Hoàn`**: Ghi nhận lý do trả hàng, lý do hủy, lý do giao thất bại từ hệ thống sàn Shopee / TikTok.
+                 - **`Ghi Chú Người Mua`**: Trích xuất chính xác nhận xét, lời nhắn khi khách bấm trả hàng hoặc khi đặt đơn.
+                 - Tự động nhận diện từ cả 5 file Excel thực tế của Shop:
+                   - Shopee Trả hàng/Hoàn tiền: trích xuất cột `Lí do Trả hàng/Hoàn tiền` và `Ghi chú của Người mua khi trả hàng` / `Ghi chú của Người mua khi đặt hàng`.
+                   - Shopee Đơn hủy: trích xuất cột `Lý do hủy` và `Nhận xét từ Người mua` / `Ghi chú`.
+                   - Shopee Giao hàng thất bại: trích xuất lý do `Giao hàng thất bại` và `Nhận xét từ Người mua` / `Ghi chú`.
+                   - TikTok / Salework: trích xuất trạng thái/lý do `THẤT THU / HỦY` và cột `Ghi chú của khách` (cột U) / `Ghi chú`.
+              2. 📦 **Tính năng mới `"Xuất File Đơn ĐÃ VỀ KHO (.xlsx)"`**:
+                 - Xuất riêng các đơn đã thực nhận tại kho (`o.status === 'Hàng đã trả'`) ra file Excel với **2 Sheet chuyên nghiệp**:
+                   - **Sheet 1: `1_Don_Da_Ve_Kho_Chi_Tiet`**: Toàn bộ chi tiết từng đơn hàng đã về kho (STT, Ngày & Giờ Về Kho, Sàn TMĐT, Loại Đơn, Mã Vận Đơn, Mã Đơn Hàng, ĐVVC, Tên SP, Màu Sắc, Size, Số Lượng, Giá Trị, Lý Do Hoàn, Ghi Chú Người Mua, Ngày Gửi Đi, Ngày Hoàn/Hủy).
+                   - **Sheet 2: `2_Tong_Ket_SP_Nhap_Lai_Kho`**: Bảng tổng kết số lượng sản phẩm theo Tên SP, Màu Sắc, Size của các kiện đã về kho để thủ kho và kế toán nhập lại kho tức thì (kèm cột Ký nhận và dòng Tổng cộng).
+              3. ⚡ **Nút bấm tắt nhanh `"📥 Xuất Đơn Đã Về"`**:
+                 - Đặt ngay trên thanh công cụ tab trạng thái (cạnh tab `🟢 Đã về kho`) và trong menu `📂 Nhập / Xuất Dữ Liệu` có badge đếm số lượng đơn đã về kho thực tế.
           files: |
             dist/*.exe
         env:

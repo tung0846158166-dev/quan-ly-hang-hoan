@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.2.4
+          name: QuanLyHangHoan-Windows-Installer-v1.2.5
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,23 +66,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.2.4
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.4 (Phân Loại 2 Sàn Shopee / TikTok Riêng Biệt & Nạp Chuẩn 100% Cả 5 Loại File Sàn)"
+          tag_name: v1.2.5
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.2.5 (Khôi Phục Dữ Liệu = Xóa Sạch Toàn Bộ Đơn Hiện Tại Về 0 Đơn & Phân Loại 2 Sàn Shopee / TikTok)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.4
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.2.5
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.4`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.4.exe`)
-            - **Điểm nâng cấp & tối ưu trong v1.2.4**:
-              1. 🛍️ **Tách biệt hoàn toàn 2 sàn `🟠 SÀN SHOPEE` và `⚫ SÀN TIKTOK SHOP`**:
-                 - Bổ sung **Thanh Phân Loại Sàn 1-Click** ngay trên đầu bảng và trên **Bảng Tổng Kết Tồn Kho 300+ Phân Loại** ở dưới (`🌐 Gộp Cả 2 Sàn`, `🟠 RIÊNG SÀN SHOPEE`, `⚫ RIÊNG SÀN TIKTOK SHOP`) kèm bộ đếm số đơn và số lượng SP trực tiếp.
-                 - Khi bấm chọn `🟠 RIÊNG SÀN SHOPEE` hoặc `⚫ RIÊNG SÀN TIKTOK SHOP`, toàn bộ **Bảng đơn hàng**, **4 thẻ KPI**, **5 tab trạng thái** và **Bảng tổng kết sản phẩm - màu sắc - size** đều lọc và tính toán độc lập cho riêng sàn đó.
-              2. 📥 **Tương thích 100% với cả 3 mẫu file xuất Shopee Seller Center (`Đơn Đã Hủy`, `Giao Hàng Thất Bại`, `Trả Hàng / Hoàn Tiền`) & 2 mẫu file Salework / TikTok Shop**:
-                 - **Nhận diện song song 2 mã vận đơn (`Mã vận đơn trả hàng` & `Mã vận đơn giao hàng`)**: Trong file Trả hàng/Hoàn tiền Shopee có cả 2 cột mã vận đơn chiều đi và chiều về, hệ thống tự động lưu cả 2 mã để khi kho quét bất kỳ mã nào trên bọc hàng cũng khớp đơn ngay lập tức.
-                 - **Xử lý chuẩn xác cột giá tiền có số thập phân `.00` của Shopee (VD: `138580.00`, `348840.00`)**: Không bị nhân 100 lần do dấu chấm thập phân; tự động dự phòng sang `Tổng Giá Trị` / `Đơn Giá` khi cột `Tổng số tiền Hoàn trả = 0`.
-                 - **Bộ lọc thông minh cho đơn Trả hàng/Hoàn tiền Shopee**: Tự động bỏ qua các dòng *"Yêu cầu của Người mua đã hủy"* (khách hủy khiếu nại, giữ lại hàng không trả nữa) và giữ lại đầy đủ các đơn có trạng thái *"Hoàn thành"* nhưng phát sinh *"Đã Chấp Thuận Yêu Cầu"* trả hàng/hoàn tiền.
-                 - **Nhận diện đầy đủ các mã vận đơn đặc thù mới của Shopee**: `SHOPEEVTPVN...` (Viettel Post), `GY...` (GHN 8 ký tự), `VN26...` (SPX Trong Ngày), và tách sạch các hậu tố `- Thêu Cao Cấp`, `- NỈ LÔNG CÁO`, `- Len Dệt Kim`, `(Pre Cao Cấp)`.
-              3. 💾 **Giữ nguyên 100% dữ liệu cũ**: Cài đè trực tiếp lên bản đang dùng, toàn bộ đơn hàng và hình ảnh trong `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json` được giữ nguyên vẹn.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.2.5`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.2.5.exe`)
+            - **Điểm nâng cấp & tối ưu trong v1.2.5**:
+              1. 🗑️ **Nâng cấp mục `Khôi Phục Dữ Liệu` = Xóa Sạch Toàn Bộ Đơn Hiện Tại (Về `0 đơn`)**:
+                 - Tại menu `⚙️ Quản Lý & Bảo Mật ➔ 🗑️ Khôi Phục Dữ Liệu (Xóa Hết Đơn Hiện Tại)` và nút `🗑️ Xóa Hết Đơn Hiện Tại` trong cửa sổ `📥 Nạp File Shopee / TikTok`, khi xác nhận bằng mật khẩu Chủ Shop (`123456`), hệ thống sẽ **xóa sạch 100% đơn hàng hiện tại trên bảng chính, bảng thống kê kho và bộ nhớ tra cứu về `0 đơn`** (thay vì nạp lại các đơn mẫu thử nghiệm như trước).
+                 - Đồng bộ ngay trạng thái bảng trống (`0 đơn`) vào file ổ cứng `Documents\QuanLyHangHoan\du_lieu_hang_hoan.json`, đảm bảo khi tắt đi bật lại bảng vẫn giữ nguyên trạng thái sạch sẽ để bạn nạp file thật từ sàn vào.
+              2. 🛍️ **Tách biệt hoàn toàn 2 sàn `🟠 SÀN SHOPEE` và `⚫ SÀN TIKTOK SHOP`**:
+                 - Thanh chuyển sàn 1-Click ngay trên đầu bảng và trên **Bảng Tổng Kết Tồn Kho 300+ Phân Loại** (`🌐 Gộp Cả 2 Sàn`, `🟠 RIÊNG SÀN SHOPEE`, `⚫ RIÊNG SÀN TIKTOK SHOP`) kèm bộ đếm số đơn và số lượng SP trực tiếp.
+              3. 📥 **Tương thích 100% với cả 3 mẫu file xuất Shopee Seller Center (`Đơn Đã Hủy`, `Giao Hàng Thất Bại`, `Trả Hàng / Hoàn Tiền`) & 2 mẫu file Salework / TikTok Shop**.
           files: |
             dist/*.exe
         env:

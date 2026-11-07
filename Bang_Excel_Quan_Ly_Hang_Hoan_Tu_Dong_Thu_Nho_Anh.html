@@ -144,7 +144,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           📦 QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK
         </h1>
         <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm hiện tại (Bấm để xem chi tiết cập nhật)">
-          🚀 Phiên bản v1.2.4
+          🚀 Phiên bản v1.2.5
         </span>
         <!-- Badge thông báo lưu trữ ổ cứng máy tính (Gọn gàng ngay cạnh tiêu đề) -->
         <span id="diskSaveNotice" onclick="openHardDriveDataFolder()"
@@ -425,17 +425,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-rose-50 transition group cursor-pointer border-t border-slate-100 mt-1 pt-2"
               >
                 <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 group-hover:bg-rose-200 font-bold text-xs">
-                  🔄
+                  🗑️
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="font-bold text-xs text-rose-600 group-hover:text-rose-700">Khôi Phục Dữ Liệu Mẫu</div>
-                  <p class="text-[10.5px] text-slate-400 leading-snug">Khôi phục về 5 đơn hàng mẫu ban đầu</p>
+                  <div class="font-bold text-xs text-rose-600 group-hover:text-rose-700">Khôi Phục Dữ Liệu (Xóa Hết Đơn Hiện Tại)</div>
+                  <p class="text-[10.5px] text-slate-400 leading-snug">Xóa sạch toàn bộ đơn hàng & bộ nhớ về 0 để nạp dữ liệu mới</p>
                 </div>
               </button>
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.4</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.2.5</span>
               </div>
             </div>
           </div>
@@ -1307,9 +1307,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <span>Tự động đẩy ra <b>Bảng chính</b> (Trạng thái: <b class="text-amber-700">🟡 Chưa trả - Đang chờ</b>)</span>
             </label>
           </div>
-          <button type="button" onclick="pushAllDbOrdersToMainTable()" class="px-3 py-1 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-lg shadow-xs transition flex items-center gap-1" title="Đẩy toàn bộ đơn đang lưu trong bộ nhớ tra cứu ra ngoài bảng chính để thống kê số lượng">
-            <span>➕ Đẩy Hết Ra Bảng Chính</span>
-          </button>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button type="button" onclick="resetSampleData()" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer" title="Xóa sạch toàn bộ đơn hàng hiện tại trên bảng chính và bộ nhớ về 0 đơn để nạp file mới">
+              <span>🗑️ Xóa Hết Đơn Hiện Tại</span>
+            </button>
+            <button type="button" onclick="pushAllDbOrdersToMainTable()" class="px-3 py-1 bg-indigo-700 hover:bg-indigo-800 text-white font-bold rounded-lg shadow-xs transition flex items-center gap-1 cursor-pointer" title="Đẩy toàn bộ đơn đang lưu trong bộ nhớ tra cứu ra ngoài bảng chính để thống kê số lượng">
+              <span>➕ Đẩy Hết Ra Bảng Chính</span>
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1355,13 +1360,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </div>
         </div>
 
-        <!-- Sample Quick-Fill Buttons -->
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2">
+        <!-- Clean / Reset All Current Orders Bar -->
+        <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-900 flex flex-wrap items-center justify-between gap-2">
           <div>
-            💡 <b>Mẫu thử nghiệm sẵn có:</b> Đã tích hợp sẵn dữ liệu của đơn <code>SPXVN067633153318</code> (Áo Polo Baby Tee Gân, Đen, XL) và các mã trong ảnh của bạn!
+            🧹 <b>Làm mới dữ liệu:</b> Muốn xóa hết các đơn hàng mẫu / đơn cũ đang có trên bảng về <b>0 đơn</b> trước khi nạp file mới?
           </div>
-          <button onclick="loadSampleShopeeDb()" class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition">
-            🔄 Khôi Phục Dữ Liệu Mẫu
+          <button onclick="resetSampleData()" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition cursor-pointer">
+            🗑️ Khôi Phục / Xóa Hết Đơn Hiện Tại
           </button>
         </div>
 
@@ -1471,6 +1476,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const tx = db.transaction(PHOTO_DB_STORE, 'readwrite');
             const store = tx.objectStore(PHOTO_DB_STORE);
             store.delete(id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+          } catch (e) {
+            resolve(false);
+          }
+        });
+      });
+    }
+
+    function clearAllPhotosFromDb() {
+      photoMemoryCache.clear();
+      return openPhotoDb().then(db => {
+        if (!db) return false;
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(PHOTO_DB_STORE, 'readwrite');
+            const store = tx.objectStore(PHOTO_DB_STORE);
+            store.clear();
             tx.oncomplete = () => resolve(true);
             tx.onerror = () => resolve(false);
           } catch (e) {
@@ -1915,16 +1938,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function loadShopeeOrderDb() {
       try {
         const saved = localStorage.getItem(SHOPEE_DB_KEY);
-        if (saved) {
+        if (saved !== null) {
           shopeeOrderDb = JSON.parse(saved);
+          if (!shopeeOrderDb || typeof shopeeOrderDb !== 'object') shopeeOrderDb = {};
+          updateShopeeDbBadge();
+          return;
         }
       } catch (e) {}
       if (!shopeeOrderDb || typeof shopeeOrderDb !== 'object') shopeeOrderDb = {};
-      Object.keys(defaultSampleShopeeDb).forEach(k => {
-        if (!shopeeOrderDb[k]) {
-          shopeeOrderDb[k] = defaultSampleShopeeDb[k];
-        }
-      });
+      if (localStorage.getItem('shopee_db_cleared_by_user') !== 'true') {
+        Object.keys(defaultSampleShopeeDb).forEach(k => {
+          if (!shopeeOrderDb[k]) {
+            shopeeOrderDb[k] = defaultSampleShopeeDb[k];
+          }
+        });
+      }
       updateShopeeDbBadge();
     }
 
@@ -2953,7 +2981,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (countEl) countEl.textContent = list.length;
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400 italic">Chưa có đơn hàng nào khớp trong bộ nhớ. Hãy nạp file Excel hoặc bấm "Khôi phục dữ liệu mẫu"!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400 italic">Hiện tại bộ nhớ tra cứu đang trống (0 đơn). Hãy chọn file Excel Shopee / TikTok ở trên để nạp đơn mới!</td></tr>`;
         return;
       }
 
@@ -2997,11 +3025,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function loadSampleShopeeDb() {
-      shopeeOrderDb = JSON.parse(JSON.stringify(defaultSampleShopeeDb));
-      saveShopeeOrderDb();
-      renderShopeeDbTable();
-      autoEnrichAllMissingOrdersFromDb(true);
-      alert('✨ Đã khôi phục thành công các đơn hàng mẫu (bao gồm đơn SPXVN067633153318 và các mã trong ảnh của bạn) vào bộ nhớ tra cứu!');
+      resetSampleData();
     }
 
     // =========================================================================
@@ -3342,7 +3366,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.2.4';
+    const APP_VERSION_NUMBER = '1.2.5';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -3381,9 +3405,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       alert(
         `🚀 BẢNG QUẢN LÝ & ĐỐI SOÁT HÀNG HOÀN SHOPEE / TIKTOK — ${curVer}\n\n` +
         `✨ Điểm mới trong phiên bản ${curVer}:\n` +
-        `1. Phân Loại 2 Sàn Riêng Biệt (🟠 Sàn Shopee vs ⚫ Sàn TikTok Shop): Bổ sung thanh chuyển sàn 1-Click ngay trên đầu bảng và ở bảng tổng kết kho 300+ phân loại. Khi chọn sàn nào, toàn bộ đơn hàng, 4 thẻ KPI, bộ lọc trạng thái và bảng tồn kho chỉ tính riêng cho sàn đó!\n` +
-        `2. Tương Thích 100% Cả 3 File Xuất Shopee (Đơn Đã Hủy, Giao Hàng Thất Bại, Trả Hàng/Hoàn Tiền) & 2 File Salework/TikTok: Tự động nhận diện cả 2 mã vận đơn (Mã vận đơn trả hàng & Mã vận đơn giao hàng), xử lý chuẩn số tiền có đuôi thập phân (.00), lọc bỏ yêu cầu trả hàng người mua đã tự hủy, và giữ lại đơn Hoàn thành nhưng có phát sinh Trả hàng/Hoàn tiền.\n` +
-        `3. Giữ nguyên đầy đủ 100% dữ liệu đơn hàng & ảnh đã lưu trên ổ cứng máy tính.`
+        `1. Khôi Phục Dữ Liệu = Xóa Sạch Toàn Bộ Đơn Hiện Tại (Về 0 Đơn): Bấm vào [🗑️ Khôi Phục Dữ Liệu (Xóa Hết Đơn Hiện Tại)] trong menu Quản Lý & Bảo Mật hoặc nút [🗑️ Xóa Hết Đơn Hiện Tại] trong bảng Nạp File để xóa sạch 100% đơn cũ / đơn mẫu về 0 đơn và lưu đồng bộ ngay lên ổ cứng.\n` +
+        `2. Phân Loại 2 Sàn Riêng Biệt (🟠 Sàn Shopee vs ⚫ Sàn TikTok Shop): Chuyển sàn 1-Click ngay trên đầu bảng và ở bảng tổng kết kho 300+ phân loại.\n` +
+        `3. Tương Thích 100% Cả 3 File Xuất Shopee (Đơn Đã Hủy, Giao Hàng Thất Bại, Trả Hàng/Hoàn Tiền) & 2 File Salework/TikTok.`
       );
     }
 
@@ -4594,13 +4618,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function loadOrders() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
+        if (saved !== null) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             orders = parsed;
           } else {
-            orders = JSON.parse(JSON.stringify(defaultSampleOrders));
+            orders = [];
           }
+        } else if (localStorage.getItem('shopee_db_cleared_by_user') === 'true') {
+          orders = [];
         } else {
           orders = JSON.parse(JSON.stringify(defaultSampleOrders));
         }
@@ -4915,8 +4941,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       try {
         const res = await window.desktopDiskAPI.loadFromDisk();
-        if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res && res.success && Array.isArray(res.data)) {
           orders = res.data;
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(orders.map(o => {
+              if (o.photo && o.photo.length > 200) {
+                const copy = Object.assign({}, o);
+                copy.photo = '';
+                return copy;
+              }
+              return o;
+            })));
+          } catch (e) {}
           orders.forEach(o => {
             if (o.photo && o.photo.length > 200) {
               if (!o.photoId) {
@@ -5216,27 +5252,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function resetSampleData() {
+      const currentCount = orders ? orders.length : 0;
       const entered = await appPrompt({
-        title: 'Khôi Phục Dữ Liệu Mẫu Ban Đầu',
-        subtitle: 'Thao tác này sẽ đặt lại danh sách về 5 đơn hàng mẫu ban đầu.\nNhập mật khẩu Chủ Shop để xác nhận:',
-        icon: '🔄'
+        title: 'Khôi Phục Dữ Liệu (Xóa Sạch Đơn Hiện Tại)',
+        subtitle: `Thao tác này sẽ XÓA SẠCH toàn bộ ${currentCount} đơn hàng hiện tại trên bảng và bộ nhớ tra cứu về 0 đơn để làm mới bảng.\nNhập mật khẩu Chủ Shop để xác nhận:`,
+        icon: '🗑️'
       });
       if (entered === null) return;
       if (!verifyPassword(entered)) {
-        addAuditLog('⚠️ CẢNH BÁO', 'Nhập sai mật khẩu khi cố bấm nút Khôi phục mẫu');
+        addAuditLog('⚠️ CẢNH BÁO', 'Nhập sai mật khẩu khi cố bấm nút Xóa sạch / Khôi phục dữ liệu');
         alert('❌ Mật khẩu Chủ Shop không đúng! Mật khẩu mặc định là 123456.');
         return;
       }
       isLocked = false;
-      localStorage.setItem(LOCK_STATE_KEY, 'false');
+      try {
+        localStorage.setItem(LOCK_STATE_KEY, 'false');
+        localStorage.setItem('shopee_db_cleared_by_user', 'true');
+      } catch (e) {}
       cellLocks = {};
       saveCellLocks();
-      addAuditLog('🔄 KHÔI PHỤC MẪU', 'Chủ Shop đã khôi phục dữ liệu mẫu ban đầu');
-      orders = JSON.parse(JSON.stringify(defaultSampleOrders));
-      saveOrders();
+      accountantStock = {};
+      saveAccountantStock();
+      shopeeOrderDb = {};
+      saveShopeeOrderDb();
+      clearAllPhotosFromDb();
+      orders = [];
+      currentPage = 1;
+      saveOrders(true);
+      renderShopeeDbTable();
       applyLockUI();
       renderAll();
-      alert('✅ ĐÃ KHÔI PHỤC DỮ LIỆU MẪU THÀNH CÔNG!\nBảng đã được mở khóa để bạn dễ dàng trải nghiệm và chỉnh sửa.');
+      addAuditLog('🗑️ XÓA SẠCH TOÀN BỘ ĐƠN', `Chủ Shop đã xóa sạch toàn bộ ${currentCount} đơn hàng hiện tại để làm mới bảng về 0 đơn`);
+      alert(`✅ ĐÃ XÓA SẠCH TOÀN BỘ ĐƠN HÀNG HIỆN TẠI (ĐÃ XÓA ${currentCount} ĐƠN VỀ 0 ĐƠN)!\n\n• Toàn bộ bảng chính, bảng thống kê kho và bộ nhớ tra cứu đã được làm mới hoàn toàn.\n• Đã lưu đồng bộ trạng thái bảng trống lên ổ cứng máy tính.\n• Bây giờ bạn có thể nạp file Shopee hoặc TikTok Shop mới vào bảng!`);
     }
 
     function compressAndSaveImage(file, orderIdx) {
@@ -5661,6 +5708,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           html += `</tr>`;
         });
       });
+
+      if (pageEntries.length === 0) {
+        const emptyMsg = orders.length === 0
+          ? `<div class="py-10 flex flex-col items-center justify-center gap-2 text-slate-500">
+               <div class="text-2xl">📭</div>
+               <div class="font-bold text-slate-700 text-sm">Bảng hiện tại đang trống (0 đơn hàng)</div>
+               <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
+             </div>`
+          : `<div class="py-8 text-center text-slate-500 text-xs font-semibold">Không có đơn hàng nào khớp với bộ lọc hiện tại.</div>`;
+        html = `<tr><td colspan="18" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
+      }
 
       tbody.innerHTML = html;
       applyLockUI();

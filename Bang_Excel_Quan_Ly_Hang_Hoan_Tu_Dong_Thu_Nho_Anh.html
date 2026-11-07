@@ -190,52 +190,82 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       contain-intrinsic-size: auto 34px;
     }
   
-    /* Sticky Checkbox & STT Columns on Horizontal Scroll (v1.6.2) */
-    .excel-table th:nth-child(1) {
+    /* Sticky Checkbox & STT Columns on Horizontal Scroll (v1.6.3) */
+    /* Sticky Columns scoped EXCLUSIVELY to Main Orders Table (Never affect Category Summary Table!) */
+    #mainTableScrollContainer .excel-table th:nth-child(1),
+    #mainTableScrollContainer .excel-table td:nth-child(1) {
       position: sticky !important;
       left: 0 !important;
-      z-index: 34 !important;
       width: 48px !important;
       min-width: 48px !important;
       max-width: 48px !important;
-      background-color: #0f172a !important; /* slate-900 */
     }
-    .excel-table td:nth-child(1) {
-      position: sticky !important;
-      left: 0 !important;
+    #mainTableScrollContainer .excel-table th:nth-child(1) {
+      z-index: 34 !important;
+      background-color: #0f172a !important;
+    }
+    #mainTableScrollContainer .excel-table td:nth-child(1) {
       z-index: 18 !important;
-      width: 48px !important;
-      min-width: 48px !important;
-      max-width: 48px !important;
       background-color: #f8fafc;
     }
-    .excel-table th:nth-child(2) {
+    #mainTableScrollContainer .excel-table th:nth-child(2),
+    #mainTableScrollContainer .excel-table td:nth-child(2) {
       position: sticky !important;
       left: 48px !important;
-      z-index: 34 !important;
       width: 40px !important;
       min-width: 40px !important;
       max-width: 40px !important;
-      background-color: #0f172a !important; /* slate-900 */
       border-right: 2px solid #475569 !important;
     }
-    .excel-table td:nth-child(2) {
-      position: sticky !important;
-      left: 48px !important;
+    #mainTableScrollContainer .excel-table th:nth-child(2) {
+      z-index: 34 !important;
+      background-color: #0f172a !important;
+    }
+    #mainTableScrollContainer .excel-table td:nth-child(2) {
       z-index: 18 !important;
-      width: 40px !important;
-      min-width: 40px !important;
-      max-width: 40px !important;
       background-color: #f8fafc;
       border-right: 2px solid #cbd5e1 !important;
     }
-    .excel-table tr:hover td:nth-child(1),
-    .excel-table tr:hover td:nth-child(2) {
+    #mainTableScrollContainer .excel-table tr:hover td:nth-child(1),
+    #mainTableScrollContainer .excel-table tr:hover td:nth-child(2) {
       background-color: #f1f5f9 !important;
     }
-    .excel-table tr.bg-blue-50 td:nth-child(1),
-    .excel-table tr.bg-blue-50 td:nth-child(2) {
+    #mainTableScrollContainer .excel-table tr.bg-blue-50 td:nth-child(1),
+    #mainTableScrollContainer .excel-table tr.bg-blue-50 td:nth-child(2) {
       background-color: #eff6ff !important;
+    }
+
+    /* BẢNG TỔNG KẾT THỐNG KÊ CHI TIẾT THEO SẢN PHẨM - MÀU SẮC - SIZE (Full Width & Clean Layout) */
+    #categorySummaryWrapper {
+      width: 100% !important;
+      background-color: #ffffff !important;
+    }
+    #categorySummaryWrapper .excel-table {
+      width: 100% !important;
+      min-width: 100% !important;
+      table-layout: auto !important;
+    }
+    #categorySummaryWrapper .excel-table th,
+    #categorySummaryWrapper .excel-table td {
+      position: static !important;
+    }
+    #categorySummaryWrapper .excel-table th:nth-child(1),
+    #categorySummaryWrapper .excel-table td:nth-child(1) {
+      width: 44px !important;
+      min-width: 44px !important;
+      max-width: 44px !important;
+      text-align: center !important;
+      background-color: inherit !important;
+    }
+    #categorySummaryWrapper .excel-table th:nth-child(2),
+    #categorySummaryWrapper .excel-table td:nth-child(2) {
+      width: auto !important;
+      min-width: 240px !important;
+      max-width: none !important;
+      text-align: left !important;
+      white-space: normal !important;
+      border-right: 1px solid #cbd5e1 !important;
+      background-color: inherit !important;
     }
 
     /* Sticky Table Footers & Bottom Summary Dock */
@@ -266,14 +296,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <div class="w-full bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 overflow-hidden">
 
-    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.2) -->
+    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.3) -->
     <div class="bg-[#ee4d2d] text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 relative z-30">
       <div class="flex flex-wrap items-center gap-1.5">
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.2">
-          🚀 v1.6.2
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.3">
+          🚀 v1.6.3
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -286,7 +316,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
 
       <div class="flex flex-wrap items-center gap-1 text-xs no-print">
-        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.2) -->
+        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.3) -->
         <button type="button" id="btnOpenWatchlistModal" onclick="openWatchlistModal()"
               class="relative inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-lg shadow-2xs transition ring-1 ring-amber-300 cursor-pointer select-none active:scale-95"
               title="Mở Bảng Theo Dõi Đơn Hàng Đặc Biệt">
@@ -643,7 +673,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.3</span>
               </div>
             </div>
           </div>
@@ -655,7 +685,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
     </div>
 
-    <!-- Row 2: Thanh Điều Hướng: Tuần Nạp + Sàn TMĐT + Chế Độ Xem + Phân Tích & Ca Nhận (v1.6.2 Siêu Gọn) -->
+    <!-- Row 2: Thanh Điều Hướng: Tuần Nạp + Sàn TMĐT + Chế Độ Xem + Phân Tích & Ca Nhận (v1.6.3 Siêu Gọn) -->
     <div class="px-3 py-1 bg-gradient-to-r from-purple-50 via-slate-50 to-indigo-50 border-b border-purple-200/80 flex flex-wrap items-center justify-between gap-2 no-print">
       <!-- Cụm Trái: Tab Tuần Nạp & Tab Sàn TMĐT -->
       <div class="flex flex-wrap items-center gap-2">
@@ -1169,7 +1199,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
   </div>
 
-  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.2) -->
+  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.3) -->
   <div id="watchlistModal" onclick="closeWatchlistModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
     <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
       <!-- Header -->
@@ -3208,9 +3238,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           changed = true;
         }
       }
-      if (match.shipDate && (forceOverwrite || !order.shipDate)) {
-        if (order.shipDate !== match.shipDate) {
-          order.shipDate = match.shipDate;
+      const newMatchShip = resolveOrderShipDate(match);
+      if (newMatchShip && (forceOverwrite || !order.shipDate)) {
+        if (order.shipDate !== newMatchShip) {
+          order.shipDate = newMatchShip;
           changed = true;
         }
       }
@@ -3373,6 +3404,66 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // Trích xuất ngày chuẩn DD/MM/YYYY từ chuỗi bất kỳ (hỗ trợ cả "13:14:41 05/11/2026" của Salework và "2026-11-05 13:14:41" của TikTok/Shopee)
+        // v1.6.3: Thuật toán phục hồi và trích xuất Ngày Gửi Đi đa tầng, bảo đảm 100% không bao giờ bị rỗng
+    function resolveOrderShipDate(order) {
+      if (!order) return '';
+
+      // Tầng 1: Giá trị shipDate đã có sẵn
+      if (order.shipDate && String(order.shipDate).trim()) {
+        const norm = normalizeShortDate(String(order.shipDate).trim());
+        if (norm) return norm;
+      }
+
+      // Tầng 2: Trích xuất từ rawDetails (orderDate, Ngày đặt hàng, createdTime)
+      if (order.rawDetails && typeof order.rawDetails === 'object') {
+        const rd = order.rawDetails;
+        const rawDate = rd.orderDate || rd['Ngày đặt hàng'] || rd.createdTime || rd.orderTime || rd.shippedTime;
+        if (rawDate) {
+          const extracted = extractDateFromCellValue(rawDate);
+          if (extracted) return extracted;
+        }
+      }
+
+      // Tầng 3: Trích xuất từ cơ sở dữ liệu shopeeOrderDb theo MVĐ hoặc Mã đơn
+      if (typeof shopeeOrderDb === 'object' && shopeeOrderDb) {
+        const candidateKeys = [order.track, order.orderId, order.altTrack, order.returnTrack, order.forwardTrack].filter(Boolean);
+        for (const k of candidateKeys) {
+          const cleanK = extractCleanTrackingCode(k) || String(k).trim().toUpperCase();
+          const match = shopeeOrderDb[cleanK] || shopeeOrderDb[k];
+          if (match) {
+            if (match.shipDate && String(match.shipDate).trim()) {
+              const norm = normalizeShortDate(String(match.shipDate).trim());
+              if (norm) return norm;
+            }
+            if (match.rawDetails) {
+              const rawDate = match.rawDetails.orderDate || match.rawDetails['Ngày đặt hàng'];
+              if (rawDate) {
+                const extracted = extractDateFromCellValue(rawDate);
+                if (extracted) return extracted;
+              }
+            }
+          }
+        }
+      }
+
+      // Tầng 4: Phân tích tự động từ tiền tố 6 chữ số Mã Đơn Hàng Shopee (YYMMDD -> DD/MM/YYYY)
+      const oid = String(order.orderId || '').trim();
+      const mOid = oid.match(/^(\d{2})(\d{2})(\d{2})[A-Za-z0-9]+/);
+      if (mOid) {
+        const yy = mOid[1];
+        const mm = mOid[2];
+        const dd = mOid[3];
+        const numY = parseInt(yy, 10);
+        const numM = parseInt(mm, 10);
+        const numD = parseInt(dd, 10);
+        if (numY >= 20 && numY <= 35 && numM >= 1 && numM <= 12 && numD >= 1 && numD <= 31) {
+          return `${dd}/${mm}/20${yy}`;
+        }
+      }
+
+      return '';
+    }
+
     function extractDateFromCellValue(val) {
       if (val === null || val === undefined) return '';
       if (typeof val === 'number' && val > 20000 && val < 90000) {
@@ -5523,7 +5614,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setImportWeekFilter(weekKey) {
-      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.2: Xóa selection khi đổi tuần
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.3: Xóa selection khi đổi tuần
       currentImportWeekFilter = weekKey;
       try {
         localStorage.setItem(SAVED_ACTIVE_WEEK_KEY, weekKey);
@@ -5812,7 +5903,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.2';
+    const APP_VERSION_NUMBER = '1.6.3';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -5986,7 +6077,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setPlatformFilter(filterVal) {
-      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.2: Tự động bỏ chọn khi đổi sàn
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.3: Tự động bỏ chọn khi đổi sàn
       
       currentPlatformFilter = filterVal;
       currentPage = 1;
@@ -6141,7 +6232,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.2: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
+    // v1.6.3: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
     // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ) mà chưa nhận được hàng
     // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
     // =========================================================================
@@ -6159,7 +6250,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return { level: 'lost', status: 'lost', text: '🔴 Bị mất', timeStr: 'Bị mất', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       }
 
-      // v1.6.2: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
+      // v1.6.3: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
       // TUYỆT ĐỐI KHÔNG FALLBACK SANG shipDate ĐỂ TRÁNH BÁO ĐỎ OAN CHO ĐƠN MỚI GỬI!
       const refStr = order.returnDate;
       if (!refStr) {
@@ -7533,10 +7624,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
       sanitizeNumericColorCodes();
-      // v1.6.2: Khôi phục tự động Ngày Gửi Đi từ Ngày đặt hàng nếu shipDate bị trống
+      // v1.6.3: Tự động phục hồi Ngày Gửi Đi cho toàn bộ đơn hàng
       (orders || []).forEach(o => {
-        if (!o.shipDate && o.rawDetails && o.rawDetails.orderDate) {
-          o.shipDate = extractDateFromCellValue(o.rawDetails.orderDate) || o.rawDetails.orderDate;
+        const d = resolveOrderShipDate(o);
+        if (d && (!o.shipDate || !o.shipDate.trim())) {
+          o.shipDate = d;
         }
       });
       updateSafeStorageHeaderBadge();
@@ -8085,8 +8177,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
           sanitizeNumericColorCodes();
           (orders || []).forEach(o => {
-            if (!o.shipDate && o.rawDetails && o.rawDetails.orderDate) {
-              o.shipDate = extractDateFromCellValue(o.rawDetails.orderDate) || o.rawDetails.orderDate;
+            const d = resolveOrderShipDate(o);
+            if (d && (!o.shipDate || !o.shipDate.trim())) {
+              o.shipDate = d;
             }
           });
           renderAll();
@@ -9308,7 +9401,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const sortDir = parts[1]; // 'desc' | 'asc'
 
         filteredEntries.sort((a, b) => {
-          // v1.6.2: Sắp xếp thông minh theo Hạn Cần Xử Lý (Cảnh báo Báo Đỏ >= 72h -> Báo Vàng >= 48h -> Trong hạn)
+          // v1.6.3: Sắp xếp thông minh theo Hạn Cần Xử Lý (Cảnh báo Báo Đỏ >= 72h -> Báo Vàng >= 48h -> Trong hạn)
           if (sortField === 'deadline') {
             const elA = getOrderReturnElapsedInfo(a.order);
             const elB = getOrderReturnElapsedInfo(b.order);
@@ -9552,7 +9645,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
             </select>`;
 
-        // Format Deadline Cell (v1.6.2: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
+        // Format Deadline Cell (v1.6.3: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
         const elapsed = getOrderReturnElapsedInfo(order);
         let deadlineHtml = '';
         if (isReceived) {
@@ -9718,7 +9811,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               ${matched ? '🔍 KHỚP' : ''}
             </td>
             ${(() => {
-              const effectiveShipDate = order.shipDate || (order.rawDetails && order.rawDetails.orderDate ? (extractDateFromCellValue(order.rawDetails.orderDate) || order.rawDetails.orderDate) : '');
+              const effectiveShipDate = resolveOrderShipDate(order);
               if (!order.shipDate && effectiveShipDate) order.shipDate = effectiveShipDate;
               return `<td class="${shipTdClass}">${renderCellInput(`${orderIdx}:shipDate`, `Ngày & Giờ gửi đơn #${orderIdx+1}`, effectiveShipDate, 'text-center font-medium text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'shipDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'shipDate',this)`)}</td>`;
             })()}
@@ -9793,7 +9886,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
              </div>`;
         } else if (currentImportWeekFilter !== 'all') {
-          // v1.6.2: Gợi ý thông minh khi chọn trúng Tab Tuần 0 đơn
+          // v1.6.3: Gợi ý thông minh khi chọn trúng Tab Tuần 0 đơn
           const weekMap = new Map();
           orders.forEach(o => {
             const wk = getOrderImportWeek(o);
@@ -9837,7 +9930,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       tbody.innerHTML = html;
 
-      // v1.6.2: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
+      // v1.6.3: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
       const chkSelectAll = document.getElementById('chkSelectAllOrders');
       if (chkSelectAll && window.lastPageEntries) {
         chkSelectAll.checked = (window.lastPageEntries.length > 0 && window.lastPageEntries.every(e => selectedOrdersSet.has(e.originalIndex)));
@@ -13671,7 +13764,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.2: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
+    // v1.6.3: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
     // =========================================================================
     // selectedOrdersSet is initialized globally above
 
@@ -13766,7 +13859,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       saveOrders();
       updateWatchlistBadge();
       renderAll(false);
-      clearAllSelectedOrders(); // v1.6.2: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
+      clearAllSelectedOrders(); // v1.6.3: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
       showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Danh Sách Theo Dõi!`, 'success');
       addAppNotification({
         type: 'system',
@@ -13860,7 +13953,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.2: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
+    // v1.6.3: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
     // =========================================================================
     let currentWatchlistFilter = 'all';
 
@@ -14172,7 +14265,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showAppToast(`Đã gỡ đơn #${orderIdx + 1} khỏi danh sách theo dõi`, 'info');
     }
 
-    // v1.6.2: Dọn dẹp các đơn đã nhận về kho khỏi danh sách theo dõi
+    // v1.6.3: Dọn dẹp các đơn đã nhận về kho khỏi danh sách theo dõi
     function cleanReturnedOrdersFromWatchlist() {
       let cleaned = 0;
       orders.forEach(o => {
@@ -14268,7 +14361,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <datalist id="productList"></datalist>
   <datalist id="colorList"></datalist>
   <datalist id="sizeList"></datalist>
-  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.2) -->
+  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.3) -->
   <div id="bulkActionBar" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[90] hidden bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 transition-all">
     <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
       <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-black text-xs flex items-center justify-center" id="bulkSelectedCountBadge">0</span>

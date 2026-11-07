@@ -521,34 +521,7 @@
       <input id="roomCodeInput" class="room-input" value="SHP-2026" onchange="changeRoomCode(this.value)" />
     </div>
 
-        <!-- KHỐI HÀNG ĐỢI NGOẠI TUYẾN KÈM ẢNH (OFFLINE QUEUE WITH PHOTOS) -->
-    <div id="offlineQueueCard" class="hidden" style="margin-bottom: 12px; background: linear-gradient(135deg, #0f172a, #1e293b); border: 1.5px solid #f59e0b; border-radius: 14px; padding: 12px 14px; color: #fff; box-shadow: 0 4px 18px rgba(245, 158, 11, 0.35);">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-        <span style="font-size:12px; font-weight:900; color:#fbbf24; display:flex; align-items:center; gap:6px;">
-          <span>⚡ ĐANG CHỜ ĐỒNG BỘ:</span>
-          <span id="offlineCountBadge" style="background:#f59e0b; color:#000; font-size:11px; padding:2px 9px; border-radius:999px; font-weight:900;">0 kiện</span>
-        </span>
-        <span id="offlinePhotoCountBadge" style="font-size:11px; color:#38bdf8; font-weight:bold;">📸 0 ảnh</span>
-      </div>
-      <p style="font-size:11px; color:#cbd5e1; margin:0 0 10px 0; line-height:1.4;">
-        Các đơn & ảnh chụp bóc kiện được lưu an toàn trong máy. Bạn có thể xóa từng đơn hoặc bấm đồng bộ:
-      </p>
-
-      <!-- Danh sách cuộn các đơn đang chờ đồng bộ -->
-      <div id="offlineQueueItemsList" style="max-height: 160px; overflow-y: auto; margin-bottom: 10px; background: rgba(0,0,0,0.35); border-radius: 9px; padding: 6px; border: 1px solid rgba(245,158,11,0.25);">
-      </div>
-
-      <!-- Cụm nút thao tác: Đồng bộ & Xóa tất cả hàng đợi -->
-      <div style="display:grid; grid-template-columns: 1fr auto; gap: 8px;">
-        <button onclick="syncOfflineQueueToPc()" id="btnSyncOffline" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:#0f172a; border:none; border-radius:9px; padding:10px 12px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 3px 10px rgba(245,158,11,0.45); transition:transform 0.1s ease;">
-          <span>🔄 ĐỒNG BỘ SANG MÁY TÍNH</span>
-        </button>
-        <button onclick="clearAllOfflineQueue()" id="btnClearOfflineQueue" style="background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid #ef4444; border-radius:9px; padding:10px 12px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; transition:all 0.15s ease;" title="Xóa toàn bộ các đơn đang chờ đồng bộ">
-          <span>🧹 Xóa tất cả</span>
-        </button>
-      </div>
-      <div id="syncProgressText" style="display:none; font-size:11px; color:#38bdf8; font-weight:bold; margin-top:8px; text-align:center;">Đang đồng bộ...</div>
-    </div>
+        
 
     <div class="camera-box">
       <div id="reader"></div>
@@ -607,6 +580,42 @@
       <button onclick="sendManualTrack()" class="btn-send">GỬI ➔</button>
     </div>
 
+        <!-- BẢNG DANH SÁCH ĐƠN CHỜ ĐỒNG BỘ VỚI MÁY TÍNH (Hiển thị khi máy tính chưa bật hoặc có đơn chờ) -->
+    <div id="offlineQueueCard" class="hidden" style="margin-bottom: 14px; background: linear-gradient(135deg, #090d16, #1e293b); border: 2px solid #f59e0b; border-radius: 14px; padding: 12px 14px; color: #fff; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:13px;">📋</span>
+          <span style="font-size:12px; font-weight:900; color:#fbbf24; text-transform:uppercase; letter-spacing:0.3px;">
+            ĐƠN CHỜ ĐỒNG BỘ VỚI MÁY TÍNH
+          </span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span id="offlineCountBadge" style="background:#f59e0b; color:#0f172a; font-size:11px; padding:2px 8px; border-radius:999px; font-weight:900;">0 kiện</span>
+          <span id="offlinePhotoCountBadge" style="font-size:11px; color:#38bdf8; font-weight:bold;">📸 0 ảnh</span>
+        </div>
+      </div>
+      
+      <div style="font-size:10.5px; color:#94a3b8; margin-bottom:8px; display:flex; align-items:center; gap:4px;">
+        <span>⚠️</span>
+        <span>Máy tính chưa bật: Các đơn quét được lưu tạm an toàn trong máy. Bạn có thể xóa từng đơn hoặc bấm Đồng Bộ:</span>
+      </div>
+
+      <!-- Danh Sách Bảng Chờ Đồng Bộ Cuộn Mượt -->
+      <div id="offlineQueueItemsList" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; background: rgba(0,0,0,0.45); border-radius: 9px; padding: 6px; border: 1px solid rgba(245,158,11,0.3);">
+      </div>
+
+      <!-- Cụm Nút Thao Tác To & Nổi Bật -->
+      <div style="display:grid; grid-template-columns: 1fr auto; gap: 8px;">
+        <button onclick="syncOfflineQueueToPc()" id="btnSyncOffline" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:#0f172a; border:none; border-radius:10px; padding:11px 12px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 3px 12px rgba(245,158,11,0.5); transition:transform 0.1s ease;">
+          <span>🔄 ĐỒNG BỘ SANG MÁY TÍNH</span>
+        </button>
+        <button onclick="clearAllOfflineQueue()" id="btnClearOfflineQueue" style="background:rgba(239,68,68,0.2); color:#fca5a5; border:1.5px solid #ef4444; border-radius:10px; padding:11px 14px; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; transition:all 0.15s ease;" title="Xóa toàn bộ các đơn đang chờ đồng bộ">
+          <span>🧹 Xóa Tất Cả</span>
+        </button>
+      </div>
+      <div id="syncProgressText" style="display:none; font-size:11px; color:#38bdf8; font-weight:bold; margin-top:8px; text-align:center;">Đang đồng bộ...</div>
+    </div>
+
     <!-- Scan History Section -->
     <div class="history-card">
       <div class="history-head">
@@ -631,6 +640,10 @@
         <div id="filterNotFound" onclick="setHistoryFilter('not_found')" class="stat-pill stat-not_found">
           <span>🟡 Không có:</span>
           <span id="histCountNotFound">0</span>
+        </div>
+        <div id="filterUnsynced" onclick="setHistoryFilter('unsynced')" class="stat-pill" style="border-color:#f59e0b; color:#fbbf24;">
+          <span>⚡ Chờ nạp PC:</span>
+          <span id="histCountUnsynced">0</span>
         </div>
       </div>
 
@@ -895,6 +908,9 @@
       else if (filter === 'not_found') {
         const nfPill = document.getElementById('filterNotFound');
         if (nfPill) nfPill.classList.add('active');
+      } else if (filter === 'unsynced') {
+        const unPill = document.getElementById('filterUnsynced');
+        if (unPill) unPill.classList.add('active');
       }
       renderScanHistory();
     }
@@ -907,12 +923,15 @@
       const okCount = scanHistory.filter(e => e.status === 'success' || !e.status || e.status === 'pending').length;
       const dupCount = scanHistory.filter(e => e.status === 'duplicate').length;
       const notFoundCount = scanHistory.filter(e => e.status === 'not_found').length;
+      const unsyncedCount = scanHistory.filter(e => e && e.status === 'success' && e.synced !== true).length;
 
       document.getElementById('histCountTotal').textContent = totalCount;
       document.getElementById('histCountOk').textContent = okCount;
       document.getElementById('histCountDup').textContent = dupCount;
       const nfEl = document.getElementById('histCountNotFound');
       if (nfEl) nfEl.textContent = notFoundCount;
+      const unEl = document.getElementById('histCountUnsynced');
+      if (unEl) unEl.textContent = unsyncedCount;
 
       let filtered = scanHistory;
       if (currentHistoryFilter === 'success') {
@@ -921,6 +940,8 @@
         filtered = scanHistory.filter(e => e.status === 'duplicate');
       } else if (currentHistoryFilter === 'not_found') {
         filtered = scanHistory.filter(e => e.status === 'not_found');
+      } else if (currentHistoryFilter === 'unsynced') {
+        filtered = scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
       }
 
       list.innerHTML = '';
@@ -2027,7 +2048,7 @@
     });
   
     // =========================================================================
-    // v1.6.2: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
+    // v1.6.3: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
     // =========================================================================
     function escapeHtml(str) {
       if (!str) return '';
@@ -2109,15 +2130,16 @@
             const hasPhoto = item.photo && item.photo.length > 50;
             const codeDisplay = escapeHtml(item.code || '');
             return `
-              <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; margin-bottom:4px; background:rgba(255,255,255,0.07); border-radius:7px; font-size:11px; border:1px solid rgba(255,255,255,0.06);">
-                <div style="display:flex; align-items:center; gap:6px; overflow:hidden; min-width:0;">
-                  <span style="color:#fbbf24; font-weight:bold; font-size:10px;">#${i + 1}</span>
-                  <span style="font-family:monospace; font-weight:800; color:#fff; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:130px;" title="${codeDisplay}">${codeDisplay}</span>
-                  ${hasPhoto ? '<span style="font-size:9.5px; color:#38bdf8; background:rgba(56,189,248,0.22); padding:1px 5px; border-radius:4px; font-weight:bold; white-space:nowrap;">📸 Có ảnh</span>' : ''}
-                  <span style="color:#94a3b8; font-size:10px; white-space:nowrap;">${timeStr}</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; margin-bottom:5px; background:rgba(255,255,255,0.08); border-radius:8px; font-size:11.5px; border:1px solid rgba(245,158,11,0.25);">
+                <div style="display:flex; align-items:center; gap:7px; overflow:hidden; min-width:0;">
+                  <span style="color:#fbbf24; font-weight:900; font-size:11px;">#${i + 1}</span>
+                  <span style="font-family:monospace; font-weight:900; color:#fff; font-size:12px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:145px;" title="${codeDisplay}">${codeDisplay}</span>
+                  ${hasPhoto ? '<span style="font-size:10px; color:#38bdf8; background:rgba(56,189,248,0.25); padding:1px 6px; border-radius:4px; font-weight:bold; white-space:nowrap;">📸 Có ảnh</span>' : ''}
+                  <span style="color:#94a3b8; font-size:10.5px; white-space:nowrap;">${timeStr}</span>
                 </div>
-                <button onclick="removeSingleOfflineItem('${codeDisplay}')" style="background:#ef4444; color:#fff; border:none; border-radius:5px; padding:3px 8px; font-size:10px; font-weight:bold; cursor:pointer; margin-left:6px; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.3);">
-                  ✕ Xóa
+                <button onclick="removeSingleOfflineItem('${codeDisplay}')" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:4px 9px; font-size:11px; font-weight:900; cursor:pointer; margin-left:8px; flex-shrink:0; display:flex; align-items:center; gap:2px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">
+                  <span>🗑️</span>
+                  <span>Xóa</span>
                 </button>
               </div>
             `;

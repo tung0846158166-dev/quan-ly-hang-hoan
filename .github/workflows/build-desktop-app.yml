@@ -57,7 +57,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.3.0
+          name: QuanLyHangHoan-Windows-Installer-v1.3.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -66,18 +66,38 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.3.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.3.0 (Một Đơn Một Dòng Tổng, Bấm Mở Chi Tiết SP, Sửa Lỗi Đơ Nhập Liệu, Sắp Đến Hạn & Quá Hạn)"
+          tag_name: v1.3.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.3.1 (Một Đơn Một Dòng Tổng, Chuẩn Hóa Số Đơn Bảng Tổng Kết, Khắc Phục Đơ Nhập Liệu)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.3.0
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.3.1
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.3.0`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.3.0.exe`)
-            - **Điểm nâng cấp & tính năng mới trong v1.3.0**:
-              1. ⚡ **Một Đơn Một Dòng Tổng — Triệt Tiêu 100% Lỗi Lag/Đơ Khi Nhấp Con Trỏ Nhập Văn Bản**:
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.3.1`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.3.1.exe`)
+            - **Điểm nâng cấp & tính năng mới trong v1.3.1**:
+              1. 📊 **Làm Rõ & Hiển Thị Độc Lập Số Đơn Gốc và Lượt Mặt Hàng Ở Chân Bảng Tổng Kết Phân Loại**:
+                 - Hiển thị trực quan: `1052 đơn (1191 lượt SP)`.
+                 - Giúp phân biệt rõ ràng giữa tổng số đơn hàng độc lập (1052 đơn) và tổng số lượt sản phẩm xuất hiện trong các đơn (1191 lượt mặt hàng do khách đặt nhiều món trong 1 đơn).
+                 - Khi áp dụng bộ lọc (ví dụ lọc theo tên sản phẩm, size), số đơn hiển thị chính xác theo số đơn thực tế có chứa các sản phẩm đó.
+              2. ⚡ **Một Đơn Một Dòng Tổng — Triệt Tiêu 100% Lỗi Lag/Đơ Khi Nhấp Con Trỏ Nhập Văn Bản**:
                  - Tái cấu trúc bảng chính sang kiến trúc 1 đơn = đúng 1 dòng tổng gọn gàng (không bung rowspan nhiều dòng làm phình to DOM).
                  - Tốc độ cuộn trang và nhấp chuột gõ chữ đạt chuẩn 60fps mượt mà, phản hồi tức thì kể cả khi có hàng nghìn đơn và ảnh chụp.
-              2. 👁️ **Bấm Xem / Sửa Chi Tiết Từng Sản Phẩm Trong Đơn (Product Drawer/Accordion)**:
+              3. 👁️ **Bấm Xem / Sửa Chi Tiết Từng Sản Phẩm Trong Đơn (Product Drawer/Accordion)**:
+                 - Cột Sản phẩm hiển thị tóm tắt: `📦 N loại (M SP)` kèm nút `👁️ Chi tiết (N)`.
+                 - Bấm vào sẽ mở rộng bảng con ngay bên dưới dòng đơn để xem chi tiết tên, màu sắc, size, số lượng, thêm bớt sản phẩm dễ dàng.
+              4. ⏰ **Cột "Hạn Cần Xử Lý" & Bộ Lọc Sắp Đến Hạn (≤ 48h) / Quá Hạn**:
+                 - Tự động trích xuất hạn chót từ file Shopee (`Người Bán cần phản hồi trước` / `Thời hạn khiếu nại`).
+                 - Đánh dấu trực quan: `⏰ Gấp (≤48h)` (màu cam) và `🚨 Quá hạn` (màu đỏ).
+                 - Bấm chuột trái để chỉnh sửa hạn xử lý nhanh chóng; nhấp chuột phải để xem lịch sử chỉnh sửa.
+              5. 🔍 **Khắc Phục Hoàn Toàn Lỗi Bộ Lọc Bảng Thống Kê 300+ SKU**:
+                 - Khi lọc theo Tên sản phẩm, Màu sắc, Size (ví dụ gõ "quần" + size "S"): bảng lọc tức thì, huy hiệu hiển thị chuẩn xác số phân loại khớp.
+                 - Nếu không có phân loại nào khớp, hiển thị thông báo rõ ràng kèm gợi ý bộ lọc thay vì giữ lại các dòng cũ.
+              6. 📱 **Phục Hồi Camera Quét Khi Tắt Màn Hình Điện Thoại Bật Lại**:
+                 - Khắc phục triệt để hiện tượng màn hình đen khi khóa màn hình điện thoại rồi bật lại.
+                 - Tự động đồng bộ và kích hoạt lại luồng camera mượt mà, hỗ trợ chạm vào màn hình để làm mới ngay mà không cần thoát ra vào lại.
+              7. 📦 **Đầy Đủ 4 Đề Xuất Đối Soát & Xuất File Excel Đơn Đã Về Kho**:
+                 - Tách mã vận đơn giao và hoàn: ưu tiên mã hoàn khi nhận kiện, hỗ trợ quét cả 2 mã.
+                 - Tách trạng thái sàn và tình trạng nhận tại kho: `⏳ Chưa nhận`, `🟢 Đã nhận`, `⚪ Không cần nhận` (đơn hủy trước gửi), `🔴 Bị mất`.
+                 - Xuất file Excel 2 Sheet chuyên nghiệp cho đơn đã về kho.
                  - Cột Sản phẩm hiển thị tóm tắt: `📦 N loại (M SP)` kèm nút `👁️ Chi tiết (N)`.
                  - Bấm vào sẽ mở rộng bảng con ngay bên dưới dòng đơn để xem chi tiết tên, màu sắc, size, số lượng, thêm bớt sản phẩm dễ dàng.
               3. ⏰ **Cột "Hạn Cần Xử Lý" & Bộ Lọc Sắp Đến Hạn (≤ 48h) / Quá Hạn**:

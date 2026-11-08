@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.6</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.7</span>
               </div>
             </div>
           </div>
@@ -6307,7 +6307,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.7.6';
+    const APP_VERSION_NUMBER = '1.7.7';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -12869,12 +12869,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return;
         }
 
+        const autoPlat = (data.platform && data.platform !== 'auto') ? data.platform : autoDetectPlatformFromCode(trackCode);
+        const autoCarrier = data.carrier || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(trackCode) : '') || (autoPlat === 'Shopee' ? 'SPX Express' : 'J&T Express');
+
         const newEntry = {
           id: 'inbox_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
           track: trackCode,
           orderId: data.orderId || trackCode,
-          platform: data.platform || (trackCode.startsWith('SPX') ? 'Shopee' : 'TikTok Shop'),
-          carrier: data.carrier || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(trackCode) : '') || (data.platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+          platform: autoPlat,
+          carrier: autoCarrier,
           time: getNowDateTimeString(),
           photo: data.photo || '',
           note: data.note || 'Đơn mới tạo từ máy quét điện thoại',
@@ -12889,9 +12892,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         newOrdersInbox.unshift(newEntry);
         saveNewOrdersInbox();
         playScanSuccessTone();
-        showAppToast(`📥 Nhận đơn mới từ điện thoại: ${trackCode} (${newEntry.platform})`, 'success');
-        appendPhoneLiveLog(`📥 ĐƠN MỚI: Nhận đơn [${trackCode}] (${newEntry.platform}) vào Hộp Đơn Mới!`);
-        sendAckToPhone(0, trackCode, 'ĐÃ VÀO HỘP ĐƠN MỚI', 'success', false, data.requestId || '', data.room || '');
+        showAppToast(`📥 Nhận đơn mới từ điện thoại: ${trackCode} [${autoPlat}]`, 'success');
+        appendPhoneLiveLog(`📥 ĐƠN MỚI: Nhận đơn [${trackCode}] ➔ Tự động phân sàn: [${autoPlat}]`);
+        sendAckToPhone(0, trackCode, 'ĐÃ VÀO HỘP ĐƠN MỚI (' + autoPlat + ')', 'success', false, data.requestId || '', data.room || '');
         return;
       }
 
@@ -13761,10 +13764,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       tbody.innerHTML = list.map((item, idx) => {
         const isChecked = Boolean(item.checked);
-        const plat = item.platform || 'TikTok Shop';
+        const plat = (item.platform && item.platform !== 'auto') ? item.platform : autoDetectPlatformFromCode(item.track || item.code);
         const platBadge = plat === 'Shopee'
-          ? '<span class="bg-orange-100 text-[#ee4d2d] border border-orange-300 text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase">🟠 Shopee</span>'
-          : '<span class="bg-slate-900 text-white text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase">⚫ TikTok Shop</span>';
+          ? `<button type="button" onclick="toggleNewOrderPlatform('${item.id}')" class="bg-orange-100 hover:bg-orange-200 text-[#ee4d2d] border border-orange-300 text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase transition cursor-pointer" title="Nhấp để chuyển đổi sàn nếu muốn">🟠 Shopee ⇄</button>`
+          : `<button type="button" onclick="toggleNewOrderPlatform('${item.id}')" class="bg-slate-900 hover:bg-slate-800 text-white text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase transition cursor-pointer" title="Nhấp để chuyển đổi sàn nếu muốn">⚫ TikTok Shop ⇄</button>`;
 
         const photoHtml = item.photo
           ? `<div class="w-10 h-8 rounded border border-slate-300 overflow-hidden cursor-zoom-in mx-auto shadow-2xs" onclick="openPhotoZoomDirect('${item.id}', '${escapeAttr(item.photo)}')"><img src="${item.photo}" class="w-full h-full object-cover" /></div>`
@@ -13825,13 +13828,68 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
+    function autoDetectPlatformFromCode(rawCode) {
+      const code = String(rawCode || '').trim().toUpperCase();
+      if (!code) return 'TikTok Shop';
+
+      // 1. Kiểm tra trong danh sách đơn hiện có hoặc cơ sở dữ liệu Shopee
+      const existing = (orders || []).find(o => {
+        const tr = String(o.track || '').trim().toUpperCase();
+        const oid = String(o.orderId || '').trim().toUpperCase();
+        const rtr = String(o.returnTrack || '').trim().toUpperCase();
+        return (tr && tr === code) || (oid && oid === code) || (rtr && rtr === code);
+      });
+      if (existing && existing.platform) return existing.platform;
+      if (typeof lookupShopeeDb === 'function' && lookupShopeeDb(code)) return 'Shopee';
+
+      // 2. Nhận diện theo Mã Vận Đơn:
+      // SPX Express luôn là sàn Shopee
+      if (code.startsWith('SPX') || code.startsWith('SHOPEE') || /^VN2[4-9][0-9A-Z]{8,14}$/.test(code)) {
+        return 'Shopee';
+      }
+
+      // J&T Express thường dùng trên TikTok Shop
+      if (/^8[0245]\d{10,12}$/.test(code)) {
+        return 'TikTok Shop';
+      }
+
+      // 3. Nhận diện theo Mã Đơn Hàng:
+      // TikTok Shop Order ID (18 chữ số dạng 58...) hoặc Mã hoàn (19 chữ số dạng 40...)
+      if (/^5\d{17}$/.test(code) || /^4\d{18}$/.test(code)) {
+        return 'TikTok Shop';
+      }
+
+      // Shopee Order ID (14-15 ký tự chữ và số, thường bắt đầu bằng 24, 25, 26...)
+      if (/^2[3-9][0-1]\d[0-3]\d[A-Z0-9]{8,10}$/.test(code) || (/^[A-Z0-9]{14,15}$/.test(code) && !/^\d+$/.test(code))) {
+        return 'Shopee';
+      }
+
+      return 'TikTok Shop';
+    }
+
+    function toggleNewOrderPlatform(id) {
+      const item = (newOrdersInbox || []).find(it => it && it.id === id);
+      if (item) {
+        item.platform = (item.platform === 'Shopee') ? 'TikTok Shop' : 'Shopee';
+        item.carrier = (item.platform === 'Shopee') ? 'SPX Express' : 'J&T Express';
+        saveNewOrdersInbox();
+        renderNewOrdersTable();
+        showAppToast(`Đã chuyển đơn ${item.track} sang sàn: ${item.platform}`, 'info');
+      }
+    }
+
     function convertInboxItemToOrder(item) {
       const cleanTrack = extractCleanTrackingCode(item.track || item.code || '');
+      const assignedPlat = (item.platform && item.platform !== 'auto')
+        ? item.platform
+        : autoDetectPlatformFromCode(cleanTrack || item.orderId || '');
+      const assignedCarrier = item.carrier || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(cleanTrack) : '') || (assignedPlat === 'Shopee' ? 'SPX Express' : 'J&T Express');
+
       return {
         shipDate: item.time || getNowDateTimeString(),
         returnDate: item.time || getNowDateTimeString(),
         recvDate: getNowDateTimeString(),
-        platform: item.platform || 'TikTok Shop',
+        platform: assignedPlat,
         orderType: 'Trả hàng/Hoàn tiền',
         platformStatus: 'Đã nhận tại kho',
         preOrder: 'Đơn thường',
@@ -13839,7 +13897,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         returnOrderId: '',
         track: cleanTrack || item.track || '',
         altTrack: '',
-        carrier: item.carrier || detectCarrierFromCode(cleanTrack) || (item.platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+        carrier: assignedCarrier,
         price: Number(item.price) || 0,
         status: 'Hàng đã trả',
         photo: item.photo || '',

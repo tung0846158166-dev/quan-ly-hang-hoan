@@ -543,24 +543,14 @@
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
         <div style="display:flex; align-items:center; gap:6px;">
           <span style="font-size:14px;">✨</span>
-          <span style="font-size:12px; font-weight:900; color:#34d399; text-transform:uppercase;">CẤU HÌNH ĐƠN MỚI GỬI MÁY TÍNH</span>
+          <span style="font-size:12px; font-weight:900; color:#34d399; text-transform:uppercase;">CHẾ ĐỘ TẠO ĐƠN MỚI TỰ ĐỘNG</span>
         </div>
-        <span style="background:#10b981; color:#064e3b; font-size:10px; padding:2px 8px; border-radius:999px; font-weight:900;">CHẾ ĐỘ TẠO ĐƠN</span>
+        <span style="background:#10b981; color:#064e3b; font-size:10px; padding:2px 8px; border-radius:999px; font-weight:900;">TỰ PHÂN SÀN TRÊN PC</span>
       </div>
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-        <button type="button" id="newPlatBtn_TikTok" onclick="setNewOrderPlatform('TikTok Shop')"
-                style="padding: 8px 6px; border-radius: 8px; font-size: 11px; font-weight: 900; border: 1.5px solid #10b981; cursor: pointer; background: #10b981; color: #064e3b; display:flex; align-items:center; justify-content:center; gap:4px;">
-          <span>⚫</span><span>TikTok Shop</span>
-        </button>
-        <button type="button" id="newPlatBtn_Shopee" onclick="setNewOrderPlatform('Shopee')"
-                style="padding: 8px 6px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1.5px solid #334155; cursor: pointer; background: #1e293b; color: #94a3b8; display:flex; align-items:center; justify-content:center; gap:4px;">
-          <span>🟠</span><span>Shopee</span>
-        </button>
-      </div>
-      <input id="newOrderNoteInput" type="text" placeholder="Ghi chú đơn mới (tên SP, size, khách hàng...)"
+      <input id="newOrderNoteInput" type="text" placeholder="Ghi chú đơn mới (tùy chọn: tên SP, size, khách hàng...)"
              style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(16,185,129,0.4); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: #fff; outline: none;" />
       <div style="font-size: 10.5px; color: #a7f3d0; margin-top: 6px; display:flex; align-items:center; gap:4px;">
-        <span>💡</span><span>Quét mã vạch/QR ➔ Tự động gửi thẳng vào <b>Bảng Đơn Mới</b> trên máy tính!</span>
+        <span>💡</span><span>Chỉ cần quét mã vạch, máy tính sẽ tự động nhận diện và phân loại đúng sàn Shopee &amp; TikTok Shop!</span>
       </div>
     </div>
 
@@ -1383,41 +1373,15 @@
 
     function setNewOrderPlatform(plat) {
       currentNewOrderPlatform = plat;
-      localStorage.setItem('mobile_new_order_platform', plat);
-      const btnTT = document.getElementById('newPlatBtn_TikTok');
-      const btnShp = document.getElementById('newPlatBtn_Shopee');
-      if (plat === 'Shopee') {
-        if (btnShp) {
-          btnShp.style.background = '#ee4d2d';
-          btnShp.style.color = '#ffffff';
-          btnShp.style.borderColor = '#ee4d2d';
-        }
-        if (btnTT) {
-          btnTT.style.background = '#1e293b';
-          btnTT.style.color = '#94a3b8';
-          btnTT.style.borderColor = '#334155';
-        }
-      } else {
-        if (btnTT) {
-          btnTT.style.background = '#10b981';
-          btnTT.style.color = '#064e3b';
-          btnTT.style.borderColor = '#10b981';
-        }
-        if (btnShp) {
-          btnShp.style.background = '#1e293b';
-          btnShp.style.color = '#94a3b8';
-          btnShp.style.borderColor = '#334155';
-        }
-      }
     }
 
     function detectCarrierFromCode(code) {
       if (!code) return '';
       const c = String(code).trim().toUpperCase();
-      if (/^SPXVN/i.test(c)) return 'SPX Express';
+      if (/^SPXVN|^SPX/i.test(c)) return 'SPX Express';
       if (/^VN|^VTP/i.test(c)) return 'Viettel Post';
       if (/^GHN/i.test(c)) return 'Giao Hàng Nhanh';
-      if (/^862|^863|^587|^JNT|^JT/i.test(c)) return 'J&T Express';
+      if (/^8[0245]\d{10,12}|^862|^863|^587|^JNT|^JT/i.test(c)) return 'J&T Express';
       if (/^NINJA/i.test(c)) return 'Ninja Van';
       return '';
     }
@@ -1427,7 +1391,7 @@
       const noteInput = document.getElementById('newOrderNoteInput');
       const customNote = noteInput ? noteInput.value.trim() : '';
 
-      triggerScanFeedback('success', clean, '✨ ĐÃ TẠO ĐƠN MỚI (GỬI PC)', `📦 Sàn: ${currentNewOrderPlatform} • Đã chuyển vào Bảng Đơn Mới`, null);
+      triggerScanFeedback('success', clean, '✨ ĐÃ TẠO ĐƠN MỚI (GỬI PC)', '📦 Máy tính sẽ tự động nhận diện và phân chia đúng sàn!', null);
 
       scanHistory.unshift({
         code: clean,
@@ -1437,7 +1401,7 @@
         dupCount: 0,
         photo: capturedPhoto || '',
         synced: false,
-        detail: `✨ Đơn mới [${currentNewOrderPlatform}]` + (customNote ? ` (${customNote})` : '')
+        detail: `✨ Đơn mới quét gửi PC` + (customNote ? ` (${customNote})` : '')
       });
       saveScanHistory();
       renderScanHistory();
@@ -1447,8 +1411,8 @@
         code: clean,
         track: clean,
         orderId: clean,
-        platform: currentNewOrderPlatform,
-        carrier: detectCarrierFromCode(clean) || (currentNewOrderPlatform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+        platform: 'auto',
+        carrier: detectCarrierFromCode(clean),
         photo: capturedPhoto || '',
         note: customNote || 'Đơn mới tạo từ máy quét điện thoại',
         time: now

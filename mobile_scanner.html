@@ -510,7 +510,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.7.4</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.7.5</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -522,6 +522,47 @@
     </div>
 
         
+
+    
+    <!-- CHẾ ĐỘ QUÉT: QUÉT HOÀN KHO vs TẠO ĐƠN MỚI -->
+    <div class="mode-switcher-container" style="margin-bottom: 12px; background: #0f172a; border: 1.5px solid #334155; border-radius: 14px; padding: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+      <button type="button" id="btnModeReturn" onclick="switchMobileScanMode('return')"
+              style="padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 900; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; box-shadow: 0 2px 8px rgba(245,158,11,0.4);">
+        <span>🔍</span>
+        <span>QUÉT HOÀN KHO</span>
+      </button>
+      <button type="button" id="btnModeNewOrder" onclick="switchMobileScanMode('new_order')"
+              style="padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; background: #1e293b; color: #94a3b8;">
+        <span>➕</span>
+        <span>TẠO ĐƠN MỚI</span>
+      </button>
+    </div>
+
+    <!-- PANEL TÙY CHỌN TẠO ĐƠN MỚI (Hiển thị khi ở chế độ Tạo Đơn Mới) -->
+    <div id="newOrderOptionsPanel" style="display: none; margin-bottom: 12px; background: linear-gradient(135deg, #064e3b, #0f172a); border: 2px solid #10b981; border-radius: 14px; padding: 12px 14px; color: #fff; box-shadow: 0 4px 20px rgba(16,185,129,0.35);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:14px;">✨</span>
+          <span style="font-size:12px; font-weight:900; color:#34d399; text-transform:uppercase;">CẤU HÌNH ĐƠN MỚI GỬI MÁY TÍNH</span>
+        </div>
+        <span style="background:#10b981; color:#064e3b; font-size:10px; padding:2px 8px; border-radius:999px; font-weight:900;">CHẾ ĐỘ TẠO ĐƠN</span>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+        <button type="button" id="newPlatBtn_TikTok" onclick="setNewOrderPlatform('TikTok Shop')"
+                style="padding: 8px 6px; border-radius: 8px; font-size: 11px; font-weight: 900; border: 1.5px solid #10b981; cursor: pointer; background: #10b981; color: #064e3b; display:flex; align-items:center; justify-content:center; gap:4px;">
+          <span>⚫</span><span>TikTok Shop</span>
+        </button>
+        <button type="button" id="newPlatBtn_Shopee" onclick="setNewOrderPlatform('Shopee')"
+                style="padding: 8px 6px; border-radius: 8px; font-size: 11px; font-weight: 800; border: 1.5px solid #334155; cursor: pointer; background: #1e293b; color: #94a3b8; display:flex; align-items:center; justify-content:center; gap:4px;">
+          <span>🟠</span><span>Shopee</span>
+        </button>
+      </div>
+      <input id="newOrderNoteInput" type="text" placeholder="Ghi chú đơn mới (tên SP, size, khách hàng...)"
+             style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(16,185,129,0.4); border-radius: 8px; padding: 8px 10px; font-size: 11px; color: #fff; outline: none;" />
+      <div style="font-size: 10.5px; color: #a7f3d0; margin-top: 6px; display:flex; align-items:center; gap:4px;">
+        <span>💡</span><span>Quét mã vạch/QR ➔ Tự động gửi thẳng vào <b>Bảng Đơn Mới</b> trên máy tính!</span>
+      </div>
+    </div>
 
     <div class="camera-box">
       <div id="reader"></div>
@@ -1277,20 +1318,168 @@
       }
     }
 
+    
+    // =========================================================================
+    // CHẾ ĐỘ TẠO ĐƠN MỚI TỪ ĐIỆN THOẠI (v1.7.5)
+    // =========================================================================
+    let currentMobileMode = localStorage.getItem('mobile_scan_mode') || 'return';
+    let currentNewOrderPlatform = localStorage.getItem('mobile_new_order_platform') || 'TikTok Shop';
+
+    function showToast(msg, duration = 2500) {
+      const toast = document.getElementById('processingToast');
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      if (window._toastTimer) clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, duration);
+    }
+
+    function switchMobileScanMode(mode) {
+      currentMobileMode = mode;
+      localStorage.setItem('mobile_scan_mode', mode);
+      const btnRet = document.getElementById('btnModeReturn');
+      const btnNew = document.getElementById('btnModeNewOrder');
+      const panel = document.getElementById('newOrderOptionsPanel');
+      const camBox = document.querySelector('.camera-box');
+
+      if (mode === 'new_order') {
+        if (btnNew) {
+          btnNew.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+          btnNew.style.color = '#ffffff';
+          btnNew.style.boxShadow = '0 2px 10px rgba(16,185,129,0.4)';
+        }
+        if (btnRet) {
+          btnRet.style.background = '#1e293b';
+          btnRet.style.color = '#94a3b8';
+          btnRet.style.boxShadow = 'none';
+        }
+        if (panel) panel.style.display = 'block';
+        if (camBox) {
+          camBox.style.borderColor = '#10b981';
+          camBox.style.boxShadow = '0 0 15px rgba(16,185,129,0.35)';
+        }
+        showToast('✨ Đã bật Chế độ Tạo Đơn Mới! Quét mã để gửi lên Bảng Đơn Mới máy tính.');
+      } else {
+        if (btnRet) {
+          btnRet.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+          btnRet.style.color = '#0f172a';
+          btnRet.style.boxShadow = '0 2px 8px rgba(245,158,11,0.4)';
+        }
+        if (btnNew) {
+          btnNew.style.background = '#1e293b';
+          btnNew.style.color = '#94a3b8';
+          btnNew.style.boxShadow = 'none';
+        }
+        if (panel) panel.style.display = 'none';
+        if (camBox) {
+          camBox.style.borderColor = '#334155';
+          camBox.style.boxShadow = 'none';
+        }
+        showToast('🔍 Đã chuyển về Chế độ Quét Hàng Hoàn Về Kho.');
+      }
+    }
+
+    function setNewOrderPlatform(plat) {
+      currentNewOrderPlatform = plat;
+      localStorage.setItem('mobile_new_order_platform', plat);
+      const btnTT = document.getElementById('newPlatBtn_TikTok');
+      const btnShp = document.getElementById('newPlatBtn_Shopee');
+      if (plat === 'Shopee') {
+        if (btnShp) {
+          btnShp.style.background = '#ee4d2d';
+          btnShp.style.color = '#ffffff';
+          btnShp.style.borderColor = '#ee4d2d';
+        }
+        if (btnTT) {
+          btnTT.style.background = '#1e293b';
+          btnTT.style.color = '#94a3b8';
+          btnTT.style.borderColor = '#334155';
+        }
+      } else {
+        if (btnTT) {
+          btnTT.style.background = '#10b981';
+          btnTT.style.color = '#064e3b';
+          btnTT.style.borderColor = '#10b981';
+        }
+        if (btnShp) {
+          btnShp.style.background = '#1e293b';
+          btnShp.style.color = '#94a3b8';
+          btnShp.style.borderColor = '#334155';
+        }
+      }
+    }
+
+    function detectCarrierFromCode(code) {
+      if (!code) return '';
+      const c = String(code).trim().toUpperCase();
+      if (/^SPXVN/i.test(c)) return 'SPX Express';
+      if (/^VN|^VTP/i.test(c)) return 'Viettel Post';
+      if (/^GHN/i.test(c)) return 'Giao Hàng Nhanh';
+      if (/^862|^863|^587|^JNT|^JT/i.test(c)) return 'J&T Express';
+      if (/^NINJA/i.test(c)) return 'Ninja Van';
+      return '';
+    }
+
+    function handleNewOrderScan(clean, capturedPhoto) {
+      const now = Date.now();
+      const noteInput = document.getElementById('newOrderNoteInput');
+      const customNote = noteInput ? noteInput.value.trim() : '';
+
+      triggerScanFeedback('success', clean, '✨ ĐÃ TẠO ĐƠN MỚI (GỬI PC)', `📦 Sàn: ${currentNewOrderPlatform} • Đã chuyển vào Bảng Đơn Mới`, null);
+
+      scanHistory.unshift({
+        code: clean,
+        time: now,
+        status: 'new_order',
+        orderNum: null,
+        dupCount: 0,
+        photo: capturedPhoto || '',
+        synced: false,
+        detail: `✨ Đơn mới [${currentNewOrderPlatform}]` + (customNote ? ` (${customNote})` : '')
+      });
+      saveScanHistory();
+      renderScanHistory();
+
+      const newOrderPayload = {
+        type: 'new_order_scan',
+        code: clean,
+        track: clean,
+        orderId: clean,
+        platform: currentNewOrderPlatform,
+        carrier: detectCarrierFromCode(clean) || (currentNewOrderPlatform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+        photo: capturedPhoto || '',
+        note: customNote || 'Đơn mới tạo từ máy quét điện thoại',
+        time: now
+      };
+
+      sendPayloadToPc(newOrderPayload, clean, '✨ Đã gửi vào Bảng Đơn Mới');
+
+      if (capturedPhoto) {
+        setTimeout(() => {
+          sendPhotoPacket(capturedPhoto, clean);
+        }, 90);
+      }
+      return true;
+    }
+
     /* Core Scan Processing */
     function sendCodeToPc(codeText) {
       const clean = extractCleanTrackingCode(codeText);
       if (!clean) return false;
       const now = Date.now();
 
-      // Debounce exact camera trigger within 1.2s to prevent rapid multi-triggers on the exact same frame
       if (clean === lastScannedRawCode && now - lastScannedRawTime < 1200) return false;
       lastScannedRawCode = clean;
       lastScannedRawTime = now;
 
-      // LUÔN LUÔN TỰ ĐỘNG BẮT ẢNH TỪ CAMERA NGAY KHI QUÉT ĐƯỢC MÃ
       const capturedPhoto = captureCurrentVideoFrame();
 
+      // NẾU ĐANG Ở CHẾ ĐỘ: TẠO ĐƠN MỚI ➔ GỬI TRỰC TIẾP LÊN HỘP ĐƠN MỚI TRÊN MÁY TÍNH!
+      if (currentMobileMode === 'new_order') {
+        return handleNewOrderScan(clean, capturedPhoto);
+      }
       // LỚP 1: KIỂM TRA LỊCH SỬ ĐÃ QUÉT TRÊN ĐIỆN THOẠI
       const existingIdx = scanHistory.findIndex(entry => extractCleanTrackingCode(entry.code) === clean);
       if (existingIdx !== -1) {
@@ -1550,7 +1739,7 @@
     let html5QrCode = null;
 
     // =========================================================================
-    // v1.7.4: CƠ CHẾ GIỮ YÊN 0.5S (TỐI ƯU CẢ MÃ VẠCH 1D VÀ QR CODE)
+    // v1.7.5: CƠ CHẾ GIỮ YÊN 0.5S (TỐI ƯU CẢ MÃ VẠCH 1D VÀ QR CODE)
     // =========================================================================
     let currentHoldingCode = null;
     let holdStartTime = 0;
@@ -1693,7 +1882,7 @@
     }
 
     // =========================================================================
-    // v1.7.4: DUAL SCAN ENGINE - NATIVE BARCODE DETECTOR & HTML5-QRCODE TỐI ƯU
+    // v1.7.5: DUAL SCAN ENGINE - NATIVE BARCODE DETECTOR & HTML5-QRCODE TỐI ƯU
     // =========================================================================
     let nativeBarcodeScannerActive = false;
     let nativeBarcodeTimer = null;

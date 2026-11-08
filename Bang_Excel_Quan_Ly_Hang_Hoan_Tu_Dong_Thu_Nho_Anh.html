@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.4</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.5</span>
               </div>
             </div>
           </div>
@@ -784,6 +784,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 class="px-2 py-1 rounded-md font-extrabold text-[11px] bg-indigo-700 hover:bg-indigo-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
                 title="Bảng phân tích chuyên sâu: Top mẫu áo bị hoàn nhiều nhất, lý do hoàn và đối soát chi phí">
           <span>📊 Phân Tích</span>
+        </button>
+
+        
+        <!-- NÚT BẢNG ĐƠN MỚI TỪ ĐIỆN THOẠI (v1.7.5) -->
+        <button type="button" onclick="openNewOrdersModal()" id="btnNewOrdersHeader"
+                class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-amber-400"
+                title="Hộp chứa các đơn mới quét từ điện thoại gửi lên máy tính">
+          <span>📥 BẢNG ĐƠN MỚI</span>
+          <span id="newOrdersCountBadge" class="bg-white text-amber-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0</span>
         </button>
 
         <button type="button" onclick="openBatchSessionModal()" id="btnSessionScanHeader"
@@ -2049,6 +2058,98 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   </div>
 
   <!-- Shopee / TikTok Order Database Import Modal (Tách riêng hoàn toàn cơ chế nạp 2 sàn) -->
+  
+  <!-- ===================================================================== -->
+  <!-- MODAL: BẢNG ĐƠN MỚI GỬI TỪ ĐIỆN THOẠI (HỘP ĐƠN MỚI CHỜ DUYỆT v1.7.5) -->
+  <!-- ===================================================================== -->
+  <div id="newOrdersModal" onclick="closeNewOrdersModal()" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-amber-300" onclick="event.stopPropagation()">
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-5 py-3.5 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm sm:text-base font-black uppercase tracking-wide flex items-center gap-2">
+            <span>📥 HỘP ĐƠN MỚI GỬI TỪ ĐIỆN THOẠI</span>
+            <span id="newOrdersModalCountBadge" class="bg-white text-amber-900 text-xs px-2.5 py-0.5 rounded-full font-mono font-black">0 đơn</span>
+          </h2>
+          <p class="text-xs text-amber-100 mt-0.5">
+            Các đơn mới quét từ điện thoại tập kết tại đây. Bạn có thể chọn từng đơn hoặc tất cả để <b>Nhập ra Bảng chính</b> hoặc <b>Xóa</b>.
+          </p>
+        </div>
+        <button onclick="closeNewOrdersModal()" class="px-3 py-1 bg-black/25 hover:bg-black/40 text-white text-xs font-bold rounded-lg cursor-pointer">
+          ✕ Đóng
+        </button>
+      </div>
+
+      <!-- Action Toolbar -->
+      <div class="px-5 py-3 bg-amber-50/80 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-1.5 cursor-pointer font-bold text-xs text-amber-950 select-none">
+            <input id="chkSelectAllNewOrders" type="checkbox" onchange="toggleSelectAllNewOrders(this.checked)" class="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer" />
+            <span>Chọn tất cả (<span id="inboxSelectedCountText">0</span>/<span id="inboxTotalCountText">0</span>)</span>
+          </label>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="importSelectedNewOrders()" id="btnImportSelectedNewOrders"
+                  class="px-3 py-1.5 rounded-lg font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+            <span>📥 Nhập Đơn Đã Chọn Ra Ngoài</span>
+          </button>
+          <button type="button" onclick="importAllNewOrders()" id="btnImportAllNewOrders"
+                  class="px-3 py-1.5 rounded-lg font-extrabold text-xs bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+            <span>➕ Nhập Tất Cả Ra Ngoài</span>
+          </button>
+          <button type="button" onclick="deleteSelectedNewOrders()" id="btnDeleteSelectedNewOrders"
+                  class="px-2.5 py-1.5 rounded-lg font-bold text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition flex items-center gap-1 cursor-pointer">
+            <span>🗑️ Xóa Đã Chọn</span>
+          </button>
+          <button type="button" onclick="clearAllNewOrders()" id="btnClearAllNewOrders"
+                  class="px-2.5 py-1.5 rounded-lg font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white transition flex items-center gap-1 cursor-pointer">
+            <span>🧹 Xóa Tất Cả</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="p-4 overflow-y-auto flex-1 bg-slate-50">
+        <div id="newOrdersEmptyNotice" class="hidden py-12 text-center text-slate-400">
+          <div class="text-3xl mb-2">📥</div>
+          <div class="text-sm font-bold text-slate-600">Hiện không có đơn mới nào đang chờ trong hộp!</div>
+          <div class="text-xs text-slate-400 mt-1">Khi bạn dùng điện thoại bật chế độ "➕ TẠO ĐƠN MỚI" và quét mã, đơn sẽ tức thì xuất hiện tại đây.</div>
+        </div>
+
+        <div id="newOrdersTableWrapper" class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-800 text-white text-[11px] font-black uppercase tracking-wider">
+              <tr>
+                <th class="w-10 text-center py-2.5 px-2">✓</th>
+                <th class="w-12 text-center py-2.5 px-2">STT</th>
+                <th class="py-2.5 px-3">Thời Gian Quét</th>
+                <th class="py-2.5 px-3">Sàn TMĐT</th>
+                <th class="py-2.5 px-3">Mã Vận Đơn</th>
+                <th class="py-2.5 px-3">ĐVVC</th>
+                <th class="py-2.5 px-3">Ghi Chú / Sản Phẩm</th>
+                <th class="w-16 text-center py-2.5 px-2">Ảnh</th>
+                <th class="w-36 text-center py-2.5 px-2">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="newOrdersTableBody" class="divide-y divide-slate-200">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-2.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <div class="flex items-center gap-2">
+          <span>💡 <i>Mẹo:</i> Đơn sau khi nhập ra ngoài sẽ tự động thêm vào Bảng chính và lưu trữ an toàn.</span>
+        </div>
+        <button onclick="closeNewOrdersModal()" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg cursor-pointer">
+          Đóng Hộp Đơn Mới
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="shopeeDbModal" onclick="closeShopeeDbModal()" class="fixed inset-0 bg-slate-900/75 z-50 hidden flex items-center justify-center p-4">
     <div class="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]" onclick="event.stopPropagation()">
       <div id="importModalHeader" class="bg-[#ee4d2d] text-white px-5 py-3 flex items-center justify-between transition-colors">
@@ -6170,7 +6271,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.7.4';
+    const APP_VERSION_NUMBER = '1.7.5';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -12716,6 +12817,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
 
+      
+      // v1.7.5: Tiếp nhận đơn mới quét từ điện thoại gửi lên
+      if (data.type === 'new_order_scan') {
+        const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
+        if (!trackCode) return;
+
+        const existingInboxIdx = (newOrdersInbox || []).findIndex(item => extractCleanTrackingCode(item.track || item.code) === trackCode);
+        if (existingInboxIdx !== -1) {
+          if (data.photo && !newOrdersInbox[existingInboxIdx].photo) {
+            newOrdersInbox[existingInboxIdx].photo = data.photo;
+          }
+          saveNewOrdersInbox();
+          sendAckToPhone(0, trackCode, 'ĐƠN MỚI ĐÃ CÓ TRONG HỘP CHỜ', 'duplicate', false, data.requestId || '', data.room || '');
+          return;
+        }
+
+        const newEntry = {
+          id: 'inbox_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+          track: trackCode,
+          orderId: data.orderId || trackCode,
+          platform: data.platform || (trackCode.startsWith('SPX') ? 'Shopee' : 'TikTok Shop'),
+          carrier: data.carrier || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(trackCode) : '') || (data.platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+          time: getNowDateTimeString(),
+          photo: data.photo || '',
+          note: data.note || 'Đơn mới tạo từ máy quét điện thoại',
+          product: data.product || 'Sản phẩm mới (Quét điện thoại)',
+          color: data.color || '',
+          size: data.size || '',
+          qty: Number(data.qty) || 1,
+          price: Number(data.price) || 0,
+          checked: false
+        };
+
+        newOrdersInbox.unshift(newEntry);
+        saveNewOrdersInbox();
+        playScanSuccessTone();
+        showAppToast(`📥 Nhận đơn mới từ điện thoại: ${trackCode} (${newEntry.platform})`, 'success');
+        appendPhoneLiveLog(`📥 ĐƠN MỚI: Nhận đơn [${trackCode}] (${newEntry.platform}) vào Hộp Đơn Mới!`);
+        sendAckToPhone(0, trackCode, 'ĐÃ VÀO HỘP ĐƠN MỚI', 'success', false, data.requestId || '', data.room || '');
+        return;
+      }
+
       if (data.type === 'phone_connected') {
         playBeepSound(880, 110);
         updatePhoneConnectionUI(true, 'ĐÃ KẾT NỐI VỚI ĐIỆN THOẠI! Sẵn sàng quét mã!');
@@ -13505,6 +13648,278 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!photoDataUrl) return;
       playBeepSound(980, 120);
       attachPhotoToOrderByCode(relatedCode, photoDataUrl);
+    }
+
+    const detectCarrierFromCode = (code) => typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(code) : '';
+
+    // =========================================================================
+    // HỘP ĐƠN MỚI GỬI TỪ ĐIỆN THOẠI (v1.7.5)
+    // =========================================================================
+    let newOrdersInbox = [];
+    try {
+      const savedInbox = localStorage.getItem('shopee_new_orders_inbox_v1');
+      if (savedInbox) newOrdersInbox = JSON.parse(savedInbox);
+    } catch (e) {}
+
+    function saveNewOrdersInbox() {
+      try {
+        localStorage.setItem('shopee_new_orders_inbox_v1', JSON.stringify(newOrdersInbox));
+      } catch (e) {}
+      updateNewOrdersBadge();
+      renderNewOrdersTable();
+    }
+
+    function updateNewOrdersBadge() {
+      const count = (newOrdersInbox || []).length;
+      const badge1 = document.getElementById('newOrdersCountBadge');
+      if (badge1) badge1.textContent = count;
+      const badgeModal = document.getElementById('newOrdersModalCountBadge');
+      if (badgeModal) badgeModal.textContent = count + ' đơn';
+      const totalTxt = document.getElementById('inboxTotalCountText');
+      if (totalTxt) totalTxt.textContent = count;
+
+      const selectedCount = (newOrdersInbox || []).filter(it => it && it.checked).length;
+      const selTxt = document.getElementById('inboxSelectedCountText');
+      if (selTxt) selTxt.textContent = selectedCount;
+
+      const headerBtn = document.getElementById('btnNewOrdersHeader');
+      if (headerBtn) {
+        if (count > 0) {
+          headerBtn.classList.add('ring-2', 'ring-amber-300', 'animate-pulse');
+        } else {
+          headerBtn.classList.remove('ring-2', 'ring-amber-300', 'animate-pulse');
+        }
+      }
+    }
+
+    function openNewOrdersModal() {
+      const modal = document.getElementById('newOrdersModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        renderNewOrdersTable();
+      }
+    }
+
+    function closeNewOrdersModal() {
+      const modal = document.getElementById('newOrdersModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function renderNewOrdersTable() {
+      const tbody = document.getElementById('newOrdersTableBody');
+      const emptyNotice = document.getElementById('newOrdersEmptyNotice');
+      const tableWrapper = document.getElementById('newOrdersTableWrapper');
+      if (!tbody) return;
+
+      const list = newOrdersInbox || [];
+      if (!list.length) {
+        if (emptyNotice) emptyNotice.classList.remove('hidden');
+        if (tableWrapper) tableWrapper.classList.add('hidden');
+        tbody.innerHTML = '';
+        updateNewOrdersBadge();
+        return;
+      }
+
+      if (emptyNotice) emptyNotice.classList.add('hidden');
+      if (tableWrapper) tableWrapper.classList.remove('hidden');
+
+      tbody.innerHTML = list.map((item, idx) => {
+        const isChecked = Boolean(item.checked);
+        const plat = item.platform || 'TikTok Shop';
+        const platBadge = plat === 'Shopee'
+          ? '<span class="bg-orange-100 text-[#ee4d2d] border border-orange-300 text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase">🟠 Shopee</span>'
+          : '<span class="bg-slate-900 text-white text-[10.5px] px-2 py-0.5 rounded-full font-extrabold uppercase">⚫ TikTok Shop</span>';
+
+        const photoHtml = item.photo
+          ? `<div class="w-10 h-8 rounded border border-slate-300 overflow-hidden cursor-zoom-in mx-auto shadow-2xs" onclick="openPhotoZoomDirect('${item.id}', '${escapeAttr(item.photo)}')"><img src="${item.photo}" class="w-full h-full object-cover" /></div>`
+          : '<span class="text-slate-300 text-[10px] italic">Không ảnh</span>';
+
+        return `
+          <tr class="hover:bg-amber-50/50 transition ${isChecked ? 'bg-amber-50/70 font-semibold' : ''}">
+            <td class="text-center py-2 px-2">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleNewOrderSelect('${item.id}', this.checked)" class="w-4 h-4 text-amber-600 rounded cursor-pointer" />
+            </td>
+            <td class="text-center font-bold text-slate-600 font-mono py-2 px-2">#${idx + 1}</td>
+            <td class="py-2 px-3 font-mono text-[11px] text-slate-700">${escapeAttr(item.time || '')}</td>
+            <td class="py-2 px-3">${platBadge}</td>
+            <td class="py-2 px-3 font-mono font-bold text-slate-900 text-xs">
+              <span class="hover:underline cursor-pointer" onclick="copyTextToClipboard('${escapeAttr(item.track || '')}', 'Đã sao chép MVĐ: ${escapeAttr(item.track || '')}')">${escapeAttr(item.track || '')}</span>
+            </td>
+            <td class="py-2 px-3 font-semibold text-slate-700 text-xs">${escapeAttr(item.carrier || 'Chưa rõ')}</td>
+            <td class="py-2 px-3 text-slate-700 text-xs">
+              <input type="text" value="${escapeAttr(item.note || '')}" placeholder="Ghi chú đơn..." onchange="updateNewOrderNote('${item.id}', this.value)" class="w-full bg-transparent hover:bg-white focus:bg-white border-b border-dashed border-slate-300 focus:border-amber-500 text-xs px-1 py-0.5 outline-none rounded" />
+            </td>
+            <td class="text-center py-2 px-2">${photoHtml}</td>
+            <td class="text-center py-2 px-2 whitespace-nowrap">
+              <button type="button" onclick="importSingleNewOrder('${item.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10.5px] rounded-lg shadow-2xs mr-1 transition cursor-pointer" title="Nhập đơn này ra Bảng chính">
+                📥 Nhập ra ngoài
+              </button>
+              <button type="button" onclick="deleteSingleNewOrder('${item.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-[10.5px] rounded-lg shadow-2xs transition cursor-pointer" title="Xóa khỏi Hộp Đơn Mới">
+                ✕
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      updateNewOrdersBadge();
+    }
+
+    function toggleNewOrderSelect(id, checked) {
+      const item = (newOrdersInbox || []).find(it => it && it.id === id);
+      if (item) item.checked = Boolean(checked);
+      updateNewOrdersBadge();
+      const chkAll = document.getElementById('chkSelectAllNewOrders');
+      if (chkAll && newOrdersInbox.length > 0) {
+        chkAll.checked = newOrdersInbox.every(it => it.checked);
+      }
+    }
+
+    function toggleSelectAllNewOrders(checked) {
+      (newOrdersInbox || []).forEach(it => { if (it) it.checked = Boolean(checked); });
+      updateNewOrdersBadge();
+      renderNewOrdersTable();
+    }
+
+    function updateNewOrderNote(id, noteVal) {
+      const item = (newOrdersInbox || []).find(it => it && it.id === id);
+      if (item) {
+        item.note = String(noteVal || '').trim();
+        saveNewOrdersInbox();
+      }
+    }
+
+    function convertInboxItemToOrder(item) {
+      const cleanTrack = extractCleanTrackingCode(item.track || item.code || '');
+      return {
+        shipDate: item.time || getNowDateTimeString(),
+        returnDate: item.time || getNowDateTimeString(),
+        recvDate: getNowDateTimeString(),
+        platform: item.platform || 'TikTok Shop',
+        orderType: 'Trả hàng/Hoàn tiền',
+        platformStatus: 'Đã nhận tại kho',
+        preOrder: 'Đơn thường',
+        orderId: item.orderId || cleanTrack || '',
+        returnOrderId: '',
+        track: cleanTrack || item.track || '',
+        altTrack: '',
+        carrier: item.carrier || detectCarrierFromCode(cleanTrack) || (item.platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+        price: Number(item.price) || 0,
+        status: 'Hàng đã trả',
+        photo: item.photo || '',
+        note: item.note || 'Đơn mới tạo từ máy quét điện thoại',
+        buyerNote: '',
+        userNote: '',
+        items: [{
+          product: item.product || 'Sản phẩm mới (Quét điện thoại)',
+          color: item.color || '',
+          size: item.size || '',
+          qty: Number(item.qty) || 1
+        }]
+      };
+    }
+
+    function importSingleNewOrder(id) {
+      const idx = (newOrdersInbox || []).findIndex(it => it && it.id === id);
+      if (idx === -1) return;
+      const item = newOrdersInbox[idx];
+      const newOrd = convertInboxItemToOrder(item);
+
+      orders.unshift(newOrd);
+      newOrdersInbox.splice(idx, 1);
+
+      saveOrders();
+      saveNewOrdersInbox();
+      renderAll(true);
+      recalcTotalsAndSummary();
+
+      showAppToast(`🎉 Đã nhập đơn [${newOrd.track || newOrd.orderId}] ra Bảng chính!`, 'success');
+      addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập đơn [${newOrd.track || newOrd.orderId}] từ Hộp Đơn Mới ra Bảng chính`);
+    }
+
+    function importSelectedNewOrders() {
+      const selectedItems = (newOrdersInbox || []).filter(it => it && it.checked);
+      if (!selectedItems.length) {
+        alert('Vui lòng tích chọn ít nhất 1 đơn trong danh sách để nhập ra ngoài Bảng chính!');
+        return;
+      }
+
+      const selectedIds = new Set(selectedItems.map(it => it.id));
+      const newOrderObjects = selectedItems.map(it => convertInboxItemToOrder(it));
+
+      orders.unshift(...newOrderObjects);
+      newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id));
+
+      saveOrders();
+      saveNewOrdersInbox();
+      renderAll(true);
+      recalcTotalsAndSummary();
+
+      showAppToast(`🎉 Đã nhập thành công ${newOrderObjects.length} đơn mới ra Bảng chính!`, 'success');
+      addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập hàng loạt ${newOrderObjects.length} đơn từ Hộp Đơn Mới ra Bảng chính`);
+    }
+
+    function importAllNewOrders() {
+      if (!newOrdersInbox || !newOrdersInbox.length) {
+        alert('Hộp Đơn Mới hiện đang trống, không có đơn nào để nhập!');
+        return;
+      }
+
+      const count = newOrdersInbox.length;
+      if (!confirm(`Bạn có chắc muốn nhập TOÀN BỘ ${count} đơn mới ra ngoài Bảng chính không?`)) return;
+
+      const newOrderObjects = newOrdersInbox.map(it => convertInboxItemToOrder(it));
+      orders.unshift(...newOrderObjects);
+      newOrdersInbox = [];
+
+      saveOrders();
+      saveNewOrdersInbox();
+      renderAll(true);
+      recalcTotalsAndSummary();
+
+      showAppToast(`🎉 Đã nhập toàn bộ ${count} đơn mới ra Bảng chính!`, 'success');
+      addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập toàn bộ ${count} đơn từ Hộp Đơn Mới ra Bảng chính`);
+    }
+
+    function deleteSingleNewOrder(id) {
+      const idx = (newOrdersInbox || []).findIndex(it => it && it.id === id);
+      if (idx === -1) return;
+      const item = newOrdersInbox[idx];
+      if (!confirm(`Bạn có chắc muốn xóa đơn "${item.track || item.code || 'này'}" khỏi Hộp Đơn Mới không?`)) return;
+
+      newOrdersInbox.splice(idx, 1);
+      saveNewOrdersInbox();
+      showAppToast(`🗑️ Đã xóa đơn khỏi Hộp Đơn Mới!`, 'info');
+    }
+
+    function deleteSelectedNewOrders() {
+      const selectedItems = (newOrdersInbox || []).filter(it => it && it.checked);
+      if (!selectedItems.length) {
+        alert('Vui lòng tích chọn ít nhất 1 đơn để xóa!');
+        return;
+      }
+
+      const count = selectedItems.length;
+      if (!confirm(`Bạn có chắc chắn muốn xóa ${count} đơn đã chọn khỏi Hộp Đơn Mới không?\n(Các đơn này sẽ không được nạp vào Bảng chính)`)) return;
+
+      const selectedIds = new Set(selectedItems.map(it => it.id));
+      newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id));
+      saveNewOrdersInbox();
+      showAppToast(`🗑️ Đã xóa ${count} đơn khỏi Hộp Đơn Mới!`, 'info');
+    }
+
+    function clearAllNewOrders() {
+      if (!newOrdersInbox || !newOrdersInbox.length) {
+        alert('Hộp Đơn Mới hiện đang trống!');
+        return;
+      }
+
+      const count = newOrdersInbox.length;
+      if (!confirm(`⚠️ Bạn có chắc chắn muốn xóa TẤT CẢ ${count} đơn trong Hộp Đơn Mới không?`)) return;
+
+      newOrdersInbox = [];
+      saveNewOrdersInbox();
+      showAppToast(`🧹 Đã xóa sạch toàn bộ Hộp Đơn Mới!`, 'info');
     }
 
     async function openPhoneScannerModal() {

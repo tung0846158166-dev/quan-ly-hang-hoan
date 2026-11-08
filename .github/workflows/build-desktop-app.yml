@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.4
+          name: QuanLyHangHoan-Windows-Installer-v1.7.5
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,19 +72,29 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.4
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.4 (Tự Động Điền Ngày Gửi Đi & Trạng Thái Sàn TikTok Shop)"
+          tag_name: v1.7.5
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.5 (Tạo Đơn Mới Trên Điện Thoại & Hộp Đơn Mới Chọn Lọc)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.4
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.5
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.4`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.4.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.4**:
-              1. 📅 **Tự động điền 100% Ngày Gửi Đi (Ship Date) cho đơn TikTok Shop**:
-                 - Thuật toán phục hồi ngày gửi đi đa tầng: Nếu file báo cáo hoàn tiền không có cột `Shipped Time`, hệ thống tự động sử dụng mốc thời gian khách yêu cầu trả hàng (`Time Requested`) hoặc ngày tạo đơn, bảo đảm cột Ngày Gửi Đi không bao giờ bị để trống `DD/MM/YYYY HH:mm`.
-                 - Khớp chéo tự động (`Cross-enrichment`): Khi nạp file Quản lý đơn hàng có cột `Shipped Time` chuẩn, hệ thống tự động cập nhật giờ gửi hàng chính xác từng giây vào đơn hoàn tương ứng.
-              2. 🏷️ **Sửa lỗi hiển thị Loại đơn & Trạng thái sàn**: Loại bỏ triệt để việc gán mặc định nhầm thành `THẤT THU` và `Chờ sàn cập nhật`. Các đơn hoàn TikTok hiển thị chuẩn xác `Trả hàng/Hoàn tiền` hoặc `Giao không thành công` (đơn bom) và trạng thái chi tiết (`Chờ khách gửi hàng`, `Chờ shop duyệt hoàn tiền`, `Giao gói hàng thất bại`).
-              3. 📦 **Tương thích toàn diện cả 2 định dạng file xuất của TikTok Shop Seller Center** (Báo Cáo Trả Hàng Hoàn Tiền & Quản Lý Đơn Hàng).
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.5`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.5.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.7.5**:
+              1. 📱 **Mục [Tạo Đơn Mới] trên điện thoại (`mobile_scanner.html`)**:
+                 - Nút chuyển đổi chế độ siêu nhanh ngay trên đầu màn hình điện thoại: `[🔍 Hàng hoàn]` và `[✨ Tạo đơn mới]`.
+                 - Cho phép chọn sàn tương ứng (`Shopee` hoặc `TikTok Shop`) và nhập ghi chú nhanh (tên sản phẩm, size, màu).
+                 - Khi quét mã vạch hoặc mã QR bất kỳ trên điện thoại, hệ thống tự động nhận diện đơn vị vận chuyển (`SPX Express`, `J&T Express`, `GHN`, `Viettel Post`...) và phát gói tin tạo đơn mới lên máy tính.
+              2. 💻 **Hộp [BẢNG ĐƠN MỚI] chuyên dụng trên máy tính**:
+                 - Nút `BẢNG ĐƠN MỚI` có huy hiệu đếm số lượng đơn chờ và hiệu ứng đèn sáng nhấp nháy trên thanh tiêu đề khi có đơn mới gửi từ điện thoại.
+                 - Bảng quản lý đơn mới đầy đủ: Thời gian nhận, Sàn, Mã vận đơn, Đơn vị vận chuyển, Ghi chú, Ảnh chụp.
+                 - **Tính năng chọn lọc linh hoạt theo yêu cầu**: Có ô checkbox từng dòng và nút `[Chọn tất cả]`.
+                 - Nút `[📥 Nhập đơn đã chọn ra ngoài]` / `[📥 Nhập tất cả ra ngoài]`: Chuyển đơn vào bảng chính và xóa khỏi hộp chờ.
+                 - Nút `[🗑️ Xóa đơn đã chọn]` / `[🗑️ Xóa tất cả]` / Nút `[✕]` từng dòng: Loại bỏ đơn khỏi hộp chờ mà không ảnh hưởng bảng chính.
+              3. 📅 **Tự động điền 100% Ngày Gửi Đi (Ship Date) cho đơn TikTok Shop**:
+                 - Thuật toán phục hồi ngày gửi đi đa tầng: Sử dụng mốc thời gian khách yêu cầu hoàn tiền (`Time Requested`) hoặc ngày tạo đơn, bảo đảm cột Ngày Gửi Đi không bao giờ bị để trống `DD/MM/YYYY HH:mm`.
+                 - Khớp chéo tự động (`Cross-enrichment`): Tự động khớp chính xác với file đơn hàng xuất ra từ TikTok Shop Seller Center.
+              4. 🏷️ **Sửa lỗi hiển thị Loại đơn & Trạng thái sàn TikTok Shop**:
+                 - Hiển thị chuẩn xác `Trả hàng/Hoàn tiền` hoặc `Giao không thành công` (đơn bom), không còn bị nhầm lẫn thành `THẤT THU` hoặc `Chờ sàn cập nhật`.
           files: |
             dist/*.exe
         env:

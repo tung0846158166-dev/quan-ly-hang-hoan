@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.4
+          name: QuanLyHangHoan-Windows-Installer-v1.6.5
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,14 +67,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.4
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.4 (Tự Động Phục Hồi Ngày Gửi Đi, Fix Bảng Tổng Kết & Bảng Chờ Đồng Bộ ĐT)"
+          tag_name: v1.6.5
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.5 (Tự Động Phục Hồi Ngày Gửi Đi, Fix Bảng Tổng Kết & Bảng Chờ Đồng Bộ ĐT)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.4
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.5
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.4`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.4.exe`)
-            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.4**:
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.5`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.5.exe`)
+            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.5**:
               1. 📅 **Tự Động Phục Hồi Chuẩn Xác Cột "Ngày Gửi Đi"**:
                  - Tích hợp cơ chế phục hồi ngày gửi đi đa tầng thông minh: kiểm tra `shipDate` -> kiểm tra `rawDetails` / `orderDate` -> đối soát CSDL lịch sử đơn Shopee -> giải mã trực tiếp tiền tố ngày tháng `YYMMDD` từ Mã Đơn Hàng Shopee (100% không bao giờ bị ô trống).
                  - Tự động quét và phục hồi lại toàn bộ ngày gửi cho các đơn hàng cũ đã lưu trên ổ cứng ngay khi khởi động phần mềm.

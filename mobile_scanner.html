@@ -525,6 +525,19 @@
 
     <div class="camera-box">
       <div id="reader"></div>
+      <!-- Indicator Giữ 2 Giây Mới Quét (v1.6.5) -->
+      <div id="holdScanOverlay" style="display:none; position:absolute; inset:0; z-index:40; pointer-events:none; background:rgba(15,23,42,0.65); backdrop-filter:blur(2px); flex-direction:column; align-items:center; justify-content:center; padding:16px;">
+        <div style="background:rgba(0,0,0,0.85); border:2px solid #22c55e; border-radius:14px; padding:12px 18px; text-align:center; box-shadow:0 8px 30px rgba(34,197,94,0.45); max-width:90%;">
+          <div style="font-size:12px; font-weight:800; color:#fbbf24; text-transform:uppercase; margin-bottom:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
+            <span>⏱️ ĐANG GIỮ MÃ</span>
+          </div>
+          <div id="holdScanCodeText" style="font-family:monospace; font-weight:900; font-size:14px; color:#fff; word-break:break-all; margin-bottom:8px;">SPXVN...</div>
+          <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;">Giữ yên thêm <span id="holdScanCountdown" style="color:#22c55e; font-weight:900; font-size:13px;">2.0s</span> để quét</div>
+          <div style="width:100%; height:8px; background:rgba(255,255,255,0.2); border-radius:999px; overflow:hidden;">
+            <div id="holdScanProgressBar" style="width:0%; height:100%; background:linear-gradient(90deg, #eab308, #22c55e); transition:width 0.1s linear;"></div>
+          </div>
+        </div>
+      </div>
       <!-- Nút Làm Mới Camera nổi ở góc khung camera để bấm khởi động lại ngay nếu bị đen/mờ -->
       <button onclick="forceRestartCamera()" title="Khởi động lại Camera" style="position:absolute;top:10px;right:10px;z-index:20;background:rgba(15,23,42,0.82);color:#38bdf8;border:1.5px solid #38bdf8;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(0,0,0,0.45);">
         <span>🔄</span>
@@ -1161,6 +1174,10 @@
         existing.orderNum = orderNum || existing.orderNum;
         existing.detail = data.extra || 'Đã khớp hàng đã trả';
       }
+      if (typeof offlineQueue !== 'undefined') {
+        offlineQueue = offlineQueue.filter(it => extractCleanTrackingCode(it.code) !== cleanCode);
+        saveOfflineQueue();
+      }
       else {
         scanHistory.unshift({
           code: cleanCode,
@@ -1180,7 +1197,7 @@
         const video = document.querySelector('#reader video') || document.querySelector('video');
         if (!video || !video.videoWidth || !video.videoHeight) return null;
         const canvas = document.createElement('canvas');
-        const MAX_DIM = 420;
+        const MAX_DIM = 240;
         let w = video.videoWidth;
         let h = video.videoHeight;
         if (w > h) {
@@ -1198,7 +1215,7 @@
         canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, w, h);
-        return canvas.toDataURL('image/jpeg', 0.50);
+        return canvas.toDataURL('image/jpeg', 0.35);
       } catch (err) {
         console.warn('Auto video capture error:', err);
         return null;
@@ -1367,599 +1384,12 @@
         orderNum: null,
         dupCount: 0,
         photo: capturedPhoto || '',
-        synced: false, // Ban đầu đánh dấu chưa có xác nhận từ PC
+        synced: false,
         detail: capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn'
       });
-      setTimeout(() => updateOfflineQueueUI(), 50);
+      // v1.6.5: Nạp ngay lập tức vào hàng đợi offlineQueue chuyên dụng & lưu vào localStorage
+      if (typeof addOfflineItem === 'function') addOfflineItem(clean, capturedPhoto);
       saveScanHistory();
-      renderScanHistory();
-
-      sendPayloadToPc({
-        type: 'barcode',
-        code: clean,
-        photo: capturedPhoto || '',
-        time: now
-      }, clean);
-
-      // Luôn gửi gói ảnh chia mảnh chuyên dụng để đảm bảo 100% ảnh tới PC
-      if (capturedPhoto) {
-        setTimeout(() => {
-          sendPhotoPacket(capturedPhoto, clean);
-        }, 80);
-      }
-      return true;
-    }
-
-    function sendManualTrack() {
-      const inp = document.getElementById('manualTrackInput');
-      if (!inp || !inp.value.trim()) return;
-      sendCodeToPc(inp.value.trim());
-      inp.value = '';
-    }
-
-    function sendPayloadToPc(payload, displayCode, subInfo = '') {
-      const now = Date.now();
-      payload.room = room;
-      payload.time = now;
-
-      if (payload.type === 'barcode' || payload.type === 'smart_label') {
-        const id = scanSession + '-' + (++scanSequence);
-        payload.requestId = id;
-        const timer = setTimeout(() => {
-          pendingScans.delete(id);
-          const banner = document.getElementById('lastScanBanner');
-          if (banner && !banner.classList.contains('hidden') && document.getElementById('lastScanCode').textContent === displayCode) {
-            document.getElementById('lastScanSub').textContent = '⚠️ Chưa nhận được phản hồi từ PC (Kiểm tra lại WiFi / MQTT)';
-          }
-        }, 10000);
-        pendingScans.set(id, { code: displayCode, timer });
-      }
-
-      const topic = getNtfyTopic();
-
-      // 1. Gửi mã vạch siêu nhẹ (< 300 bytes, tách riêng trường photo nặng) qua ntfy.sh để đảm bảo không bao giờ vượt ngưỡng 4KB của ntfy.sh!
-      const lightPayload = Object.assign({}, payload);
-      if (lightPayload.type === 'barcode' || lightPayload.type === 'smart_label') {
-        delete lightPayload.photo;
-      }
-      const lightJsonStr = JSON.stringify(lightPayload);
-
-      try {
-        fetch('https://ntfy.sh/' + topic, {
-          method: 'POST',
-          body: lightJsonStr,
-          headers: { 'Title': 'Shopee Scan' }
-        }).catch(e => console.warn('Ntfy post warn:', e));
-      } catch (e) {}
-
-      // 2. Đồng thời gửi trọn gói (bao gồm cả ảnh chụp nếu có) qua MQTT WebSocket
-      const fullJsonStr = JSON.stringify(payload);
-      if (client && client.connected) {
-        try {
-          client.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr);
-          client.publish(GLOBAL_TOPIC, fullJsonStr);
-        } catch (e) {}
-      }
-    }
-
-    function getNtfyTopic() {
-      const clean = String(room || 'SHP-2026').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-      return 'agy_shopee_' + clean;
-    }
-
-    let phoneEventSource = null;
-    function initPhoneSync() {
-      const topic = getNtfyTopic();
-      const badge = document.getElementById('connBadge');
-
-      // 1. Primary: EventSource to ntfy.sh (Standard HTTPS port 443, instant & zero CORS block)
-      try {
-        if (phoneEventSource) {
-          try { phoneEventSource.close(); } catch(e) {}
-        }
-        phoneEventSource = new EventSource('https://ntfy.sh/' + topic + '/sse');
-
-        phoneEventSource.onopen = () => {
-          if (badge) {
-            badge.className = 'conn-pill conn-ok';
-            badge.textContent = '🟢 Đã nối Máy Tính';
-          }
-          const hello = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
-          fetch('https://ntfy.sh/' + topic, { method: 'POST', body: hello, headers: { 'Title': 'Shopee Connect' } }).catch(() => {});
-        };
-
-        phoneEventSource.onmessage = (event) => {
-          try {
-            const wrapper = JSON.parse(event.data);
-            if (!wrapper || !wrapper.message) return;
-            let data = null;
-            try { data = JSON.parse(wrapper.message); } catch (e) { return; }
-            if (!data) return;
-
-            handleScanAck(data);
-          } catch (e) {}
-        };
-      } catch (err) {
-        console.warn('SSE err:', err);
-      }
-
-      // 2. Secondary fallback: MQTT
-      connectMqtt();
-    }
-
-    function connectMqtt() {
-      if (typeof mqtt === 'undefined') return;
-      if (client) {
-        try { client.end(true); } catch (e) {}
-      }
-      try {
-        client = mqtt.connect('wss://broker.emqx.io:8084/mqtt');
-        const badge = document.getElementById('connBadge');
-
-        client.on('connect', () => {
-          if (badge && !phoneEventSource) {
-            badge.className = 'conn-pill conn-ok';
-            badge.textContent = '🟢 Đã nối Máy Tính';
-          }
-          try {
-            client.subscribe('agy_shopee_return_scanner_2026/' + room);
-            const helloMsg = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
-            client.publish('agy_shopee_return_scanner_2026/' + room, helloMsg);
-            client.publish(GLOBAL_TOPIC, helloMsg);
-          } catch (e) {}
-        });
-
-        client.on('message', (t, msgBuf) => {
-          try {
-            const data = JSON.parse(msgBuf.toString());
-            if (t === 'agy_shopee_return_scanner_2026/' + room) handleScanAck(data);
-          } catch (e) {}
-        });
-      } catch (e) {}
-    }
-
-    function changeRoomCode(newRoom) {
-      room = String(newRoom || 'SHP-2026').trim().toUpperCase();
-      for (const scan of pendingScans.values()) clearTimeout(scan.timer);
-      pendingScans.clear();
-      lastScannedRawCode = '';
-      lastScannedRawTime = 0;
-      document.getElementById('lastScanBanner').classList.add('hidden');
-      loadScanHistory();
-      initPhoneSync();
-    }
-
-    let html5QrCode = null;
-    let isCameraStarting = false;
-    let wasCameraActive = false;
-    let wakeLockSentinel = null;
-
-    // Giữ màn hình điện thoại sáng khi đang mở camera quét (Screen Wake Lock API)
-    async function requestScreenWakeLock() {
-      if ('wakeLock' in navigator) {
-        try {
-          if (wakeLockSentinel) {
-            try { await wakeLockSentinel.release(); } catch (e) {}
-          }
-          wakeLockSentinel = await navigator.wakeLock.request('screen');
-        } catch (err) {}
-      }
-    }
-
-    async function safelyStopAndClearScanner() {
-      if (!html5QrCode) return;
-      try {
-        // Ngắt toàn bộ MediaStream track đang bị hệ điều hành khóa
-        const videoEl = document.querySelector('#reader video');
-        if (videoEl && videoEl.srcObject) {
-          const tracks = videoEl.srcObject.getTracks();
-          tracks.forEach(t => { try { t.stop(); } catch (e) {} });
-          videoEl.srcObject = null;
-        }
-      } catch (e) {}
-      try {
-        await html5QrCode.stop();
-      } catch (e) {}
-      try {
-        await html5QrCode.clear();
-      } catch (e) {}
-      html5QrCode = null;
-      const readerEl = document.getElementById('reader');
-      if (readerEl) readerEl.innerHTML = '';
-    }
-
-    async function startCameraScanner(isAutoResume = false) {
-      if (typeof Html5Qrcode === 'undefined') {
-        if (!isAutoResume) alert('Đang tải bộ quét Camera, vui lòng thử lại sau 2 giây...');
-        return;
-      }
-      if (isCameraStarting) return;
-      isCameraStarting = true;
-      try {
-        document.getElementById('cameraStartOverlay').classList.add('hidden');
-        await safelyStopAndClearScanner();
-
-        html5QrCode = new Html5Qrcode('reader');
-        await html5QrCode.start(
-          { facingMode: 'environment' },
-          { fps: 14, qrbox: { width: 260, height: 160 } },
-          (decodedText) => {
-            sendCodeToPc(decodedText);
-          },
-          () => {}
-        );
-        wasCameraActive = true;
-        requestScreenWakeLock();
-
-        // Lắng nghe nếu hệ điều hành ngắt luồng camera (khi khóa màn hình hoặc chuyển app)
-        setTimeout(() => {
-          const videoEl = document.querySelector('#reader video');
-          if (videoEl) {
-            videoEl.setAttribute('playsinline', 'true');
-            videoEl.setAttribute('autoplay', 'true');
-            videoEl.setAttribute('muted', 'true');
-            if (videoEl.srcObject) {
-              const tracks = videoEl.srcObject.getVideoTracks();
-              if (tracks && tracks[0]) {
-                tracks[0].onended = () => {
-                  if (document.visibilityState === 'visible') {
-                    setTimeout(() => checkAndRecoverCamera(), 300);
-                  }
-                };
-              }
-            }
-          }
-        }, 400);
-      } catch (err) {
-        if (!isAutoResume) {
-          alert('Trình duyệt chặn Camera trực tiếp hoặc Camera đang bận. Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam] nhé!');
-        }
-        document.getElementById('cameraStartOverlay').classList.remove('hidden');
-      } finally {
-        isCameraStarting = false;
-      }
-    }
-
-    async function forceRestartCamera() {
-      wasCameraActive = true;
-      await safelyStopAndClearScanner();
-      await new Promise(r => setTimeout(r, 200));
-      await startCameraScanner(true);
-    }
-
-    // Kiểm tra xem luồng video camera có bị đen / bị ngắt sau khi tắt màn hình bật lại không
-    let lastVideoTime = -1;
-    let videoStallCount = 0;
-
-    async function checkAndRecoverCamera() {
-      if (document.visibilityState !== 'visible') return;
-      if (!wasCameraActive || isCameraStarting) return;
-
-      const videoEl = document.querySelector('#reader video');
-      let isDead = false;
-
-      if (!videoEl || !videoEl.srcObject || !html5QrCode) {
-        isDead = true;
-      } else {
-        const tracks = videoEl.srcObject.getVideoTracks();
-        if (!tracks || tracks.length === 0) {
-          isDead = true;
-        } else {
-          const track = tracks[0];
-          if (track.readyState === 'ended' || !track.enabled || track.muted) {
-            isDead = true;
-          }
-        }
-        if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) {
-          try {
-            await videoEl.play();
-          } catch (e) {
-            isDead = true;
-          }
-        }
-      }
-
-      if (isDead) {
-        console.log('Phát hiện Camera bị ngắt / bị đen sau khi bật lại màn hình -> Khởi động lại Camera...');
-        await forceRestartCamera();
-      } else {
-        requestScreenWakeLock();
-      }
-    }
-
-    // Khi tắt màn hình điện thoại (hidden) -> Giải phóng track ngay lập tức; Khi bật lại màn hình (visible) -> Tự động bật lại camera!
-    document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'hidden') {
-        try {
-          const videoEl = document.querySelector('#reader video');
-          if (videoEl && videoEl.srcObject) {
-            videoEl.srcObject.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
-            videoEl.srcObject = null;
-          }
-        } catch (e) {}
-      } else if (document.visibilityState === 'visible') {
-        initPhoneSync();
-        if (wasCameraActive) {
-          setTimeout(() => {
-            forceRestartCamera().catch(() => {});
-          }, 500);
-        }
-      }
-    });
-
-    window.addEventListener('pageshow', (event) => {
-      if (document.visibilityState === 'visible' && wasCameraActive) {
-        initPhoneSync();
-        setTimeout(() => checkAndRecoverCamera(), 500);
-      }
-    });
-
-    window.addEventListener('focus', () => {
-      if (document.visibilityState === 'visible' && wasCameraActive) {
-        setTimeout(() => checkAndRecoverCamera(), 500);
-      }
-    });
-
-    // Chạm vào bất kỳ điểm nào trên khung quét để tự động phục hồi Camera nếu màn hình bị tối/đen
-    const scannerBox = document.getElementById('scannerWrapper') || document.getElementById('reader');
-    if (scannerBox) {
-      scannerBox.addEventListener('click', (e) => {
-        const videoEl = document.querySelector('#reader video');
-        if (!videoEl || videoEl.paused || !videoEl.srcObject || !html5QrCode) {
-          forceRestartCamera().catch(() => {});
-        }
-      });
-    }
-
-    // Bộ tuần tra tự động mỗi 1.8 giây: Nếu màn hình đang mở mà khung hình camera bị đứng/đen thì phục hồi ngay
-    setInterval(() => {
-      if (document.visibilityState === 'visible' && wasCameraActive && !isCameraStarting) {
-        const videoEl = document.querySelector('#reader video');
-        if (videoEl && videoEl.srcObject) {
-          const tracks = videoEl.srcObject.getVideoTracks();
-          if (!tracks.length || tracks[0].readyState === 'ended' || videoEl.paused) {
-            checkAndRecoverCamera();
-          } else {
-            if (videoEl.currentTime === lastVideoTime && videoEl.currentTime > 0) {
-              videoStallCount++;
-              if (videoStallCount >= 2) {
-                videoStallCount = 0;
-                checkAndRecoverCamera();
-              }
-            } else {
-              lastVideoTime = videoEl.currentTime;
-              videoStallCount = 0;
-            }
-          }
-        }
-      }
-    }, 1800);
-
-    function loadImageElement(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const img = new Image();
-          img.onload = () => resolve({ img, dataUrl: e.target.result });
-          img.onerror = reject;
-          img.src = e.target.result;
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
-    function cropImageToBlob(img, sxRatio, syRatio, swRatio, shRatio, maxW = 600, highContrast = false, quality = 0.62) {
-      return new Promise(resolve => {
-        const sx = Math.floor(img.width * sxRatio);
-        const sy = Math.floor(img.height * syRatio);
-        const sw = Math.floor(img.width * swRatio);
-        const sh = Math.floor(img.height * shRatio);
-        let targetW = sw;
-        let targetH = sh;
-        if (targetW > maxW) {
-          targetH = Math.round((targetH * maxW) / targetW);
-          targetW = maxW;
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (highContrast) {
-          ctx.filter = 'contrast(150%) grayscale(100%)';
-        }
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
-        canvas.toBlob(blob => {
-          resolve({
-            file: new File([blob], 'crop.jpg', { type: 'image/jpeg' }),
-            dataUrl: canvas.toDataURL('image/jpeg', quality),
-            canvas: canvas
-          });
-        }, 'image/jpeg', quality);
-      });
-    }
-
-    function parseShippingLabelText(rawText) {
-      const cleaned = String(rawText || '').replace(/\r/g, '\n');
-      const noSpaceUpper = cleaned.replace(/[ \t]+/g, '').toUpperCase();
-      let track = '';
-      let orderId = '';
-      let shipDate = '';
-      let qty = 1;
-
-      const spxMatch = noSpaceUpper.match(/SPXVN[0-9A-Z]{9,15}/i) || cleaned.match(/SPX\s*VN\s*[0-9A-Z]{9,15}/i);
-      const ghtkMatch = cleaned.match(/S\d+[\.\-]\w+[\.\-]\w+[\.\-]\d{6,12}/i);
-      const ghnMatch = noSpaceUpper.match(/GHN[0-9A-Z]{6,12}/i);
-      const vtpMatch = noSpaceUpper.match(/VTP[0-9A-Z]{6,14}/i);
-      const trackLineMatch = cleaned.match(/v[aậ]n\s*[đd][oơ]n\s*[:\-\.]?\s*([A-Z0-9\.]{7,22})/i);
-
-      if (spxMatch) track = spxMatch[0].replace(/\s+/g, '').toUpperCase();
-      else if (ghtkMatch) track = ghtkMatch[0].toUpperCase();
-      else if (ghnMatch) track = ghnMatch[0].toUpperCase();
-      else if (vtpMatch) track = vtpMatch[0].toUpperCase();
-      else if (trackLineMatch) track = trackLineMatch[1].toUpperCase();
-
-      if (track.startsWith('SPXVN') && track.length >= 14) {
-        const body = track.substring(5, track.length - 1)
-          .replace(/O/g, '0')
-          .replace(/I/g, '1')
-          .replace(/S/g, '5')
-          .replace(/B/g, '8');
-        track = 'SPXVN' + body + track.charAt(track.length - 1);
-      }
-
-      const orderLineMatch = cleaned.match(/[đd][oơ]n\s*h[aà]ng\s*[:\-\.]?\s*([2][0-9A-Z]{11,16})/i);
-      if (orderLineMatch) {
-        orderId = orderLineMatch[1].toUpperCase();
-      } else {
-        const shopeeIdMatch = cleaned.match(/\b(2[4-9]\d{4}[0-9A-Z]{7,10})\b/);
-        if (shopeeIdMatch && shopeeIdMatch[1] !== track) {
-          orderId = shopeeIdMatch[1].toUpperCase();
-        }
-      }
-
-      const dateMatch = cleaned.match(/\b(\d{2})[\-\/](\d{2})[\-\/](202\d)\b/);
-      if (dateMatch) {
-        shipDate = `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}`;
-      }
-
-      const qtyMatch = cleaned.match(/SL\s*[:\-]?\s*(\d+)/i);
-      if (qtyMatch) {
-        qty = parseInt(qtyMatch[1], 10) || 1;
-      }
-
-      let product = '';
-      let color = '';
-      let size = '';
-
-      let start = cleaned.search(/nội\s*dung\s*hàng|noi\s*dung\s*hang|tổng\s*sl\s*sản\s*phẩm/i);
-      if (start < 0) start = 0;
-      const contentText = cleaned.slice(start, start + 450);
-
-      const pm = contentText.match(/1\s*[\.\)]\s*([^\n\r]+)/);
-      if (pm) {
-        product = pm[1].split(/\s\/\s|\/|\n/)[0].replace(/^1\s*[\.\)]\s*/, '').trim().slice(0, 80);
-      } else {
-        const lineMatch = contentText.match(/(?:Áo|Quần|Váy|Đầm|Sơ mi|Set|Bộ|Tee|Polo|Jean|Khoác)[^\n\r\/,]+/i);
-        if (lineMatch) product = lineMatch[0].trim().slice(0, 80);
-      }
-
-      const varCombo = contentText.match(/,\s*([A-Za-zÀ-ỹĐđ\s]{2,16}?)\s*[,|\/|\-]\s*(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|[SML])\b/i) ||
-                       contentText.match(/(?:màu|mau|color)?\s*[:\-\s]*([A-Za-zÀ-ỹĐđ\s]{2,14}?)\s*[,|\/|\-]\s*(?:size|kích cỡ)?\s*[:\-\s]*(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|[SML])\b/i);
-      if (varCombo) {
-        if (!color) color = varCombo[1].trim();
-        if (!size) size = varCombo[2].toUpperCase();
-      }
-
-      if (!size) {
-        const smMulti = contentText.match(/\b(XXXL|XXL|XL|XS|[2-5]XL|\b\d{2}\b|Free\s*size)\b/i);
-        if (smMulti) {
-          size = smMulti[1].toUpperCase().replace(/\s+/g, '');
-        } else {
-          const smSingle = contentText.match(/\b([SML])\b/i);
-          if (smSingle) size = smSingle[1].toUpperCase();
-        }
-      }
-
-      if (!color) {
-        const vm = contentText.match(/,\s*([A-Za-zÀ-ỹĐđ\s]{2,18}?)\s*,\s*(?:XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\b\d{2}\b)/i) ||
-                   contentText.match(/[\/,\-]\s*([A-Za-zÀ-ỹĐđ\s]{2,18}?)\s*,\s*(?:XXXL|XXL|XL|XS|S|M|L|[2-5]XL|\b\d{2}\b)/i);
-        if (vm) color = vm[1].trim();
-      }
-
-      return { track, orderId, shipDate, qty, product, color, size };
-    }
-
-    async function scanSmartLabelImage(e) {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const toast = document.getElementById('processingToast');
-      toast.classList.remove('hidden');
-      toast.textContent = '⏳ Bước 1/2: Đang quét mã QR / Mã vạch trên phiếu...';
-
-      try {
-        const { img } = await loadImageElement(file);
-        const compressedPhoto = await cropImageToBlob(img, 0, 0, 1, 1, 480, false, 0.55);
-
-        let decodedCode = '';
-        if ('BarcodeDetector' in window) {
-          try {
-            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
-            const barcodes = await detector.detect(img);
-            if (barcodes && barcodes.length > 0) {
-              const spx = barcodes.find(b => /SPX|GHN|GHTK|VTP/i.test(b.rawValue));
-              decodedCode = spx ? spx.rawValue : barcodes[0].rawValue;
-            }
-          } catch (bdErr) {}
-        }
-
-        if (!decodedCode && typeof Html5Qrcode !== 'undefined') {
-          const scanner = html5QrCode || new Html5Qrcode('reader');
-          const crops = [
-            await cropImageToBlob(img, 0.45, 0.32, 0.48, 0.42, 800, false, 0.8),
-            await cropImageToBlob(img, 0.32, 0.06, 0.62, 0.22, 950, false, 0.8),
-            await cropImageToBlob(img, 0, 0, 1, 1, 1000, false, 0.8)
-          ];
-          for (let i = 0; i < crops.length; i++) {
-            try {
-              const res = await scanner.scanFile(crops[i].file, false);
-              if (res && String(res).trim()) {
-                decodedCode = String(res).trim();
-                break;
-              }
-            } catch (err) {}
-          }
-        }
-
-        toast.textContent = '⏳ Bước 2/2: Đang đọc chữ Mã vận đơn & Mã đơn hàng trên phiếu...';
-        let ocrParsed = { track: '', orderId: '', shipDate: '', qty: 1 };
-        let rawOcrText = '';
-        try {
-          if (typeof Tesseract === 'undefined') {
-            await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
-          }
-          const labelCrop = await cropImageToBlob(img, 0.03, 0.03, 0.94, 0.94, 1400, true, 0.85);
-          const result = await Tesseract.recognize(labelCrop.dataUrl, 'vie+eng');
-          const text = result?.data?.text || '';
-          rawOcrText = text;
-          if (text) {
-            ocrParsed = parseShippingLabelText(text);
-          }
-        } catch (ocrErr) {
-          console.warn('Tesseract OCR error:', ocrErr);
-        }
-
-        const finalTrack = ocrParsed.track || decodedCode;
-        const finalOrderId = ocrParsed.orderId || '';
-
-        toast.classList.add('hidden');
-
-        if (finalTrack || finalOrderId) {
-          const codeToSend = finalTrack || finalOrderId;
-          
-          // Check local duplicate
-          const existingIdx = scanHistory.findIndex(entry => extractCleanTrackingCode(entry.code) === codeToSend);
-          if (existingIdx !== -1) {
-            const existing = scanHistory[existingIdx];
-            existing.status = 'duplicate';
-            existing.dupCount = (existing.dupCount || 1) + 1;
-            scanHistory.splice(existingIdx, 1);
-            scanHistory.unshift(existing);
-            saveScanHistory();
-            renderScanHistory();
-
-            triggerScanFeedback('duplicate', codeToSend, '🚨 MÃ ĐÃ BỊ TRÙNG!', `⚠️ Phiếu này đã quét trước đó (Trùng lần ${existing.dupCount})`, existing.orderNum);
-          } else {
-            triggerScanFeedback('success', codeToSend, '🟢 MÃ HỢP LỆ (ẢNH PHIẾU)', '📸 Đã gửi ảnh phiếu & đối soát', null);
-            scanHistory.unshift({
-              code: codeToSend,
-              time: Date.now(),
-              status: 'success',
-              orderNum: null,
-              dupCount: 0,
-              detail: '📸 Quét từ ảnh phiếu'
-            });
-            saveScanHistory();
             renderScanHistory();
           }
 
@@ -2048,7 +1478,7 @@
     });
   
     // =========================================================================
-    // v1.6.4: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
+    // v1.6.5: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
     // =========================================================================
     function escapeHtml(str) {
       if (!str) return '';
@@ -2061,7 +1491,7 @@
     }
 
     function getUnsyncedItems() {
-      // v1.6.4: Lấy toàn bộ các kiện chưa được máy tính xác nhận đồng bộ (loại trừ các kiện máy tính đã báo trùng)
+      // v1.6.5: Lấy toàn bộ các kiện chưa được máy tính xác nhận đồng bộ (loại trừ các kiện máy tính đã báo trùng)
       return scanHistory.filter(e => e && e.synced !== true && e.status !== 'duplicate');
     }
 
@@ -2117,16 +1547,16 @@
       const listEl = document.getElementById('offlineQueueItemsList');
       if (!card || !badge) return;
 
-      const unsynced = getUnsyncedItems();
-      const photoCount = unsynced.filter(e => e.photo && e.photo.length > 50).length;
+      const queue = offlineQueue || [];
+      const photoCount = queue.filter(e => e.photo && e.photo.length > 50).length;
 
-      if (unsynced.length > 0) {
+      if (queue.length > 0) {
         card.classList.remove('hidden');
-        badge.textContent = unsynced.length + ' kiện';
+        badge.textContent = queue.length + ' kiện';
         if (photoBadge) photoBadge.textContent = '📸 ' + photoCount + ' ảnh';
 
         if (listEl) {
-          listEl.innerHTML = unsynced.map((item, i) => {
+          listEl.innerHTML = queue.map((item, i) => {
             const timeStr = item.time ? new Date(item.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
             const hasPhoto = item.photo && item.photo.length > 50;
             const codeDisplay = escapeHtml(item.code || '');
@@ -2155,8 +1585,7 @@
     let isSyncingOffline = false;
     async function syncOfflineQueueToPc() {
       if (isSyncingOffline) return;
-      const unsynced = getUnsyncedItems();
-      if (!unsynced.length) {
+      if (!offlineQueue.length) {
         alert('Tất cả các kiện và ảnh chụp đã được đồng bộ 100% sang máy tính!');
         return;
       }
@@ -2166,20 +1595,48 @@
       const btn = document.getElementById('btnSyncOffline');
       if (progressEl) {
         progressEl.style.display = 'block';
-        progressEl.textContent = 'Đang đồng bộ 0 / ' + unsynced.length + ' kiện & ảnh...';
+        progressEl.textContent = 'Đang đồng bộ ' + offlineQueue.length + ' kiện & ảnh sang máy tính...';
       }
       if (btn) btn.disabled = true;
 
       const topic = getNtfyTopic();
-      let sentCount = 0;
+      const itemsToSync = [...offlineQueue];
 
-      for (let i = 0; i < unsynced.length; i++) {
-        const item = unsynced[i];
+      // 1. Gửi gói tổng hợp bulk_sync qua MQTT và HTTPS ntfy.sh (Siêu nhanh, nạp toàn bộ danh sách 1 lần)
+      const bulkPayload = {
+        type: 'bulk_sync',
+        items: itemsToSync.map(it => ({
+          code: it.code,
+          time: it.time,
+          photo: it.photo || '',
+          requestId: 'sync_' + it.code + '_' + it.time
+        })),
+        room: room,
+        time: Date.now()
+      };
+
+      if (client && client.connected) {
+        try {
+          client.publish('agy_shopee_return_scanner_2026/' + room, JSON.stringify(bulkPayload));
+        } catch (e) {}
+      }
+
+      try {
+        await fetch('https://ntfy.sh/' + topic, {
+          method: 'POST',
+          body: JSON.stringify(bulkPayload),
+          headers: { 'Title': 'Shopee Bulk Sync' }
+        });
+      } catch (e) {}
+
+      // 2. Gửi từng kiện lẻ kèm ảnh dự phòng
+      let sentCount = 0;
+      for (let i = 0; i < itemsToSync.length; i++) {
+        const item = itemsToSync[i];
         if (progressEl) {
-          progressEl.textContent = 'Đang gửi kiện ' + (i + 1) + '/' + unsynced.length + ': ' + item.code + (item.photo ? ' (Kèm ảnh)' : '');
+          progressEl.textContent = 'Đang gửi kiện ' + (i + 1) + '/' + itemsToSync.length + ': ' + item.code + (item.photo ? ' (Kèm ảnh)' : '');
         }
 
-        // 1. Gửi qua MQTT trực tiếp nếu có kết nối (Siêu nhanh 10ms, trọn vẹn 100% ảnh!)
         const syncPayload = {
           type: 'sync_item',
           code: item.code,
@@ -2195,42 +1652,27 @@
           } catch (e) {}
         }
 
-        // 2. Gửi bản tin đồng bộ trực tiếp qua HTTPS ntfy.sh có await đảm bảo gói tin gửi tới nơi
         try {
-          const lightPayload = {
-            type: 'sync_item',
-            code: item.code,
-            photo: '',
-            time: item.time || Date.now(),
-            room: room,
-            requestId: 'sync_' + item.code + '_' + (item.time || Date.now())
-          };
           await fetch('https://ntfy.sh/' + topic, {
             method: 'POST',
-            body: JSON.stringify(lightPayload),
+            body: JSON.stringify(syncPayload),
             headers: { 'Title': 'Shopee Sync Item' }
           });
-        } catch (postErr) {
-          console.warn('Sync post err:', postErr);
-        }
+        } catch (postErr) {}
 
-        // 3. Nếu có ảnh, gửi các mảnh ảnh qua ntfy.sh để đảm bảo không mất ảnh
         if (item.photo && item.photo.length > 50) {
           try {
             await sendPhotoPacket(item.photo, item.code);
           } catch (e) {}
         }
 
-        item.synced = true;
-        item.status = 'success';
-        item.detail = 'Đã đồng bộ sang máy tính';
         sentCount++;
-        await new Promise(r => setTimeout(r, 160));
+        await new Promise(r => setTimeout(r, 120));
       }
 
-      saveScanHistory();
-      renderScanHistory();
-      updateOfflineQueueUI();
+      // Xóa các kiện đã gửi khỏi offlineQueue
+      offlineQueue = [];
+      saveOfflineQueue();
 
       if (progressEl) {
         progressEl.textContent = '🎉 Đã gửi thành công ' + sentCount + ' kiện và ảnh sang máy tính!';

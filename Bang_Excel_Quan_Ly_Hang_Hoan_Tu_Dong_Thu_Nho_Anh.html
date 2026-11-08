@@ -190,7 +190,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       contain-intrinsic-size: auto 34px;
     }
   
-    /* Sticky Checkbox & STT Columns on Horizontal Scroll (v1.6.4) */
+    /* Sticky Checkbox & STT Columns on Horizontal Scroll (v1.6.5) */
     /* Sticky Columns scoped EXCLUSIVELY to Main Orders Table (Never affect Category Summary Table!) */
     
     /* Enforce dark legible text across table cells, protecting from header text-white inheritance */
@@ -305,14 +305,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <div class="w-full bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 overflow-hidden">
 
-    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.4) -->
+    <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.5) -->
     <div class="bg-[#ee4d2d] text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 relative z-30">
       <div class="flex flex-wrap items-center gap-1.5">
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.4">
-          🚀 v1.6.4
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.5">
+          🚀 v1.6.5
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -325,7 +325,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
 
       <div class="flex flex-wrap items-center gap-1 text-xs no-print">
-        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.4) -->
+        <!-- Nút Bảng Theo Dõi Đơn Hàng Đặc Biệt (v1.6.5) -->
         <button type="button" id="btnOpenWatchlistModal" onclick="openWatchlistModal()"
               class="relative inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-900 font-extrabold text-xs rounded-lg shadow-2xs transition ring-1 ring-amber-300 cursor-pointer select-none active:scale-95"
               title="Mở Bảng Theo Dõi Đơn Hàng Đặc Biệt">
@@ -682,7 +682,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.4</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.5</span>
               </div>
             </div>
           </div>
@@ -695,7 +695,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
     </div>
 
-    <!-- Row 2: Thanh Điều Hướng: Tuần Nạp + Sàn TMĐT + Chế Độ Xem + Phân Tích & Ca Nhận (v1.6.4 Siêu Gọn) -->
+    <!-- Row 2: Thanh Điều Hướng: Tuần Nạp + Sàn TMĐT + Chế Độ Xem + Phân Tích & Ca Nhận (v1.6.5 Siêu Gọn) -->
     <div class="px-3 py-1 bg-gradient-to-r from-purple-50 via-slate-50 to-indigo-50 border-b border-purple-200/80 flex flex-wrap items-center justify-between gap-2 no-print">
       <!-- Cụm Trái: Tab Tuần Nạp & Tab Sàn TMĐT -->
       <div class="flex flex-wrap items-center gap-2">
@@ -1209,7 +1209,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
   </div>
 
-  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.4) -->
+  <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.5) -->
   <div id="watchlistModal" onclick="closeWatchlistModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
     <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
       <!-- Header -->
@@ -3414,7 +3414,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // Trích xuất ngày chuẩn DD/MM/YYYY từ chuỗi bất kỳ (hỗ trợ cả "13:14:41 05/11/2026" của Salework và "2026-11-05 13:14:41" của TikTok/Shopee)
-        // v1.6.4: Thuật toán phục hồi và trích xuất Ngày Gửi Đi đa tầng, bảo đảm 100% không bao giờ bị rỗng
+        // v1.6.5: Thuật toán phục hồi và trích xuất Ngày Gửi Đi đa tầng, bảo đảm 100% không bao giờ bị rỗng
     function resolveOrderShipDate(order) {
       if (!order) return '';
 
@@ -5624,7 +5624,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setImportWeekFilter(weekKey) {
-      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.4: Xóa selection khi đổi tuần
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.5: Xóa selection khi đổi tuần
       currentImportWeekFilter = weekKey;
       try {
         localStorage.setItem(SAVED_ACTIVE_WEEK_KEY, weekKey);
@@ -5913,7 +5913,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.4';
+    const APP_VERSION_NUMBER = '1.6.5';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6087,7 +6087,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function setPlatformFilter(filterVal) {
-      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.4: Tự động bỏ chọn khi đổi sàn
+      if (typeof clearAllSelectedOrders === 'function') clearAllSelectedOrders(); // v1.6.5: Tự động bỏ chọn khi đổi sàn
       
       currentPlatformFilter = filterVal;
       currentPage = 1;
@@ -6242,7 +6242,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.4: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
+    // v1.6.5: TÍNH THỜI HẠN XỬ LÝ CHUẨN XÁC THEO CẢ NGÀY, GIỜ VÀ PHÚT TỪ NGÀY HỦY
     // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ) mà chưa nhận được hàng
     // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
     // =========================================================================
@@ -6260,7 +6260,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return { level: 'lost', status: 'lost', text: '🔴 Bị mất', timeStr: 'Bị mất', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       }
 
-      // v1.6.4: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
+      // v1.6.5: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
       // TUYỆT ĐỐI KHÔNG FALLBACK SANG shipDate ĐỂ TRÁNH BÁO ĐỎ OAN CHO ĐƠN MỚI GỬI!
       const refStr = order.returnDate;
       if (!refStr) {
@@ -7634,7 +7634,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
       sanitizeNumericColorCodes();
-      // v1.6.4: Tự động phục hồi Ngày Gửi Đi cho toàn bộ đơn hàng
+      // v1.6.5: Tự động phục hồi Ngày Gửi Đi cho toàn bộ đơn hàng
       (orders || []).forEach(o => {
         const d = resolveOrderShipDate(o);
         if (d && (!o.shipDate || !o.shipDate.trim())) {
@@ -9411,7 +9411,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const sortDir = parts[1]; // 'desc' | 'asc'
 
         filteredEntries.sort((a, b) => {
-          // v1.6.4: Sắp xếp thông minh theo Hạn Cần Xử Lý (Cảnh báo Báo Đỏ >= 72h -> Báo Vàng >= 48h -> Trong hạn)
+          // v1.6.5: Sắp xếp thông minh theo Hạn Cần Xử Lý (Cảnh báo Báo Đỏ >= 72h -> Báo Vàng >= 48h -> Trong hạn)
           if (sortField === 'deadline') {
             const elA = getOrderReturnElapsedInfo(a.order);
             const elB = getOrderReturnElapsedInfo(b.order);
@@ -9655,7 +9655,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <option value="Bị mất" ${order.status === 'Bị mất' ? 'selected' : ''}>🔴 Bị mất (Khiếu nại)</option>
             </select>`;
 
-        // Format Deadline Cell (v1.6.4: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
+        // Format Deadline Cell (v1.6.5: Cảnh báo chuẩn xác theo ngày giờ phút từ thời gian hủy: Báo Vàng >= 48h, Báo Đỏ >= 72h)
         const elapsed = getOrderReturnElapsedInfo(order);
         let deadlineHtml = '';
         if (isReceived) {
@@ -9896,7 +9896,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                <div class="text-xs text-slate-500">Bạn có thể bấm <b>[📂 Nhập / Xuất Dữ Liệu ➔ Nạp File Shopee / TikTok]</b> để nạp đơn mới, hoặc bấm <b>[➕ Thêm Đơn (Alt+N)]</b> / <b>[📱 Quét Bằng ĐT]</b>!</div>
              </div>`;
         } else if (currentImportWeekFilter !== 'all') {
-          // v1.6.4: Gợi ý thông minh khi chọn trúng Tab Tuần 0 đơn
+          // v1.6.5: Gợi ý thông minh khi chọn trúng Tab Tuần 0 đơn
           const weekMap = new Map();
           orders.forEach(o => {
             const wk = getOrderImportWeek(o);
@@ -9940,7 +9940,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       tbody.innerHTML = html;
 
-      // v1.6.4: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
+      // v1.6.5: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
       const chkSelectAll = document.getElementById('chkSelectAllOrders');
       if (chkSelectAll && window.lastPageEntries) {
         chkSelectAll.checked = (window.lastPageEntries.length > 0 && window.lastPageEntries.every(e => selectedOrdersSet.has(e.originalIndex)));
@@ -12112,7 +12112,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (err) {}
     }
 
-    // v1.6.4: Cloud Message Deduplication (Ngăn chặn re-process tin nhắn cũ từ 12h trước)
+    // v1.6.5: Cloud Message Deduplication (Ngăn chặn re-process tin nhắn cũ từ 12h trước)
     const PROCESSED_CLOUD_MSG_KEY = 'shopee_processed_cloud_msg_ids_v2';
     let processedCloudMsgIds = new Set();
     try {
@@ -12339,15 +12339,59 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         try { localStorage.setItem('shopee_phone_room_id', phoneRoomId); } catch (e) {}
       }
 
+      // v1.6.5: Hỗ trợ Đồng Bộ Hàng Loạt từ Điện Thoại (bulk_sync)
+      if (data.type === 'bulk_sync' && Array.isArray(data.items)) {
+        let matchedCount = 0;
+        data.items.forEach(item => {
+          const syncCode = String(item.code || '').trim();
+          const syncPhoto = item.photo || '';
+          const cleanCode = extractCleanTrackingCode(syncCode);
+          if (!cleanCode) return;
+
+          const existingIdx = orders.findIndex(o => {
+            const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
+            const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
+            const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
+            const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
+            const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
+            const oid = String(o.orderId || '').trim().toUpperCase();
+            return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
+          });
+
+          if (existingIdx !== -1) {
+            const o = orders[existingIdx];
+            o.status = 'Hàng đã trả';
+            if (!o.recvDate) o.recvDate = getNowDateTimeString();
+            if (syncPhoto) {
+              o.photo = syncPhoto;
+              if (!o.photoId) o.photoId = 'p_' + (o.track || o.orderId || Date.now());
+              savePhotoToDb(o.photoId, syncPhoto);
+            }
+            matchedCount++;
+          }
+        });
+
+        if (matchedCount > 0) {
+          saveOrders();
+          recalcTotalsAndSummary();
+          renderCategorySummaryTable();
+          renderAll(false);
+          playScanSuccessTone();
+          appendPhoneLiveLog(`🎉 ĐÃ ĐỒNG BỘ: ${matchedCount} kiện quét lúc tắt máy đã được nạp chuẩn vào bảng!`);
+          addAuditLog('📥 ĐỒNG BỘ NGOẠI TUYẾN', `Đã nạp thành công ${matchedCount} kiện hàng từ danh sách chờ của điện thoại`);
+        }
+        sendAckToPhone(0, 'BULK_SYNC', `ĐÃ ĐỒNG BỘ ${matchedCount} KIỆN`, 'success', false, data.requestId || '', data.room || '');
+        return;
+      }
+
       if (data.type === 'sync_item') {
         const syncCode = String(data.code || '').trim();
         const syncPhoto = data.photo || '';
         appendPhoneLiveLog(`⚡ ĐỒNG BỘ OFFLINE: Nhận kiện [${syncCode}]` + (syncPhoto ? ' (Kèm 100% Ảnh chụp)' : ''));
-        handleIncomingPhoneBarcode(syncCode, data.requestId || '', syncPhoto, data.room || '');
+        handleIncomingPhoneBarcode(syncCode, data.requestId || 'sync_' + syncCode, syncPhoto, data.room || '');
         if (syncPhoto) {
           attachPhotoToOrderByCode(syncCode, syncPhoto);
         }
-        sendAckToPhone(0, syncCode, 'ĐÃ ĐỒNG BỘ MÃ & ẢNH OFFLINE', 'success', false, data.requestId || '', data.room || '');
         return;
       }
 
@@ -12805,7 +12849,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const now = Date.now();
-      if (cleanCode === lastScannedCode && now - lastScannedTime < 2000) {
+      const isSyncRequest = String(requestId || "").startsWith("sync_");
+      if (!isSyncRequest && cleanCode === lastScannedCode && now - lastScannedTime < 2000) {
         // Quan trọng: Nếu gói đầu tiên đến qua ntfy.sh (không kèm ảnh để siêu nhanh), và gói thứ 2 đến qua MQTT (có kèm ảnh chụp),
         // thì VẪN PHẢI gắn ảnh chụp vào đơn hàng trước khi return!
         if (photoDataUrl) {
@@ -13859,7 +13904,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.4: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
+    // v1.6.5: QUẢN LÝ Ô TÍCH CHỌN NHIỀU ĐƠN & THAO TÁC HÀNG LOẠT (BULK ACTIONS)
     // =========================================================================
     // selectedOrdersSet is initialized globally above
 
@@ -13954,7 +13999,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       saveOrders();
       updateWatchlistBadge();
       renderAll(false);
-      clearAllSelectedOrders(); // v1.6.4: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
+      clearAllSelectedOrders(); // v1.6.5: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
       showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Danh Sách Theo Dõi!`, 'success');
       addAppNotification({
         type: 'system',
@@ -14048,7 +14093,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // v1.6.4: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
+    // v1.6.5: BẢNG THEO DÕI ĐƠN HÀNG ĐẶC BIỆT (WATCHLIST MODAL)
     // =========================================================================
     let currentWatchlistFilter = 'all';
 
@@ -14360,7 +14405,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showAppToast(`Đã gỡ đơn #${orderIdx + 1} khỏi danh sách theo dõi`, 'info');
     }
 
-    // v1.6.4: Dọn dẹp các đơn đã nhận về kho khỏi danh sách theo dõi
+    // v1.6.5: Dọn dẹp các đơn đã nhận về kho khỏi danh sách theo dõi
     function cleanReturnedOrdersFromWatchlist() {
       let cleaned = 0;
       orders.forEach(o => {
@@ -14456,7 +14501,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <datalist id="productList"></datalist>
   <datalist id="colorList"></datalist>
   <datalist id="sizeList"></datalist>
-  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.4) -->
+  <!-- Floating Bulk Action Bar (Thanh Thao Tác Nổi Khi Tích Chọn Nhiều Đơn v1.6.5) -->
   <div id="bulkActionBar" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[90] hidden bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 transition-all">
     <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
       <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-black text-xs flex items-center justify-center" id="bulkSelectedCountBadge">0</span>

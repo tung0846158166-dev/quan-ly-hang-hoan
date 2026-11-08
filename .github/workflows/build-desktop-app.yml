@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.1
+          name: QuanLyHangHoan-Windows-Installer-v1.7.2
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,23 +72,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.1
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.1 (Tách Riêng Sàn Shopee & TikTok - Hỗ Trợ Chuẩn File Hoàn TikTok Seller Center)"
+          tag_name: v1.7.2
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.2 (Tương Thích Toàn Diện Cả 2 Định Dạng File Xuất TikTok Shop)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.1
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.2
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.1`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.1.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.1**:
-              1. 🏷️ **Tách riêng biệt danh sách hiển thị giữa Sàn Shopee và Sàn TikTok Shop**:
-                 - Hai tab không gian làm việc chính độc lập: **🟠 SÀN SHOPEE** và **⚫ SÀN TIKTOK SHOP**.
-                 - Khi mở ứng dụng hoặc nạp dữ liệu sàn nào, hệ thống tự động lọc hiển thị riêng dữ liệu sàn đó, không trộn lẫn hai sàn gây rối mắt.
-                 - Ghi nhớ trạng thái sàn ưa thích vào bộ nhớ máy, khởi động lại vẫn giữ đúng sàn đang làm việc.
-                 - Vẫn có tùy chọn **🌐 Xem Cả 2 Sàn** khi cần đối soát tổng hợp toàn shop.
-              2. 📥 **Hỗ trợ toàn diện 100% File Báo Cáo Trả Hàng / Hoàn Tiền TikTok Shop Seller Center**:
-                 - Trích xuất chính xác tuyệt đối toàn bộ thông tin từ file xuất trực tiếp của TikTok: Return Order ID, Order ID, Return Logistics Tracking ID, Lý do hoàn, Trạng thái chi tiết (Chờ khách gửi bưu cục, Đang chuyển về, Chờ duyệt hoàn tiền...), Ghi chú của khách (Buyer Note), Đơn giá hoàn, Tên sản phẩm & Phân loại SKU Premium Cao Cấp.
-                 - Tự động nhận diện chuẩn không bỏ sót đơn hàng (kể cả các đơn TikTok đánh dấu là Delivered trước khi khách bấm hoàn).
-              3. 📱 **Kế thừa toàn bộ nâng cấp Dual Scan Engine v1.7.0**: Quét cực nhạy cả mã vạch 1D dài và mã QR trên Camera điện thoại, giữ yên 0.5s tự động nhận diện và đồng bộ vào máy tính.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.2`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.2.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.7.2**:
+              1. 📦 **Tương thích toàn diện cả 2 định dạng file xuất của TikTok Shop Seller Center**:
+                 - **Định dạng 1**: File Báo Cáo Trả Hàng / Hoàn Tiền (`Return Order ID`, `Return Logistics Tracking ID`, `Time Requested`,...).
+                 - **Định dạng 2**: File Danh Sách Đơn Hàng (`Order ID`, `Tracking ID`, `Order Status = Đã hủy`, `Cancel Reason = Giao gói hàng thất bại`, `Cancelled Time`,...).
+                 - Tự động nhận diện chuẩn xác đơn bom / giao thất bại, trích xuất chuẩn Mã vận đơn, Mã đơn hàng, ngày gửi, ngày hoàn, phân loại màu & size, giá tiền sau chiết khấu.
+                 - Khắc phục triệt để lỗi xung đột từ khóa "chuyen" (vận chuyển/trung chuyển) với "huy".
+              2. 🏷️ **Tách riêng biệt không gian Sàn Shopee & TikTok Shop**: Hai tab độc lập `🟠 SÀN SHOPEE` và `⚫ SÀN TIKTOK SHOP` kèm tính năng ghi nhớ thông minh.
+              3. 📱 **Bộ quét Camera Dual Scan Engine siêu nhạy**: Quét cực nhanh mã vạch 1D và QR code di động, giữ yên 0.5s tự động nhận diện và đồng bộ.
           files: |
             dist/*.exe
         env:

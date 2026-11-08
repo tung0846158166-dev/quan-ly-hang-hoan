@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.2</span>
               </div>
             </div>
           </div>
@@ -3929,7 +3929,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const sampleKeys = Object.keys(combinedRows[0] || {});
       const isTikTokFile = sampleKeys.some(k => {
         const kn = removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '');
-        return kn === 'returnorderid' || kn === 'returnlogisticstrackingid' || kn === 'returnreason';
+        return kn === 'returnorderid' || kn === 'returnlogisticstrackingid' || kn === 'returnreason' ||
+               kn === 'cancelationreturntype' || kn === 'skuquantityofreturn' || kn === 'cancelreason' ||
+               kn === 'rtstime' || kn === 'ordersubstatus' ||
+               (kn.includes('orderid') && sampleKeys.some(k2 => removeVietnameseTones(k2).toLowerCase().includes('cancelreason')));
       });
 
       if (forcedPlatform === 'TikTok Shop' || isTikTokFile) {
@@ -3951,19 +3954,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!(await requireUnlocked('Nạp Đơn Sàn TikTok / Salework'))) return;
       if (!rawRows || !rawRows.length) return;
 
-      // Tập hợp toàn bộ tên cột từ các dòng đầu để không bao giờ bị sót cột
+      // Tập hợp toàn bộ tên cột từ 50 dòng đầu để không bao giờ bị sót cột
       const keySet = new Set();
       rawRows.slice(0, 50).forEach(r => { if (r && typeof r === "object") Object.keys(r).forEach(k => keySet.add(k)); });
       const keys = Array.from(keySet);
 
       function findKeyExactOrIncludes(exactList, includePatterns = [], excludePatterns = []) {
-        // 1. Ưu tiên khớp chính xác tên cột chuẩn
         for (const exName of exactList) {
           const exNorm = removeVietnameseTones(exName).toLowerCase().replace(/[^a-z0-9]/g, '');
           const foundExact = keys.find(k => removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '') === exNorm);
           if (foundExact) return foundExact;
         }
-        // 2. Khớp theo từ khóa chứa bên trong
         for (const p of includePatterns) {
           const found = keys.find(k => {
             const norm = removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -3975,7 +3976,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return undefined;
       }
 
-      // Phát hiện cấu trúc File Báo Cáo Trả Hàng / Hoàn Tiền xuất từ TikTok Shop Seller Center
+      // 1. Nhóm cột Báo Cáo Trả Hàng / Hoàn Tiền (TikTok Seller Center Return & Refund)
       const returnOrderIdKey = findKeyExactOrIncludes(
         ['Return Order ID', 'Mã yêu cầu trả hàng', 'Return ID'],
         ['returnorderid', 'returnid', 'mayeucau']
@@ -3985,12 +3986,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['returnlogisticstrackingid', 'mvdtrahang', 'returntracking']
       );
       const returnTypeKey = findKeyExactOrIncludes(
-        ['Return Type', 'Loại yêu cầu'],
-        ['returntype', 'loaiyeucau']
+        ['Return Type', 'Cancelation/Return Type', 'Loại yêu cầu', 'Loại hủy'],
+        ['returntype', 'cancelationreturntype', 'canceltype', 'loaiyeucau']
       );
       const returnReasonKey = findKeyExactOrIncludes(
-        ['Return Reason', 'Lý do hoàn', 'Lý do trả hàng'],
-        ['returnreason', 'lydohoan', 'lydotrahang']
+        ['Return Reason', 'Cancel Reason', 'Lý do hoàn', 'Lý do trả hàng', 'Lý do hủy'],
+        ['returnreason', 'cancelreason', 'lydohoan', 'lydotrahang', 'lydohuy']
       );
       const returnStatusKey = findKeyExactOrIncludes(
         ['Return Status', 'Trạng thái hoàn'],
@@ -4013,7 +4014,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['returnunitprice', 'dongiahoan']
       );
 
-      // Cột chuẩn file đơn hàng TikTok Shop / Salework
+      // 2. Nhóm cột Danh Sách Quản Lý Đơn Hàng (TikTok Seller Center Order Management List)
+      const cancelledTimeKey = findKeyExactOrIncludes(
+        ['Cancelled Time', 'Thời gian hủy'],
+        ['cancelledtime', 'thoigianhuy']
+      );
+      const orderSubstatusKey = findKeyExactOrIncludes(
+        ['Order Substatus', 'Trạng thái phụ'],
+        ['ordersubstatus', 'substatus']
+      );
+      const skuQuantityOfReturnKey = findKeyExactOrIncludes(
+        ['Sku Quantity of return', 'Số lượng hoàn'],
+        ['skuquantityofreturn', 'soluonghoan']
+      );
+      const shippedTimeKey = findKeyExactOrIncludes(
+        ['Shipped Time', 'Thời gian gửi'],
+        ['shippedtime', 'thoigiangui']
+      );
+      const rtsTimeKey = findKeyExactOrIncludes(
+        ['RTS Time', 'Thời gian đóng'],
+        ['rtstime', 'thoigiandong']
+      );
+      const buyerMessageKey = findKeyExactOrIncludes(
+        ['Buyer Note', 'Buyer Message', 'Ghi chú của khách', 'Ghi chú'],
+        ['buyernote', 'buyermessage', 'ghichucuakhach', 'ghichukhach', 'ghichu']
+      );
+
+      // 3. Nhóm cột chung
       const trackKey = returnLogisticsTrackKey || findKeyExactOrIncludes(
         ['Mã vận đơn', 'Tracking ID', 'Mã vận đơn trả hàng', 'Mã vận đơn giao hàng', 'Return Logistics Tracking ID'],
         ['mavandon', 'trackingid', 'trackingnumber', 'tracking', 'mvd', 'sovandon', 'mabuugui']
@@ -4024,8 +4051,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['masokhieunai', 'makhieunai']
       );
       const carrierKey = findKeyExactOrIncludes(
-        ['Đơn vị vận chuyển', 'Shipping Provider Name', 'Nhà vận chuyển'],
-        ['donvivanchuyen', 'shippingprovider', 'nhavanchuyen', 'dvvc', 'carrier']
+        ['Shipping Provider Name', 'Đơn vị vận chuyển', 'Nhà vận chuyển'],
+        ['shippingprovidername', 'donvivanchuyen', 'shippingprovider', 'nhavanchuyen', 'dvvc', 'carrier']
       );
       const productKey = findKeyExactOrIncludes(
         ['Product Name', 'Tên sản phẩm trên sàn', 'Tên sản phẩm'],
@@ -4033,8 +4060,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['masanpham', 'id', 'masku', 'skuid']
       );
       const varKey = findKeyExactOrIncludes(
-        ['SKU Name', 'Tên phân loại trên sàn', 'Variation', 'Tên phân loại'],
-        ['skuname', 'tenphanloaitrensan', 'tenphanloai', 'variation', 'phanloai', 'tenbienthe'],
+        ['Variation', 'SKU Name', 'Tên phân loại trên sàn', 'Tên phân loại'],
+        ['variation', 'skuname', 'tenphanloaitrensan', 'tenphanloai', 'phanloai', 'tenbienthe'],
         ['maphanloai', 'masanpham', 'masku', 'skuid']
       );
       const sellerSkuKey = findKeyExactOrIncludes(
@@ -4042,30 +4069,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['sellersku', 'masanphamsalework', 'skuphanloai']
       );
       const qtyKey = findKeyExactOrIncludes(
-        ['Return Quantity', 'Số lượng', 'Quantity', 'Số lượng hoàn'],
-        ['returnquantity', 'soluong', 'quantity', 'qty'],
+        ['Return Quantity', 'Quantity', 'Số lượng', 'Số lượng hoàn'],
+        ['returnquantity', 'quantity', 'soluong', 'qty'],
         ['tongsoluong']
       );
 
-      // Các cột giá trị
+      // Cột giá tiền
       const priceTongGiaTriKey = findKeyExactOrIncludes(['Order Amount', 'Tổng giá trị', 'Return unit price'], ['orderamount', 'tonggiatri', 'returnunitprice']);
-      const priceGiaSanTmdtKey = findKeyExactOrIncludes(['Giá sàn TMĐT', 'SKU Unit Original Price', 'Đơn giá'], ['giasantmdt']);
-      const priceSauChietKhauKey = findKeyExactOrIncludes(['Tổng tiền hàng sau chiết khấu', 'SKU Subtotal After Discount'], ['tongtienhangsauchietkhau']);
+      const priceSauChietKhauKey = findKeyExactOrIncludes(['SKU Subtotal After Discount', 'Tổng tiền hàng sau chiết khấu'], ['skusubtotalafterdiscount', 'tongtienhangsauchietkhau']);
+      const priceGiaSanTmdtKey = findKeyExactOrIncludes(['SKU Unit Original Price', 'Giá sàn TMĐT', 'Đơn giá'], ['skuunitoriginalprice', 'giasantmdt']);
       const priceTongTienHangKey = findKeyExactOrIncludes(['Tổng tiền hàng', 'SKU Subtotal Before Discount'], ['tongtienhang'], ['sauchietkhau']);
       const priceGiaSaleworkKey = findKeyExactOrIncludes(['Giá Salework'], ['giasalework']);
       const priceDoanhThuKey = findKeyExactOrIncludes(['Doanh thu ước tính'], ['doanhthuuoctinh']);
 
       const shipDateCandidateKeys = [
-        findKeyExactOrIncludes(['Thời gian gửi', 'Shipped Time'], ['thoigiangui', 'shippedtime']),
+        shippedTimeKey,
+        rtsTimeKey,
         timeRequestedKey,
-        findKeyExactOrIncludes(['Thời gian đóng', 'RTS Time'], ['thoigiandong']),
         findKeyExactOrIncludes(['Thời gian xử lý'], ['thoigianxuly']),
         findKeyExactOrIncludes(['Ngày tạo đơn', 'Created Time'], ['ngaytaodon', 'createdtime'])
       ].filter(Boolean);
 
       const returnDateCandidateKeys = [
         timeRequestedKey,
-        findKeyExactOrIncludes(['Thời gian khiếu nại', 'Cancelled Time'], ['thoigiankhieunai', 'ngayhuy', 'ngayhoan']),
+        cancelledTimeKey,
         refundTimeKey,
         findKeyExactOrIncludes(['Thời gian đóng'], ['thoigiandong']),
         findKeyExactOrIncludes(['Ngày tạo đơn'], ['ngaytaodon'])
@@ -4076,22 +4103,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['returnstatus', 'trangthaidonhang', 'orderstatus', 'trangthai']
       );
       const noteKey = returnReasonKey || findKeyExactOrIncludes(
-        ['Return Reason', 'Lý do hủy', 'Cancel Reason', 'Lý do'],
-        ['returnreason', 'lydohuy', 'cancelreason', 'lydo']
-      );
-      const buyerNoteKey = findKeyExactOrIncludes(
-        ['Buyer Note', 'Ghi chú của khách', 'Buyer Message', 'Ghi chú', 'Customer Note'],
-        ['buyernote', 'ghichucuakhach', 'buyermessage', 'ghichukhach', 'ghichu']
+        ['Return Reason', 'Cancel Reason', 'Lý do hủy', 'Lý do'],
+        ['returnreason', 'cancelreason', 'lydohuy', 'lydo']
       );
       const preOrderKey = findKeyExactOrIncludes(
-        ['Hàng đặt trước', 'Pre-order', 'Preorder', 'Loại đơn hàng'],
-        ['hangdattruoc', 'dattruoc', 'preorder', 'loaidonhang']
+        ['Hàng đặt trước', 'Pre-order', 'Preorder', 'Normal or Pre-order', 'Loại đơn hàng'],
+        ['hangdattruoc', 'dattruoc', 'preorder', 'normalorpreorder', 'loaidonhang']
       );
 
-      // Nhận diện xem file này là File Báo Cáo Trả Hàng / Hoàn Tiền TikTok Seller Center hay File đơn thông thường
-      const isTikTokReturnRefundFile = Boolean(returnOrderIdKey || returnReasonKey || returnSubStatusKey || returnLogisticsTrackKey);
+      // Nhận diện cấu trúc file xuất
+      const isTikTokReturnRefundFile = Boolean(returnOrderIdKey || returnLogisticsTrackKey);
+      const isTikTokOrderListFile = Boolean(cancelledTimeKey || skuQuantityOfReturnKey || (keys.includes('Order Status') && keys.includes('Cancel Reason')));
 
-      function translateTikTokReturnReason(en) {
+      function translateTikTokReason(en) {
         if (!en) return '';
         const map = {
           'change of mind': 'Đổi ý / Không còn nhu cầu',
@@ -4150,10 +4174,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let addedCount = 0;
       let withTrackCount = 0;
       let emptyTrackCancelCount = 0;
-      let skippedUnshippedCancelCount = 0;
+      let skippedCount = 0;
       let multiItemAppendedCount = 0;
-      let skippedSuccessCount = 0;
       let premiumItemCount = 0;
+      let failedDeliveryCount = 0;
       let lastGroupKey = '';
       let lastSkippedRow = false;
 
@@ -4192,23 +4216,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const rawStatusText = statusKey ? String(row[statusKey] || '').trim() : '';
-        const rawSubStatusText = returnSubStatusKey ? String(row[returnSubStatusKey] || '').trim() : '';
-        const rawOrderStNorm = removeVietnameseTones(rawStatusText).toLowerCase();
+        const rawSubStatusText = (returnSubStatusKey && row[returnSubStatusKey]) ? String(row[returnSubStatusKey]).trim() : (orderSubstatusKey && row[orderSubstatusKey] ? String(row[orderSubstatusKey]).trim() : '');
+        const rawCancelReason = noteKey ? String(row[noteKey] || '').trim() : '';
+        const rawCancelType = returnTypeKey ? String(row[returnTypeKey] || '').trim() : '';
+        const rawRetQty = skuQuantityOfReturnKey ? parseInt(String(row[skuQuantityOfReturnKey] || '0').replace(/[^\d]/g, ''), 10) : 0;
 
-        // NẾU LÀ FILE BÁO CÁO TRẢ HÀNG / HOÀN TIỀN TIKTOK: 100% dòng đều là đơn hoàn -> TUYỆT ĐỐI KHÔNG BỎ QUA!
+        const rawOrderStNorm = removeVietnameseTones(rawStatusText).toLowerCase();
+        const rawSubStNorm = removeVietnameseTones(rawSubStatusText).toLowerCase();
+        const rawCancelReasonNorm = removeVietnameseTones(rawCancelReason).toLowerCase();
+        const rawCancelTypeNorm = removeVietnameseTones(rawCancelType).toLowerCase();
+
+        // Kiểm tra hủy bằng word boundary để tránh nhầm chữ "chuyen" (vận chuyển/trung chuyển) với "huy"
+        const isCancelledWord = /\bhuy\b/i.test(rawOrderStNorm) || /\bcancel\b/i.test(rawOrderStNorm) || /\bhuy\b/i.test(rawSubStNorm) || rawCancelTypeNorm.includes('cancel');
+        const isFailedDelivery = rawCancelReasonNorm.includes('giao goi hang that bai') || rawCancelReasonNorm.includes('that bai') || rawCancelReasonNorm.includes('fail');
+        const isReturnOrRefund = rawOrderStNorm.includes('hoan') || rawOrderStNorm.includes('tra') || rawOrderStNorm.includes('return') || rawRetQty > 0 || isTikTokReturnRefundFile;
+
+        const isReturnOrCancel = isFailedDelivery || isCancelledWord || isReturnOrRefund || rawOrderStNorm.includes('that thu');
+
         if (!isTikTokReturnRefundFile) {
           if (!isContinuationRow) {
-            if (onlyReturns && rawOrderStNorm) {
-              const isDelivered = rawOrderStNorm.includes('thanh cong') || rawOrderStNorm.includes('da giao') || rawOrderStNorm.includes('hoan thanh') || rawOrderStNorm.includes('delivered') || rawOrderStNorm.includes('completed');
-              const isReturnOrCancel = rawOrderStNorm.includes('that thu') || rawOrderStNorm.includes('hoan') || rawOrderStNorm.includes('huy') || rawOrderStNorm.includes('tra') || rawOrderStNorm.includes('that bai') || rawOrderStNorm.includes('cancel') || rawOrderStNorm.includes('return');
-              if (isDelivered && !isReturnOrCancel) {
-                skippedSuccessCount++;
+            if (onlyReturns) {
+              if (!isReturnOrCancel) {
+                skippedCount++;
                 lastSkippedRow = true;
                 return;
               }
             }
-            if (skipUnshippedCancel && !rawTrack && (rawOrderStNorm.includes('huy') || rawOrderStNorm.includes('cancel'))) {
-              skippedUnshippedCancelCount++;
+            if (skipUnshippedCancel && !rawTrack && isCancelledWord) {
+              skippedCount++;
               lastSkippedRow = true;
               return;
             }
@@ -4240,8 +4275,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Trích xuất các mức giá tiền
         const valUnitPrice = returnUnitPriceKey ? parseMoneyCellValue(row[returnUnitPriceKey]) : 0;
         const valZ = priceTongGiaTriKey ? parseMoneyCellValue(row[priceTongGiaTriKey]) : 0;
-        const valK = priceGiaSanTmdtKey ? parseMoneyCellValue(row[priceGiaSanTmdtKey]) : 0;
         const valAM = priceSauChietKhauKey ? parseMoneyCellValue(row[priceSauChietKhauKey]) : 0;
+        const valK = priceGiaSanTmdtKey ? parseMoneyCellValue(row[priceGiaSanTmdtKey]) : 0;
         const valAO = priceTongTienHangKey ? parseMoneyCellValue(row[priceTongTienHangKey]) : 0;
         const valG = priceGiaSaleworkKey ? parseMoneyCellValue(row[priceGiaSaleworkKey]) : 0;
         const valL = priceDoanhThuKey ? parseMoneyCellValue(row[priceDoanhThuKey]) : 0;
@@ -4266,40 +4301,44 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Trích xuất Lý do hoàn / hủy
         let rawNote = '';
-        if (returnReasonKey && row[returnReasonKey]) {
-          rawNote = translateTikTokReturnReason(row[returnReasonKey]);
-        } else if (noteKey && row[noteKey]) {
-          rawNote = String(row[noteKey]).trim();
+        if (rawCancelReason) {
+          rawNote = translateTikTokReason(rawCancelReason);
+        } else if (rawCancelType) {
+          rawNote = rawCancelType;
         }
 
-        // Trích xuất Ghi chú của khách (Buyer Note)
-        let buyerComment = buyerNoteKey && row[buyerNoteKey] ? String(row[buyerNoteKey]).trim() : extractBuyerNote(row);
+        // Trích xuất Ghi chú của khách (Buyer Note / Buyer Message)
+        let buyerComment = buyerMessageKey && row[buyerMessageKey] ? String(row[buyerMessageKey]).trim() : extractBuyerNote(row);
         if (/^(không|khong|none|\-)$/i.test(removeVietnameseTones(buyerComment))) buyerComment = '';
 
         // Trạng thái sàn (Platform Status)
         let rawPlatStatus = '';
         if (isTikTokReturnRefundFile) {
           rawPlatStatus = translateTikTokReturnStatus(rawStatusText, rawSubStatusText);
+        } else if (rawCancelReason) {
+          rawPlatStatus = rawCancelReason;
         } else {
-          rawPlatStatus = rawStatusText || 'Chờ sàn cập nhật';
+          rawPlatStatus = rawStatusText + (rawSubStatusText ? ' - ' + rawSubStatusText : '');
         }
 
         // Nhận diện Loại Đơn / Sàn
         let detectedOrderType = 'Trả hàng/Hoàn tiền';
-        if (returnTypeKey && row[returnTypeKey]) {
-          const rtNorm = removeVietnameseTones(String(row[returnTypeKey])).toLowerCase();
-          if (rtNorm.includes('refund only') || rtNorm.includes('chi hoan')) {
+        if (isFailedDelivery) {
+          detectedOrderType = 'Giao không thành công';
+          failedDeliveryCount++;
+        } else if (isReturnOrRefund) {
+          if (rawCancelTypeNorm.includes('refund only') || rawCancelTypeNorm.includes('chi hoan')) {
             detectedOrderType = 'Chỉ hoàn tiền';
           } else {
             detectedOrderType = 'Trả hàng/Hoàn tiền';
           }
-        } else if (rawOrderStNorm === 'that thu' || rawOrderStNorm.includes('that thu')) {
+        } else if (isCancelledWord) {
+          detectedOrderType = 'Đơn hủy';
+        } else if (rawOrderStNorm.includes('that thu')) {
           detectedOrderType = 'THẤT THOÁT';
           rawNote = rawNote ? `THẤT THOÁT | ${rawNote}` : 'THẤT THOÁT (Trạng thái Salework)';
-        } else if (rawOrderStNorm.includes('giao') && (rawOrderStNorm.includes('that bai') || rawOrderStNorm.includes('khong thanh'))) {
-          detectedOrderType = 'Giao không thành công';
-        } else if (rawOrderStNorm === 'huy' || rawOrderStNorm.includes('da huy') || rawOrderStNorm.includes('cancel')) {
-          detectedOrderType = 'Đơn hủy';
+        } else {
+          detectedOrderType = 'Đang chuyển hoàn / Vận chuyển';
         }
 
         // Phân tích Tên sản phẩm, Màu sắc, Size
@@ -4307,15 +4346,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let color = '';
         let size = '';
 
-        if (isTikTokReturnRefundFile && rawVarInput) {
-          // Xử lý SKU Name của TikTok Return: "Nâu, M - Premium Cao Cấp" hoặc "Xanh Than Kem, L"
-          if (rawVarInput.includes(',')) {
-            const vParts = rawVarInput.split(',').map(s => s.trim());
-            color = vParts[0] || '';
-            size = vParts.slice(1).join(', ') || '';
-          } else {
-            color = rawVarInput;
-          }
+        if (rawVarInput && rawVarInput.includes(',')) {
+          const vParts = rawVarInput.split(',').map(s => s.trim());
+          color = vParts[0] || '';
+          size = vParts.slice(1).join(', ') || '';
+        } else if (rawVarInput) {
+          color = rawVarInput;
         } else {
           const parsedItem = parseSaleworkProductAndVariation(rawProdInput, rawVarInput, rawSellerSku);
           cleanProd = parsedItem.product;
@@ -4336,7 +4372,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const existedBefore = tempMap.has(groupKey);
         if (!existedBefore) {
-          const priceVal = valUnitPrice || valZ || (valK * rawQty) || valAM || valAO || 0;
+          const priceVal = valUnitPrice || valAM || valZ || (valK * rawQty) || valAO || 0;
           const priceModesObj = {
             tong_gia_tri: priceVal,
             sau_chiet_khau: valAM || priceVal,
@@ -4492,22 +4528,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         saveOrders();
         
-        // TỰ ĐỘNG CHUYỂN NGAY SANG KHÔNG GIAN SÀN TIKTOK SHOP ĐỂ NGƯỜI DÙNG QUẢN LÝ RIÊNG!
+        // TỰ ĐỘNG CHUYỂN NGAY SANG KHÔNG GIAN SÀN TIKTOK SHOP ĐỂ QUẢN LÝ RIÊNG!
         setPlatformFilter('TikTok Shop');
         renderAll();
       } else {
         autoEnrichAllMissingOrdersFromDb(true);
       }
 
-      addAuditLog('📥 NẠP ĐƠN TIKTOK SHOP', `Đã nạp thành công ${addedCount} đơn TikTok (Có MVD trả: ${withTrackCount}, Chờ khách gửi: ${emptyTrackCancelCount}, SP Premium: ${premiumItemCount})`);
+      addAuditLog('📥 NẠP ĐƠN TIKTOK SHOP', `Đã nạp thành công ${addedCount} đơn TikTok (Có MVD: ${withTrackCount}, Bom/Giao thất bại: ${failedDeliveryCount}, SP Premium: ${premiumItemCount})`);
+      
+      let fileTypeLabel = 'File Báo Cáo Trả Hàng / Hoàn Tiền TikTok Shop Seller Center';
+      if (isTikTokOrderListFile) {
+        fileTypeLabel = 'File Danh Sách Đơn Hàng TikTok Shop Seller Center (Đơn hoàn / Giao thất bại)';
+      }
+
       alert(
         `🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SÀN TIKTOK SHOP!\n\n` +
-        (isTikTokReturnRefundFile ? '  Nhận diện chuẩn: File Báo Cáo Trả Hàng / Hoàn Tiền TikTok Shop Seller Center\n' : '  Nhận diện chuẩn: File Đơn Hàng TikTok Shop / Salework\n') +
-        `  Đơn đã có Mã Vận Đơn bưu tá hoàn: ${withTrackCount} đơn\n` +
-        (emptyTrackCancelCount > 0 ? `  Đơn khách mới bấm hoàn (Chờ khách gửi bưu cục): ${emptyTrackCancelCount} đơn\n` : '') +
+        `  Nhận diện chuẩn: ${fileTypeLabel}\n` +
+        `  Đơn có Mã Vận Đơn giao / hoàn: ${withTrackCount} đơn\n` +
+        (failedDeliveryCount > 0 ? `  Đơn bom / Giao hàng thất bại hoàn về: ${failedDeliveryCount} đơn\n` : '') +
+        (emptyTrackCancelCount > 0 ? `  Đơn khách mới bấm hoàn (Chờ gửi bưu cục): ${emptyTrackCancelCount} đơn\n` : '') +
         `  Giữ nguyên dòng sản phẩm "Premium Cao Cấp": ${premiumItemCount} SP\n` +
         (pushToMain ? `  Đã đẩy vào bảng: ${newTableCount} đơn mới | Cập nhật: ${enrichedTableCount} đơn\n` : '') +
-        (multiItemAppendedCount > 0 ? `  Đã tự động ghép ${multiItemAppendedCount} sản phẩm thứ 2, 3 vào đúng đơn nhiều SP!\n` : '') +
+        (skippedCount > 0 ? `  Đã tự động lọc bỏ ${skippedCount} đơn vận chuyển thông thường (không phải đơn hoàn)\n` : '') +
         '\n👉 Hệ thống đã tự động chuyển giao diện sang tab [⚫ SÀN TIKTOK SHOP] để bạn theo dõi riêng biệt!'
       );
     }

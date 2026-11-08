@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.6
+          name: QuanLyHangHoan-Windows-Installer-v1.6.7
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,13 +67,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.6
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.6 (Thêm Cột Ghi Chú Của Tôi & Ghi Chú Lý Do Theo Dõi Đơn)"
+          tag_name: v1.6.7
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.7 (Giữ Quét 0.5s Siêu Nhanh, Cột Ghi Chú Của Tôi & Ghi Chú Theo Dõi)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.6
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.7
 
             - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.6`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.6.exe`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.7.exe`)
             - **Các cải tiến mới nhất trong phiên bản v1.6.6**:
               1. 📝 **Bổ sung cột "Ghi Chú Của Tôi" trên Bảng Chính**:
                  - Cho phép người dùng ghi chú nội bộ riêng cho từng đơn hàng (bấm 1 lần xem nhanh/copy, nhấp đúp để gõ chỉnh sửa trực tiếp, Enter hoặc click ngoài tự động lưu).

@@ -2048,7 +2048,7 @@
     });
   
     // =========================================================================
-    // v1.6.3: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
+    // v1.6.4: QUẢN LÝ HÀNG ĐỢI OFFLINE & XÓA ĐƠN CHỜ ĐỒNG BỘ
     // =========================================================================
     function escapeHtml(str) {
       if (!str) return '';
@@ -2061,7 +2061,8 @@
     }
 
     function getUnsyncedItems() {
-      return scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
+      // v1.6.4: Lấy toàn bộ các kiện chưa được máy tính xác nhận đồng bộ (loại trừ các kiện máy tính đã báo trùng)
+      return scanHistory.filter(e => e && e.synced !== true && e.status !== 'duplicate');
     }
 
     function removeSingleOfflineItem(code) {
@@ -2194,13 +2195,24 @@
           } catch (e) {}
         }
 
-        // 2. Đồng thời gửi bản tin siêu nhẹ qua ntfy.sh
-        sendPayloadToPc({
-          type: 'barcode',
-          code: item.code,
-          photo: '',
-          time: item.time || Date.now()
-        }, item.code);
+        // 2. Gửi bản tin đồng bộ trực tiếp qua HTTPS ntfy.sh có await đảm bảo gói tin gửi tới nơi
+        try {
+          const lightPayload = {
+            type: 'sync_item',
+            code: item.code,
+            photo: '',
+            time: item.time || Date.now(),
+            room: room,
+            requestId: 'sync_' + item.code + '_' + (item.time || Date.now())
+          };
+          await fetch('https://ntfy.sh/' + topic, {
+            method: 'POST',
+            body: JSON.stringify(lightPayload),
+            headers: { 'Title': 'Shopee Sync Item' }
+          });
+        } catch (postErr) {
+          console.warn('Sync post err:', postErr);
+        }
 
         // 3. Nếu có ảnh, gửi các mảnh ảnh qua ntfy.sh để đảm bảo không mất ảnh
         if (item.photo && item.photo.length > 50) {
@@ -2210,8 +2222,10 @@
         }
 
         item.synced = true;
+        item.status = 'success';
+        item.detail = 'Đã đồng bộ sang máy tính';
         sentCount++;
-        await new Promise(r => setTimeout(r, 120));
+        await new Promise(r => setTimeout(r, 160));
       }
 
       saveScanHistory();

@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.3
+          name: QuanLyHangHoan-Windows-Installer-v1.7.4
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,14 +72,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.3
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.3 (Tự Động Điền Ngày Gửi Đi & Trạng Thái Sàn TikTok Shop)"
+          tag_name: v1.7.4
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.4 (Tự Động Điền Ngày Gửi Đi & Trạng Thái Sàn TikTok Shop)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.3
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.4
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.3`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.3.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.3**:
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.4`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.4.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.7.4**:
               1. 📅 **Tự động điền 100% Ngày Gửi Đi (Ship Date) cho đơn TikTok Shop**:
                  - Thuật toán phục hồi ngày gửi đi đa tầng: Nếu file báo cáo hoàn tiền không có cột `Shipped Time`, hệ thống tự động sử dụng mốc thời gian khách yêu cầu trả hàng (`Time Requested`) hoặc ngày tạo đơn, bảo đảm cột Ngày Gửi Đi không bao giờ bị để trống `DD/MM/YYYY HH:mm`.
                  - Khớp chéo tự động (`Cross-enrichment`): Khi nạp file Quản lý đơn hàng có cột `Shipped Time` chuẩn, hệ thống tự động cập nhật giờ gửi hàng chính xác từng giây vào đơn hoàn tương ứng.

@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.3</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.4</span>
               </div>
             </div>
           </div>
@@ -6170,7 +6170,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.9';
+    const APP_VERSION_NUMBER = '1.7.4';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -10020,12 +10020,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </div>
           `;
         } else {
+          const emptyTrackPlaceholder = (order.orderType === 'Đơn hủy' || order.status === 'Không cần nhận')
+            ? 'Chưa có MVĐ (Hủy trước gửi)...'
+            : (order.platform === 'TikTok Shop' && String(order.platformStatus || '').toLowerCase().includes('khách'))
+              ? 'Chờ khách gửi hàng...'
+              : (order.orderType === 'Chỉ hoàn tiền')
+                ? 'Chỉ hoàn tiền (Không gửi kiện)...'
+                : 'Chưa có mã vận đơn...';
           trackCellHtml = renderCellInput(
             `${orderIdx}:track`,
             `Mã vận đơn #${orderIdx+1}`,
             order.track,
             'text-center font-mono text-slate-400 text-[10.5px]',
-            'Chưa có MVĐ (Hủy trước gửi)...',
+            emptyTrackPlaceholder,
             `handleTrackingChange(${orderIdx},this.value,false)`,
             'text',
             '',
@@ -10101,7 +10108,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="text-center min-w-[110px] px-1">${preOrderCellHtml}</td>
             <td>${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
             <td>${trackCellHtml}</td>
-            <td>${carrierCellHtml}</td>
+            <td class="text-center min-w-[125px] px-1">${carrierCellHtml}</td>
             <td class="px-2">
               <div class="flex items-center justify-between gap-1.5">
                 <div class="truncate text-[11px] font-medium text-slate-800 max-w-[200px]" title="${escapeAttr(itemSummarySnippet.replace(/<[^>]+>/g, ''))}">

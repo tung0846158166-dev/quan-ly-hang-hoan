@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.5</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.6</span>
               </div>
             </div>
           </div>
@@ -4518,6 +4518,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
         if (rawTrack && !entry.track) {
           entry.track = rawTrack;
@@ -5081,6 +5082,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           detectedOrderType = 'Đơn hủy';
         }
 
+        // Trích xuất chuẩn xác Trạng thái sàn (Platform Status) từ file Shopee
+        let extractedPlatformStatus = '';
+        if (returnStatusKey && row[returnStatusKey]) {
+          const rsVal = String(row[returnStatusKey]).trim();
+          if (rsVal && !/^(không|khong|none|\-)$/i.test(removeVietnameseTones(rsVal))) {
+            extractedPlatformStatus = rsVal;
+          }
+        }
+        if (!extractedPlatformStatus && returnShipmentStatusKey && row[returnShipmentStatusKey]) {
+          const rssVal = String(row[returnShipmentStatusKey]).trim();
+          if (rssVal && !/^(không|khong|none|\-)$/i.test(removeVietnameseTones(rssVal))) {
+            extractedPlatformStatus = rssVal;
+          }
+        }
+        if (!extractedPlatformStatus && statusKey && row[statusKey]) {
+          const stVal = String(row[statusKey]).trim();
+          if (stVal && !/^(không|khong|none|\-)$/i.test(removeVietnameseTones(stVal))) {
+            extractedPlatformStatus = stVal;
+          }
+        }
+        if (!extractedPlatformStatus) {
+          if (detectedOrderType === 'Trả hàng/Hoàn tiền') {
+            extractedPlatformStatus = 'Chờ bạn xác nhận hàng trả về';
+          } else if (detectedOrderType === 'Đơn hủy') {
+            extractedPlatformStatus = 'Đã hủy';
+          } else if (detectedOrderType === 'Giao không thành công') {
+            extractedPlatformStatus = 'Giao hàng thất bại';
+          } else {
+            extractedPlatformStatus = 'Chờ xử lý';
+          }
+        }
+
         const existedBefore = tempMap.has(groupKey);
         if (!existedBefore) {
           const rawDetailsObj = {
@@ -5118,6 +5151,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
           tempMap.set(groupKey, {
             platform: detectedPlatform,
+            platformStatus: extractedPlatformStatus,
             orderType: detectedOrderType,
             preOrder: rawPreOrder,
             deadline: (sellerResponseDueKey && String(row[sellerResponseDueKey] || '').trim()) || '',
@@ -5146,6 +5180,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
         if (rawForwardTrack && !entry.forwardTrack) entry.forwardTrack = rawForwardTrack;
         if (rawReturnTrack && !entry.returnTrack) entry.returnTrack = rawReturnTrack;
@@ -5278,6 +5313,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               returnDate: orderData.returnDate || orderData.shipDate || today,
               recvDate: '',
               platform: orderData.platform || 'Shopee',
+              platformStatus: orderData.platformStatus || (orderData.rawDetails?.returnStatus) || (orderData.orderType === 'Đơn hủy' ? 'Đã hủy' : (orderData.orderType === 'Giao không thành công' ? 'Giao hàng thất bại' : 'Chờ bạn xác nhận hàng trả về')),
               orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
               preOrder: orderData.preOrder || 'Đơn thường',
               deadline: orderData.deadline || '',
@@ -6271,7 +6307,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.7.5';
+    const APP_VERSION_NUMBER = '1.7.6';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);

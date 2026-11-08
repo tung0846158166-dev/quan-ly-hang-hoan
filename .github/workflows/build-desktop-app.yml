@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.5
+          name: QuanLyHangHoan-Windows-Installer-v1.7.6
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,27 +72,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.5
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.5 (Tạo Đơn Mới Trên Điện Thoại & Hộp Đơn Mới Chọn Lọc)"
+          tag_name: v1.7.6
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.6 (Hoàn Hảo 100% Nạp File Shopee & TikTok)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.5
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.6
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.5`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.5.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.5**:
-              1. 📱 **Mục [Tạo Đơn Mới] trên điện thoại (`mobile_scanner.html`)**:
-                 - Nút chuyển đổi chế độ siêu nhanh ngay trên đầu màn hình điện thoại: `[🔍 Hàng hoàn]` và `[✨ Tạo đơn mới]`.
-                 - Cho phép chọn sàn tương ứng (`Shopee` hoặc `TikTok Shop`) và nhập ghi chú nhanh (tên sản phẩm, size, màu).
-                 - Khi quét mã vạch hoặc mã QR bất kỳ trên điện thoại, hệ thống tự động nhận diện đơn vị vận chuyển (`SPX Express`, `J&T Express`, `GHN`, `Viettel Post`...) và phát gói tin tạo đơn mới lên máy tính.
-              2. 💻 **Hộp [BẢNG ĐƠN MỚI] chuyên dụng trên máy tính**:
-                 - Nút `BẢNG ĐƠN MỚI` có huy hiệu đếm số lượng đơn chờ và hiệu ứng đèn sáng nhấp nháy trên thanh tiêu đề khi có đơn mới gửi từ điện thoại.
-                 - Bảng quản lý đơn mới đầy đủ: Thời gian nhận, Sàn, Mã vận đơn, Đơn vị vận chuyển, Ghi chú, Ảnh chụp.
-                 - **Tính năng chọn lọc linh hoạt theo yêu cầu**: Có ô checkbox từng dòng và nút `[Chọn tất cả]`.
-                 - Nút `[📥 Nhập đơn đã chọn ra ngoài]` / `[📥 Nhập tất cả ra ngoài]`: Chuyển đơn vào bảng chính và xóa khỏi hộp chờ.
-                 - Nút `[🗑️ Xóa đơn đã chọn]` / `[🗑️ Xóa tất cả]` / Nút `[✕]` từng dòng: Loại bỏ đơn khỏi hộp chờ mà không ảnh hưởng bảng chính.
-              3. 📅 **Tự động điền 100% Ngày Gửi Đi (Ship Date) cho đơn TikTok Shop**:
-                 - Thuật toán phục hồi ngày gửi đi đa tầng: Sử dụng mốc thời gian khách yêu cầu hoàn tiền (`Time Requested`) hoặc ngày tạo đơn, bảo đảm cột Ngày Gửi Đi không bao giờ bị để trống `DD/MM/YYYY HH:mm`.
-                 - Khớp chéo tự động (`Cross-enrichment`): Tự động khớp chính xác với file đơn hàng xuất ra từ TikTok Shop Seller Center.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.6`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.6.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.7.6**:
+              1. 🎯 **Chuẩn hóa 100% Trạng thái sàn & Loại đơn cho Sàn Shopee & TikTok**:
+                 - Sửa triệt để tình trạng hiển thị `Chờ sàn cập nhật` trên các đơn Shopee. Tự động trích xuất chính xác trạng thái từ cột `Trạng thái Trả hàng/Hoàn tiền` ("Chờ bạn xác nhận hàng trả về", "Đã hoàn tiền cho Người mua"...) và `Trạng thái đơn hàng` ("Đã hủy").
+                 - Đảm bảo 100% đơn Shopee và TikTok không còn bị gán nhầm thành `THẤT THU` hay `Chờ sàn cập nhật`.
+              2. 📅 **Tự động điền 100% Ngày Gửi Đi (Ship Date) cho cả Shopee & TikTok Shop**:
+                 - Thuật toán phục hồi ngày gửi đi đa tầng: Tuyệt đối không còn hiển thị placeholder `DD/MM/YYYY HH:mm`.
+              3. 📱 **Mục [Tạo Đơn Mới] trên điện thoại (`mobile_scanner.html`)**:
+                 - Nút chuyển chế độ `[🔍 Hàng hoàn]` và `[✨ Tạo đơn mới]`, chọn sàn Shopee/TikTok và ghi chú.
+              4. 💻 **Hộp [BẢNG ĐƠN MỚI] chuyên dụng trên máy tính**:
+                 - Checkbox chọn từng đơn hoặc chọn tất cả.
+                 - Các nút `[📥 Nhập ra ngoài]` và `[🗑️ Xóa]` linh hoạt theo đúng yêu cầu.
               4. 🏷️ **Sửa lỗi hiển thị Loại đơn & Trạng thái sàn TikTok Shop**:
                  - Hiển thị chuẩn xác `Trả hàng/Hoàn tiền` hoặc `Giao không thành công` (đơn bom), không còn bị nhầm lẫn thành `THẤT THU` hoặc `Chờ sàn cập nhật`.
           files: |

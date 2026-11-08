@@ -510,7 +510,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Tự Động Báo Xanh (Đúng) & Đỏ (Trùng) + Lịch Sử</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.7.0</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -1550,13 +1550,14 @@
     let html5QrCode = null;
 
     // =========================================================================
-    // v1.6.5: CƠ CHẾ GIỮ 2 GIÂY MỚI QUÉT (HOLD 2 SECONDS TO SCAN)
+    // v1.7.0: CƠ CHẾ GIỮ YÊN 0.5S (TỐI ƯU CẢ MÃ VẠCH 1D VÀ QR CODE)
     // =========================================================================
     let currentHoldingCode = null;
     let holdStartTime = 0;
     let lastDetectedTime = 0;
     let holdWatchdogTimer = null;
-    const HOLD_DURATION_MS = 500; // Phải giữ yên mã trong camera đủ 0.5 giây (nhanh & mượt)!
+    let holdHitCount = 0;
+    const HOLD_DURATION_MS = 500; // Giữ yên 0.5 giây chuẩn xác
 
     function updateHoldIndicatorUI(code, progressRatio, remainingSec) {
       const overlay = document.getElementById('holdScanOverlay');
@@ -1571,8 +1572,8 @@
       }
       overlay.style.display = 'flex';
       if (codeEl) codeEl.textContent = code;
-      if (countEl) countEl.textContent = remainingSec.toFixed(1) + 's';
-      if (barEl) barEl.style.width = Math.round(progressRatio * 100) + '%';
+      if (countEl) countEl.textContent = Math.max(0, remainingSec).toFixed(1) + 's';
+      if (barEl) barEl.style.width = Math.min(100, Math.round(progressRatio * 100)) + '%';
     }
 
     function handleCameraFrameDecoded(decodedText) {
@@ -1582,36 +1583,41 @@
       const now = Date.now();
       lastDetectedTime = now;
 
-      // Nếu phát hiện mã mới khác mã đang giữ -> Bắt đầu đếm 2 giây cho mã mới
+      // Nếu phát hiện mã mới khác mã đang giữ -> Bắt đầu đếm cho mã mới
       if (currentHoldingCode !== clean) {
         currentHoldingCode = clean;
         holdStartTime = now;
-        updateHoldIndicatorUI(clean, 0.1, 0.5);
+        holdHitCount = 1;
+        updateHoldIndicatorUI(clean, 0.2, 0.5);
       } else {
-        // Vẫn đang giữ đúng mã đó trước camera
+        // Vẫn đang hướng camera vào đúng mã đó
+        holdHitCount++;
         const elapsed = now - holdStartTime;
         const remaining = Math.max(0, (HOLD_DURATION_MS - elapsed) / 1000);
         const progress = Math.min(1, elapsed / HOLD_DURATION_MS);
         updateHoldIndicatorUI(clean, progress, remaining);
 
-        // ĐÃ GIỮ ĐỦ 2 GIÂY TRỌN VẸN -> KÍCH HOẠT QUÉT THÀNH CÔNG!
-        if (elapsed >= HOLD_DURATION_MS) {
+        // ĐÃ GIỮ ĐỦ 0.5S (hoặc nhận diện liên tục >= 4 khung hình trong >= 350ms) -> KÍCH HOẠT QUÉT THÀNH CÔNG!
+        if (elapsed >= HOLD_DURATION_MS || (holdHitCount >= 4 && elapsed >= 350)) {
           currentHoldingCode = null;
           holdStartTime = 0;
+          holdHitCount = 0;
           updateHoldIndicatorUI(clean, 0, 0);
           sendCodeToPc(clean);
         }
       }
 
-      // Bộ giám sát: Nếu camera mất dấu mã quá 450ms (người dùng rút gói hàng ra) -> Hủy đếm
+      // Bộ giám sát thông minh: Cho phép độ trễ an toàn 1.2s trước khi reset.
+      // Tránh việc khung hình quét mã vạch bị rớt 1 frame (300ms) làm reset về 0 liên tục!
       if (holdWatchdogTimer) clearTimeout(holdWatchdogTimer);
       holdWatchdogTimer = setTimeout(() => {
-        if (Date.now() - lastDetectedTime > 400) {
+        if (Date.now() - lastDetectedTime >= 1100) {
           currentHoldingCode = null;
           holdStartTime = 0;
+          holdHitCount = 0;
           updateHoldIndicatorUI('', 0, 0);
         }
-      }, 450);
+      }, 1200);
     }
 
     // =========================================================================
@@ -1686,7 +1692,81 @@
       }
     }
 
+    // =========================================================================
+    // v1.7.0: DUAL SCAN ENGINE - NATIVE BARCODE DETECTOR & HTML5-QRCODE TỐI ƯU
+    // =========================================================================
+    let nativeBarcodeScannerActive = false;
+    let nativeBarcodeTimer = null;
+
+    async function startNativeBarcodeDetectorLoop() {
+      if (!('BarcodeDetector' in window)) {
+        console.log('ℹ️ Trình duyệt không hỗ trợ BarcodeDetector Native, sử dụng bộ quét Html5Qrcode đa định dạng.');
+        return;
+      }
+
+      let detector = null;
+      try {
+        let formatsToUse = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code'];
+        if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+          const supported = await BarcodeDetector.getSupportedFormats();
+          if (Array.isArray(supported) && supported.length > 0) {
+            formatsToUse = formatsToUse.filter(f => supported.includes(f));
+          }
+        }
+        detector = new BarcodeDetector({ formats: formatsToUse });
+        console.log('🚀 Đã khởi tạo Native BarcodeDetector với các định dạng:', formatsToUse);
+      } catch (err) {
+        try {
+          detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] });
+        } catch (e2) {}
+      }
+
+      if (!detector) return;
+
+      nativeBarcodeScannerActive = true;
+      let isDetecting = false;
+
+      const detectFrame = async () => {
+        if (!nativeBarcodeScannerActive || !wasCameraActive) return;
+        const videoEl = document.querySelector('#reader video');
+        if (videoEl && !videoEl.paused && videoEl.readyState >= 2 && !isDetecting) {
+          isDetecting = true;
+          try {
+            // Quét toàn bộ khung hình camera gốc ở độ phân giải cao nhất, không bị giới hạn bởi hộp cắt
+            const barcodes = await detector.detect(videoEl);
+            if (barcodes && barcodes.length > 0) {
+              for (const b of barcodes) {
+                if (b.rawValue && String(b.rawValue).trim()) {
+                  handleCameraFrameDecoded(b.rawValue);
+                  break;
+                }
+              }
+            }
+          } catch (err) {
+            // Bỏ qua lỗi từng khung hình
+          } finally {
+            isDetecting = false;
+          }
+        }
+
+        if (nativeBarcodeScannerActive) {
+          nativeBarcodeTimer = setTimeout(detectFrame, 65); // ~15 khung hình/giây
+        }
+      };
+
+      detectFrame();
+    }
+
+    function stopNativeBarcodeDetectorLoop() {
+      nativeBarcodeScannerActive = false;
+      if (nativeBarcodeTimer) {
+        clearTimeout(nativeBarcodeTimer);
+        nativeBarcodeTimer = null;
+      }
+    }
+
     async function safelyStopAndClearScanner() {
+      stopNativeBarcodeDetectorLoop();
       if (!html5QrCode) return;
       try {
         // Ngắt toàn bộ MediaStream track đang bị hệ điều hành khóa
@@ -1719,10 +1799,39 @@
         document.getElementById('cameraStartOverlay').classList.add('hidden');
         await safelyStopAndClearScanner();
 
-        html5QrCode = new Html5Qrcode('reader');
+        // Cấu hình đầy đủ mọi định dạng mã vạch 1D & QR Code cho Html5Qrcode
+        const formatsToSupport = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF
+        ] : undefined;
+
+        html5QrCode = new Html5Qrcode('reader', {
+          formatsToSupport: formatsToSupport,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+          },
+          verbose: false
+        });
+
+        // Băng quét rộng tối đa 94% chiều ngang để ôm trọn cả thanh mã vạch 1D dài
         await html5QrCode.start(
           { facingMode: 'environment' },
-          { fps: 14, qrbox: { width: 260, height: 160 } },
+          {
+            fps: 15,
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+              const w = Math.min(viewfinderWidth, Math.max(300, Math.floor(viewfinderWidth * 0.94)));
+              const h = Math.min(viewfinderHeight, Math.max(180, Math.floor(viewfinderHeight * 0.70)));
+              return { width: w, height: h };
+            }
+          },
           (decodedText) => {
             handleCameraFrameDecoded(decodedText);
           },
@@ -1731,7 +1840,10 @@
         wasCameraActive = true;
         requestScreenWakeLock();
 
-        // Lắng nghe nếu hệ điều hành ngắt luồng camera (khi khóa màn hình hoặc chuyển app)
+        // Kích hoạt song song bộ quét Native BarcodeDetector (đọc mã vạch siêu nhạy)
+        startNativeBarcodeDetectorLoop();
+
+        // Lắng nghe và tự động bật chế độ lấy nét liên tục (continuous focus)
         setTimeout(() => {
           const videoEl = document.querySelector('#reader video');
           if (videoEl) {
@@ -1741,6 +1853,13 @@
             if (videoEl.srcObject) {
               const tracks = videoEl.srcObject.getVideoTracks();
               if (tracks && tracks[0]) {
+                try {
+                  const caps = tracks[0].getCapabilities ? tracks[0].getCapabilities() : {};
+                  if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                    tracks[0].applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+                  }
+                } catch (e) {}
+
                 tracks[0].onended = () => {
                   if (document.visibilityState === 'visible') {
                     setTimeout(() => checkAndRecoverCamera(), 300);
@@ -2024,7 +2143,7 @@
         let decodedCode = '';
         if ('BarcodeDetector' in window) {
           try {
-            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
+            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'] });
             const barcodes = await detector.detect(img);
             if (barcodes && barcodes.length > 0) {
               const spx = barcodes.find(b => /SPX|GHN|GHTK|VTP/i.test(b.rawValue));

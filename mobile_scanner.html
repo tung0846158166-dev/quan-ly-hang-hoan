@@ -1669,25 +1669,7 @@
       saveOfflineQueue();
     }
 
-    function removeSingleOfflineItem(code) {
-      const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
-      offlineQueue = offlineQueue.filter(item => extractCleanTrackingCode(item.code) !== clean);
-      saveOfflineQueue();
-      if (typeof showToast === 'function') {
-        showToast('Đã xóa đơn ' + clean + ' khỏi hàng đợi đồng bộ!');
-      }
-    }
 
-    function clearAllOfflineQueue() {
-      if (!offlineQueue.length) return;
-      if (confirm('Bạn có chắc chắn muốn xóa tất cả các đơn trong danh sách chờ đồng bộ không?')) {
-        offlineQueue = [];
-        saveOfflineQueue();
-        if (typeof showToast === 'function') {
-          showToast('Đã xóa sạch hàng đợi đồng bộ!');
-        }
-      }
-    }
     let isCameraStarting = false;
     let wasCameraActive = false;
     let wakeLockSentinel = null;
@@ -2219,51 +2201,90 @@
     }
 
     function getUnsyncedItems() {
-      return scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
+      return (scanHistory || []).filter(e => e && e.status === 'success' && e.synced !== true);
     }
 
     function removeSingleOfflineItem(code) {
       const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
-      const idx = scanHistory.findIndex(e => (extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase()) === clean && e.synced !== true && e.status === 'success');
-      if (idx !== -1) {
-        scanHistory.splice(idx, 1);
-        saveScanHistory();
-        updateOfflineQueueUI();
-        renderScanHistory();
-        if (typeof showToast === 'function') {
-          showToast('Đã xóa đơn ' + clean + ' khỏi hàng đợi đồng bộ!');
-        }
+      if (!clean) return;
+
+      // 1. Xóa sạch khỏi hàng đợi offlineQueue và lưu localStorage
+      offlineQueue = (offlineQueue || []).filter(item => {
+        const itClean = extractCleanTrackingCode(item.code) || String(item.code || '').trim().toUpperCase();
+        return itClean !== clean;
+      });
+      saveOfflineQueue();
+
+      // 2. Xóa sạch khỏi lịch sử quét scanHistory nếu là đơn chờ
+      scanHistory = (scanHistory || []).filter(e => {
+        const eClean = extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase();
+        return eClean !== clean || e.synced === true;
+      });
+      saveScanHistory();
+
+      // 3. Cập nhật tức thì cả 2 phần giao diện trên màn hình
+      updateOfflineQueueUI();
+      renderScanHistory();
+
+      if (typeof showToast === 'function') {
+        showToast('Đã xóa đơn ' + clean + ' khỏi danh sách chờ đồng bộ!');
       }
     }
 
     function clearAllOfflineQueue() {
-      const unsynced = getUnsyncedItems();
-      if (!unsynced.length) {
-        alert('Hàng đợi hiện không có đơn nào đang chờ đồng bộ!');
+      const queueCount = (offlineQueue || []).length;
+      const unsyncedCount = getUnsyncedItems().length;
+      const totalCount = queueCount || unsyncedCount;
+      if (totalCount === 0) {
+        if (typeof showToast === 'function') {
+          showToast('Hàng đợi hiện không có đơn nào đang chờ đồng bộ!');
+        } else {
+          alert('Hàng đợi hiện không có đơn nào đang chờ đồng bộ!');
+        }
         return;
       }
-      if (confirm(`Bạn có chắc muốn xóa TẤT CẢ ${unsynced.length} đơn đang chờ đồng bộ không?\n(Các đơn này sẽ không được gửi sang máy tính nữa)`)) {
-        scanHistory = scanHistory.filter(e => e.synced === true || e.status !== 'success');
+      if (confirm(`Bạn có chắc muốn xóa TẤT CẢ ${totalCount} đơn đang chờ đồng bộ không?\n(Các đơn này sẽ bị xóa khỏi hàng đợi và không gửi sang máy tính nữa)`)) {
+        // 1. Xóa sạch offlineQueue và lưu vào localStorage
+        offlineQueue = [];
+        saveOfflineQueue();
+
+        // 2. Xóa sạch toàn bộ đơn chờ trong scanHistory
+        scanHistory = (scanHistory || []).filter(e => e.synced === true);
         saveScanHistory();
+
+        // 3. Cập nhật tức thì cả 2 phần giao diện
         updateOfflineQueueUI();
         renderScanHistory();
+
         if (typeof showToast === 'function') {
-          showToast(`Đã xóa sạch ${unsynced.length} đơn chờ đồng bộ!`);
+          showToast(`Đã xóa sạch toàn bộ ${totalCount} đơn chờ đồng bộ!`);
         }
       }
     }
 
     function deleteSingleHistoryItem(code) {
       const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
-      const idx = scanHistory.findIndex(e => (extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase()) === clean);
-      if (idx !== -1) {
-        scanHistory.splice(idx, 1);
-        saveScanHistory();
-        updateOfflineQueueUI();
-        renderScanHistory();
-        if (typeof showToast === 'function') {
-          showToast('Đã xóa đơn ' + clean + ' khỏi lịch sử quét!');
-        }
+      if (!clean) return;
+
+      // Xóa khỏi scanHistory
+      scanHistory = (scanHistory || []).filter(e => {
+        const eClean = extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase();
+        return eClean !== clean;
+      });
+      saveScanHistory();
+
+      // Xóa luôn khỏi offlineQueue nếu có
+      offlineQueue = (offlineQueue || []).filter(item => {
+        const itClean = extractCleanTrackingCode(item.code) || String(item.code || '').trim().toUpperCase();
+        return itClean !== clean;
+      });
+      saveOfflineQueue();
+
+      updateOfflineQueueUI();
+      renderScanHistory();
+
+      if (typeof showToast === 'function') {
+        showToast('Đã xóa đơn ' + clean + ' khỏi lịch sử quét!');
       }
     }
 
@@ -2287,6 +2308,7 @@
             const timeStr = item.time ? new Date(item.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
             const hasPhoto = item.photo && item.photo.length > 50;
             const codeDisplay = escapeHtml(item.code || '');
+const safeCodeAttr = String(item.code || '').replace(/'/g, "\\'");
             return `
               <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; margin-bottom:5px; background:rgba(255,255,255,0.08); border-radius:8px; font-size:11.5px; border:1px solid rgba(245,158,11,0.25);">
                 <div style="display:flex; align-items:center; gap:7px; overflow:hidden; min-width:0;">
@@ -2295,7 +2317,7 @@
                   ${hasPhoto ? '<span style="font-size:10px; color:#38bdf8; background:rgba(56,189,248,0.25); padding:1px 6px; border-radius:4px; font-weight:bold; white-space:nowrap;">📸 Có ảnh</span>' : ''}
                   <span style="color:#94a3b8; font-size:10.5px; white-space:nowrap;">${timeStr}</span>
                 </div>
-                <button onclick="removeSingleOfflineItem('${codeDisplay}')" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:4px 9px; font-size:11px; font-weight:900; cursor:pointer; margin-left:8px; flex-shrink:0; display:flex; align-items:center; gap:2px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">
+                <button onclick="removeSingleOfflineItem('${safeCodeAttr}')" style="background:#ef4444; color:#fff; border:none; border-radius:6px; padding:4px 9px; font-size:11px; font-weight:900; cursor:pointer; margin-left:8px; flex-shrink:0; display:flex; align-items:center; gap:2px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">
                   <span>🗑️</span>
                   <span>Xóa</span>
                 </button>
@@ -2397,13 +2419,28 @@
         await new Promise(r => setTimeout(r, 120));
       }
 
-      // Xóa các kiện đã gửi khỏi offlineQueue
+      // 1. Xóa sạch hàng đợi offlineQueue và lưu vào localStorage
       offlineQueue = [];
       saveOfflineQueue();
 
+      // 2. Tự động xóa lịch sử các đơn chờ đã gửi sang máy tính khỏi scanHistory
+      const syncedCodeSet = new Set(itemsToSync.map(it => extractCleanTrackingCode(it.code) || String(it.code || '').trim().toUpperCase()));
+      scanHistory = (scanHistory || []).filter(e => {
+        const eClean = extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase();
+        return !syncedCodeSet.has(eClean) && e.synced === true;
+      });
+      saveScanHistory();
+
+      // 3. Cập nhật tức thì cả 2 phần giao diện
+      updateOfflineQueueUI();
+      renderScanHistory();
+
       if (progressEl) {
-        progressEl.textContent = '🎉 Đã gửi thành công ' + sentCount + ' kiện và ảnh sang máy tính!';
+        progressEl.textContent = '🎉 Đã gửi thành công ' + sentCount + ' kiện sang máy tính & tự động xóa sạch danh sách chờ!';
         setTimeout(() => { progressEl.style.display = 'none'; }, 3500);
+      }
+      if (typeof showToast === 'function') {
+        showToast('🎉 Đã đồng bộ ' + sentCount + ' đơn sang máy tính & xóa danh sách chờ!');
       }
       if (btn) btn.disabled = false;
       isSyncingOffline = false;

@@ -697,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.3</span>
               </div>
             </div>
           </div>
@@ -3549,6 +3549,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       }
 
+      // Tầng 5: Nếu vẫn chưa có Ngày gửi đi, dùng Ngày hoàn/hủy (order.returnDate) làm ngày mốc bảo đảm không bao giờ để trống
+      if (order.returnDate && String(order.returnDate).trim()) {
+        const norm = normalizeShortDate(String(order.returnDate).trim());
+        if (norm) return norm;
+      }
+
       return '';
     }
 
@@ -4647,12 +4653,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // Các cột ngày gửi / đóng / xử lý / tạo đơn theo thứ tự ưu tiên để luôn lấy được ngày kể cả khi cột Thời gian gửi bị trống (như trên Salework)
       const shipDateCandidateKeys = [
         findKey(['thoigiangui', 'ngaygui', 'shippedtime']),
-        findKey(['thoigiandong', 'ngaydong']),
+        findKey(['thoigiandong', 'ngaydong', 'rtstime']),
         findKey(['thoigianxuly', 'ngayxuly']),
-        findKey(['ngaytaodon', 'thoigiantao', 'ngaydat', 'orderdate', 'thoidiemtao', 'thoidiemdathang', 'createdtime', 'paidtime'])
+        findKey(['ngaytaodon', 'thoigiantao', 'ngaydat', 'orderdate', 'thoidiemtao', 'thoidiemdathang', 'createdtime', 'paidtime']),
+        findKey(['timerequested', 'thoigiankhieunai', 'thoigianyeucau', 'thoigianhoan', 'ngayyeucau'])
       ].filter(Boolean);
       const returnDateCandidateKeys = [
-        findKey(['thoigiankhieunai', 'ngayhuythanhcong', 'ngayhoan', 'thoigianhoan', 'ngaytrahang', 'ngayhuy', 'thoigianhoantien']),
+        findKey(['timerequested', 'thoigiankhieunai', 'ngayhuythanhcong', 'ngayhoan', 'thoigianhoan', 'ngaytrahang', 'ngayhuy', 'thoigianhoantien', 'refundtime', 'thoigianyeucau', 'ngayyeucau']),
         findKey(['ngaygiaohangthanhcong', 'thoigiangiao', 'deliverytime'])
       ].filter(Boolean);
       const statusKey = findKey(['trangthaidonhang', 'orderstatus', 'status', 'tinhtrang', 'trangthaigoihang'], ['trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaikhieunai']);
@@ -4779,6 +4786,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         if (!rawReturnDate && rawShipDate) {
           rawReturnDate = rawShipDate;
+        }
+        if (!rawShipDate && rawReturnDate) {
+          rawShipDate = rawReturnDate;
         }
 
         // Xây dựng Lý do hoàn & Ghi chú người mua chi tiết từ các cột Shopee / TikTok / Salework
@@ -5270,7 +5280,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             returnDate: orderData.returnDate || orderData.shipDate || today,
             recvDate: '',
             platform: orderData.platform || 'Shopee',
-            orderType: orderData.orderType || (orderData.platform === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền'),
+            orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
             preOrder: orderData.preOrder || 'Đơn thường',
             deadline: orderData.deadline || '',
             orderId: orderData.orderId || '',
@@ -5382,7 +5392,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const platBadge = plat === 'TikTok Shop'
           ? `<span class="px-1.5 py-0.5 rounded bg-slate-900 text-white font-bold text-[10px]">⚫ TikTok</span>`
           : `<span class="px-1.5 py-0.5 rounded bg-orange-100 text-[#ee4d2d] border border-orange-300 font-bold text-[10px]">🟠 Shopee</span>`;
-        const oType = it.orderType || (plat === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền');
+        const oType = it.orderType || 'Trả hàng/Hoàn tiền';
         const oTypeBadge = oType === 'Giao không thành công'
           ? `<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px]">🚚 Giao KTC</span>`
           : oType === 'Đơn hủy'
@@ -6403,9 +6413,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       if (noteNorm.includes('don huy') || noteNorm.includes('da huy') || noteNorm.startsWith('huy')) {
         return 'Đơn hủy';
-      }
-      if (plat === 'TikTok Shop') {
-        return 'THẤT THU';
       }
       return 'Trả hàng/Hoàn tiền';
     }
@@ -8692,7 +8699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const defaultPlat = currentPlatformFilter !== 'all' ? currentPlatformFilter : 'Shopee';
       const defaultOrderType = currentOrderTypeFilter !== 'all'
         ? currentOrderTypeFilter
-        : (defaultPlat === 'TikTok Shop' ? 'THẤT THU' : 'Trả hàng/Hoàn tiền');
+        : 'Trả hàng/Hoàn tiền';
       orders.push({
         shipDate: '',
         returnDate: today,

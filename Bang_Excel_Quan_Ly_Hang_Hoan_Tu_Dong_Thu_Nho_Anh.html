@@ -4479,6 +4479,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           carrier = rawTrack ? 'J&T Express' : 'Chờ bưu cục tiếp nhận';
         }
 
+        const isTikTokPartial = Boolean(
+          (valUnitPrice > 0 && valZ > 0 && valUnitPrice < (valZ * 0.95)) ||
+          (row['Return Quantity'] && row['Quantity'] && parseInt(row['Return Quantity'], 10) < parseInt(row['Quantity'], 10)) ||
+          rawCancelTypeNorm.includes('partial') ||
+          rawCancelReasonNorm.includes('mot phan')
+        );
+
         const existedBefore = tempMap.has(groupKey);
         if (!existedBefore) {
           const priceVal = valUnitPrice || valAM || valZ || (valK * rawQty) || valAO || 0;
@@ -4493,13 +4500,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             hasOrderLevelL: Boolean(valL)
           };
           const chosenPrice = priceModesObj[selectedPriceMode] || priceModesObj.tong_gia_tri || priceVal;
-
-          const isTikTokPartial = Boolean(
-            (valUnitPrice > 0 && valZ > 0 && valUnitPrice < (valZ * 0.95)) ||
-            (row['Return Quantity'] && row['Quantity'] && parseInt(row['Return Quantity'], 10) < parseInt(row['Quantity'], 10)) ||
-            rawCancelTypeNorm.includes('partial') ||
-            rawCancelReasonNorm.includes('mot phan')
-          );
 
           tempMap.set(groupKey, {
             platform: 'TikTok Shop',
@@ -4528,7 +4528,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
-        if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
+        if (isTikTokPartial) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
         if (rawTrack && !entry.track) {
@@ -5214,6 +5214,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
         if (rawForwardTrack && !entry.forwardTrack) entry.forwardTrack = rawForwardTrack;

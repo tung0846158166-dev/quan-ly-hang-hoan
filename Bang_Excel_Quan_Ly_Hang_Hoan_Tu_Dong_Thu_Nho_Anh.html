@@ -699,7 +699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.8</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.9</span>
               </div>
             </div>
           </div>
@@ -904,6 +904,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="all">📂 Loại đơn (Tất cả)</option>
           <option value="Giao không thành công">🚚 Giao không thành công</option>
           <option value="Trả hàng/Hoàn tiền">↩️ Trả hàng/Hoàn tiền</option>
+          <option value="partial_return">⚡ Hoàn 1 phần đơn hàng</option>
           <option value="Đơn hủy">🚫 Đơn hủy</option>
           <option value="THẤT THU">⚫ THẤT THU</option>
         </select>
@@ -4493,9 +4494,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           };
           const chosenPrice = priceModesObj[selectedPriceMode] || priceModesObj.tong_gia_tri || priceVal;
 
+          const isTikTokPartial = Boolean(
+            (valUnitPrice > 0 && valZ > 0 && valUnitPrice < (valZ * 0.95)) ||
+            (row['Return Quantity'] && row['Quantity'] && parseInt(row['Return Quantity'], 10) < parseInt(row['Quantity'], 10)) ||
+            rawCancelTypeNorm.includes('partial') ||
+            rawCancelReasonNorm.includes('mot phan')
+          );
+
           tempMap.set(groupKey, {
             platform: 'TikTok Shop',
             orderType: detectedOrderType,
+            isPartialReturn: isTikTokPartial,
             preOrder: rawPreOrder,
             orderId: rawOrderId,
             returnOrderId: rawReturnOrderId,
@@ -4519,6 +4528,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
         if (rawTrack && !entry.track) {
@@ -4608,6 +4618,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               recvDate: '',
               platform: 'TikTok Shop',
               orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
+              isPartialReturn: Boolean(orderData.isPartialReturn),
               platformStatus: orderData.platformStatus || 'Chờ xử lý',
               preOrder: orderData.preOrder || 'Đơn thường',
               orderId: orderData.orderId || orderData.returnOrderId || '',
@@ -4836,13 +4847,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         let rawQty = 1;
+        let hasExplicitReturnQty = false;
         if (returnQtyKey && row[returnQtyKey] !== undefined && row[returnQtyKey] !== '') {
           const rq = parseInt(String(row[returnQtyKey]).replace(/[^\d]/g, ''), 10);
-          if (rq > 0) rawQty = rq;
+          if (rq > 0) {
+            rawQty = rq;
+            hasExplicitReturnQty = true;
+          }
         }
-        if (rawQty === 1 && orderQtyKey && row[orderQtyKey] !== undefined && row[orderQtyKey] !== '') {
+        if (!hasExplicitReturnQty && orderQtyKey && row[orderQtyKey] !== undefined && row[orderQtyKey] !== '') {
           const oq = parseInt(String(row[orderQtyKey]).replace(/[^\d]/g, ''), 10);
           if (oq > 0) rawQty = oq;
+        }
+
+        // Nhận diện đơn hoàn 1 phần (khách mua 2 hoặc nhiều sản phẩm nhưng chỉ hoàn 1 sản phẩm)
+        const rawIsFullReturnStr = isFullReturnKey ? String(row[isFullReturnKey] || '').trim() : '';
+        const rawIsFullLower = rawIsFullReturnStr.toLowerCase();
+        let isShopeePartial = false;
+        if (rawIsFullLower.includes('một phần') || rawIsFullLower.includes('mot phan') || rawIsFullLower.includes('partial')) {
+          isShopeePartial = true;
+        } else if (rawIsFullLower.includes('toàn bộ') || rawIsFullLower.includes('toan bo')) {
+          isShopeePartial = false;
+        }
+        let isPartialQty = false;
+        if (hasExplicitReturnQty && orderQtyKey && row[orderQtyKey] !== undefined && row[orderQtyKey] !== '') {
+          const oq = parseInt(String(row[orderQtyKey]).replace(/[^\d]/g, ''), 10);
+          if (oq > rawQty) isPartialQty = true;
         }
 
         let rawPreOrder = 'Đơn thường';
@@ -5150,10 +5180,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             returnShippingFee: returnShippingFeeKey ? parseMoneyCellValue(row[returnShippingFeeKey]) : 0
           };
 
+          const isPartial = Boolean(isShopeePartial || isPartialQty);
+
           tempMap.set(groupKey, {
             platform: detectedPlatform,
             platformStatus: extractedPlatformStatus,
             orderType: detectedOrderType,
+            isPartialReturn: isPartial,
             preOrder: rawPreOrder,
             deadline: (sellerResponseDueKey && String(row[sellerResponseDueKey] || '').trim()) || '',
             orderId: rawOrderId,
@@ -5316,6 +5349,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               platform: orderData.platform || 'Shopee',
               platformStatus: orderData.platformStatus || (orderData.rawDetails?.returnStatus) || (orderData.orderType === 'Đơn hủy' ? 'Đã hủy' : (orderData.orderType === 'Giao không thành công' ? 'Giao hàng thất bại' : 'Chờ bạn xác nhận hàng trả về')),
               orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
+              isPartialReturn: Boolean(orderData.isPartialReturn || String(orderData.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần')),
               preOrder: orderData.preOrder || 'Đơn thường',
               deadline: orderData.deadline || '',
               orderId: orderData.orderId || '',
@@ -6308,7 +6342,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.7.8';
+    const APP_VERSION_NUMBER = '1.7.9';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8687,7 +8721,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const oType = getOrderType(order);
       const preOrderText = order.preOrder || 'Đơn thường';
       const claimText = `${order.rawDetails?.claimId || ''} ${order.claimId || ''} ${order.buyerUsername || ''} ${order.rawDetails?.buyerUsername || ''}`;
-      const hay = `${plat} ${oType} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''} ${itemsText}`.toLowerCase();
+      const partialText = (order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần')) ? 'hoan 1 phan mot phan partial return' : '';
+      const hay = `${plat} ${oType} ${partialText} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''} ${itemsText}`.toLowerCase();
       const kwLower = kwTrim.toLowerCase();
       const kwNorm = removeVietnameseTones(kwTrim).toLowerCase();
       const hayNorm = removeVietnameseTones(hay).toLowerCase();
@@ -9775,7 +9810,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (currentImportWeekFilter !== 'all' && getOrderImportWeek(order) !== currentImportWeekFilter) return false;
 
         // Order Type Filtering (Giao không thành công / Trả hàng/Hoàn tiền / Đơn hủy / THẤT THU)
-        if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) return false;
+        if (currentOrderTypeFilter === 'partial_return') {
+          const isPartial = Boolean(order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần'));
+          if (!isPartial) return false;
+        } else if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) return false;
 
         // Pre-order Filter (Hàng đặt trước / Đơn thường)
         if (currentPreOrderFilter !== 'all') {
@@ -10187,6 +10225,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           ? 'bg-indigo-600 text-white hover:bg-indigo-700'
           : 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100';
 
+        const isPartialOrder = Boolean(order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần'));
+        const partialBadgeHtml = isPartialOrder ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-500 text-white shadow-2xs mr-1 shrink-0" title="⚡ Đơn hoàn 1 phần: Khách mua nhiều SP nhưng chỉ hoàn món này!">⚡ Hoàn 1 phần</span>` : '';
+
         let itemSummarySnippet = '';
         if (items.length > 0) {
           const first = items[0];
@@ -10241,7 +10282,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="${deadlineTdClass}">${deadlineHtml}</td>
             <td class="${recvTdClass}">${renderCellInput(`${orderIdx}:recvDate`, `Ngày & Giờ về kho đơn #${orderIdx+1}`, order.recvDate, 'text-center font-semibold text-emerald-800 text-[11px]', 'dd/mm/yyyy hh:mm:ss', `updateOrderField(${orderIdx},'recvDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'recvDate',this)`)}</td>
             <td class="text-center min-w-[122px] px-1">${platformCellHtml}</td>
-            <td class="text-center min-w-[135px] px-1">${orderTypeCellHtml}</td>
+            <td class="text-center min-w-[135px] px-1">
+              ${orderTypeCellHtml}
+              ${isPartialOrder ? `<div class="mt-0.5"><span class="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs whitespace-nowrap" title="⚡ Đơn hoàn 1 phần: Khách mua nhiều SP nhưng chỉ hoàn 1 sản phẩm!">⚡ Hoàn 1 phần</span></div>` : ''}
+            </td>
             <td class="text-center min-w-[150px] px-1">${platformStatusCellHtml}</td>
             <td class="text-center min-w-[110px] px-1">${preOrderCellHtml}</td>
             <td>${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
@@ -10249,8 +10293,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="text-center min-w-[125px] px-1">${carrierCellHtml}</td>
             <td class="px-2">
               <div class="flex items-center justify-between gap-1.5">
-                <div class="truncate text-[11px] font-medium text-slate-800 max-w-[200px]" title="${escapeAttr(itemSummarySnippet.replace(/<[^>]+>/g, ''))}">
-                  ${itemSummarySnippet}
+                <div class="flex items-center min-w-0">
+                  ${partialBadgeHtml}
+                  <div class="truncate text-[11px] font-medium text-slate-800 max-w-[200px]" title="${escapeAttr(itemSummarySnippet.replace(/<[^>]+>/g, ''))}">
+                    ${itemSummarySnippet}
+                  </div>
                 </div>
                 <button type="button" onclick="toggleOrderItemsDrawer(${orderIdx})" class="px-2 py-0.5 rounded text-[10.5px] font-bold ${drawerBtnClass} transition whitespace-nowrap shadow-2xs cursor-pointer flex items-center gap-1">
                   <span>${drawerChevron}</span>
@@ -10259,7 +10306,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </div>
             </td>
             <td class="text-center font-bold text-slate-900 bg-slate-50/50">
-              <span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 font-extrabold text-xs">${totalOrderQty}</span>
+              <span class="inline-block px-1.5 py-0.5 rounded ${isPartialOrder ? 'bg-amber-100 text-amber-900 border border-amber-300 font-black' : 'bg-slate-100 font-extrabold'} text-xs" title="${isPartialOrder ? 'Đơn hoàn 1 phần: Khách chỉ trả ' + totalOrderQty + ' SP (các SP khác khách giữ lại)' : 'Tổng số lượng'}">
+                ${totalOrderQty}${isPartialOrder ? ' (1 phần)' : ''}
+              </span>
             </td>
             <td>${renderCellInput(`${orderIdx}:price`, `Tổng giá trị Đơn #${orderIdx+1}`, formatMoney(order.price || 0), 'text-right font-bold text-slate-900', '0 đ', `updateOrderField(${orderIdx},'price',this.value)`)}</td>
             <td class="text-center min-w-[135px] px-1">${statusHtml}</td>
@@ -10475,6 +10524,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   <span>🏷️ Đơn Hàng & Khiếu Nại</span>
                   <span class="text-[9.5px] bg-slate-100 text-slate-700 px-1 rounded font-semibold">${escapeAttr(order.platform || 'Shopee')}</span>
                 </div>
+                <div><span class="text-slate-500">Phạm vi hoàn hàng:</span> ${(order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần')) ? '<b class="inline-block px-2 py-0.5 rounded text-[10.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">⚡ Hoàn 1 phần đơn hàng (Khách giữ lại SP khác)</b>' : '<span class="text-slate-700 font-semibold">Toàn bộ đơn hàng</span>'}</div>
                 <div><span class="text-slate-500">Mã đơn hàng:</span> <b class="font-mono text-slate-900 select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.orderId || '')}', 'Đã chép Mã đơn')">${escapeAttr(order.orderId || '-')}</b></div>
                 <div><span class="text-slate-500">Mã khiếu nại:</span> <b class="font-mono text-indigo-800 select-all cursor-pointer hover:underline" onclick="copyTextToClipboard('${escapeAttr(order.rawDetails?.claimId || '')}', 'Đã chép Mã khiếu nại')">${escapeAttr(order.rawDetails?.claimId || '-')}</b></div>
                 <div><span class="text-slate-500">Người mua:</span> <b class="text-slate-800">${escapeAttr(order.rawDetails?.buyerUsername || '-')}</b></div>
@@ -10512,8 +10562,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 </div>
                 <div><span class="text-slate-500">Phương án:</span> <b class="text-purple-800">${escapeAttr(order.rawDetails?.returnMethod || order.orderType || '-')}</b></div>
                 <div><span class="text-slate-500">Trạng thái sàn:</span> <span class="font-semibold text-slate-800">${escapeAttr(order.rawDetails?.returnStatus || '-')}</span></div>
-                <div><span class="text-slate-500">Tổng tiền hoàn trả:</span> <b class="text-rose-700 text-xs">${formatMoney(order.rawDetails?.refundAmount || order.price || 0)}</b></div>
-                <div><span class="text-slate-500">Tổng giá trị đơn:</span> <b class="text-slate-900">${formatMoney(order.rawDetails?.totalValue || order.price || 0)}</b></div>
+                <div><span class="text-slate-500">Tiền hoàn trả món này:</span> <b class="text-rose-700 text-xs">${formatMoney(order.rawDetails?.refundAmount || order.price || 0)}</b></div>
+                ${(order.rawDetails?.totalValue && order.rawDetails?.totalValue > (order.rawDetails?.refundAmount || 0)) ? `<div><span class="text-slate-500">Tổng giá trị cả đơn mua:</span> <b class="text-slate-900">${formatMoney(order.rawDetails.totalValue)}</b></div>` : `<div><span class="text-slate-500">Tổng giá trị đơn:</span> <b class="text-slate-900">${formatMoney(order.rawDetails?.totalValue || order.price || 0)}</b></div>`} 
                 <div><span class="text-slate-500">Doanh thu ước tính:</span> <span class="text-slate-700 font-medium">${formatMoney(order.rawDetails?.revenue || 0)}</span></div>
                 <div><span class="text-slate-500">Phí ship Giao / Hoàn:</span> <span class="text-slate-600 font-medium">${formatMoney(order.rawDetails?.forwardShippingFee || 0)} / ${formatMoney(order.rawDetails?.returnShippingFee || 0)}</span></div>
                 <div><span class="text-slate-500">Thanh toán:</span> <span class="text-slate-700">${escapeAttr(order.rawDetails?.paymentMethod || '-')}</span></div>
@@ -10617,7 +10667,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) {
           return;
         }
-        if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) {
+        if (currentOrderTypeFilter === 'partial_return') {
+          const isPartial = Boolean(order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần'));
+          if (!isPartial) return;
+        } else if (currentOrderTypeFilter !== 'all' && getOrderType(order) !== currentOrderTypeFilter) {
           return;
         }
         if (currentPreOrderFilter !== 'all') {
@@ -10770,7 +10823,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const countFiltered = orders.filter(o => {
         if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return false;
         if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
-        if (currentOrderTypeFilter !== 'all' && getOrderType(o) !== currentOrderTypeFilter) return false;
+        if (currentOrderTypeFilter === 'partial_return') {
+        const isPartial = Boolean(o.isPartialReturn || String(o.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần'));
+        if (!isPartial) return false;
+      } else if (currentOrderTypeFilter !== 'all' && getOrderType(o) !== currentOrderTypeFilter) return false;
         return true;
       }).length;
 

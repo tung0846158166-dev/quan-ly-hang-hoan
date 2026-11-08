@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.8
+          name: QuanLyHangHoan-Windows-Installer-v1.7.9
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,14 +72,29 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.8
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.8 (Hoàn Hảo 100% Nạp File Shopee & TikTok)"
+          tag_name: v1.7.9
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.9 (Nhận Diện Thông Minh Đơn Hoàn 1 Phần)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.8
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.9
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.8`)
+- **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.9`)
+- **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.9.exe`)
+- **Các cải tiến mới nhất trong phiên bản v1.7.9**:
+  1. ⚡ **Nhận diện chính xác 100% Đơn Hoàn 1 Phần (Khách mua 2 SP nhưng chỉ hoàn 1 SP)**:
+     - Tự động nhận diện từ cột `Trả hàng/Hoàn tiền toàn bộ Đơn Hàng? : Một phần đơn hàng` của Shopee và `Return Quantity` của TikTok Shop.
+     - Sửa triệt để lỗi ghi đè số lượng: Ưu tiên tuyệt đối Số lượng Hoàn (`Return Quantity`), không bị nhầm lẫn với số lượng mua ban đầu.
+  2. 🏷️ **Huy hiệu trực quan `⚡ Hoàn 1 phần` nổi bật**:
+     - Hiển thị badge màu cam nổi bật ngay tại cột *Sản phẩm* và cột *Loại đơn* kèm số lượng hoàn thực tế (`x1 (1 phần)`).
+     - Giúp nhân viên kho khui hàng biết ngay khách chỉ trả 1 món, không tìm kiếm món thứ 2 và không khiếu nại nhầm!
+  3. 🔍 **Bộ lọc & Tìm kiếm Đơn Hoàn 1 Phần**:
+     - Thêm mục `⚡ Hoàn 1 phần đơn hàng` vào dropdown *Loại đơn*.
+     - Hỗ trợ gõ tìm kiếm "hoàn 1 phần" hoặc "một phần" trên thanh tìm kiếm.
+  4. 📊 **Bảng đối soát chi tiết tài chính**:
+     - Hiển thị rõ *Phạm vi hoàn hàng*, *Tiền hoàn trả món này* và *Tổng giá trị cả đơn mua ban đầu*.
+
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.9`)
             - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.6.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.8**:
+            - **Các cải tiến mới nhất trong phiên bản v1.7.9**:
               1. 🎯 **Chuẩn hóa 100% Trạng thái sàn & Loại đơn cho Sàn Shopee & TikTok**:
                  - Sửa triệt để tình trạng hiển thị `Chờ sàn cập nhật` trên các đơn Shopee. Tự động trích xuất chính xác trạng thái từ cột `Trạng thái Trả hàng/Hoàn tiền` ("Chờ bạn xác nhận hàng trả về", "Đã hoàn tiền cho Người mua"...) và `Trạng thái đơn hàng` ("Đã hủy").
                  - Đảm bảo 100% đơn Shopee và TikTok không còn bị gán nhầm thành `THẤT THU` hay `Chờ sàn cập nhật`.

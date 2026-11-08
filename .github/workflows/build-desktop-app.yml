@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.8
+          name: QuanLyHangHoan-Windows-Installer-v1.6.9
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,22 +67,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.8
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.8 (Giữ Quét 0.5s Siêu Nhanh, Cột Ghi Chú Của Tôi & Ghi Chú Theo Dõi)"
+          tag_name: v1.6.9
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.9 (Sửa Hoàn Toàn Hàng Tổng Cộng, Căn Chuẩn Cột & Thanh Thống Kê Nổi Bật)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.8
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.9
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.8`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.8.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.6.8**:
-              1. 📝 **Bổ sung cột "Ghi Chú Của Tôi" trên Bảng Chính**:
-                 - Cho phép người dùng ghi chú nội bộ riêng cho từng đơn hàng (bấm 1 lần xem nhanh/copy, nhấp đúp để gõ chỉnh sửa trực tiếp, Enter hoặc click ngoài tự động lưu).
-                 - Xuất khẩu đầy đủ cột Ghi Chú Của Tôi sang các bảng báo cáo Excel.
-              2. ⭐ **Thêm Ghi Chú / Lý Do Theo Dõi Khi Tích Chọn Theo Dõi**:
-                 - Khi tích chọn theo dõi (hoặc bấm biểu tượng ngôi sao), hệ thống mở hộp thoại để nhập lý do theo dõi (ví dụ: Chờ bồi thường, Hàng dễ vỡ, Nghi ngờ tráo hàng...).
-                 - Bấm lại vào ngôi sao để chỉnh sửa nhanh lý do theo dõi hoặc xóa trắng để gỡ khỏi danh sách theo dõi.
-                 - Bảng Theo Dõi Đơn Hàng (Watchlist Modal) có thêm cột "Lý Do Theo Dõi" với nút chỉnh sửa nhanh ✏️.
-                 - Tìm kiếm thông minh theo từ khóa trong Ghi Chú Của Tôi và Lý Do Theo Dõi.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.9`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.9.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.6.9**:
+              1. 📊 **Sửa triệt để lỗi hiển thị hàng Tổng Cộng (tfoot)**:
+                 - Căn chuẩn toàn bộ 23 cột của bảng: Cột 1 (Ký hiệu Σ) và Cột 2 (Tổng số đơn) được ghim cố định bên trái (sticky column).
+                 - Tích hợp thanh tóm tắt chỉ số nổi bật (Tổng số đơn, Tổng SL sản phẩm, Tổng tiền hàng, Đã về kho, Chưa về kho, Không cần nhận) ngay trong tầm nhìn (từ cột 3 đến 15) giúp người dùng nhìn thấy số liệu tổng ngay lập tức mà không cần cuộn ngang 15 cột.
+                 - Các cột Tổng SL, Tổng Tiền, Nhận Tại Kho căn thẳng hàng tuyệt đối với cột dữ liệu tương ứng ở bảng chính.
+                 - Sửa xung đột CSS ép độ rộng 48px sai lệch vào ô tổng cộng.
+              2. 📌 **Kích hoạt thanh Dock thống kê tức thì ở mép dưới màn hình (Sticky Bottom Dock)**:
+                 - Tự động cập nhật số liệu thời gian thực theo bộ lọc và sàn TMĐT.
           files: |
             dist/*.exe
         env:

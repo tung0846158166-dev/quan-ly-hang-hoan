@@ -201,24 +201,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       color: #1e293b !important;
     }
 
-    #mainTableScrollContainer .excel-table th:nth-child(1),
-    #mainTableScrollContainer .excel-table td:nth-child(1) {
+    #mainTableScrollContainer .excel-table thead th:nth-child(1),
+    #mainTableScrollContainer .excel-table tbody td:nth-child(1),
+    #mainTableScrollContainer .excel-table tfoot td:nth-child(1) {
       position: sticky !important;
       left: 0 !important;
       width: 48px !important;
       min-width: 48px !important;
       max-width: 48px !important;
     }
-    #mainTableScrollContainer .excel-table th:nth-child(1) {
+    #mainTableScrollContainer .excel-table thead th:nth-child(1) {
       z-index: 34 !important;
       background-color: #0f172a !important;
     }
-    #mainTableScrollContainer .excel-table td:nth-child(1) {
+    #mainTableScrollContainer .excel-table tbody td:nth-child(1) {
       z-index: 18 !important;
       background-color: #f8fafc;
     }
-    #mainTableScrollContainer .excel-table th:nth-child(2),
-    #mainTableScrollContainer .excel-table td:nth-child(2) {
+    #mainTableScrollContainer .excel-table tfoot td:nth-child(1) {
+      z-index: 28 !important;
+      background-color: #0f172a !important;
+      color: #fbbf24 !important;
+    }
+
+    #mainTableScrollContainer .excel-table thead th:nth-child(2),
+    #mainTableScrollContainer .excel-table tbody td:nth-child(2),
+    #mainTableScrollContainer .excel-table tfoot td:nth-child(2) {
       position: sticky !important;
       left: 48px !important;
       width: 40px !important;
@@ -226,17 +234,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       max-width: 40px !important;
       border-right: 2px solid #475569 !important;
     }
-    #mainTableScrollContainer .excel-table th:nth-child(2) {
+    #mainTableScrollContainer .excel-table thead th:nth-child(2) {
       z-index: 34 !important;
       background-color: #0f172a !important;
     }
-    #mainTableScrollContainer .excel-table td:nth-child(2) {
+    #mainTableScrollContainer .excel-table tbody td:nth-child(2) {
       z-index: 18 !important;
       background-color: #f8fafc;
       border-right: 2px solid #cbd5e1 !important;
     }
-    #mainTableScrollContainer .excel-table tr:hover td:nth-child(1),
-    #mainTableScrollContainer .excel-table tr:hover td:nth-child(2) {
+    #mainTableScrollContainer .excel-table tfoot td:nth-child(2) {
+      z-index: 28 !important;
+      background-color: #0f172a !important;
+      color: #fcd34d !important;
+      border-right: 2px solid #cbd5e1 !important;
+    }
+
+    #mainTableScrollContainer .excel-table tbody tr:hover td:nth-child(1),
+    #mainTableScrollContainer .excel-table tbody tr:hover td:nth-child(2) {
       background-color: #f1f5f9 !important;
     }
     #mainTableScrollContainer .excel-table tr.bg-blue-50 td:nth-child(1),
@@ -311,8 +326,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.6.8">
-          🚀 v1.6.8
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.6.9">
+          🚀 v1.6.9
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -682,7 +697,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.8</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.9</span>
               </div>
             </div>
           </div>
@@ -1023,10 +1038,43 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <tbody id="orderTableBody"></tbody>
         <tfoot>
           <tr class="bg-slate-100 font-bold text-xs border-t-2 border-slate-800">
-            <td colspan="15" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
-            <td id="footTotalQty" class="text-center py-2.5 text-slate-900 text-sm">0</td>
-            <td id="footTotalPrice" class="text-right py-2.5 px-2 text-slate-900 text-sm">0 đ</td>
-            <td colspan="6"></td>
+            <td class="text-center font-black text-sm py-2 bg-slate-900 text-amber-400 select-none">Σ</td>
+            <td class="text-center font-black text-[11px] py-2 bg-slate-900 text-amber-300 select-none" title="Tổng số đơn hàng đang hiển thị"><span id="footOrderCount">0</span></td>
+            <td colspan="13" class="py-2.5 px-3 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-t-2 border-slate-700">
+              <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div class="flex items-center flex-wrap gap-2">
+                  <span class="font-black uppercase tracking-wider text-slate-900 flex items-center gap-1">
+                    <span>📊</span>
+                    <span>TỔNG CỘNG:</span>
+                  </span>
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-800 text-white font-black text-xs shadow-xs font-mono">
+                    <span id="footDisplayOrders">0</span>&nbsp;đơn
+                  </span>
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-indigo-700 text-white font-black text-xs shadow-xs font-mono">
+                    SL:&nbsp;<span id="footDisplayQty">0</span>&nbsp;SP
+                  </span>
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-rose-700 text-white font-black text-xs shadow-xs font-mono">
+                    Tiền:&nbsp;<span id="footDisplayPrice">0 đ</span>
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold text-[11px] border border-emerald-300 font-mono">
+                    🟢 Đã về:&nbsp;<span id="footDisplayReturned">0</span>
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold text-[11px] border border-amber-300 font-mono">
+                    🟠 Chưa về:&nbsp;<span id="footDisplayUnreturned">0</span>
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold text-[11px] border border-slate-300 font-mono">
+                    ⚪ K.cần nhận:&nbsp;<span id="footDisplayUnneeded">0</span>
+                  </span>
+                </div>
+                <span class="text-[11px] text-slate-500 italic hidden xl:inline">
+                  (Chi tiết cột Tổng SL &amp; Tổng Tiền ở bên phải ➔)
+                </span>
+              </div>
+            </td>
+            <td id="footTotalQty" class="text-center font-black text-sm py-2 px-1 text-indigo-950 bg-indigo-100/90 border border-indigo-300 font-mono" title="Tổng số lượng sản phẩm">0</td>
+            <td id="footTotalPrice" class="text-right font-black text-sm py-2 px-2 text-rose-950 bg-rose-100/90 border border-rose-300 font-mono whitespace-nowrap" title="Tổng giá trị đơn hàng">0 đ</td>
+            <td id="footReturnedSummary" class="text-center font-black text-xs py-2 px-1 text-emerald-900 bg-emerald-100/90 border border-emerald-300 whitespace-nowrap">🟢 Đã về: 0</td>
+            <td colspan="5" class="bg-slate-100/80"></td>
           </tr>
         </tfoot>
       </table>
@@ -1138,6 +1186,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     </div>
 
   </div> <!-- End of main full-width responsive wrapper -->
+    <!-- Sticky Bottom Summary Dock (Thanh dock cố định ở mép dưới màn hình) -->
+    <div id="stickyBottomDock" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md text-white px-4 py-2 border-t-2 border-teal-500 shadow-2xl flex flex-wrap items-center justify-between gap-2.5 text-xs no-print transition-transform duration-300">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="font-extrabold text-teal-400 flex items-center gap-1 uppercase tracking-wide">
+          <span>📊 TỔNG KẾT TỨC THÌ:</span>
+        </span>
+        <span id="dockOrdersBadge" class="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded font-mono font-bold text-white">0 đơn</span>
+        <span id="dockQtyBadge" class="bg-indigo-900 border border-indigo-600 px-2 py-0.5 rounded font-mono font-bold text-indigo-100">0 SP</span>
+        <span id="dockReturnedBadge" class="bg-emerald-950 border border-emerald-600 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">🟢 Đã về: 0</span>
+        <span id="dockUnreturnedBadge" class="bg-amber-950 border border-amber-600 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">🟠 Chưa về: 0</span>
+        <span id="dockPriceBadge" class="bg-rose-950 border border-rose-600 text-rose-300 px-2 py-0.5 rounded font-mono font-bold">0 đ</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="switchMainView('summary'); scrollToSummaryTable();"
+                class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-extrabold transition shadow-xs flex items-center gap-1 cursor-pointer">
+          <span>▲ Xem Bảng Thống Kê Phân Loại (Màu & Size)</span>
+        </button>
+        <button type="button" onclick="switchMainView('orders'); scrollToMainTable();"
+                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition cursor-pointer">
+          <span>📋 Bảng Đơn Hàng</span>
+        </button>
+      </div>
+    </div>
+
 
   <input id="hiddenPhotoInput" type="file" accept="image/*" class="hidden" />
 
@@ -5915,7 +5987,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.8';
+    const APP_VERSION_NUMBER = '1.6.9';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -10360,8 +10432,42 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const elLost = document.getElementById('tabCountLost');
       if (elLost) elLost.textContent = countLost;
 
-      document.getElementById('footTotalQty').textContent = totalQty;
-      document.getElementById('footTotalPrice').textContent = formatMoney(totalPrice);
+      const countFiltered = orders.filter(o => {
+        if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return false;
+        if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
+        if (currentOrderTypeFilter !== 'all' && getOrderType(o) !== currentOrderTypeFilter) return false;
+        return true;
+      }).length;
+
+      const elFootOrderCount = document.getElementById('footOrderCount');
+      if (elFootOrderCount) elFootOrderCount.textContent = countFiltered;
+
+      const elFootDisplayOrders = document.getElementById('footDisplayOrders');
+      if (elFootDisplayOrders) elFootDisplayOrders.textContent = countFiltered;
+
+      const elFootDisplayQty = document.getElementById('footDisplayQty');
+      if (elFootDisplayQty) elFootDisplayQty.textContent = totalQty;
+
+      const elFootDisplayPrice = document.getElementById('footDisplayPrice');
+      if (elFootDisplayPrice) elFootDisplayPrice.textContent = formatMoney(totalPrice);
+
+      const elFootDisplayReturned = document.getElementById('footDisplayReturned');
+      if (elFootDisplayReturned) elFootDisplayReturned.textContent = returnedQty;
+
+      const elFootDisplayUnreturned = document.getElementById('footDisplayUnreturned');
+      if (elFootDisplayUnreturned) elFootDisplayUnreturned.textContent = unreturnedQty;
+
+      const elFootDisplayUnneeded = document.getElementById('footDisplayUnneeded');
+      if (elFootDisplayUnneeded) elFootDisplayUnneeded.textContent = unneededQty;
+
+      const elFootReturnedSummary = document.getElementById('footReturnedSummary');
+      if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${returnedQty}`;
+
+      const elFootTotalQty = document.getElementById('footTotalQty');
+      if (elFootTotalQty) elFootTotalQty.textContent = totalQty;
+
+      const elFootTotalPrice = document.getElementById('footTotalPrice');
+      if (elFootTotalPrice) elFootTotalPrice.textContent = formatMoney(totalPrice);
 
       // Cập nhật View Switcher Badges & Sticky Bottom Dock Badges
       const viewOrdBadge = document.getElementById('viewOrdersCountBadge');
@@ -13635,32 +13741,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <div class="order-meta">Mã: ${escapeAttr(order.orderId || order.track || '-')} | ${today}</div>
           </div>
           <scr' + 'ipt>window.onload = function() { window.print(); };<\/scr' + 'ipt>
-        
-    <!-- Sticky Bottom Summary Dock (Thanh dock cố định ở mép dưới màn hình) -->
-    <div id="stickyBottomDock" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md text-white px-4 py-2 border-t-2 border-teal-500 shadow-2xl flex flex-wrap items-center justify-between gap-2.5 text-xs no-print transition-transform duration-300">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="font-extrabold text-teal-400 flex items-center gap-1 uppercase tracking-wide">
-          <span>📊 TỔNG KẾT TỨC THÌ:</span>
-        </span>
-        <span id="dockOrdersBadge" class="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded font-mono font-bold text-white">0 đơn</span>
-        <span id="dockQtyBadge" class="bg-indigo-900 border border-indigo-600 px-2 py-0.5 rounded font-mono font-bold text-indigo-100">0 SP</span>
-        <span id="dockReturnedBadge" class="bg-emerald-950 border border-emerald-600 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">🟢 Đã về: 0</span>
-        <span id="dockUnreturnedBadge" class="bg-amber-950 border border-amber-600 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">🟠 Chưa về: 0</span>
-        <span id="dockPriceBadge" class="bg-rose-950 border border-rose-600 text-rose-300 px-2 py-0.5 rounded font-mono font-bold">0 đ</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button type="button" onclick="switchMainView('summary'); scrollToSummaryTable();"
-                class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-extrabold transition shadow-xs flex items-center gap-1 cursor-pointer">
-          <span>▲ Xem Bảng Thống Kê Phân Loại (Màu & Size)</span>
-        </button>
-        <button type="button" onclick="switchMainView('orders'); scrollToMainTable();"
-                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition cursor-pointer">
-          <span>📋 Bảng Đơn Hàng</span>
-        </button>
-      </div>
-    </div>
-
-</body>
+        </body>
         </html>
       `;
 

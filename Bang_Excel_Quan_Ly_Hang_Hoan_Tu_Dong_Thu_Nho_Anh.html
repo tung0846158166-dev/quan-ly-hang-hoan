@@ -318,10 +318,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 </head>
 <body class="p-1 sm:p-1.5 md:p-2 bg-slate-100">
 
-  <div class="w-full bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 overflow-hidden">
+  <div class="w-full bg-white rounded-none sm:rounded-xl shadow-md border border-slate-300 overflow-visible">
 
     <!-- Row 1: Ultra-Compact Shopee Orange Title Banner & Consolidated Actions (v1.6.5) -->
-    <div class="bg-[#ee4d2d] text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 relative z-30">
+    <div class="bg-[#ee4d2d] text-white px-3 py-1.5 flex flex-wrap items-center justify-between gap-1.5 relative z-50">
       <div class="flex flex-wrap items-center gap-1.5">
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
@@ -383,7 +383,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </button>
 
         <!-- Menu Gộp 1: Nhập / Xuất Dữ Liệu -->
-        <div class="relative inline-block text-left header-dropdown-container">
+        <div class="relative inline-block text-left header-dropdown-container" style="position: relative; z-index: 9999;">
           <button
             type="button"
             id="btnMenuImport"
@@ -397,7 +397,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </button>
           <div
             id="headerMenuImport"
-            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-76 sm:w-84 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100 max-h-[82vh] overflow-y-auto"
+            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-[360px] sm:w-[400px] max-w-[95vw] rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 divide-y divide-slate-100 max-h-[85vh] overflow-y-auto"
+            style="z-index: 99999 !important;"
           >
             <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📥 Cơ Chế Nhập Tách Riêng 2 Sàn</div>
             <div class="p-1 space-y-0.5">
@@ -581,7 +582,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
 
         <!-- Menu Gộp 2: Hệ Thống & Cài Đặt -->
-        <div class="relative inline-block text-left header-dropdown-container">
+        <div class="relative inline-block text-left header-dropdown-container" style="position: relative; z-index: 9999;">
           <button
             type="button"
             id="btnMenuTools"
@@ -594,7 +595,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </button>
           <div
             id="headerMenuTools"
-            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 z-50 divide-y divide-slate-100 max-h-[82vh] overflow-y-auto"
+            class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-[340px] sm:w-[380px] max-w-[95vw] rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 divide-y divide-slate-100 max-h-[85vh] overflow-y-auto"
+            style="z-index: 99999 !important;"
           >
             <div class="p-1">
               <div class="px-2.5 py-1.5 mb-1 bg-orange-50 rounded-lg border border-orange-200 text-[11px] text-orange-900">
@@ -697,7 +699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.7</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.7.8</span>
               </div>
             </div>
           </div>
@@ -753,7 +755,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <span id="platCount_all" class="bg-slate-200 text-slate-700 text-[10px] px-1 py-0.2 rounded-full font-mono">0</span>
           </button>
           <div id="activePlatformBannerBadge" class="flex items-center text-xs font-black px-2.5 py-0.5 rounded-lg"></div>
-        </div>
         </div>
       </div>
 
@@ -6307,7 +6308,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.7.7';
+    const APP_VERSION_NUMBER = '1.7.8';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);

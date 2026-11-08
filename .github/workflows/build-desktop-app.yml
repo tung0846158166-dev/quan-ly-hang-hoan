@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.7.7
+          name: QuanLyHangHoan-Windows-Installer-v1.7.8
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,14 +72,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.7.7
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.7 (Hoàn Hảo 100% Nạp File Shopee & TikTok)"
+          tag_name: v1.7.8
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.7.8 (Hoàn Hảo 100% Nạp File Shopee & TikTok)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.7
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.7.8
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.7`)
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.7.8`)
             - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.7.6.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.7.7**:
+            - **Các cải tiến mới nhất trong phiên bản v1.7.8**:
               1. 🎯 **Chuẩn hóa 100% Trạng thái sàn & Loại đơn cho Sàn Shopee & TikTok**:
                  - Sửa triệt để tình trạng hiển thị `Chờ sàn cập nhật` trên các đơn Shopee. Tự động trích xuất chính xác trạng thái từ cột `Trạng thái Trả hàng/Hoàn tiền` ("Chờ bạn xác nhận hàng trả về", "Đã hoàn tiền cho Người mua"...) và `Trạng thái đơn hàng` ("Đã hủy").
                  - Đảm bảo 100% đơn Shopee và TikTok không còn bị gán nhầm thành `THẤT THU` hay `Chờ sàn cập nhật`.

@@ -4599,10 +4599,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
 
           if (existingIdx !== -1) {
+            const oldPlatStatus = orders[existingIdx].platformStatus || '';
+            const newPlatStatus = orderData.platformStatus || '';
             const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
-            if (orderData.platformStatus) orders[existingIdx].platformStatus = orderData.platformStatus;
+            if (orderData.platformStatus && orderData.platformStatus !== oldPlatStatus) {
+              orders[existingIdx].platformStatus = orderData.platformStatus;
+            }
             if (orderData.buyerNote) orders[existingIdx].buyerNote = orderData.buyerNote;
-            if (changed) enrichedTableCount++;
+            if (changed || (newPlatStatus && newPlatStatus !== oldPlatStatus)) {
+              enrichedTableCount++;
+              let detailMsg = 'Cập nhật đơn trùng TikTok:';
+              if (oldPlatStatus !== newPlatStatus && newPlatStatus) {
+                detailMsg += ` Trạng thái sàn: [${oldPlatStatus || 'Chưa rõ'}] ➔ [${newPlatStatus}].`;
+              } else {
+                detailMsg += ' Cập nhật dữ liệu chi tiết từ sàn TikTok Shop.';
+              }
+              addAppNotification({
+                type: 'excel_update',
+                title: '🔄 Cập Nhật Trạng Thái Đơn #' + (existingIdx + 1),
+                detail: detailMsg,
+                code: orders[existingIdx].orderId || orders[existingIdx].track || cleanTrack,
+                orderIdx: existingIdx
+              });
+            }
           } else {
             let targetIdx = orders.length;
             if (orders.length > 0) {
@@ -4651,6 +4670,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // TỰ ĐỘNG CHUYỂN NGAY SANG KHÔNG GIAN SÀN TIKTOK SHOP ĐỂ QUẢN LÝ RIÊNG!
         setPlatformFilter('TikTok Shop');
         renderAll();
+        if (enrichedTableCount > 0) {
+          showAppToast(`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn TikTok có sẵn!`, 'info', 4000);
+          try { playBeepSound(1300, 150); } catch (e) {}
+        }
       } else {
         autoEnrichAllMissingOrdersFromDb(true);
       }
@@ -5383,6 +5406,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         saveOrders();
         renderAll();
+        if (enrichedTableCount > 0) {
+          showAppToast(`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn Shopee có sẵn!`, 'info', 4000);
+          try { playBeepSound(1300, 150); } catch (e) {}
+        }
       } else {
         autoEnrichAllMissingOrdersFromDb(true);
       }

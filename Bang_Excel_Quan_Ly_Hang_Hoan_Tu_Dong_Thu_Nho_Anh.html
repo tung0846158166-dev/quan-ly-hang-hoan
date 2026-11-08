@@ -311,8 +311,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10.5px] font-extrabold bg-white/95 text-[#ee4d2d] shadow-2xs ring-1 ring-orange-200 cursor-pointer hover:bg-yellow-200 hover:text-slate-900 transition select-none" title="Phiên bản phần mềm v1.6.5">
-          🚀 v1.6.5
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.6.8">
+          🚀 v1.6.8
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -682,7 +682,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.7</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.8</span>
               </div>
             </div>
           </div>
@@ -1424,7 +1424,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   </div>
 
   <!-- Modal Nhập Mật Khẩu / Xác Nhận Thao Tác (Hoạt động 100% trên cả Desktop App và Web) -->
-  <div id="customPromptModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden flex items-center justify-center p-4">
+  <div id="customPromptModal" class="fixed inset-0 bg-slate-900/80 z-[200] hidden flex items-center justify-center p-4">
     <div class="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden" onclick="event.stopPropagation()">
       <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white px-5 py-4 flex items-center justify-between">
         <div class="flex items-center gap-2.5">
@@ -5915,7 +5915,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.7';
+    const APP_VERSION_NUMBER = '1.6.8';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -6718,11 +6718,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const inputEl = document.getElementById('customPromptInput');
         const hintEl = document.getElementById('customPromptHint');
         const iconEl = document.getElementById('customPromptIcon');
+        const eyeBtn = modal ? modal.querySelector('button[onclick="togglePromptPasswordVisibility()"]') : null;
 
         if (titleEl) titleEl.textContent = title;
         if (subEl) subEl.textContent = subtitle;
         if (labelEl) labelEl.textContent = label;
         if (iconEl) iconEl.textContent = icon;
+        if (eyeBtn) eyeBtn.style.display = isPassword ? 'block' : 'none';
         if (inputEl) {
           inputEl.type = isPassword ? 'password' : 'text';
           inputEl.value = defaultValue || '';
@@ -10161,10 +10163,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       `;
     }
 
-    function promptEditDeadline(orderIdx) {
+    async function promptEditDeadline(orderIdx) {
       if (!orders[orderIdx]) return;
       const current = orders[orderIdx].deadline || '';
-      const entered = prompt(`Nhập hạn cần xử lý / phản hồi cho Đơn #${orderIdx + 1} (Ví dụ: 10/11/2026 hoặc 23:59 10/11/2026):\n(Để trống nếu muốn xóa hạn)`, current);
+      const entered = await appPrompt({
+        title: '⏰ Sửa Hạn Cần Xử Lý',
+        subtitle: `Đơn #${orderIdx + 1} (${orders[orderIdx].orderId || orders[orderIdx].track || ''})`,
+        label: 'Nhập hạn cần xử lý / phản hồi:',
+        placeholder: 'Ví dụ: 10/11/2026 hoặc 23:59 10/11/2026 (để trống để xóa)',
+        defaultValue: current,
+        isPassword: false,
+        icon: '⏰',
+        hint: '💡 Bấm "Xác Nhận" để lưu hạn (hoặc để trống để xóa hạn). Bấm "Hủy" để giữ nguyên.'
+      });
       if (entered === null) return;
       const oldVal = orders[orderIdx].deadline || '';
       const newVal = entered.trim();
@@ -10172,6 +10183,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       recordCellEditHistory(`${orderIdx}:deadline`, `Hạn xử lý Đơn #${orderIdx+1}`, oldVal, newVal, 'Cập nhật hạn xử lý');
       saveOrders();
       renderAll(false);
+      showAppToast(`Đã cập nhật hạn xử lý Đơn #${orderIdx + 1}${newVal ? `: ${newVal}` : ' (đã xóa)'}`, 'success');
     }
 
     function recalcTotalsAndSummary(skipDomRebuildIfTyping = false) {
@@ -12674,7 +12686,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showToast('🧹 Đã xóa toàn bộ lịch sử thông báo.', 'info');
     }
 
-    function promptEditPlatformStatus(orderIdx) {
+    async function promptEditPlatformStatus(orderIdx) {
       if (isLocked) {
         alert('🔒 Bảng đang ở chế độ CHỈ XEM. Vui lòng mở khóa trước khi sửa!');
         return;
@@ -12682,7 +12694,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const o = orders[orderIdx];
       if (!o) return;
       const cur = o.platformStatus || '';
-      const newVal = prompt(`Chỉnh sửa Trạng Thái Sàn cho Đơn #${orderIdx + 1} (${o.orderId || o.track}):\n(Ví dụ: Chờ bạn xác nhận, Đã hoàn tiền cho Người mua, Giao hàng hoàn trả thành công, Đang chuyển hoàn...)`, cur);
+      const newVal = await appPrompt({
+        title: '🔄 Sửa Trạng Thái Sàn',
+        subtitle: `Đơn #${orderIdx + 1} (${o.orderId || o.track || ''})`,
+        label: 'Nhập trạng thái sàn mới:',
+        placeholder: 'Ví dụ: Chờ bạn xác nhận, Đã hoàn tiền cho Người mua, Giao hàng hoàn trả thành công...',
+        defaultValue: cur,
+        isPassword: false,
+        icon: '🔄',
+        hint: '💡 Nhập trạng thái sàn thực tế rồi bấm "Xác Nhận".'
+      });
       if (newVal !== null) {
         o.platformStatus = newVal.trim();
         addAuditLog('🔄 ĐỔI TRẠNG THÁI SÀN', `Đơn #${orderIdx + 1} (${o.orderId || o.track}): [${cur}] ➔ [${o.platformStatus}]`);
@@ -12691,6 +12712,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         saveOrders();
         renderAll(false);
+        showAppToast(`Đã cập nhật trạng thái sàn Đơn #${orderIdx + 1}: ${o.platformStatus || '(để trống)'}`, 'success');
       }
     }
 
@@ -13993,13 +14015,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       updateBulkActionBarUI();
     }
 
-    function bulkAddSelectedToWatchlist() {
+    async function bulkAddSelectedToWatchlist() {
       if (selectedOrdersSet.size === 0) return;
       const count = selectedOrdersSet.size;
-      const reason = prompt(
-        `⭐ THÊM ${count} ĐƠN VÀO DANH SÁCH THEO DÕI\n\nNhập ghi chú / lý do theo dõi chung cho ${count} đơn này:\n(Để trống nếu không cần ghi chú lý do)`,
-        ''
-      );
+      const reason = await appPrompt({
+        title: `⭐ Thêm ${count} Đơn Vào Danh Sách Theo Dõi`,
+        subtitle: `Đang chọn ${count} đơn hàng trên bảng`,
+        label: 'Nhập ghi chú / lý do theo dõi chung (có thể để trống):',
+        placeholder: 'Ví dụ: Cần kiểm tra kỹ bồi hoàn, Đơn giá trị cao, Hàng dễ vỡ...',
+        defaultValue: '',
+        isPassword: false,
+        icon: '⭐',
+        hint: '💡 Nhập lý do theo dõi chung hoặc để trống, rồi bấm "Xác Nhận". Bấm "Hủy" để thoát.'
+      });
       if (reason === null) return;
       let countAdded = 0;
       selectedOrdersSet.forEach(idx => {
@@ -14078,15 +14106,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
-    function toggleOrderWatchlist(orderIdx) {
+    async function toggleOrderWatchlist(orderIdx) {
       if (!orders[orderIdx]) return;
       const order = orders[orderIdx];
       if (!order.isWatchlist) {
         const curReason = order.watchlistReason || '';
-        const inputReason = prompt(
-          `⭐ THÊM ĐƠN VÀO DANH SÁCH THEO DÕI\n\nĐơn hàng: #${orderIdx + 1} (${order.orderId || order.track || ''})\n\nNhập ghi chú / lý do theo dõi (ví dụ: Chờ bồi thường, Hàng dễ vỡ, Nghi ngờ tráo hàng, Cần gọi khách...):\n(Bấm OK để lưu, Cancel để hủy)`,
-          curReason
-        );
+        const inputReason = await appPrompt({
+          title: '⭐ Thêm Đơn Vào Danh Sách Theo Dõi',
+          subtitle: `Đơn #${orderIdx + 1} (${order.orderId || order.track || ''})`,
+          label: 'Nhập ghi chú / lý do theo dõi (có thể để trống):',
+          placeholder: 'Ví dụ: Chờ sàn bồi thường, Hàng dễ vỡ, Nghi ngờ tráo hàng, Cần gọi khách...',
+          defaultValue: curReason,
+          isPassword: false,
+          icon: '⭐',
+          hint: '💡 Bấm "Xác Nhận" để đánh dấu theo dõi đơn này (không bắt buộc nhập lý do). Bấm "Hủy" để đóng.'
+        });
         if (inputReason === null) return;
         order.isWatchlist = true;
         order.watchlistReason = inputReason.trim();
@@ -14102,10 +14136,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
       } else {
         const curReason = order.watchlistReason || '';
-        const inputReason = prompt(
-          `⭐ ĐƠN #${orderIdx + 1} ĐANG TRONG DANH SÁCH THEO DÕI\n\nLý do hiện tại: "${curReason || 'Chưa ghi lý do'}"\n\n- SỬA LÝ DO: Nhập lý do mới rồi bấm OK\n- BỎ THEO DÕI: Xóa trắng toàn bộ rồi bấm OK\n- ĐÓNG LẠI (GIỮ NGUYÊN): Bấm Cancel`,
-          curReason
-        );
+        const inputReason = await appPrompt({
+          title: `⭐ Đơn #${orderIdx + 1} Đang Được Theo Dõi`,
+          subtitle: `Lý do hiện tại: "${curReason || 'Chưa ghi lý do'}"`,
+          label: 'Sửa lý do (hoặc XÓA TRẮNG rồi bấm Xác Nhận để BỎ THEO DÕI):',
+          placeholder: 'Nhập lý do mới hoặc xóa sạch ô để bỏ theo dõi...',
+          defaultValue: curReason,
+          isPassword: false,
+          icon: '⭐',
+          hint: '💡 <b>Mẹo:</b> Xóa trắng toàn bộ rồi bấm "Xác Nhận" để gỡ đơn khỏi danh sách theo dõi.'
+        });
         if (inputReason === null) return;
         if (!inputReason.trim()) {
           order.isWatchlist = false;
@@ -14390,14 +14430,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       tbody.innerHTML = rowsHtml;
     }
 
-    function editSingleWatchlistReason(orderIdx) {
+    async function editSingleWatchlistReason(orderIdx) {
       if (!orders[orderIdx]) return;
       const order = orders[orderIdx];
       const curReason = order.watchlistReason || '';
-      const inputReason = prompt(
-        `⭐ SỬA LÝ DO THEO DÕI ĐƠN #${orderIdx + 1}\nMã đơn: ${order.orderId || order.track || ''}\n\nNhập nội dung lý do theo dõi mới:\n(Để trống nếu muốn xóa lý do)`,
-        curReason
-      );
+      const inputReason = await appPrompt({
+        title: '⭐ Sửa Lý Do Theo Dõi',
+        subtitle: `Đơn #${orderIdx + 1} (${order.orderId || order.track || ''})`,
+        label: 'Nhập nội dung lý do theo dõi mới:',
+        placeholder: 'Nhập lý do theo dõi... (để trống nếu muốn xóa lý do)',
+        defaultValue: curReason,
+        isPassword: false,
+        icon: '⭐',
+        hint: '💡 Bấm "Xác Nhận" để lưu lý do theo dõi mới. Bấm "Hủy" để giữ nguyên.'
+      });
       if (inputReason === null) return;
       order.watchlistReason = inputReason.trim();
       saveOrders();

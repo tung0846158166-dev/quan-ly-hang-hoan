@@ -58,7 +58,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.6.5
+          name: QuanLyHangHoan-Windows-Installer-v1.6.6
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -67,24 +67,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.6.5
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.5 (Tự Động Phục Hồi Ngày Gửi Đi, Fix Bảng Tổng Kết & Bảng Chờ Đồng Bộ ĐT)"
+          tag_name: v1.6.6
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.6.6 (Thêm Cột Ghi Chú Của Tôi & Ghi Chú Lý Do Theo Dõi Đơn)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.5
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.6.6
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.5`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.5.exe`)
-            - **Các cải tiến & tính năng đột phá mới nhất trong phiên bản v1.6.5**:
-              1. 📅 **Tự Động Phục Hồi Chuẩn Xác Cột "Ngày Gửi Đi"**:
-                 - Tích hợp cơ chế phục hồi ngày gửi đi đa tầng thông minh: kiểm tra `shipDate` -> kiểm tra `rawDetails` / `orderDate` -> đối soát CSDL lịch sử đơn Shopee -> giải mã trực tiếp tiền tố ngày tháng `YYMMDD` từ Mã Đơn Hàng Shopee (100% không bao giờ bị ô trống).
-                 - Tự động quét và phục hồi lại toàn bộ ngày gửi cho các đơn hàng cũ đã lưu trên ổ cứng ngay khi khởi động phần mềm.
-              2. 📊 **Sửa Triệt Để Giao Diện Bảng Tổng Kết Thống Kê Phân Loại**:
-                 - Loại bỏ hoàn toàn xung đột CSS sticky làm cột "Tên Sản Phẩm" bị ép co cụm 40px.
-                 - Cột Tên Sản Phẩm hiển thị rộng rãi, rõ ràng, toàn bộ bảng mở rộng 100% toàn màn hình với nền trắng sang trọng, không còn dải màu đỏ trống bên phải.
-              3. 📱 **Bảng Danh Sách Chờ Đồng Bộ Độc Lập Trên Điện Thoại (Quét Lúc Tắt Máy Tính)**:
-                 - Bổ sung bảng chuyên biệt "BẢNG DANH SÁCH ĐƠN CHỜ ĐỒNG BỘ VỚI MÁY TÍNH" ngay trên giao diện quét mã điện thoại.
-                 - Khi máy tính chưa bật, mọi kiện hàng quét và ảnh chụp được lưu trữ cục bộ an toàn, hiển thị rõ ràng mã vận đơn, giờ quét, biểu tượng ảnh và huy hiệu số lượng chờ nạp.
-                 - Cho phép người dùng xóa từng đơn đã quét (`🗑️ Xóa`) hoặc xóa toàn bộ danh sách chờ bất kỳ lúc nào trước khi mở máy tính để đồng bộ.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.6.6`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.6.6.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.6.6**:
+              1. 📝 **Bổ sung cột "Ghi Chú Của Tôi" trên Bảng Chính**:
+                 - Cho phép người dùng ghi chú nội bộ riêng cho từng đơn hàng (bấm 1 lần xem nhanh/copy, nhấp đúp để gõ chỉnh sửa trực tiếp, Enter hoặc click ngoài tự động lưu).
+                 - Xuất khẩu đầy đủ cột Ghi Chú Của Tôi sang các bảng báo cáo Excel.
+              2. ⭐ **Thêm Ghi Chú / Lý Do Theo Dõi Khi Tích Chọn Theo Dõi**:
+                 - Khi tích chọn theo dõi (hoặc bấm biểu tượng ngôi sao), hệ thống mở hộp thoại để nhập lý do theo dõi (ví dụ: Chờ bồi thường, Hàng dễ vỡ, Nghi ngờ tráo hàng...).
+                 - Bấm lại vào ngôi sao để chỉnh sửa nhanh lý do theo dõi hoặc xóa trắng để gỡ khỏi danh sách theo dõi.
+                 - Bảng Theo Dõi Đơn Hàng (Watchlist Modal) có thêm cột "Lý Do Theo Dõi" với nút chỉnh sửa nhanh ✏️.
+                 - Tìm kiếm thông minh theo từ khóa trong Ghi Chú Của Tôi và Lý Do Theo Dõi.
           files: |
             dist/*.exe
         env:

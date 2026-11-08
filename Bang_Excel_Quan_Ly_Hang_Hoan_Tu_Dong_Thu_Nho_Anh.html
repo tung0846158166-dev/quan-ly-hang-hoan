@@ -682,7 +682,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.5</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.6.6</span>
               </div>
             </div>
           </div>
@@ -1016,6 +1016,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <th class="w-24 py-1.5" title="Bấm vào ô rồi Ctrl+V để dán ảnh đơn hàng">Ảnh Đơn Hàng</th>
             <th class="w-36 py-1.5" title="Lý do hoàn hàng hoặc lý do hủy đơn từ sàn">Lý Do Hoàn / Hủy</th>
             <th class="w-44 py-1.5 !bg-amber-950" title="Ghi chú / nhận xét của người mua hàng khi đặt hoặc khi trả hàng">Ghi Chú Người Mua</th>
+            <th class="w-48 py-1.5 !bg-indigo-950 text-indigo-100" title="Ghi chú riêng của tôi / shop (Bấm 1 lần xem đầy đủ, nhấp đúp để chỉnh sửa)">Ghi Chú Của Tôi</th>
             <th class="w-16 no-print py-1.5 text-center">Thao Tác</th>
           </tr>
         </thead>
@@ -1025,7 +1026,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td colspan="15" class="text-right py-2.5 px-4 uppercase text-slate-800">TỔNG CỘNG TOÀN BỘ ĐƠN HÀNG HOÀN:</td>
             <td id="footTotalQty" class="text-center py-2.5 text-slate-900 text-sm">0</td>
             <td id="footTotalPrice" class="text-right py-2.5 px-2 text-slate-900 text-sm">0 đ</td>
-            <td colspan="5"></td>
+            <td colspan="6"></td>
           </tr>
         </tfoot>
       </table>
@@ -1285,6 +1286,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <th class="w-32 py-2 px-2 border-r border-slate-700">Mã Đơn Hàng</th>
               <th class="w-36 py-2 px-2 border-r border-slate-700">Mã Vận Đơn</th>
               <th class="min-w-[200px] py-2 px-2 border-r border-slate-700">Sản Phẩm & Phân Loại</th>
+              <th class="w-48 py-2 px-2 border-r border-slate-700">Lý Do Theo Dõi</th>
               <th class="w-32 py-2 text-center border-r border-slate-700">Ngày Hủy</th>
               <th class="w-40 py-2 text-center border-r border-slate-700">Hạn Cần Xử Lý</th>
               <th class="w-32 py-2 text-center border-r border-slate-700">Trạng Thái Sàn</th>
@@ -5913,7 +5915,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.6.5';
+    const APP_VERSION_NUMBER = '1.6.6';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8266,6 +8268,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         price: 'Tổng giá trị',
         note: 'Lý do hoàn',
         buyerNote: 'Ghi chú người mua',
+        myNote: 'Ghi chú của tôi',
         platform: 'Sàn TMĐT',
         orderType: 'Loại đơn',
         preOrder: 'Hàng đặt trước',
@@ -8282,7 +8285,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const oType = getOrderType(order);
       const preOrderText = order.preOrder || 'Đơn thường';
       const claimText = `${order.rawDetails?.claimId || ''} ${order.claimId || ''} ${order.buyerUsername || ''} ${order.rawDetails?.buyerUsername || ''}`;
-      const hay = `${plat} ${oType} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${itemsText}`.toLowerCase();
+      const hay = `${plat} ${oType} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''} ${itemsText}`.toLowerCase();
       const kwLower = kwTrim.toLowerCase();
       const kwNorm = removeVietnameseTones(kwTrim).toLowerCase();
       const hayNorm = removeVietnameseTones(hay).toLowerCase();
@@ -9811,7 +9814,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                        onchange="toggleSingleOrderSelection(${orderIdx}, this.checked)" />
                 <button type="button" onclick="toggleOrderWatchlist(${orderIdx})" 
                         class="text-[14px] leading-none transition transform hover:scale-125 focus:outline-none cursor-pointer" 
-                        title="${order.isWatchlist ? 'Đang theo dõi đơn này (Bấm để gỡ khỏi theo dõi)' : 'Bấm để thêm đơn này vào Danh Sách Theo Dõi'}">
+                        title="${order.isWatchlist ? `⭐ Đang theo dõi: ${escapeAttr(order.watchlistReason || 'Chưa ghi lý do')}\n(Bấm để sửa lý do hoặc bỏ theo dõi)` : 'Bấm để thêm đơn này vào Danh Sách Theo Dõi (Kèm ghi chú lý do)'}">
                   ${order.isWatchlist ? '⭐' : '<span class="text-slate-300 hover:text-amber-500 font-bold">☆</span>'}
                 </button>
               </div>
@@ -9862,6 +9865,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </td>
             <td>${renderCellInput(`${orderIdx}:note`, `Lý do hoàn/hủy Đơn #${orderIdx+1}`, order.note, 'text-xs text-slate-700', 'Lý do...', `updateOrderField(${orderIdx},'note',this.value)`)}</td>
             <td>${renderCellInput(`${orderIdx}:buyerNote`, `Ghi chú người mua Đơn #${orderIdx+1}`, order.buyerNote || '', 'text-xs text-amber-900', 'Ghi chú...', `updateOrderField(${orderIdx},'buyerNote',this.value)`)}</td>
+            <td>${renderCellInput(`${orderIdx}:myNote`, `Ghi chú của tôi Đơn #${orderIdx+1}`, order.myNote || '', 'text-xs font-semibold text-indigo-900', 'Thêm ghi chú shop...', `updateOrderField(${orderIdx},'myNote',this.value)`)}</td>
             <td class="text-center no-print whitespace-nowrap px-1">
               <div class="flex items-center justify-center gap-1">
                 <button type="button" onclick="toggleOrderItemsDrawer(${orderIdx})" class="p-1 text-indigo-700 hover:bg-indigo-50 rounded text-xs" title="Xem / sửa từng sản phẩm">
@@ -9879,7 +9883,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (isDrawerOpen) {
           html += `
             <tr id="drawer_row_${orderIdx}" class="bg-indigo-50/40 border-y-2 border-indigo-200">
-              <td colspan="22" class="p-2.5 sm:p-3">
+              <td colspan="23" class="p-2.5 sm:p-3">
                 ${renderOrderItemsDrawer(order, orderIdx)}
               </td>
             </tr>
@@ -10580,14 +10584,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Tổng Giá Trị Đơn (VNĐ)': itemIdx === 0 ? (Number(o.price) || 0) : 0,
             'Đã Nhận Thực Tế (Quét Kho)': o.status === 'Hàng đã trả' ? 'Đã nhận (Hàng đã trả)' : o.status === 'Bị mất' ? 'Bị mất (Khiếu nại)' : o.status === 'Không cần nhận' ? 'Không cần nhận (Hủy trước gửi)' : 'Chưa nhận (Chờ về)',
             'Lý Do Hoàn': o.note || '',
-            'Ghi Chú Người Mua': o.buyerNote || ''
+            'Ghi Chú Người Mua': o.buyerNote || '',
+            'Ghi Chú Của Tôi': o.myNote || '',
+            'Lý Do Theo Dõi': o.watchlistReason || ''
           });
           currentRowIdx++;
         });
 
         if (span > 1) {
           const endRow = currentRowIdx - 1;
-          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18].forEach(colIdx => {
+          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19, 20].forEach(colIdx => {
             merges.push({ s: { r: startRow, c: colIdx }, e: { r: endRow, c: colIdx } });
           });
         }
@@ -13989,18 +13995,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function bulkAddSelectedToWatchlist() {
       if (selectedOrdersSet.size === 0) return;
+      const count = selectedOrdersSet.size;
+      const reason = prompt(
+        `⭐ THÊM ${count} ĐƠN VÀO DANH SÁCH THEO DÕI\n\nNhập ghi chú / lý do theo dõi chung cho ${count} đơn này:\n(Để trống nếu không cần ghi chú lý do)`,
+        ''
+      );
+      if (reason === null) return;
       let countAdded = 0;
       selectedOrdersSet.forEach(idx => {
         if (orders[idx]) {
           orders[idx].isWatchlist = true;
+          if (reason.trim()) orders[idx].watchlistReason = reason.trim();
           countAdded++;
         }
       });
       saveOrders();
       updateWatchlistBadge();
       renderAll(false);
-      clearAllSelectedOrders(); // v1.6.5: Tự động bỏ chọn & ẩn bulkActionBar để tránh bấm nhầm nút Xóa!
-      showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Danh Sách Theo Dõi!`, 'success');
+      clearAllSelectedOrders();
+      showAppToast(`⭐ Đã thêm thành công ${countAdded} đơn vào Theo Dõi${reason.trim() ? ` (${reason.trim()})` : ''}!`, 'success');
       addAppNotification({
         type: 'system',
         title: `⭐ Đã thêm ${countAdded} đơn vào Danh Sách Theo Dõi`,
@@ -14067,17 +14080,47 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function toggleOrderWatchlist(orderIdx) {
       if (!orders[orderIdx]) return;
-      orders[orderIdx].isWatchlist = !orders[orderIdx].isWatchlist;
-      saveOrders();
-      updateWatchlistBadge();
-      renderAll(false);
-      const isNow = orders[orderIdx].isWatchlist;
-      showAppToast(
-        isNow 
-          ? `⭐ Đã thêm đơn #${orderIdx + 1} (${orders[orderIdx].orderId || ''}) vào Danh Sách Theo Dõi!`
-          : `Đã bỏ theo dõi đơn #${orderIdx + 1}`,
-        isNow ? 'success' : 'info'
-      );
+      const order = orders[orderIdx];
+      if (!order.isWatchlist) {
+        const curReason = order.watchlistReason || '';
+        const inputReason = prompt(
+          `⭐ THÊM ĐƠN VÀO DANH SÁCH THEO DÕI\n\nĐơn hàng: #${orderIdx + 1} (${order.orderId || order.track || ''})\n\nNhập ghi chú / lý do theo dõi (ví dụ: Chờ bồi thường, Hàng dễ vỡ, Nghi ngờ tráo hàng, Cần gọi khách...):\n(Bấm OK để lưu, Cancel để hủy)`,
+          curReason
+        );
+        if (inputReason === null) return;
+        order.isWatchlist = true;
+        order.watchlistReason = inputReason.trim();
+        saveOrders();
+        updateWatchlistBadge();
+        renderAll(false);
+        showAppToast(`⭐ Đã thêm đơn #${orderIdx + 1} vào Theo Dõi${order.watchlistReason ? ` (${order.watchlistReason})` : ''}!`, 'success');
+        addAppNotification({
+          type: 'system',
+          title: `⭐ Đã thêm đơn #${orderIdx + 1} vào Theo Dõi`,
+          content: `Mã đơn: ${order.orderId || order.track || ''} - Lý do: ${order.watchlistReason || 'Chưa ghi lý do'}`,
+          isImportant: false
+        });
+      } else {
+        const curReason = order.watchlistReason || '';
+        const inputReason = prompt(
+          `⭐ ĐƠN #${orderIdx + 1} ĐANG TRONG DANH SÁCH THEO DÕI\n\nLý do hiện tại: "${curReason || 'Chưa ghi lý do'}"\n\n- SỬA LÝ DO: Nhập lý do mới rồi bấm OK\n- BỎ THEO DÕI: Xóa trắng toàn bộ rồi bấm OK\n- ĐÓNG LẠI (GIỮ NGUYÊN): Bấm Cancel`,
+          curReason
+        );
+        if (inputReason === null) return;
+        if (!inputReason.trim()) {
+          order.isWatchlist = false;
+          order.watchlistReason = '';
+          saveOrders();
+          updateWatchlistBadge();
+          renderAll(false);
+          showAppToast(`Đã bỏ theo dõi đơn #${orderIdx + 1}`, 'info');
+        } else {
+          order.watchlistReason = inputReason.trim();
+          saveOrders();
+          renderAll(false);
+          showAppToast(`⭐ Đã cập nhật lý do theo dõi đơn #${orderIdx + 1}: "${order.watchlistReason}"`, 'success');
+        }
+      }
     }
 
     function updateWatchlistBadge() {
@@ -14188,6 +14231,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             order.carrier || '',
             order.platform || '',
             order.platformStatus || '',
+            order.watchlistReason || '',
+            order.myNote || '',
             (order.items || []).map(i => `${i.product || i.name || ''} ${i.color || i.variant || ''} ${i.size || ''}`).join(' ')
           ].join(' ').toLowerCase();
           if (!searchBlob.includes(kw)) return false;
@@ -14200,7 +14245,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       if (filtered.length === 0) {
         tbody.innerHTML = `<tr>
-          <td colspan="9" class="text-center py-10 text-slate-400 bg-slate-50/50">
+          <td colspan="10" class="text-center py-10 text-slate-400 bg-slate-50/50">
             <div class="text-3xl mb-1.5">⭐</div>
             <div class="font-bold text-slate-600 text-sm">
               ${totalWl === 0 ? 'Chưa có đơn hàng nào trong danh sách theo dõi' : 'Không có đơn theo dõi nào khớp với bộ lọc hiện tại'}
@@ -14298,6 +14343,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </div>
               <div class="text-[10px] text-slate-500 mt-0.5">${escapeAttr(order.platform || 'Shopee')} • ${escapeAttr(order.carrier || '')}</div>
             </td>
+            <td class="py-2 px-2 max-w-[200px]">
+              <div class="flex items-center justify-between gap-1 group bg-amber-50/70 p-1 rounded border border-amber-200/60">
+                <span class="text-[11px] font-semibold text-amber-950 truncate flex-1" title="${escapeAttr(order.watchlistReason || 'Chưa có ghi chú lý do')}">
+                  ${order.watchlistReason ? `⭐ ${escapeAttr(order.watchlistReason)}` : '<span class="text-slate-400 italic">Chưa ghi lý do</span>'}
+                </span>
+                <button type="button" onclick="editSingleWatchlistReason(${originalIndex})"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 transition shadow-2xs cursor-pointer whitespace-nowrap"
+                        title="Bấm để chỉnh sửa lý do theo dõi">
+                  ✏️ Sửa
+                </button>
+              </div>
+            </td>
             <td class="py-2 text-center font-semibold text-amber-900">
               ${escapeAttr(order.returnDate || order.shipDate || '-')}
             </td>
@@ -14331,6 +14388,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       tbody.innerHTML = rowsHtml;
+    }
+
+    function editSingleWatchlistReason(orderIdx) {
+      if (!orders[orderIdx]) return;
+      const order = orders[orderIdx];
+      const curReason = order.watchlistReason || '';
+      const inputReason = prompt(
+        `⭐ SỬA LÝ DO THEO DÕI ĐƠN #${orderIdx + 1}\nMã đơn: ${order.orderId || order.track || ''}\n\nNhập nội dung lý do theo dõi mới:\n(Để trống nếu muốn xóa lý do)`,
+        curReason
+      );
+      if (inputReason === null) return;
+      order.watchlistReason = inputReason.trim();
+      saveOrders();
+      renderWatchlistTable();
+      renderAll(false);
+      showAppToast(`⭐ Đã cập nhật lý do theo dõi đơn #${orderIdx + 1}${order.watchlistReason ? `: "${order.watchlistReason}"` : ''}!`, 'success');
     }
 
     function locateOrderFromWatchlist(orderIdx) {
@@ -14474,7 +14547,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           'Tổng Giá Trị': Number(o.price) || 0,
           'Sản Phẩm': (o.items || []).map(it => `${it.product || it.name || ''} [${it.color || it.variant || ''} ${it.size || ''}] x${it.qty || 1}`).join('; '),
           'Lý Do Hoàn': o.note || '',
-          'Ghi Chú Người Mua': o.buyerNote || ''
+          'Ghi Chú Người Mua': o.buyerNote || '',
+          'Lý Do Theo Dõi': o.watchlistReason || '',
+          'Ghi Chú Của Tôi': o.myNote || ''
         };
       });
       const ws = XLSX.utils.json_to_sheet(rows);

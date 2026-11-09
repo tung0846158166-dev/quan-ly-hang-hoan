@@ -1131,11 +1131,22 @@
       if (!raw) return '';
       let str = String(raw).trim();
 
+      // 1. Nếu là URL, xử lý bóc tách thông minh
       if (str.includes('http://') || str.includes('https://') || str.includes('spx.vn') || str.includes('ghn.vn')) {
-        const mParam = str.match(/(?:spx|track|code|c|id|bill|order_code|s)=([A-Za-z0-9\.\-_]+)/i);
-        if (mParam && mParam[1]) str = mParam[1];
+        // 1.1 Tìm trong query params: ?spx=... hoặc ?bill=... hoặc ?code=...
+        const mParam = str.match(/(?:spx|track|code|c|id|bill|order_code|tracking|tracking_number|s)=([A-Za-z0-9\.\-_]+)/i);
+        if (mParam && mParam[1]) {
+          str = mParam[1];
+        } else {
+          // 1.2 Bóc các segment trong đường dẫn URL (loại trừ http:, domain)
+          const segments = str.split(/[\/\?#&]/).filter(s => s && !s.toLowerCase().startsWith('http') && !s.includes('.') && s.length >= 6);
+          if (segments.length > 0) {
+            str = segments[segments.length - 1];
+          }
+        }
       }
 
+      // 2. Tìm theo mẫu các hãng vận chuyển quen thuộc
       const mSpx = str.match(/(SPXVN[0-9A-Za-z]{6,18})/i);
       if (mSpx) return mSpx[1].toUpperCase();
 
@@ -1157,16 +1168,18 @@
       const mJt = str.match(/(8[024][0-9]{10,13})/);
       if (mJt) return mJt[1];
 
+      // 3. Phân tách dấu phân cách /, |, ;
       let cleaned = str.replace(/^[\*\"\'\<\>\#\s\[\]\(\)]+|[\*\"\'\<\>\#\s\[\]\(\)]+$/g, '').trim();
       if (cleaned.includes('/') || cleaned.includes('|') || cleaned.includes(';')) {
-        const parts = cleaned.split(/[\/\|;]/);
+        const parts = cleaned.split(/[\/\|;]/).filter(p => !p.toLowerCase().startsWith('http'));
         for (const p of parts) {
           const partClean = extractCleanTrackingCode(p);
-          if (partClean) return partClean;
+          if (partClean && partClean.length >= 6) return partClean;
         }
       }
 
-      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned)) {
+      // 4. Nếu là mã alphanumeric sạch (loại trừ http:)
+      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned) && !cleaned.toLowerCase().startsWith('http')) {
         return cleaned.toUpperCase();
       }
 
@@ -2123,7 +2136,7 @@
               } catch (eBd) {}
             }
 
-            // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine trên dải cắt siêu gọn 480x140 (11-15ms, đạt 40 FPS!)
+            // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine (Có Timeout chống treo + Hỗ trợ cả 2 chiều Ngang 0° & Dọc 90°)
             if (!detectedCode && typeof Quagga !== 'undefined') {
               const reticleW = Math.round(vw * 0.85);
               const reticleH = Math.round(vh * 0.28);
@@ -2131,18 +2144,42 @@
               const reticleY = Math.round((vh - reticleH) / 2);
 
               const sCtx = stripCanvas.getContext('2d', { willReadFrequently: true });
+
+              // Hàm helper giải mã Quagga bọc timeout an toàn 250ms
+              const safeQuaggaDecode = (canvasEl) => {
+                return Promise.race([
+                  new Promise(res => {
+                    try {
+                      Quagga.decodeSingle({
+                        src: canvasEl.toDataURL('image/png'),
+                        numOfWorkers: 0,
+                        decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+                        locate: false
+                      }, r => res(r?.codeResult?.code || null));
+                    } catch (eQ) {
+                      res(null);
+                    }
+                  }),
+                  new Promise(res => setTimeout(() => res(null), 250)) // Timeout chống treo vòng lặp
+                ]);
+              };
+
+              // Thử 1: Quét chiều ngang (0°)
+              sCtx.clearRect(0, 0, 480, 140);
               sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, 0, 0, 480, 140);
+              let qCode = await safeQuaggaDecode(stripCanvas);
 
-              const dataUrl = stripCanvas.toDataURL('image/png');
-
-              const qCode = await new Promise(res => {
-                Quagga.decodeSingle({
-                  src: dataUrl,
-                  numOfWorkers: 0,
-                  decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-                  locate: false
-                }, r => res(r?.codeResult?.code || null));
-              });
+              // Thử 2: Nếu chưa ra mã, thử quét chiều dọc xoay 90° (để đọc mã in dọc trên kiện hàng)
+              if (!qCode) {
+                sCtx.save();
+                sCtx.clearRect(0, 0, 480, 140);
+                sCtx.translate(240, 70);
+                sCtx.rotate(Math.PI / 2);
+                // Vẽ dải trung tâm nhưng xoay 90 độ
+                sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, -70, -240, 140, 480);
+                sCtx.restore();
+                qCode = await safeQuaggaDecode(stripCanvas);
+              }
 
               if (qCode && String(qCode).trim().length >= 6) {
                 detectedCode = String(qCode).trim();
@@ -2235,14 +2272,43 @@
         for (const st of strips) {
           sCtx.clearRect(0, 0, 480, 140);
           sCtx.drawImage(capCanvas, st.x, st.y, st.w, st.h, 0, 0, 480, 140);
-          const q = await new Promise(res => {
-            Quagga.decodeSingle({
-              src: sCanvas.toDataURL('image/png'),
-              numOfWorkers: 0,
-              decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-              locate: false
-            }, r => res(r?.codeResult?.code || null));
-          });
+          
+          let q = await Promise.race([
+            new Promise(res => {
+              try {
+                Quagga.decodeSingle({
+                  src: sCanvas.toDataURL('image/png'),
+                  numOfWorkers: 0,
+                  decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+                  locate: false
+                }, r => res(r?.codeResult?.code || null));
+              } catch (e) { res(null); }
+            }),
+            new Promise(res => setTimeout(() => res(null), 350))
+          ]);
+
+          // Thử xoay 90 độ nếu chưa đọc được
+          if (!q) {
+            sCtx.save();
+            sCtx.clearRect(0, 0, 480, 140);
+            sCtx.translate(240, 70);
+            sCtx.rotate(Math.PI / 2);
+            sCtx.drawImage(capCanvas, st.x, st.y, st.w, st.h, -70, -240, 140, 480);
+            sCtx.restore();
+            q = await Promise.race([
+              new Promise(res => {
+                try {
+                  Quagga.decodeSingle({
+                    src: sCanvas.toDataURL('image/png'),
+                    numOfWorkers: 0,
+                    decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+                    locate: false
+                  }, r => res(r?.codeResult?.code || null));
+                } catch (e) { res(null); }
+              }),
+              new Promise(res => setTimeout(() => res(null), 350))
+            ]);
+          }
           if (q && String(q).trim().length >= 6) {
             decoded = String(q).trim();
             break;
@@ -2343,8 +2409,9 @@
     const scannerBox = document.getElementById('scannerWrapper') || document.getElementById('reader');
     if (scannerBox) {
       scannerBox.addEventListener('click', (e) => {
+        // Chỉ khởi động lại nếu thực sự camera bị tắt hoàn toàn hoặc video bị tạm dừng
         const videoEl = document.querySelector('#reader video');
-        if (!videoEl || videoEl.paused || !videoEl.srcObject || !html5QrCode) {
+        if (!videoEl || videoEl.paused || !videoEl.srcObject || videoEl.readyState < 2) {
           forceRestartCamera().catch(() => {});
         }
       });

@@ -14929,6 +14929,126 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       updateBulkActionBarUI();
     }
 
+        async function bulkExportSelectedToExcel() {
+      if (selectedOrdersSet.size === 0) {
+        showAppToast('⚠️ Vui lòng tích chọn ít nhất 1 đơn hàng để xuất Excel!', 'warning');
+        return;
+      }
+      if (!(await requireUnlocked('Xuất Excel Đơn Đã Chọn'))) return;
+
+      const selectedIndices = Array.from(selectedOrdersSet).sort((a, b) => a - b);
+      const selectedList = selectedIndices.map(idx => orders[idx]).filter(Boolean);
+
+      if (selectedList.length === 0) {
+        showAppToast('⚠️ Không tìm thấy dữ liệu các đơn đã chọn!', 'warning');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const flatRows = [];
+      const merges = [];
+      let currentRowIdx = 1;
+
+      selectedList.forEach((o, orderIdx) => {
+        const items = (o.items && o.items.length > 0) ? o.items : [{ product: '', color: '', size: '', qty: 1 }];
+        const span = items.length;
+        const startRow = currentRowIdx;
+
+        items.forEach((it, itemIdx) => {
+          flatRows.push({
+            'STT': itemIdx === 0 ? orderIdx + 1 : `↳ SP ${itemIdx + 1}`,
+            'Sàn TMĐT': getOrderPlatform(o),
+            'Loại Đơn': getOrderType(o),
+            'Mã Đơn Hàng': o.orderId || '',
+            'Mã Vận Đơn': o.track || o.returnTrack || '',
+            'Mã VĐ Chiều Giao (Gốc)': o.forwardTrack || '',
+            'Đơn Vị Vận Chuyển': o.carrier || '',
+            'Ngày Gửi Đi': o.shipDate || '',
+            'Ngày Khách Bấm Hoàn/Hủy': o.returnDate || '',
+            'Ngày Hàng Về Kho': o.recvDate || '',
+            'Tên Sản Phẩm': it.product || it.name || '',
+            'Màu Sắc': it.color || it.variant || '',
+            'Size': it.size || '',
+            'Số Lượng': Number(it.qty) || 1,
+            'Tổng Giá Trị Đơn (VNĐ)': itemIdx === 0 ? (Number(o.price) || 0) : 0,
+            'Trạng Thái Nhận Kho': o.status === 'Hàng đã trả' ? 'Đã nhận (Hàng đã trả)' : o.status === 'Bị mất' ? 'Bị mất (Khiếu nại)' : o.status === 'Không cần nhận' ? 'Không cần nhận (Hủy trước gửi)' : 'Chưa nhận (Chờ về)',
+            'Trạng Thái Sàn': o.platformStatus || '',
+            'Đang Theo Dõi': o.isWatchlist ? 'Có (⭐)' : 'Không',
+            'Lý Do Hoàn': o.note || '',
+            'Ghi Chú Người Mua': o.buyerNote || '',
+            'Ghi Chú Của Tôi': o.myNote || '',
+            'Lý Do Theo Dõi': o.watchlistReason || ''
+          });
+          currentRowIdx++;
+        });
+
+        if (span > 1) {
+          const endRow = currentRowIdx - 1;
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20, 21].forEach(colIdx => {
+            merges.push({ s: { r: startRow, c: colIdx }, e: { r: endRow, c: colIdx } });
+          });
+        }
+      });
+
+      const ws1 = XLSX.utils.json_to_sheet(flatRows);
+      if (merges.length > 0) ws1['!merges'] = merges;
+      XLSX.utils.book_append_sheet(wb, ws1, '1_Don_Da_Chon_Chi_Tiet');
+
+      const productMap = new Map();
+      selectedList.forEach(o => {
+        const items = (o.items && o.items.length > 0) ? o.items : [{ product: 'Chưa rõ', color: '', size: '', qty: 1 }];
+        items.forEach(it => {
+          const key = `${it.product || 'Chưa rõ'}__${it.color || ''}__${it.size || ''}`;
+          if (!productMap.has(key)) {
+            productMap.set(key, {
+              product: it.product || 'Chưa rõ',
+              color: it.color || '',
+              size: it.size || '',
+              totalQty: 0,
+              orderCount: 0
+            });
+          }
+          const rec = productMap.get(key);
+          rec.totalQty += (Number(it.qty) || 1);
+          rec.orderCount += 1;
+        });
+      });
+
+      const sumRows = Array.from(productMap.values()).map((p, pIdx) => ({
+        'STT': pIdx + 1,
+        'Tên Sản Phẩm': p.product,
+        'Màu Sắc': p.color,
+        'Size': p.size,
+        'Tổng Số Lượng': p.totalQty,
+        'Số Lần Xuất Hiện (Đơn)': p.orderCount
+      }));
+
+      const totalAllQty = sumRows.reduce((sum, r) => sum + r['Tổng Số Lượng'], 0);
+      sumRows.push({
+        'STT': 'TỔNG CỘNG',
+        'Tên Sản Phẩm': `Tổng cộng ${sumRows.length} phân loại sản phẩm`,
+        'Màu Sắc': '',
+        'Size': '',
+        'Tổng Số Lượng': totalAllQty,
+        'Số Lần Xuất Hiện (Đơn)': selectedList.length
+      });
+
+      const ws2 = XLSX.utils.json_to_sheet(sumRows);
+      XLSX.utils.book_append_sheet(wb, ws2, '2_Tong_Ket_San_Pham');
+
+      const dStr = new Date().toISOString().slice(0, 10);
+      const fileName = `Danh_Sach_${selectedList.length}_Don_Da_Chon_${dStr}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      showAppToast(`📊 Đã xuất Excel thành công ${selectedList.length} đơn hàng đã chọn!`, 'success');
+      addAppNotification({
+        type: 'system',
+        title: `📊 Đã xuất Excel ${selectedList.length} đơn hàng đã chọn`,
+        content: `File "${fileName}" đã được tải xuống máy tính với 2 sheet: Chi tiết từng đơn và Tổng kết số lượng sản phẩm.`,
+        isImportant: false
+      });
+    }
+
     async function bulkAddSelectedToWatchlist() {
       if (selectedOrdersSet.size === 0) return;
       const count = selectedOrdersSet.size;
@@ -15542,9 +15662,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <span class="w-6 h-6 rounded-full bg-blue-500 text-white font-black text-xs flex items-center justify-center" id="bulkSelectedCountBadge">0</span>
       <span class="font-bold text-xs text-slate-200">Đơn đã chọn</span>
     </div>
-    <button type="button" onclick="bulkAddSelectedToWatchlist()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95">
+    <button type="button" onclick="bulkAddSelectedToWatchlist()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95" title="Thêm các đơn đã chọn vào danh sách theo dõi">
       <span>⭐</span>
       <span>Thêm Vào Theo Dõi</span>
+    </button>
+    <button type="button" onclick="bulkExportSelectedToExcel()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95" title="Xuất các đơn đã chọn ra file Excel (.xlsx)">
+      <span>📊</span>
+      <span>Xuất Excel Đơn Đã Chọn</span>
     </button>
     <button type="button" onclick="bulkDeleteSelectedOrders()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95">
       <span>🗑️</span>

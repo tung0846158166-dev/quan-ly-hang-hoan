@@ -15049,6 +15049,619 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
+    function generateInteractiveChecklistHtml(selectedOrders) {
+  const exportDate = new Date().toLocaleString('vi-VN');
+  const fileId = 'chk_' + Date.now();
+
+  const rows = [];
+  let totalInitialQty = 0;
+
+  selectedOrders.forEach((o, oIdx) => {
+    const items = (o.items && o.items.length > 0) ? o.items : [{ product: 'Chưa rõ', color: '', size: '', qty: 1 }];
+    items.forEach((it, itIdx) => {
+      const q = Math.max(1, parseInt(it.qty, 10) || 1);
+      totalInitialQty += q;
+      rows.push({
+        id: `r_${oIdx}_${itIdx}`,
+        orderIdx: oIdx + 1,
+        orderId: o.orderId || '',
+        track: o.track || o.returnTrack || '',
+        product: it.product || it.name || '',
+        color: it.color || it.variant || '',
+        size: it.size || '',
+        initialQty: q,
+        checks: new Array(q).fill(false)
+      });
+    });
+  });
+
+  const jsonData = JSON.stringify(rows).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bảng Kiểm Hàng - ${selectedOrders.length} Đơn Hàng Hoàn</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1380px;
+      margin: 0 auto;
+    }
+    .header-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-sub {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+    .stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .badge-total { background: #334155; color: #f1f5f9; }
+    .badge-done { background: #064e3b; color: #34d399; border: 1px solid #10b981; }
+    .badge-pending { background: #78350f; color: #fbbf24; border: 1px solid #f59e0b; }
+    .badge-pwd { background: #4c1d95; color: #c084fc; border: 1px solid #a855f7; }
+
+    .search-box {
+      width: 100%;
+      background: #1e293b;
+      border: 1.5px solid #475569;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 14px;
+      color: #fff;
+      outline: none;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+    }
+    .search-box:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+
+    .table-wrapper {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      padding: 14px 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid #334155;
+      white-space: nowrap;
+    }
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #334155;
+      vertical-align: middle;
+    }
+    tr:hover {
+      background: rgba(51, 65, 85, 0.5);
+    }
+    tr.row-completed {
+      background: rgba(6, 78, 59, 0.25);
+    }
+    tr.row-completed td {
+      color: #94a3b8;
+    }
+    tr.row-completed .item-qty-badge {
+      background: #064e3b;
+      color: #34d399;
+      border-color: #10b981;
+    }
+
+    /* Editable cell styling */
+    .editable-cell {
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 4px 8px;
+      transition: all 0.15s;
+      display: inline-block;
+      max-width: 100%;
+    }
+    .editable-cell:hover {
+      background: rgba(56, 189, 248, 0.15);
+      outline: 1px dashed #38bdf8;
+    }
+    .editable-cell::after {
+      content: ' 🔒';
+      font-size: 10px;
+      opacity: 0.35;
+    }
+    .editable-cell:hover::after {
+      opacity: 1;
+    }
+
+    .code-badge {
+      font-family: monospace;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+    .track-badge {
+      font-family: monospace;
+      font-weight: 800;
+      color: #fbbf24;
+    }
+    .item-qty-badge {
+      font-weight: 900;
+      font-size: 14px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: #0284c7;
+      color: #fff;
+      border: 1px solid #38bdf8;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 50px;
+      justify-content: center;
+    }
+
+    /* Checkbox boxes container */
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .check-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 2px solid #64748b;
+      background: #0f172a;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 16px;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+    .check-btn:hover {
+      border-color: #38bdf8;
+      transform: scale(1.05);
+    }
+    .check-btn.checked {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-color: #34d399;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+    }
+    .check-btn.checked:hover {
+      border-color: #f43f5e;
+      background: linear-gradient(135deg, #e11d48, #be123c);
+    }
+    .check-btn-label {
+      font-size: 9px;
+      color: #94a3b8;
+      display: block;
+      text-align: center;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .status-waiting { background: #334155; color: #94a3b8; }
+    .status-partial { background: #78350f; color: #fde68a; border: 1px solid #f59e0b; }
+    .status-done { background: #064e3b; color: #a7f3d0; border: 1px solid #10b981; }
+
+    .footer-note {
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 20px;
+    }
+    .btn-action {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-reset {
+      background: #334155;
+      color: #f8fafc;
+    }
+    .btn-reset:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-card">
+      <div>
+        <div class="header-title">
+          <span>📋 BẢNG KIỂM TRA ĐƠN HÀNG HOÀN</span>
+          <span style="font-size:11px; background:#0284c7; color:#fff; padding:2px 8px; border-radius:999px;">TỰ ĐỘNG TRỪ SỐ LƯỢNG</span>
+        </div>
+        <div class="header-sub">Xuất ngày: ${exportDate} • Mã đợt: <code style="color:#38bdf8;">${fileId}</code></div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+        <span class="stat-badge badge-pwd" title="Mật khẩu bảo vệ sửa thông tin và bỏ tích là 9999">
+          <span>🔒 Mật Khẩu Sửa/Bỏ Tích: <b>9999</b></span>
+        </span>
+        <span class="stat-badge badge-total">
+          <span>Tổng SP: <b id="statTotalQty">${totalInitialQty}</b></span>
+        </span>
+        <span class="stat-badge badge-done">
+          <span>Đã Kiểm: <b id="statCheckedQty">0</b></span>
+        </span>
+        <span class="stat-badge badge-pending">
+          <span>Còn Lại: <b id="statRemainingQty">${totalInitialQty}</b></span>
+        </span>
+        <button class="btn-action btn-reset" onclick="resetAllChecklist()">
+          <span>🔄 Đặt lại</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Search Input -->
+    <input type="text" id="quickSearch" class="search-box"
+           placeholder="🔍 Tìm kiếm nhanh (Mã đơn, Mã vận đơn, Tên sản phẩm, Màu sắc, Size)..."
+           oninput="filterRows()" />
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 45px; text-align: center;">STT</th>
+            <th>Mã Đơn Hàng</th>
+            <th>Mã Vận Đơn</th>
+            <th>Tên Sản Phẩm</th>
+            <th>Màu</th>
+            <th>Size</th>
+            <th style="text-align: center; width: 110px;">Số Lượng</th>
+            <th style="min-width: 220px;">Ô Tích Theo Số Lượng (Tích = Trừ SL)</th>
+            <th style="width: 120px; text-align: center;">Trạng Thái</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Rendered dynamically via JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-note">
+      💡 <b>Hướng dẫn sử dụng:</b><br/>
+      • Bấm vào ô tích ở cuối mỗi hàng để <b>trừ số lượng sản phẩm</b> đi (mỗi ô tích tương ứng 1 sản phẩm).<br/>
+      • Ô đã tích rồi: Bắt buộc nhập mật khẩu <b>9999</b> mới được bỏ tích.<br/>
+      • Muốn chỉnh sửa Mã đơn, Mã vận đơn, Tên SP, Màu, Size: Bấm trực tiếp vào ô và nhập mật khẩu <b>9999</b>.<br/>
+      • Dữ liệu kiểm hàng được tự động lưu trên trình duyệt của bạn (không bị mất khi tải lại trang).
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = '${fileId}';
+    const MASTER_PASSWORD = '9999';
+
+    // Dữ liệu gốc
+    let rowsData = ${jsonData};
+
+    // Tải dữ liệu đã lưu nếu có
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === rowsData.length) {
+          rowsData = parsed;
+        }
+      }
+    } catch (e) {}
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rowsData));
+      } catch (e) {}
+      updateSummaryStats();
+    }
+
+    function updateSummaryStats() {
+      let total = 0;
+      let checked = 0;
+      rowsData.forEach(r => {
+        total += r.initialQty;
+        const c = r.checks.filter(Boolean).length;
+        checked += c;
+      });
+      const remaining = Math.max(0, total - checked);
+
+      document.getElementById('statTotalQty').textContent = total;
+      document.getElementById('statCheckedQty').textContent = checked;
+      document.getElementById('statRemainingQty').textContent = remaining;
+    }
+
+    // 1. Xử lý tích chọn / bỏ tích
+    function toggleCheck(rowId, checkIdx) {
+      const row = rowsData.find(r => r.id === rowId);
+      if (!row) return;
+
+      const isChecked = Boolean(row.checks[checkIdx]);
+
+      if (isChecked) {
+        // ĐANG TÍCH -> MUỐN BỎ TÍCH: BẮT BUỘC MẬT KHẨU 9999
+        const pwd = prompt('🔒 BẢO VỆ: Nhập mật khẩu (9999) để BỎ TÍCH ô này:');
+        if (pwd === null) return; // Bấm Hủy
+        if (pwd !== MASTER_PASSWORD) {
+          alert('❌ Mật khẩu không đúng! Bạn không thể bỏ tích ô này.');
+          return;
+        }
+        row.checks[checkIdx] = false;
+      } else {
+        // CHƯA TÍCH -> TÍCH VÀO ĐỂ TRỪ SỐ LƯỢNG (Không cần mật khẩu khi tích kiểm hàng)
+        row.checks[checkIdx] = true;
+      }
+
+      saveState();
+      renderTable();
+    }
+
+    // 2. Xử lý chỉnh sửa thông tin ô dữ liệu (Bắt buộc mật khẩu 9999)
+    function editCell(rowId, fieldName, fieldLabel) {
+      const row = rowsData.find(r => r.id === rowId);
+      if (!row) return;
+
+      const pwd = prompt(\`🔒 BẢO VỆ: Nhập mật khẩu (9999) để sửa [\${fieldLabel}]:\`);
+      if (pwd === null) return;
+      if (pwd !== MASTER_PASSWORD) {
+        alert('❌ Mật khẩu không đúng! Không được phép chỉnh sửa.');
+        return;
+      }
+
+      const currentVal = row[fieldName] || '';
+      const newVal = prompt(\`Nhập giá trị mới cho [\${fieldLabel}]:\`, currentVal);
+      if (newVal !== null) {
+        if (fieldName === 'initialQty') {
+          const num = parseInt(newVal, 10);
+          if (isNaN(num) || num < 1) {
+            alert('❌ Số lượng phải là số nguyên lớn hơn 0!');
+            return;
+          }
+          row.initialQty = num;
+          // Cập nhật mảng checks theo số lượng mới
+          const newChecks = new Array(num).fill(false);
+          for (let i = 0; i < Math.min(num, row.checks.length); i++) {
+            newChecks[i] = row.checks[i];
+          }
+          row.checks = newChecks;
+        } else {
+          row[fieldName] = newVal.trim();
+        }
+        saveState();
+        renderTable();
+      }
+    }
+
+    // 3. Đặt lại tất cả (Cần mật khẩu 9999)
+    function resetAllChecklist() {
+      const pwd = prompt('🔒 Nhập mật khẩu (9999) để ĐẶT LẠI toàn bộ tiến độ kiểm hàng:');
+      if (pwd !== MASTER_PASSWORD) {
+        alert('❌ Mật khẩu không đúng!');
+        return;
+      }
+      rowsData.forEach(r => {
+        r.checks = new Array(r.initialQty).fill(false);
+      });
+      saveState();
+      renderTable();
+      alert('✅ Đã đặt lại toàn bộ tiến độ kiểm hàng về ban đầu!');
+    }
+
+    // 4. Tìm kiếm nhanh
+    function filterRows() {
+      const q = (document.getElementById('quickSearch').value || '').toLowerCase().trim();
+      const trs = document.querySelectorAll('#tableBody tr');
+
+      trs.forEach(tr => {
+        const text = tr.getAttribute('data-search') || '';
+        if (!q || text.includes(q)) {
+          tr.style.display = '';
+        } else {
+          tr.style.display = 'none';
+        }
+      });
+    }
+
+    // 5. Render toàn bộ bảng
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      rowsData.forEach((row, idx) => {
+        const checkedCount = row.checks.filter(Boolean).length;
+        const remainingQty = Math.max(0, row.initialQty - checkedCount);
+        const isFullyDone = (remainingQty === 0);
+
+        const tr = document.createElement('tr');
+        tr.id = 'row_' + row.id;
+        if (isFullyDone) tr.className = 'row-completed';
+
+        // Chuỗi tìm kiếm
+        const searchStr = [
+          row.orderId,
+          row.track,
+          row.product,
+          row.color,
+          row.size,
+          isFullyDone ? 'đã đủ' : 'chờ kiểm'
+        ].join(' ').toLowerCase();
+        tr.setAttribute('data-search', searchStr);
+
+        // Sinh danh sách ô tích theo số lượng
+        let checkButtonsHtml = '<div class="checkbox-group">';
+        for (let i = 0; i < row.initialQty; i++) {
+          const isChk = Boolean(row.checks[i]);
+          checkButtonsHtml += \`
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+              <button type="button" class="check-btn \${isChk ? 'checked' : ''}"
+                      onclick="toggleCheck('\${row.id}', \${i})"
+                      title="\${isChk ? 'Đã kiểm (Bấm để bỏ tích - cần mật khẩu 9999)' : 'Bấm để xác nhận kiểm 1 sản phẩm (trừ số lượng)'}">
+                \${isChk ? '✓' : ''}
+              </button>
+              <span class="check-btn-label">SP \${i+1}</span>
+            </div>
+          \`;
+        }
+        checkButtonsHtml += '</div>';
+
+        // Trạng thái
+        let statusHtml = '';
+        if (isFullyDone) {
+          statusHtml = '<span class="status-badge status-done">✅ Đã đủ (' + checkedCount + '/' + row.initialQty + ')</span>';
+        } else if (checkedCount > 0) {
+          statusHtml = '<span class="status-badge status-partial">⏳ Đang kiểm (' + checkedCount + '/' + row.initialQty + ')</span>';
+        } else {
+          statusHtml = '<span class="status-badge status-waiting">Chờ kiểm</span>';
+        }
+
+        tr.innerHTML = \`
+          <td style="text-align: center; color: #64748b; font-weight: bold;">\${idx + 1}</td>
+          <td>
+            <span class="editable-cell code-badge" onclick="editCell('\${row.id}', 'orderId', 'Mã Đơn Hàng')">\${escapeHtml(row.orderId)}</span>
+          </td>
+          <td>
+            <span class="editable-cell track-badge" onclick="editCell('\${row.id}', 'track', 'Mã Vận Đơn')">\${escapeHtml(row.track)}</span>
+          </td>
+          <td>
+            <span class="editable-cell font-bold" onclick="editCell('\${row.id}', 'product', 'Tên Sản Phẩm')">\${escapeHtml(row.product)}</span>
+          </td>
+          <td>
+            <span class="editable-cell" onclick="editCell('\${row.id}', 'color', 'Màu Sắc')">\${escapeHtml(row.color || '-')}</span>
+          </td>
+          <td>
+            <span class="editable-cell" onclick="editCell('\${row.id}', 'size', 'Size')">\${escapeHtml(row.size || '-')}</span>
+          </td>
+          <td style="text-align: center;">
+            <span class="item-qty-badge editable-cell" onclick="editCell('\${row.id}', 'initialQty', 'Số Lượng Ban Đầu')" title="Bấm để sửa số lượng (cần MK 9999)">
+              \${remainingQty}
+            </span>
+            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">(Gốc: \${row.initialQty})</div>
+          </td>
+          <td>\${checkButtonsHtml}</td>
+          <td style="text-align: center;">\${statusHtml}</td>
+        \`;
+
+        tbody.appendChild(tr);
+      });
+
+      updateSummaryStats();
+      filterRows();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Khởi tạo hiển thị ban đầu
+    renderTable();
+  <\/script>
+</body>
+</html>`;
+}
+
+
+
+
+    async function bulkExportSelectedToHtml() {
+      if (selectedOrdersSet.size === 0) {
+        showAppToast('⚠️ Vui lòng tích chọn ít nhất 1 đơn hàng để xuất file HTML!', 'warning');
+        return;
+      }
+      if (!(await requireUnlocked('Xuất File HTML Đơn Đã Chọn'))) return;
+
+      const selectedIndices = Array.from(selectedOrdersSet).sort((a, b) => a - b);
+      const selectedList = selectedIndices.map(idx => orders[idx]).filter(Boolean);
+
+      if (selectedList.length === 0) {
+        showAppToast('⚠️ Không tìm thấy dữ liệu các đơn đã chọn!', 'warning');
+        return;
+      }
+
+      const htmlContent = generateInteractiveChecklistHtml(selectedList);
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = `Bang_Kiem_Hang_Don_Hoan_${dateStr}_${selectedList.length}_Don.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      showAppToast(`✅ Đã xuất file HTML kiểm hàng cho ${selectedList.length} đơn đã chọn!`, 'success');
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('EXPORT_HTML', `Xuất file HTML kiểm hàng cho ${selectedList.length} đơn đã chọn.`);
+      }
+    }
+
     async function bulkAddSelectedToWatchlist() {
       if (selectedOrdersSet.size === 0) return;
       const count = selectedOrdersSet.size;
@@ -15669,6 +16282,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <button type="button" onclick="bulkExportSelectedToExcel()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95" title="Xuất các đơn đã chọn ra file Excel (.xlsx)">
       <span>📊</span>
       <span>Xuất Excel Đơn Đã Chọn</span>
+    </button>
+    <button type="button" onclick="bulkExportSelectedToHtml()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95" title="Xuất file HTML kiểm hàng tương tác (mật khẩu 9999 &amp; ô tích trừ số lượng)">
+      <span>🌐</span>
+      <span>Xuất HTML Kiểm Hàng</span>
     </button>
     <button type="button" onclick="bulkDeleteSelectedOrders()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer active:scale-95">
       <span>🗑️</span>

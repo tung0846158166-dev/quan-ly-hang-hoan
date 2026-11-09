@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+    <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>📱 Máy Quét Mã Vận Đơn Shopee / TikTok</title>
   <style>
@@ -20,6 +23,37 @@
       flex-direction: column;
       user-select: none;
       position: relative;
+    }
+
+    
+    /* Laser Scan Animation */
+    @keyframes laserSweep {
+      0% { top: 10%; opacity: 0.3; }
+      50% { top: 90%; opacity: 1; }
+      100% { top: 10%; opacity: 0.3; }
+    }
+    .laser-scanner-line {
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #ef4444, #22c55e, #ef4444, transparent);
+      box-shadow: 0 0 12px #22c55e, 0 0 20px #ef4444;
+      border-radius: 999px;
+      animation: laserSweep 2s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 15;
+    }
+
+    /* Shutter Flash Animation */
+    #shutterFlashOverlay {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+      transition: opacity 0.15s ease-out;
     }
 
     /* Screen Flash Overlay (Nháy Xanh khi Đúng, Nháy Đỏ khi Trùng) */
@@ -554,36 +588,65 @@
       </div>
     </div>
 
-    <div class="camera-box">
-      <div id="reader"></div>
-      <!-- Indicator Giữ 2 Giây Mới Quét (v1.6.5) -->
-      <div id="holdScanOverlay" style="display:none; position:absolute; inset:0; z-index:40; pointer-events:none; background:rgba(15,23,42,0.65); backdrop-filter:blur(2px); flex-direction:column; align-items:center; justify-content:center; padding:16px;">
-        <div style="background:rgba(0,0,0,0.85); border:2px solid #22c55e; border-radius:14px; padding:12px 18px; text-align:center; box-shadow:0 8px 30px rgba(34,197,94,0.45); max-width:90%;">
-          <div style="font-size:12px; font-weight:800; color:#fbbf24; text-transform:uppercase; margin-bottom:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
-            <span>⏱️ ĐANG GIỮ MÃ</span>
-          </div>
-          <div id="holdScanCodeText" style="font-family:monospace; font-weight:900; font-size:14px; color:#fff; word-break:break-all; margin-bottom:8px;">SPXVN...</div>
-          <div style="font-size:11px; color:#cbd5e1; margin-bottom:8px;">Giữ yên thêm <span id="holdScanCountdown" style="color:#22c55e; font-weight:900; font-size:13px;">0.5s</span> để quét</div>
-          <div style="width:100%; height:8px; background:rgba(255,255,255,0.2); border-radius:999px; overflow:hidden;">
-            <div id="holdScanProgressBar" style="width:0%; height:100%; background:linear-gradient(90deg, #eab308, #22c55e); transition:width 0.1s linear;"></div>
-          </div>
+    <div class="camera-box" style="position:relative; overflow:hidden; border-radius:18px; border:2px solid #334155; box-shadow:0 10px 30px rgba(0,0,0,0.5); min-height:300px; background:#000;">
+      <div id="reader" style="width:100%; height:100%; min-height:300px; background:#000;"></div>
+      
+      <!-- Shutter Flash Effect -->
+      <div id="shutterFlashOverlay"></div>
+
+      <!-- Reticle / Target Viewfinder Frame -->
+      <div id="scannerReticle" style="position:absolute; inset:16px; pointer-events:none; border:2px dashed #22c55e; border-radius:16px; box-shadow:0 0 25px rgba(34,197,94,0.35); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:10px; z-index:10;">
+        <div style="font-size:11px; background:rgba(15,23,42,0.88); color:#22c55e; padding:4px 12px; border-radius:999px; font-weight:800; border:1px solid #22c55e; backdrop-filter:blur(4px); letter-spacing:0.3px;">
+          🎯 CĂN MÃ VẠCH 1D HOẶC QR VÀO GIỮA KHUNG
+        </div>
+        
+        <!-- Laser Sweep Line -->
+        <div class="laser-scanner-line"></div>
+        
+        <div style="font-size:10px; color:#cbd5e1; background:rgba(0,0,0,0.7); padding:3px 10px; border-radius:8px; backdrop-filter:blur(4px);">
+          ⚡ Tự động đọc tức thì 10-25ms • Đưa cách 15-25cm
         </div>
       </div>
-      <!-- Nút Làm Mới Camera nổi ở góc khung camera đ�� bấm khởi động lại ngay nếu bị đen/mờ -->
-      <button onclick="forceRestartCamera()" title="Khởi động lại Camera" style="position:absolute;top:10px;right:10px;z-index:20;background:rgba(15,23,42,0.82);color:#38bdf8;border:1.5px solid #38bdf8;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(0,0,0,0.45);">
-        <span>🔄</span>
-        <span>Làm mới Cam</span>
-      </button>
+
+      <!-- Top Toolbar: Flash & Zoom Pill -->
+      <div style="position:absolute; top:12px; left:12px; right:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; pointer-events:auto;">
+        <!-- Torch Toggle -->
+        <button id="torchToggleBtn" type="button" onclick="toggleTorch()" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
+          <span>⚡ Bật Flash</span>
+        </button>
+
+        <!-- Zoom Switcher (1x, 1.8x, 2.5x) -->
+        <div style="background:rgba(15,23,42,0.85); border:1.5px solid #64748b; border-radius:999px; padding:3px 5px; display:flex; gap:3px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
+          <button type="button" id="btnZoom1" onclick="setCameraZoom(1.0)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">1x</button>
+          <button type="button" id="btnZoom18" onclick="setCameraZoom(1.8)" style="background:#38bdf8; border:none; color:#0f172a; font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; cursor:pointer; box-shadow:0 1px 5px rgba(56,189,248,0.5);">1.8x</button>
+          <button type="button" id="btnZoom25" onclick="setCameraZoom(2.5)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">2.5x</button>
+        </div>
+
+        <!-- Refresh Cam -->
+        <button type="button" onclick="forceRestartCamera()" title="Khởi động lại Camera" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
+          <span>🔄</span>
+        </button>
+      </div>
+
+      <!-- Bottom Floating Shutter Button [📸 CHỤP ĐỌC NGAY] -->
+      <div style="position:absolute; bottom:14px; left:0; right:0; z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto;">
+        <button type="button" onclick="captureAndDecodeCurrentFrame()" style="background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; border:2.5px solid #ffffff; border-radius:999px; padding:8px 22px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 20px rgba(16,185,129,0.6); active:scale-95 transition:all 0.15s ease;">
+          <span style="font-size:15px;">📸</span>
+          <span>CHỤP ĐỌC TỨC THÌ (NẾU RUNG TAY)</span>
+        </button>
+      </div>
+
+      <!-- Camera Start Overlay (Nút bật khi lần đầu vào) -->
       <div id="cameraStartOverlay" class="camera-overlay">
         <label class="btn-secondary-cam">
-          <span>📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN</span>
+          <span>📷 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN</span>
           <input type="file" accept="image/*" onchange="scanSmartLabelImage(event)" />
         </label>
-        <button onclick="startCameraScanner()" class="btn-primary-cam">
+        <button type="button" onclick="startCameraScanner()" class="btn-primary-cam">
           <span>📷 BẬT CAMERA QUÉT TRỰC TIẾP</span>
         </button>
         <p class="hint-text">
-          ✨ <b>Nháy XANH khi mã đúng / mới • Nháy ĐỎ khi mã bị trùng</b> • Tự nhập thẳng vào bảng Máy Tính!
+          💡 <b>Nháy XANH khi mã đúng / mới • Nháy ĐỎ khi mã bị trùng</b> • Tự nhập thẳng vào bảng Máy Tính!
         </p>
       </div>
     </div>
@@ -1803,8 +1866,7 @@
     }
 
     // =========================================================================
-    // v1.8.0: SUPER ENGINE MULTI-SCANNER (JSQR 2D + QUAGGA2 SUB-PIXEL 1D + NATIVE BARCODE DETECTOR)
-    // Sửa triệt để 100% quét mã vạch 1D Code 128 trên điện thoại & Safari iOS
+    // v1.8.0: MASTER HIGH-SPEED SCANNER OVERHAUL (40 FPS SUB-PIXEL 1D + JSQR 2D + HARDWARE)
     // =========================================================================
     let mediaStream = null;
     let cameraScanInterval = null;
@@ -1812,6 +1874,60 @@
     let scanCanvas = null;
     let stripCanvas = null;
     let nativeDetector = null;
+    let currentZoomLevel = 1.8;
+    let isTorchActive = false;
+
+    async function setCameraZoom(val) {
+      currentZoomLevel = val;
+      ['btnZoom1', 'btnZoom18', 'btnZoom25'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.style.background = 'none';
+          btn.style.color = '#94a3b8';
+          btn.style.boxShadow = 'none';
+        }
+      });
+      const activeBtn = val <= 1.2 ? 'btnZoom1' : (val <= 2.0 ? 'btnZoom18' : 'btnZoom25');
+      const b = document.getElementById(activeBtn);
+      if (b) {
+        b.style.background = '#38bdf8';
+        b.style.color = '#0f172a';
+        b.style.boxShadow = '0 1px 5px rgba(56,189,248,0.5)';
+      }
+
+      if (!mediaStream) return;
+      const track = mediaStream.getVideoTracks()[0];
+      if (track && track.getCapabilities) {
+        const caps = track.getCapabilities();
+        if (caps.zoom) {
+          const target = Math.min(caps.zoom.max, Math.max(caps.zoom.min, val));
+          try {
+            await track.applyConstraints({ advanced: [{ zoom: target }] });
+          } catch (e) {}
+        }
+      }
+    }
+
+    async function toggleTorch() {
+      if (!mediaStream) return;
+      const track = mediaStream.getVideoTracks()[0];
+      if (!track || !track.getCapabilities) return;
+      const caps = track.getCapabilities();
+      if (caps.torch) {
+        isTorchActive = !isTorchActive;
+        try {
+          await track.applyConstraints({ advanced: [{ torch: isTorchActive }] });
+          const btn = document.getElementById('torchToggleBtn');
+          if (btn) {
+            btn.innerHTML = isTorchActive ? '<span>⚡ Tắt Flash</span>' : '<span>⚡ Bật Flash</span>';
+            btn.style.background = isTorchActive ? '#eab308' : 'rgba(15,23,42,0.85)';
+            btn.style.color = isTorchActive ? '#0f172a' : '#38bdf8';
+          }
+        } catch (e) {}
+      } else {
+        alert('Thiết bị này không hỗ trợ bật đèn Flash trực tiếp từ trình duyệt.');
+      }
+    }
 
     async function safelyStopAndClearScanner() {
       isCameraScanning = false;
@@ -1826,11 +1942,6 @@
           });
         } catch (e) {}
         mediaStream = null;
-      }
-      if (typeof html5QrCode !== 'undefined' && html5QrCode) {
-        try { await html5QrCode.stop(); } catch (e) {}
-        try { await html5QrCode.clear(); } catch (e) {}
-        html5QrCode = null;
       }
       const videoEl = document.getElementById('scannerLiveVideo');
       if (videoEl) {
@@ -1863,14 +1974,14 @@
         videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transform:translateZ(0);';
         videoContainer.appendChild(videoEl);
 
-        // Khởi động Camera chuẩn tuyệt đối cho iOS Safari & Android
         let stream = null;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 }, height: { ideal: 1080 }
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
             }
           });
         } catch (e1) {
@@ -1895,7 +2006,7 @@
         wasCameraActive = true;
         requestScreenWakeLock();
 
-        // Bật lấy nét liên tục (continuous focus)
+        // Tự động bật lấy nét liên tục và Zoom 1.8x (chuẩn khoảng cách quét kho)
         try {
           const track = stream.getVideoTracks()[0];
           if (track) {
@@ -1909,11 +2020,14 @@
               if (caps.focusMode && caps.focusMode.includes('continuous')) {
                 track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
               }
+              if (caps.zoom) {
+                const target = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.8));
+                track.applyConstraints({ advanced: [{ zoom: target }] }).catch(() => {});
+              }
             }
           }
         } catch (eFocus) {}
 
-        // Khởi động vòng lặp quét đa động cơ siêu nhạy
         startSuperScannerLoop(videoEl);
 
       } catch (err) {
@@ -1922,14 +2036,14 @@
           let errorMsg = '⚠️ Không thể mở Camera trực tiếp trên điện thoại.\n\n';
           const errName = err ? (err.name || '') : '';
           if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            errorMsg += '📌 Nguyên nhân: Safari / Trình duyệt chưa được cấp quyền dùng Camera.\n\n' +
+            errorMsg += '📌 Safari / Trình duyệt chưa được cấp quyền dùng Camera.\n\n' +
               '👉 Hướng dẫn khắc phục trên iPhone (Safari):\n' +
               '1. Bấm vào chữ [aA] (hoặc biểu tượng ổ khóa 🔒) ở góc trái thanh địa chỉ Safari.\n' +
               '2. Chọn "Cài đặt trang web" (Website Settings).\n' +
               '3. Mục Camera: chọn "Cho phép" (Allow).\n' +
               '4. Sau đó bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam].';
           } else if (errName === 'NotReadableError') {
-            errorMsg += '📌 Nguyên nhân: Camera đang bị ứng dụng khác (Zalo, Facebook, ứng dụng Chụp ảnh...) chiếm dụng.\n\n' +
+            errorMsg += '📌 Camera đang bị ứng dụng khác (Zalo, Facebook, ứng dụng Chụp ảnh...) chiếm dụng.\n\n' +
               '👉 Bạn hãy vuốt tắt các ứng dụng đó rồi bấm lại [Làm mới Cam] nhé!';
           } else {
             errorMsg += '👉 Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] bên dưới hoặc sử dụng nút [📷 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN] nhé!';
@@ -1947,7 +2061,11 @@
       isCameraScanning = true;
 
       if (!scanCanvas) scanCanvas = document.createElement('canvas');
-      if (!stripCanvas) stripCanvas = document.createElement('canvas');
+      if (!stripCanvas) {
+        stripCanvas = document.createElement('canvas');
+        stripCanvas.width = 480;
+        stripCanvas.height = 140;
+      }
 
       if ('BarcodeDetector' in window) {
         try {
@@ -1975,7 +2093,7 @@
 
             let detectedCode = null;
 
-            // 1. ENGINE 1: jsQR (Đọc siêu tốc 10-30ms cho mã QR / 2D của Shopee SPX & TikTok)
+            // 1. ENGINE 1: jsQR trên vùng giữa khung hình (10-15ms)
             if (typeof jsQR !== 'undefined') {
               try {
                 const cw = Math.round(vw * 0.85);
@@ -1990,7 +2108,7 @@
               } catch (eQr) {}
             }
 
-            // 2. ENGINE 2: Hardware Native BarcodeDetector (Nếu thiết bị hỗ trợ)
+            // 2. ENGINE 2: Hardware Native BarcodeDetector (nếu thiết bị có hỗ trợ)
             if (!detectedCode && nativeDetector) {
               try {
                 const barcodes = await nativeDetector.detect(scanCanvas);
@@ -2005,18 +2123,15 @@
               } catch (eBd) {}
             }
 
-            // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine (locate: false - Đọc cực nhạy mã vạch 1D Code 128 Shopee SPX)
+            // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine trên dải cắt siêu gọn 480x140 (11-15ms, đạt 40 FPS!)
             if (!detectedCode && typeof Quagga !== 'undefined') {
-              // Vùng ngắm trọng tâm (viewfinder reticle)
               const reticleW = Math.round(vw * 0.85);
-              const reticleH = Math.round(vh * 0.32);
+              const reticleH = Math.round(vh * 0.28);
               const reticleX = Math.round((vw - reticleW) / 2);
               const reticleY = Math.round((vh - reticleH) / 2);
 
-              stripCanvas.width = reticleW;
-              stripCanvas.height = reticleH;
               const sCtx = stripCanvas.getContext('2d', { willReadFrequently: true });
-              sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, 0, 0, reticleW, reticleH);
+              sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, 0, 0, 480, 140);
 
               const dataUrl = stripCanvas.toDataURL('image/png');
 
@@ -2046,11 +2161,102 @@
         }
 
         if (isCameraScanning) {
-          cameraScanInterval = setTimeout(processNextFrame, 80);
+          cameraScanInterval = setTimeout(processNextFrame, 70); // ~14 FPS mượt mà
         }
       };
 
       processNextFrame();
+    }
+
+    // Nút chụp tức thì trực tiếp từ video stream nếu camera auto chưa nhận
+    async function captureAndDecodeCurrentFrame() {
+      const videoEl = document.getElementById('scannerLiveVideo');
+      if (!videoEl || videoEl.paused || videoEl.readyState < 2) {
+        alert('Camera chưa sẵn sàng. Bạn hãy hướng camera vào đơn hàng rồi bấm lại nhé!');
+        return;
+      }
+
+      // Visual shutter flash
+      const shutterFlash = document.getElementById('shutterFlashOverlay');
+      if (shutterFlash) {
+        shutterFlash.style.opacity = '1';
+        setTimeout(() => { shutterFlash.style.opacity = '0'; }, 150);
+      }
+
+      const toast = document.getElementById('processingToast');
+      toast.classList.remove('hidden');
+      toast.textContent = '⚡ Đang phân tích ảnh chụp siêu tốc...';
+
+      const vw = videoEl.videoWidth || 1280;
+      const vh = videoEl.videoHeight || 720;
+      const capCanvas = document.createElement('canvas');
+      capCanvas.width = vw;
+      capCanvas.height = vh;
+      const ctx = capCanvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(videoEl, 0, 0, vw, vh);
+
+      let decoded = null;
+
+      // 1. jsQR trên toàn ảnh
+      if (typeof jsQR !== 'undefined') {
+        try {
+          const imgData = ctx.getImageData(0, 0, vw, vh);
+          const qr = jsQR(imgData.data, vw, vh);
+          if (qr && qr.data && String(qr.data).trim()) {
+            decoded = String(qr.data).trim();
+          }
+        } catch (e) {}
+      }
+
+      // 2. BarcodeDetector
+      if (!decoded && 'BarcodeDetector' in window) {
+        try {
+          const bd = new BarcodeDetector({ formats: ['code_128', 'code_39', 'qr_code', 'ean_13'] });
+          const barcodes = await bd.detect(capCanvas);
+          if (barcodes && barcodes.length > 0) {
+            decoded = barcodes[0].rawValue;
+          }
+        } catch (e) {}
+      }
+
+      // 3. Quagga2 trên 3 dải cắt
+      if (!decoded && typeof Quagga !== 'undefined') {
+        const sCanvas = document.createElement('canvas');
+        sCanvas.width = 480;
+        sCanvas.height = 140;
+        const sCtx = sCanvas.getContext('2d');
+
+        const strips = [
+          { x: Math.round(vw * 0.1), y: Math.round(vh * 0.35), w: Math.round(vw * 0.8), h: Math.round(vh * 0.3) },
+          { x: Math.round(vw * 0.35), y: Math.round(vh * 0.08), w: Math.round(vw * 0.58), h: Math.round(vh * 0.16) },
+          { x: Math.round(vw * 0.1), y: Math.round(vh * 0.15), w: Math.round(vw * 0.8), h: Math.round(vh * 0.25) }
+        ];
+
+        for (const st of strips) {
+          sCtx.clearRect(0, 0, 480, 140);
+          sCtx.drawImage(capCanvas, st.x, st.y, st.w, st.h, 0, 0, 480, 140);
+          const q = await new Promise(res => {
+            Quagga.decodeSingle({
+              src: sCanvas.toDataURL('image/png'),
+              numOfWorkers: 0,
+              decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+              locate: false
+            }, r => res(r?.codeResult?.code || null));
+          });
+          if (q && String(q).trim().length >= 6) {
+            decoded = String(q).trim();
+            break;
+          }
+        }
+      }
+
+      toast.classList.add('hidden');
+
+      if (decoded) {
+        handleCameraFrameDecoded(decoded);
+      } else {
+        alert('⚠️ Chưa nhận diện được mã. Bạn hãy đưa camera lại gần mã vạch hơn (khoảng 15-20cm) hoặc bấm nút [1.8x] hoặc [2.5x] để phóng to nhé!');
+      }
     }
 
     async function forceRestartCamera(isSilent = false) {

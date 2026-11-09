@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.2
+          name: QuanLyHangHoan-Windows-Installer-v1.8.3
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,29 +72,23 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.2
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.2 (Chống Trùng Đơn Khi Tạo Nhanh, Quét Mã Vạch 40 FPS & Chuẩn Hóa Chờ Về)"
+          tag_name: v1.8.3
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.3 (Gom Nhóm SP Khi Xuất HTML Kiểm Hàng & Bảo Mật Mật Khẩu)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.2
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.3
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.2`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.2.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.8.2**:
-              1. 🛡️ **Kiểm Soát & Chống Trùng Đơn Thông Minh Khi Tạo Nhanh**:
-                 - Khi dán danh sách mã vào bảng Tạo Đơn Nhanh, hệ thống tự động đối chiếu với toàn bộ đơn ngoài Bảng chính.
-                 - Nếu mã đã có sẵn, dòng đó sẽ được gắn nhãn cảnh báo trực quan: `⚠️ ĐÃ CÓ TRÊN BẢNG: Chờ về (Chưa nhận)` hoặc `⚠️ ĐÃ CÓ: Đã nhận kho (ngày...)`.
-                 - **Tự động bỏ tích (uncheck)** các đơn đã có sẵn để khi bấm *[📥 Đưa Đơn Đã Chọn Ra Ngoài]* sẽ chỉ đưa những đơn thực sự mới ra ngoài, không lo bị nhân đôi đơn.
-                 - Bổ sung nút **[⚡ Chỉ chọn đơn mới]** để tích chọn toàn bộ đơn mới và bỏ chọn toàn bộ đơn trùng chỉ với 1 cú click.
-                 - Bổ sung nút **[🛡️ Xóa đơn trùng]** để thanh lọc ngay lập tức toàn bộ các mã đã có ra khỏi danh sách tạo nhanh.
-                 - Nếu người dùng chủ động tích chọn đơn trùng để đưa ra ngoài, hệ thống sẽ đưa ra hộp thoại lựa chọn thông minh: **Cập nhật thông tin vào đơn cũ** (không tạo dòng trùng) hoặc **Vẫn tạo thêm dòng mới**.
-              2. ⚡ **Bảng Tạo Đơn Nhanh Hàng Loạt ([⚡ TẠO ĐƠN NHANH])**:
-                 - Tự động tách dòng, xóa dấu `-` và khoảng trắng.
-                 - Chọn Sàn TMĐT (Shopee, TikTok Shop, Lazada, Khác) và Loại đơn hoàn đồng loạt.
-                 - Đơn mới luôn ở trạng thái chuẩn **"Chưa nhận (Chờ về)"**.
-              3. ⏳ **Quy Trình Kho Chuẩn Tuyệt Đối**:
-                 - Đơn mới luôn mặc định là "Chờ về (Chưa nhận)", chỉ khi nhân viên quét hoàn kho thực tế trên điện thoại mới chuyển sang "Đã nhận".
-              4. 📱 **Nâng Cấp Quét Mã Vạch 40 FPS**:
-                 - Bắt nét siêu tốc tương đương Salework, xoay đa hướng 90°, không bị giật lag.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.3`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.3.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.8.3**:
+              1. 📋 **Tối Ưu Bảng HTML Xuất Kiểm Hàng Tương Tác**:
+                 - **Tự động gom nhóm sản phẩm**: Tất cả các sản phẩm có cùng Tên sản phẩm, Màu sắc và Size sẽ được tự động gom vào 1 dòng duy nhất và cộng dồn số lượng. (Lưu ý: Chỉ gom nhóm khi cả 3 yếu tố Tên, Màu, Size đều giống nhau 100%, khác size hoặc màu sẽ tách riêng).
+                 - **Lược bỏ cột mã**: Bỏ cột Mã đơn hàng và Mã vận đơn để bảng hiển thị rộng rãi, tập trung trực quan vào: Tên sản phẩm, Màu sắc, Size, Số lượng, Ô tích trừ và Trạng thái.
+                 - **Bảo mật tuyệt đối**: Đã ẩn hoàn toàn dòng chữ hiển thị mật khẩu `9999` trên giao diện, badge và các thông báo, tránh việc nhân viên nhìn thấy mật khẩu quản lý. Mật khẩu vẫn được bảo vệ ngầm khi sửa/bỏ tích.
+              2. 🛡️ **Chống Trùng Đơn Khi Tạo Nhanh Hàng Loạt**:
+                 - Tự động nhận diện và cảnh báo đơn đã có trên Bảng chính.
+                 - Tự động bỏ tích các đơn trùng và bổ sung nút `[Lọc bỏ đơn trùng]`, `[Chỉ chọn đơn mới]`.
+              3. ⚡ **Bảng Tạo Đơn Nhanh ([⚡ TẠO ĐƠN NHANH])**:
+                 - Dán danh sách mã hàng loạt, lọc ký tự thừa, phân loại sàn TMĐT và trạng thái chờ về chuẩn xác.
           files: |
             dist/*.exe
         env:

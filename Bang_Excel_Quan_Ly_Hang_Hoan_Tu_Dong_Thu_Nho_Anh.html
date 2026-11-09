@@ -699,7 +699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.2</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.3</span>
               </div>
             </div>
           </div>
@@ -6517,7 +6517,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.2';
+    const APP_VERSION_NUMBER = '1.8.3';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -15638,25 +15638,57 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   const exportDate = new Date().toLocaleString('vi-VN');
   const fileId = 'chk_' + Date.now();
 
-  const rows = [];
+  // 1. Tự động nhóm những sản phẩm có CÙNG Tên Sản Phẩm, Màu Sắc, Size vào 1 hàng duy nhất
+  // Lưu ý: Mọi thứ (Tên SP, Màu, Size) phải giống nhau 100% thì mới gom vào 1 hàng.
+  const groupMap = new Map();
   let totalInitialQty = 0;
 
-  selectedOrders.forEach((o, oIdx) => {
+  selectedOrders.forEach(o => {
     const items = (o.items && o.items.length > 0) ? o.items : [{ product: 'Chưa rõ', color: '', size: '', qty: 1 }];
-    items.forEach((it, itIdx) => {
+    items.forEach(it => {
       const q = Math.max(1, parseInt(it.qty, 10) || 1);
       totalInitialQty += q;
-      rows.push({
-        id: `r_${oIdx}_${itIdx}`,
-        orderIdx: oIdx + 1,
-        orderId: o.orderId || '',
-        track: o.track || o.returnTrack || '',
-        product: it.product || it.name || '',
-        color: it.color || it.variant || '',
-        size: it.size || '',
-        initialQty: q,
-        checks: new Array(q).fill(false)
-      });
+
+      const rawProd = String(it.product || it.name || 'Chưa rõ').trim();
+      const rawColor = String(it.color || it.variant || '-').trim() || '-';
+      const rawSize = String(it.size || '-').trim() || '-';
+
+      // Khóa nhóm chính xác theo: Tên sản phẩm + Màu sắc + Size
+      const groupKey = `${rawProd.toLowerCase()}|||${rawColor.toLowerCase()}|||${rawSize.toLowerCase()}`;
+
+      const oid = String(o.orderId || '').trim();
+      const trk = String(o.track || o.returnTrack || '').trim();
+
+      if (groupMap.has(groupKey)) {
+        const grp = groupMap.get(groupKey);
+        grp.initialQty += q;
+        if (oid && !grp.orderIds.includes(oid)) grp.orderIds.push(oid);
+        if (trk && !grp.tracks.includes(trk)) grp.tracks.push(trk);
+      } else {
+        groupMap.set(groupKey, {
+          id: 'grp_' + (groupMap.size + 1),
+          product: rawProd,
+          color: rawColor,
+          size: rawSize,
+          initialQty: q,
+          orderIds: oid ? [oid] : [],
+          tracks: trk ? [trk] : []
+        });
+      }
+    });
+  });
+
+  const rows = [];
+  groupMap.forEach(val => {
+    rows.push({
+      id: val.id,
+      product: val.product,
+      color: val.color,
+      size: val.size,
+      initialQty: val.initialQty,
+      checks: new Array(val.initialQty).fill(false),
+      orderIds: val.orderIds,
+      tracks: val.tracks
     });
   });
 
@@ -15783,7 +15815,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       border-color: #10b981;
     }
 
-    /* Editable cell styling */
     .editable-cell {
       cursor: pointer;
       border-radius: 6px;
@@ -15805,16 +15836,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       opacity: 1;
     }
 
-    .code-badge {
-      font-family: monospace;
-      font-weight: 800;
-      color: #38bdf8;
-    }
-    .track-badge {
-      font-family: monospace;
-      font-weight: 800;
-      color: #fbbf24;
-    }
     .item-qty-badge {
       font-weight: 900;
       font-size: 14px;
@@ -15830,7 +15851,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       justify-content: center;
     }
 
-    /* Checkbox boxes container */
     .checkbox-group {
       display: flex;
       flex-wrap: wrap;
@@ -15891,6 +15911,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       font-size: 12px;
       color: #64748b;
       margin-top: 20px;
+      line-height: 1.6;
     }
     .btn-action {
       padding: 8px 14px;
@@ -15921,11 +15942,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>📋 BẢNG KIỂM TRA ĐƠN HÀNG HOÀN</span>
           <span style="font-size:11px; background:#0284c7; color:#fff; padding:2px 8px; border-radius:999px;">TỰ ĐỘNG TRỪ SỐ LƯỢNG</span>
         </div>
-        <div class="header-sub">Xuất ngày: ${exportDate} • Mã đợt: <code style="color:#38bdf8;">${fileId}</code></div>
+        <div class="header-sub">Xuất ngày: ${exportDate} • Mã đợt: <code style="color:#38bdf8;">${fileId}</code> • Gom nhóm: <b>${rows.length} phân loại sản phẩm</b></div>
       </div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-        <span class="stat-badge badge-pwd" title="Mật khẩu bảo vệ sửa thông tin và bỏ tích là 9999">
-          <span>🔒 Mật Khẩu Sửa/Bỏ Tích: <b>9999</b></span>
+        <span class="stat-badge badge-pwd" title="Cần mật khẩu quản lý để sửa thông tin hoặc bỏ tích">
+          <span>🔒 Khóa Bảo Vệ Sửa / Bỏ Tích</span>
         </span>
         <span class="stat-badge badge-total">
           <span>Tổng SP: <b id="statTotalQty">${totalInitialQty}</b></span>
@@ -15944,7 +15965,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     <!-- Quick Search Input -->
     <input type="text" id="quickSearch" class="search-box"
-           placeholder="🔍 Tìm kiếm nhanh (Mã đơn, Mã vận đơn, Tên sản phẩm, Màu sắc, Size)..."
+           placeholder="🔍 Tìm kiếm nhanh (Tên sản phẩm, Màu sắc, Size)..."
            oninput="filterRows()" />
 
     <div class="table-wrapper">
@@ -15952,14 +15973,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <thead>
           <tr>
             <th style="width: 45px; text-align: center;">STT</th>
-            <th>Mã Đơn Hàng</th>
-            <th>Mã Vận Đơn</th>
             <th>Tên Sản Phẩm</th>
-            <th>Màu</th>
-            <th>Size</th>
+            <th style="width: 150px;">Màu</th>
+            <th style="width: 110px;">Size</th>
             <th style="text-align: center; width: 110px;">Số Lượng</th>
-            <th style="min-width: 220px;">Ô Tích Theo Số Lượng (Tích = Trừ SL)</th>
-            <th style="width: 120px; text-align: center;">Trạng Thái</th>
+            <th style="min-width: 240px;">Ô Tích Theo Số Lượng (Tích = Trừ SL)</th>
+            <th style="width: 140px; text-align: center;">Trạng Thái</th>
           </tr>
         </thead>
         <tbody id="tableBody">
@@ -15971,8 +15990,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <div class="footer-note">
       💡 <b>Hướng dẫn sử dụng:</b><br/>
       • Bấm vào ô tích ở cuối mỗi hàng để <b>trừ số lượng sản phẩm</b> đi (mỗi ô tích tương ứng 1 sản phẩm).<br/>
-      • Ô đã tích rồi: Bắt buộc nhập mật khẩu <b>9999</b> mới được bỏ tích.<br/>
-      • Muốn chỉnh sửa Mã đơn, Mã vận đơn, Tên SP, Màu, Size: Bấm trực tiếp vào ô và nhập mật khẩu <b>9999</b>.<br/>
+      • Ô đã tích rồi: Bắt buộc nhập <b>Mật khẩu quản lý</b> mới được bỏ tích.<br/>
+      • Muốn chỉnh sửa Tên SP, Màu, Size, Số lượng: Bấm trực tiếp vào ô và nhập <b>Mật khẩu quản lý</b>.<br/>
       • Dữ liệu kiểm hàng được tự động lưu trên trình duyệt của bạn (không bị mất khi tải lại trang).
     </div>
   </div>
@@ -15981,7 +16000,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const STORAGE_KEY = '${fileId}';
     const MASTER_PASSWORD = '9999';
 
-    // Dữ liệu gốc
+    // Dữ liệu gốc đã gom nhóm
     let rowsData = ${jsonData};
 
     // Tải dữ liệu đã lưu nếu có
@@ -16025,16 +16044,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const isChecked = Boolean(row.checks[checkIdx]);
 
       if (isChecked) {
-        // ĐANG TÍCH -> MUỐN BỎ TÍCH: BẮT BUỘC MẬT KHẨU 9999
-        const pwd = prompt('🔒 BẢO VỆ: Nhập mật khẩu (9999) để BỎ TÍCH ô này:');
-        if (pwd === null) return; // Bấm Hủy
+        // ĐANG TÍCH -> MUỐN BỎ TÍCH: BẮT BUỘC MẬT KHẨU
+        const pwd = prompt('🔒 BẢO MẬT: Nhập mật khẩu quản lý để BỎ TÍCH ô này:');
+        if (pwd === null) return;
         if (pwd !== MASTER_PASSWORD) {
           alert('❌ Mật khẩu không đúng! Bạn không thể bỏ tích ô này.');
           return;
         }
         row.checks[checkIdx] = false;
       } else {
-        // CHƯA TÍCH -> TÍCH VÀO ĐỂ TRỪ SỐ LƯỢNG (Không cần mật khẩu khi tích kiểm hàng)
         row.checks[checkIdx] = true;
       }
 
@@ -16042,12 +16060,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderTable();
     }
 
-    // 2. Xử lý chỉnh sửa thông tin ô dữ liệu (Bắt buộc mật khẩu 9999)
+    // 2. Xử lý chỉnh sửa thông tin ô dữ liệu (Bắt buộc mật khẩu)
     function editCell(rowId, fieldName, fieldLabel) {
       const row = rowsData.find(r => r.id === rowId);
       if (!row) return;
 
-      const pwd = prompt(\`🔒 BẢO VỆ: Nhập mật khẩu (9999) để sửa [\${fieldLabel}]:\`);
+      const pwd = prompt('🔒 BẢO MẬT: Nhập mật khẩu quản lý để sửa [' + fieldLabel + ']:');
       if (pwd === null) return;
       if (pwd !== MASTER_PASSWORD) {
         alert('❌ Mật khẩu không đúng! Không được phép chỉnh sửa.');
@@ -16055,7 +16073,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const currentVal = row[fieldName] || '';
-      const newVal = prompt(\`Nhập giá trị mới cho [\${fieldLabel}]:\`, currentVal);
+      const newVal = prompt('Nhập giá trị mới cho [' + fieldLabel + ']:', currentVal);
       if (newVal !== null) {
         if (fieldName === 'initialQty') {
           const num = parseInt(newVal, 10);
@@ -16064,7 +16082,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             return;
           }
           row.initialQty = num;
-          // Cập nhật mảng checks theo số lượng mới
           const newChecks = new Array(num).fill(false);
           for (let i = 0; i < Math.min(num, row.checks.length); i++) {
             newChecks[i] = row.checks[i];
@@ -16078,9 +16095,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    // 3. Đặt lại tất cả (Cần mật khẩu 9999)
+    // 3. Đặt lại tất cả (Cần mật khẩu)
     function resetAllChecklist() {
-      const pwd = prompt('🔒 Nhập mật khẩu (9999) để ĐẶT LẠI toàn bộ tiến độ kiểm hàng:');
+      const pwd = prompt('🔒 BẢO MẬT: Nhập mật khẩu quản lý để ĐẶT LẠI toàn bộ tiến độ kiểm hàng:');
       if (pwd !== MASTER_PASSWORD) {
         alert('❌ Mật khẩu không đúng!');
         return;
@@ -16122,13 +16139,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         tr.id = 'row_' + row.id;
         if (isFullyDone) tr.className = 'row-completed';
 
-        // Chuỗi tìm kiếm
+        // Chuỗi tìm kiếm (Tên SP, Màu, Size, Mã đơn/Mã vận đơn liên quan)
         const searchStr = [
-          row.orderId,
-          row.track,
           row.product,
           row.color,
           row.size,
+          (row.orderIds || []).join(' '),
+          (row.tracks || []).join(' '),
           isFullyDone ? 'đã đủ' : 'chờ kiểm'
         ].join(' ').toLowerCase();
         tr.setAttribute('data-search', searchStr);
@@ -16137,16 +16154,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let checkButtonsHtml = '<div class="checkbox-group">';
         for (let i = 0; i < row.initialQty; i++) {
           const isChk = Boolean(row.checks[i]);
-          checkButtonsHtml += \`
-            <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
-              <button type="button" class="check-btn \${isChk ? 'checked' : ''}"
-                      onclick="toggleCheck('\${row.id}', \${i})"
-                      title="\${isChk ? 'Đã kiểm (Bấm để bỏ tích - cần mật khẩu 9999)' : 'Bấm để xác nhận kiểm 1 sản phẩm (trừ số lượng)'}">
-                \${isChk ? '✓' : ''}
-              </button>
-              <span class="check-btn-label">SP \${i+1}</span>
-            </div>
-          \`;
+          checkButtonsHtml += '<div style="display:flex; flex-direction:column; align-items:center; gap:2px;">' +
+            '<button type="button" class="check-btn ' + (isChk ? 'checked' : '') + '"' +
+            ' data-row="' + row.id + '" data-idx="' + i + '"' +
+            ' onclick="toggleCheck(this.dataset.row, parseInt(this.dataset.idx, 10))"' +
+            ' title="' + (isChk ? 'Đã kiểm (Bấm để bỏ tích - cần mật khẩu)' : 'Bấm để xác nhận kiểm 1 sản phẩm (trừ số lượng)') + '">' +
+            (isChk ? '✓' : '') + '</button>' +
+            '<span class="check-btn-label">SP ' + (i + 1) + '</span>' +
+            '</div>';
         }
         checkButtonsHtml += '</div>';
 
@@ -16160,32 +16175,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           statusHtml = '<span class="status-badge status-waiting">Chờ kiểm</span>';
         }
 
-        tr.innerHTML = \`
-          <td style="text-align: center; color: #64748b; font-weight: bold;">\${idx + 1}</td>
-          <td>
-            <span class="editable-cell code-badge" onclick="editCell('\${row.id}', 'orderId', 'Mã Đơn Hàng')">\${escapeHtml(row.orderId)}</span>
-          </td>
-          <td>
-            <span class="editable-cell track-badge" onclick="editCell('\${row.id}', 'track', 'Mã Vận Đơn')">\${escapeHtml(row.track)}</span>
-          </td>
-          <td>
-            <span class="editable-cell font-bold" onclick="editCell('\${row.id}', 'product', 'Tên Sản Phẩm')">\${escapeHtml(row.product)}</span>
-          </td>
-          <td>
-            <span class="editable-cell" onclick="editCell('\${row.id}', 'color', 'Màu Sắc')">\${escapeHtml(row.color || '-')}</span>
-          </td>
-          <td>
-            <span class="editable-cell" onclick="editCell('\${row.id}', 'size', 'Size')">\${escapeHtml(row.size || '-')}</span>
-          </td>
-          <td style="text-align: center;">
-            <span class="item-qty-badge editable-cell" onclick="editCell('\${row.id}', 'initialQty', 'Số Lượng Ban Đầu')" title="Bấm để sửa số lượng (cần MK 9999)">
-              \${remainingQty}
-            </span>
-            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">(Gốc: \${row.initialQty})</div>
-          </td>
-          <td>\${checkButtonsHtml}</td>
-          <td style="text-align: center;">\${statusHtml}</td>
-        \`;
+        tr.innerHTML = '<td style="text-align: center; color: #64748b; font-weight: bold;">' + (idx + 1) + '</td>' +
+          '<td><span class="editable-cell font-bold text-white" data-row="' + row.id + '" data-field="product" data-label="Tên Sản Phẩm" onclick="editCell(this.dataset.row, this.dataset.field, this.dataset.label)">' + escapeHtml(row.product) + '</span></td>' +
+          '<td><span class="editable-cell" data-row="' + row.id + '" data-field="color" data-label="Màu Sắc" onclick="editCell(this.dataset.row, this.dataset.field, this.dataset.label)">' + escapeHtml(row.color || '-') + '</span></td>' +
+          '<td><span class="editable-cell" data-row="' + row.id + '" data-field="size" data-label="Size" onclick="editCell(this.dataset.row, this.dataset.field, this.dataset.label)">' + escapeHtml(row.size || '-') + '</span></td>' +
+          '<td style="text-align: center;"><span class="item-qty-badge editable-cell" data-row="' + row.id + '" data-field="initialQty" data-label="Số Lượng Ban Đầu" onclick="editCell(this.dataset.row, this.dataset.field, this.dataset.label)" title="Bấm để sửa số lượng (cần mật khẩu)">' + remainingQty + '</span><div style="font-size: 10px; color: #64748b; margin-top: 2px;">(Gốc: ' + row.initialQty + ')</div></td>' +
+          '<td>' + checkButtonsHtml + '</td>' +
+          '<td style="text-align: center;">' + statusHtml + '</td>';
 
         tbody.appendChild(tr);
       });
@@ -16201,7 +16197,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/\'/g, '&#39;');
     }
 
     // Khởi tạo hiển thị ban đầu
@@ -16210,8 +16206,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 </body>
 </html>`;
 }
-
-
 
 
     async function bulkExportSelectedToHtml() {

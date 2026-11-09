@@ -1273,7 +1273,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             Tất Cả (<span id="notifCount_all">0</span>)
           </button>
           <button type="button" onclick="setNotifFilterCategory('phone')" id="notifCatBtn_phone" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
-            📱 Quét ĐT (<span id="notifCount_phone">0</span>)
+            📱 Quét Nhận Kho (<span id="notifCount_phone">0</span>)
+          </button>
+          <button type="button" onclick="setNotifFilterCategory('new_order')" id="notifCatBtn_new_order" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
+            ✨ Tạo Đơn Mới (<span id="notifCount_new_order">0</span>)
           </button>
           <button type="button" onclick="setNotifFilterCategory('excel')" id="notifCatBtn_excel" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
             🔄 Cập Nhật Excel (<span id="notifCount_excel">0</span>)
@@ -12980,6 +12983,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         showAppToast(`📥 Nhận đơn mới từ điện thoại: ${trackCode} [${autoPlat}]`, 'success');
         appendPhoneLiveLog(`📥 ĐƠN MỚI: Nhận đơn [${trackCode}] ➔ Tự động phân sàn: [${autoPlat}]`);
         sendAckToPhone(0, trackCode, 'ĐÃ VÀO HỘP ĐƠN MỚI (' + autoPlat + ')', 'success', false, data.requestId || '', data.room || '');
+        addAppNotification({
+          type: 'phone_new_order',
+          title: '✨ ĐT Quét Tạo Đơn Mới',
+          detail: `Điện thoại quét tạo đơn mới mã [${trackCode}] ➔ Tự động phân sàn [${autoPlat}], đã lưu vào Bảng Đơn Mới chờ duyệt`,
+          code: trackCode
+        });
         return;
       }
 
@@ -13117,7 +13126,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setNotifFilterCategory(cat) {
       currentNotifFilter = cat;
-      ['all', 'phone', 'excel', 'warning'].forEach(c => {
+      ['all', 'phone', 'new_order', 'excel', 'warning'].forEach(c => {
         const btn = document.getElementById('notifCatBtn_' + c);
         if (btn) {
           if (c === cat) {
@@ -13138,11 +13147,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const normKw = removeVietnameseTones(kw);
 
       let phoneCount = 0;
+      let newOrderCount = 0;
       let excelCount = 0;
       let warningCount = 0;
 
       appNotifications.forEach(n => {
         if (n.type === 'phone_scan') phoneCount++;
+        else if (n.type === 'phone_new_order' || n.type === 'new_order_import') newOrderCount++;
         else if (n.type === 'excel_update' || n.type === 'excel_import') excelCount++;
         else if (n.type === 'duplicate_scan' || n.type === 'unknown_scan') warningCount++;
       });
@@ -13151,6 +13162,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elAll) elAll.textContent = appNotifications.length;
       const elPhone = document.getElementById('notifCount_phone');
       if (elPhone) elPhone.textContent = phoneCount;
+      const elNewOrder = document.getElementById('notifCount_new_order');
+      if (elNewOrder) elNewOrder.textContent = newOrderCount;
       const elExcel = document.getElementById('notifCount_excel');
       if (elExcel) elExcel.textContent = excelCount;
       const elWarn = document.getElementById('notifCount_warning');
@@ -13159,6 +13172,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let filtered = appNotifications.filter(item => {
         // Category filter
         if (currentNotifFilter === 'phone' && item.type !== 'phone_scan') return false;
+        if (currentNotifFilter === 'new_order' && (item.type !== 'phone_new_order' && item.type !== 'new_order_import')) return false;
         if (currentNotifFilter === 'excel' && (item.type !== 'excel_update' && item.type !== 'excel_import')) return false;
         if (currentNotifFilter === 'warning' && (item.type !== 'duplicate_scan' && item.type !== 'unknown_scan')) return false;
 
@@ -13190,6 +13204,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (item.type === 'phone_scan') {
           badgeColor = 'bg-emerald-100 text-emerald-900 border-emerald-300';
           icon = '📱';
+        } else if (item.type === 'phone_new_order' || item.type === 'new_order_import') {
+          badgeColor = 'bg-amber-100 text-amber-900 border-amber-400';
+          icon = '✨';
         } else if (item.type === 'excel_update') {
           badgeColor = 'bg-indigo-100 text-indigo-900 border-indigo-300';
           icon = '🔄';
@@ -14014,6 +14031,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       showAppToast(`🎉 Đã nhập đơn [${newOrd.track || newOrd.orderId}] ra Bảng chính!`, 'success');
       addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập đơn [${newOrd.track || newOrd.orderId}] từ Hộp Đơn Mới ra Bảng chính`);
+      addAppNotification({
+        type: 'new_order_import',
+        title: '✨ Đã Thêm Đơn Mới Vào Bảng',
+        detail: `Đã duyệt đơn [${newOrd.track || newOrd.orderId}] (${newOrd.platform || 'Sàn'}) từ Bảng Đơn Mới vào Bảng chính`,
+        code: newOrd.track || newOrd.orderId,
+        orderIdx: 0
+      });
     }
 
     function importSelectedNewOrders() {
@@ -14036,6 +14060,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       showAppToast(`🎉 Đã nhập thành công ${newOrderObjects.length} đơn mới ra Bảng chính!`, 'success');
       addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập hàng loạt ${newOrderObjects.length} đơn từ Hộp Đơn Mới ra Bảng chính`);
+      addAppNotification({
+        type: 'new_order_import',
+        title: `✨ Đã Thêm ${newOrderObjects.length} Đơn Mới Vào Bảng`,
+        detail: `Đã duyệt và nhập ${newOrderObjects.length} đơn hàng từ Bảng Đơn Mới vào Bảng chính`,
+        code: newOrderObjects[0]?.track || newOrderObjects[0]?.orderId || '',
+        orderIdx: 0
+      });
     }
 
     function importAllNewOrders() {
@@ -14058,6 +14089,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       showAppToast(`🎉 Đã nhập toàn bộ ${count} đơn mới ra Bảng chính!`, 'success');
       addAuditLog('📥 NHẬP ĐƠN MỚI', `Nhập toàn bộ ${count} đơn từ Hộp Đơn Mới ra Bảng chính`);
+      addAppNotification({
+        type: 'new_order_import',
+        title: `✨ Đã Thêm Toàn Bộ ${count} Đơn Mới Vào Bảng`,
+        detail: `Đã duyệt và nhập toàn bộ ${count} đơn hàng từ Bảng Đơn Mới vào Bảng chính`,
+        code: newOrderObjects[0]?.track || newOrderObjects[0]?.orderId || '',
+        orderIdx: 0
+      });
     }
 
     function deleteSingleNewOrder(id) {

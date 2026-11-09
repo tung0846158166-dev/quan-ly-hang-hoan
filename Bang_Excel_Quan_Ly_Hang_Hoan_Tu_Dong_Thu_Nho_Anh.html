@@ -2882,7 +2882,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       reader.onload = async function(evt) {
         try {
           const data = JSON.parse(evt.target.result);
-          if (!data || !Array.isArray(data.orders)) {
+          if (!data || (!Array.isArray(data.orders) && !data.orders)) {
             alert('❌ File không đúng định dạng sao lưu đơn hàng!');
             return;
           }
@@ -2903,9 +2903,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
           if (Array.isArray(data.orders)) {
             orders = data.orders.map(o => {
-              if (o.photo) {
-                if (!o.photoId) o.photoId = 'p_' + (o.track || o.orderId || Math.random().toString(36).slice(2));
-                photoMemoryCache.set(o.photoId, o.photo);
+              if (o.photo && !o.photoId) {
+                o.photoId = 'p_' + (o.track || o.orderId || Math.random().toString(36).slice(2));
                 savePhotoToDb(o.photoId, o.photo);
               } else if (o.photoId && photoMemoryCache.has(o.photoId)) {
                 o.photo = photoMemoryCache.get(o.photoId);
@@ -2913,11 +2912,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               return o;
             });
           }
-
-          cellLocks = data.cellLocks && typeof data.cellLocks === 'object' ? data.cellLocks : {};
-          saveCellLocks();
-          selectedOrdersSet.clear();
-          activePhotoOrderIndex = null;
 
           if (Array.isArray(data.catalog)) {
             catalogItems = data.catalog;
@@ -3373,8 +3367,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function lookupShopeeDb(code) {
       if (!code || !shopeeOrderDb) return null;
-      const exact = String(code).trim().toUpperCase();
-      if (shopeeOrderDb[exact]) return shopeeOrderDb[exact];
       const clean = extractCleanTrackingCode(code);
       if (!clean) return null;
       if (shopeeOrderDb[clean]) return shopeeOrderDb[clean];
@@ -3399,10 +3391,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function applyShopeeDbMatchToOrder(order, match, forceOverwrite = false) {
       if (!order || !match) return false;
       let changed = false;
-      if (match.scanAliases?.length) {
-        order.scanAliases = Array.from(new Set([...(order.scanAliases || []), ...match.scanAliases]));
-        changed = true;
-      }
       if (match.platform && (forceOverwrite || !order.platform || order.platform === 'Shopee')) {
         if (order.platform !== match.platform) {
           order.platform = match.platform;
@@ -3586,9 +3574,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Lưu ý: nếu chuỗi có dạng "138.580" (3 chữ số sau dấu chấm) thì đây là dấu phân cách hàng nghìn, KHÔNG cắt
         return '';
       });
-      const negative = /^\s*-/.test(s) || /^\(.*\)$/.test(s);
       const digits = s.replace(/[^\d]/g, '');
-      return digits ? (negative ? -1 : 1) * (parseInt(digits, 10) || 0) : 0;
+      return digits ? (parseInt(digits, 10) || 0) : 0;
     }
 
     // Chuyển đổi mã đơn hàng bị Excel xuất dạng số khoa học (VD: 5.8702686118684454e+17 -> 587026861186844540)
@@ -4965,8 +4952,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Xây dựng Lý do hoàn & Ghi chú người mua chi tiết từ các cột Shopee / TikTok / Salework
         let noteParts = [];
-        const shipmentStatusKeys = keys.filter(k => removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/\d+$/, '') === 'trangthaitrahang');
-        const returnShipStRaw = shipmentStatusKeys.map(k => String(row[k] || '').trim()).find(v => v && !/^(khong|none|-|co)$/i.test(removeVietnameseTones(v))) || '';
+        const returnShipStRaw = returnShipmentStatusKey ? String(row[returnShipmentStatusKey] || '').trim() : '';
         const returnShipSt = /^(không|khong|none|\-)$/i.test(removeVietnameseTones(returnShipStRaw)) ? '' : returnShipStRaw;
         const returnMethod = returnMethodKey ? String(row[returnMethodKey] || '').trim() : '';
         const mainReason = noteKey ? String(row[noteKey] || '').trim() : '';
@@ -5199,7 +5185,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             buyerReturnNote: buyerComment,
             refundAmount: refundAmountKey ? parseMoneyCellValue(row[refundAmountKey]) : 0,
             refundTime: refundTimeKey ? String(row[refundTimeKey] || '').trim() : '',
-            returnShippingStatus: returnShipStRaw,
+            returnShippingStatus: returnShipmentStatusKey ? String(row[returnShipmentStatusKey] || '').trim() : '',
             returnCarrier: rawReturnCarrier,
             returnTrack: rawReturnTrack,
             returnSuccessTime: returnSuccessTimeKey ? String(row[returnSuccessTimeKey] || '').trim() : '',
@@ -5254,7 +5240,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
-        entry.scanAliases = Array.from(new Set([...(entry.scanAliases || []), rawTrack, rawAltTrack, rawReturnTrack, rawForwardTrack, rawOrderId, claimIdKey ? String(row[claimIdKey] || '').trim() : ''].filter(Boolean).map(v => String(v).trim().toUpperCase())));
         if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
@@ -5281,7 +5266,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       tempMap.forEach(orderData => {
-        (orderData.scanAliases || []).forEach(alias => { shopeeOrderDb[alias] = orderData; });
         if (!orderData.items.length) {
           orderData.items.push({ product: '', color: '', size: '', qty: 1 });
         }
@@ -5408,7 +5392,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               photo: '',
               note: orderData.note || '',
               buyerNote: orderData.buyerNote || '',
-              scanAliases: (orderData.scanAliases || []).slice(),
               rawDetails: orderData.rawDetails ? Object.assign({}, orderData.rawDetails) : undefined,
               items: (orderData.items && orderData.items.length)
                 ? JSON.parse(JSON.stringify(orderData.items))
@@ -8128,14 +8111,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
       updateSafeStorageHeaderBadge();
-      const recoveryTarget = orders;
-      const recoverySnapshot = JSON.stringify(orders);
-      const mayRecover = localStorage.getItem(STORAGE_KEY) === null && localStorage.getItem('shopee_db_cleared_by_user') !== 'true';
       loadOrdersFromSafeStore().then(safeRes => {
-        const safeTime = Date.parse(safeRes?.savedAt || '') || Number(safeRes?.savedAt) || 0;
-        const currentTime = Number(localStorage.getItem(LAST_MODIFIED_TS_KEY) || 0);
-        if (orders === recoveryTarget && JSON.stringify(orders) === recoverySnapshot && safeRes && Array.isArray(safeRes.data) &&
-            (mayRecover || (safeTime > 0 && currentTime > 0 && safeTime > currentTime))) {
+        if (safeRes && Array.isArray(safeRes.data) && safeRes.data.length > orders.length) {
           console.log('Khôi phục dữ liệu an toàn từ IndexedDB Safe Store, số đơn:', safeRes.data.length);
           orders = safeRes.data;
           renderAll();
@@ -8531,37 +8508,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       XLSX.writeFile(wb, fileName);
 
       if (shouldDelete) {
-        await loadAllPhotosIntoMemory();
-        const archiveOrders = monthOrders.map(o => ({...o, photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || ''}));
-        const subsetMetadata = source => {
-          const result = {};
-          monthOrders.forEach((order, newIdx) => {
-            const oldIdx = orders.indexOf(order);
-            Object.entries(source || {}).forEach(([key, value]) => {
-              if (key.startsWith(oldIdx + ':')) result[newIdx + key.slice(String(oldIdx).length)] = value;
-            });
-          });
-          return result;
-        };
-        const completeBackup = {version:'archive-1', exportTime:new Date().toISOString(), orders:archiveOrders,
-          catalog:catalogItems, accountantStock, cellLocks:subsetMetadata(cellLocks), cellEditHistory:subsetMetadata(cellEditHistory), photos:[]};
-        const backupLink = document.createElement('a');
-        backupLink.href = URL.createObjectURL(new Blob([JSON.stringify(completeBackup)], {type:'application/json'}));
-        backupLink.download = fileName.replace(/\.xlsx$/, '_day_du.json');
-        document.body.appendChild(backupLink); backupLink.click(); backupLink.remove();
-        setTimeout(() => URL.revokeObjectURL(backupLink.href), 1000);
         const ok = await appConfirm(
-          `File lưu trữ [ ${fileName} ] đã được tải về máy tính thành công!\n\nBạn có chắc muốn dọn dẹp ${monthOrders.length} đơn hàng của Tháng ${m}/${y} khỏi bảng chính để bảng luôn nhẹ?\n(Hãy kiểm tra đã tải đủ file Excel và bản JSON đầy đủ; dùng JSON để phục hồi ảnh và toàn bộ chi tiết).`,
+          `File lưu trữ [ ${fileName} ] đã được tải về máy tính thành công!\n\nBạn có chắc muốn dọn dẹp ${monthOrders.length} đơn hàng của Tháng ${m}/${y} khỏi bảng chính để bảng luôn nhẹ?\n(Bạn luôn có thể xem lại file Excel vừa tải hoặc nạp lại bất cứ lúc nào).`,
           `Xác Nhận Dọn Dẹp Đơn Tháng ${m}/${y}`
         );
         if (ok) {
-          const deletedIndices = orders.map((o, idx) => monthOrders.includes(o) ? idx : -1).filter(idx => idx >= 0).sort((a,b) => b-a);
-          deletedIndices.forEach(idx => {
-            orders.splice(idx,1);
-            shiftCellLocksAfterOrderDelete(idx);
-            shiftCellEditHistoryAfterOrderDelete(idx);
-            shiftSelectedOrdersAfterDelete(idx);
-          });
+          orders = orders.filter(o => !monthOrders.includes(o));
           saveOrders(true);
           renderAll();
           openSafeStorageModal();
@@ -8593,13 +8545,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
           return o;
         });
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(leanOrders)); }
-        catch (storageError) {
-          console.warn('Local storage unavailable:', storageError);
-          if (typeof showAppToast === 'function') showAppToast('Bộ nhớ trình duyệt đã đầy. Đang thử lưu dự phòng; hãy xuất bản sao lưu JSON.', 'warning');
-        }
-        try { Promise.resolve(saveOrdersToSafeStore(orders)).catch(e => console.warn('Safe store warning:', e)); }
-        catch (safeError) { console.warn('Safe store warning:', safeError); }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(leanOrders));
+        saveOrdersToSafeStore(orders);
         updateSafeStorageHeaderBadge();
 
         // 2. Lưu trực tiếp vào file vật lý trên ổ cứng máy tính (Documents\QuanLyHangHoan\du_lieu_hang_hoan.json)
@@ -9106,7 +9053,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       orders.splice(orderIdx, 1);
       shiftCellLocksAfterOrderDelete(orderIdx);
       shiftCellEditHistoryAfterOrderDelete(orderIdx);
-      shiftSelectedOrdersAfterDelete(orderIdx);
       saveOrders();
       renderAll();
     }
@@ -12673,8 +12619,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             extractCleanTrackingCode(o.returnTrack),
             extractCleanTrackingCode(o.forwardTrack),
             String(o.orderId || '').trim().toUpperCase(),
-            String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase(),
-            ...(o.scanAliases || []).flatMap(code => [String(code).trim().toUpperCase(), extractCleanTrackingCode(code)])
+            String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase()
           ].filter(Boolean);
 
           const isReturned = (o.status === 'Hàng đã trả');
@@ -12862,7 +12807,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
           const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
           const oid = String(o.orderId || '').trim().toUpperCase();
-          return (o.scanAliases || []).some(alias => alias === String(cleanCode).trim().toUpperCase() || extractCleanTrackingCode(alias) === cleanCode) || (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
+          return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
         });
       }
       if (targetIdx === -1 && activePhotoOrderIndex !== null && orders[activePhotoOrderIndex]) {
@@ -12960,7 +12905,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
             const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
             const oid = String(o.orderId || '').trim().toUpperCase();
-            return (o.scanAliases || []).some(alias => alias === String(cleanCode).trim().toUpperCase() || extractCleanTrackingCode(alias) === cleanCode) || (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
+            return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
           });
 
           if (existingIdx !== -1) {
@@ -13552,7 +13497,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
         const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
         const oid = String(o.orderId || '').trim().toUpperCase();
-        return (o.scanAliases || []).some(alias => alias === String(cleanCode).trim().toUpperCase() || extractCleanTrackingCode(alias) === cleanCode) || (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
+        return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
       });
 
       if (mode === 'smart_auto' && existingIdx !== -1) {
@@ -13808,7 +13753,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const autoCarrier = detectCarrierByTrackingCode(rawTrack) || 'SPX Express';
 
       const existingIdx = orders.findIndex(o => {
-        const tMatch = rawTrack && [o.track, o.altTrack, o.returnTrack, o.forwardTrack, o.claimId, o.rawDetails?.claimId, ...(o.scanAliases || [])].some(code => extractCleanTrackingCode(code) === rawTrack);
+        const tMatch = rawTrack && String(o.track || '').trim().toUpperCase() === rawTrack.toUpperCase();
         const oMatch = rawOrderId && String(o.orderId || '').trim().toUpperCase() === rawOrderId.toUpperCase();
         return tMatch || oMatch;
       });
@@ -13840,7 +13785,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // Đơn quét từ phiếu ảnh không có trong danh sách ➔ Báo không tồn tại, không tạo đơn mới
       addAuditLog('⚠️ QUÉT PHIẾU KHÔNG TỒN TẠI', `Quét phiếu [${rawTrack || rawOrderId}] ➔ KHÔNG TÌM THẤY trong danh sách đơn hàng máy tính!`);
       appendPhoneLiveLog(`🟡 KHÔNG CÓ TRÊN HT: Phiếu [${rawTrack || rawOrderId}] chưa có trong danh sách!`);
-      playScanUnknownTone(); recordCodeToActiveSession(rawTrack || rawOrderId, -1, false);
+      playScanUnknownTone(); recordCodeToActiveSession(cleanCode, -1, false);
       sendAckToPhone(0, rawTrack || rawOrderId, '⚠️ KHÔNG TÌM THẤY TRÊN HỆ THỐNG!', 'not_found', false, data.requestId || '', data.room || '');
     }
 
@@ -14049,10 +13994,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {
         shipDate: item.time || getNowDateTimeString(),
         returnDate: item.time || getNowDateTimeString(),
-        recvDate: getNowDateTimeString(),
+        recvDate: '',
         platform: assignedPlat,
         orderType: 'Trả hàng/Hoàn tiền',
-        platformStatus: 'Đã nhận tại kho',
+        platformStatus: 'Đang chuyển hoàn',
         preOrder: 'Đơn thường',
         orderId: item.orderId || cleanTrack || '',
         returnOrderId: '',
@@ -14060,7 +14005,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         altTrack: '',
         carrier: assignedCarrier,
         price: Number(item.price) || 0,
-        status: 'Hàng đã trả',
+        status: 'Chưa trả',
         photo: item.photo || '',
         note: item.note || 'Đơn mới tạo từ máy quét điện thoại',
         buyerNote: '',
@@ -14835,7 +14780,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                       const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
                       const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
                       const oid = String(o.orderId || '').trim().toUpperCase();
-                      return (o.scanAliases || []).some(alias => alias === String(cleanCode).trim().toUpperCase() || extractCleanTrackingCode(alias) === cleanCode) || (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
+                      return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
                     });
 
                     if (existingIdx !== -1) {
@@ -15790,7 +15735,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
           orders.splice(idx, 1);
           shiftCellLocksAfterOrderDelete(idx);
-          shiftCellEditHistoryAfterOrderDelete(idx);
           shiftSelectedOrdersAfterDelete(idx);
         }
       });
@@ -16354,4 +16298,3 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 </body>
 </html>
-

@@ -510,7 +510,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.7.5</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.7.9</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -1979,26 +1979,58 @@
           verbose: false
         });
 
-        // Băng quét rộng tối đa 94% chiều ngang để ôm trọn cả thanh mã vạch 1D dài
-        await html5QrCode.start(
-          {
-          facingMode: 'environment',
-          width: { min: 1280, ideal: 1920 },
-          height: { min: 720, ideal: 1080 }
-        },
-          {
-            fps: 15,
-            qrbox: function(viewfinderWidth, viewfinderHeight) {
-              const w = Math.min(viewfinderWidth, Math.max(300, Math.floor(viewfinderWidth * 0.94)));
-              const h = Math.min(viewfinderHeight, Math.max(180, Math.floor(viewfinderHeight * 0.70)));
-              return { width: w, height: h };
-            }
-          },
-          (decodedText) => {
-            handleCameraFrameDecoded(decodedText);
-          },
-          () => {}
-        );
+        const scanConfig = {
+          fps: 15,
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const w = Math.min(viewfinderWidth, Math.max(280, Math.floor(viewfinderWidth * 0.94)));
+            const h = Math.min(viewfinderHeight, Math.max(160, Math.floor(viewfinderHeight * 0.70)));
+            return { width: w, height: h };
+          }
+        };
+
+        const onFrameSuccess = (decodedText) => {
+          handleCameraFrameDecoded(decodedText);
+        };
+
+        // Khởi động Camera linh hoạt nhiều cấp độ (tương thích tối đa iOS Safari & Android)
+        let started = false;
+        try {
+          // Cấp 1: Cấu hình độ nét cao lý tưởng (KHÔNG dùng min để tránh OverconstrainedError trên iOS Safari khi cầm dọc)
+          await html5QrCode.start(
+            { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            scanConfig,
+            onFrameSuccess,
+            () => {}
+          );
+          started = true;
+        } catch (e1) {
+          console.warn('High-res camera constraints failed, fallback to basic facingMode:', e1);
+        }
+
+        if (!started) {
+          try {
+            // Cấp 2: Cấu hình environment tiêu chuẩn
+            await html5QrCode.start(
+              { facingMode: 'environment' },
+              scanConfig,
+              onFrameSuccess,
+              () => {}
+            );
+            started = true;
+          } catch (e2) {
+            console.warn('FacingMode environment failed, fallback to generic camera:', e2);
+          }
+        }
+
+        if (!started) {
+          // Cấp 3: Mở camera bất kỳ sẵn có
+          await html5QrCode.start(
+            {},
+            scanConfig,
+            onFrameSuccess,
+            () => {}
+          );
+        }
         wasCameraActive = true;
         requestScreenWakeLock();
 
@@ -2032,8 +2064,24 @@
           }
         }, 400);
       } catch (err) {
+        console.warn('startCameraScanner error:', err);
         if (!isAutoResume) {
-          alert('Trình duyệt chặn Camera trực tiếp hoặc Camera đang bận. Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam] nhé!');
+          let errorMsg = '⚠️ Không thể mở Camera trực tiếp trên điện thoại.\n\n';
+          const errName = err ? (err.name || '') : '';
+          if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+            errorMsg += '📌 Nguyên nhân: Safari / Trình duyệt chưa được cấp quyền dùng Camera.\n\n' +
+              '👉 Hướng dẫn khắc phục trên iPhone (Safari):\n' +
+              '1. Bấm vào chữ [aA] (hoặc biểu tượng ổ khóa 🔒) ở góc trái thanh địa chỉ Safari.\n' +
+              '2. Chọn "Cài đặt trang web" (Website Settings).\n' +
+              '3. Mục Camera: chọn "Cho phép" (Allow).\n' +
+              '4. Sau đó bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam].';
+          } else if (errName === 'NotReadableError') {
+            errorMsg += '📌 Nguyên nhân: Camera đang bị ứng dụng khác (Zalo, Facebook, ứng dụng Chụp ảnh...) chiếm dụng.\n\n' +
+              '👉 Bạn hãy vuốt tắt các ứng dụng đó rồi bấm lại [Làm mới Cam] nhé!';
+          } else {
+            errorMsg += '👉 Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] bên dưới hoặc sử dụng nút [📸 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN] nhé!';
+          }
+          alert(errorMsg);
         }
         document.getElementById('cameraStartOverlay').classList.remove('hidden');
       } finally {
@@ -2504,7 +2552,8 @@
       initPhoneSync();
       setTimeout(() => {
         if (typeof Html5Qrcode !== 'undefined') {
-          startCameraScanner().catch(() => {});
+          // Thử khởi động ngầm (isAutoResume = true) để KHÔNG hiện popup phiền hà nếu Safari yêu cầu chạm màn hình
+          startCameraScanner(true).catch(() => {});
         }
       }, 350);
     }).catch(err => {

@@ -1973,9 +1973,7 @@
 
         html5QrCode = new Html5Qrcode('reader', {
           formatsToSupport: formatsToSupport,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          },
+          experimentalFeatures: { useBarCodeDetectorIfSupported: false },
           verbose: false
         });
 
@@ -1992,38 +1990,42 @@
           handleCameraFrameDecoded(decodedText);
         };
 
-        // Khởi động Camera linh hoạt nhiều cấp độ (tương thích tối đa iOS Safari & Android)
+        // Khởi động Camera chuẩn tuyệt đối cho iOS Safari và Android:
         let started = false;
+        // Ưu tiên 1: facingMode: 'environment' (chuẩn tương thích cao nhất của WebKit Apple)
         try {
-          // Cấp 1: Cấu hình độ nét cao lý tưởng (KHÔNG dùng min để tránh OverconstrainedError trên iOS Safari khi cầm dọc)
           await html5QrCode.start(
-            { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+            { facingMode: 'environment' },
             scanConfig,
             onFrameSuccess,
             () => {}
           );
           started = true;
         } catch (e1) {
-          console.warn('High-res camera constraints failed, fallback to basic facingMode:', e1);
+          console.warn('Priority 1 facingMode environment failed:', e1);
         }
 
+        // Ưu tiên 2: Tìm camera qua danh sách getCameras()
         if (!started) {
           try {
-            // Cấp 2: Cấu hình environment tiêu chuẩn
-            await html5QrCode.start(
-              { facingMode: 'environment' },
-              scanConfig,
-              onFrameSuccess,
-              () => {}
-            );
-            started = true;
+            const devices = await Html5Qrcode.getCameras();
+            if (devices && devices.length > 0) {
+              const backDevice = devices.find(d => /back|rear|environment|sau/i.test(d.label)) || devices[devices.length - 1];
+              await html5QrCode.start(
+                backDevice.id,
+                scanConfig,
+                onFrameSuccess,
+                () => {}
+              );
+              started = true;
+            }
           } catch (e2) {
-            console.warn('FacingMode environment failed, fallback to generic camera:', e2);
+            console.warn('Priority 2 getCameras failed:', e2);
           }
         }
 
+        // Ưu tiên 3: Mở bất kỳ camera nào còn lại
         if (!started) {
-          // Cấp 3: Mở camera bất kỳ sẵn có
           await html5QrCode.start(
             {},
             scanConfig,
@@ -2042,6 +2044,7 @@
           const videoEl = document.querySelector('#reader video');
           if (videoEl) {
             videoEl.setAttribute('playsinline', 'true');
+            videoEl.setAttribute('webkit-playsinline', 'true');
             videoEl.setAttribute('autoplay', 'true');
             videoEl.setAttribute('muted', 'true');
             if (videoEl.srcObject) {

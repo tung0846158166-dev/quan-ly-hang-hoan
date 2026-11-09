@@ -1922,7 +1922,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </div>
           <div class="w-full text-center text-xs text-slate-700 bg-sky-50 p-2 rounded-lg border border-sky-200 space-y-1">
             <span class="text-[11px] text-slate-600">Hoặc gõ link ngắn trên điện thoại:</span><br/>
-            <a id="phoneShortLinkTag" href="https://is.gd/vOTcdJ" target="_blank" class="font-mono font-extrabold text-sky-700 text-sm underline tracking-wide">is.gd/vOTcdJ</a>
+            <a id="phoneShortLinkTag" href="https://is.gd/h8z8Va" target="_blank" class="font-mono font-extrabold text-sky-700 text-sm underline tracking-wide">is.gd/h8z8Va</a>
             <button onclick="copyPhoneScannerLink()" class="w-full mt-1 py-1 px-2 bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-[11px] rounded border border-sky-300 transition flex items-center justify-center gap-1">
               <span>📋</span>
               <span>Sao Chép Link Mở ĐT</span>
@@ -12456,10 +12456,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=170',
-      brewpage: 'https://my-uywwt16q64.brewpage.app/',
-      beacon: 'https://hinged-butte-86.beacon.host/',
-      short: 'https://is.gd/vOTcdJ'
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html',
+      short: 'https://is.gd/h8z8Va',
+      htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
 
     function buildPhoneScannerLink(roomCode) {
@@ -12477,7 +12476,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const linkTag = document.getElementById('phoneShortLinkTag');
       if (linkTag) {
         linkTag.href = link;
-        linkTag.textContent = selectedMobileServer === 'github' ? 'Mở Máy Quét v1.2 (Bấm vào đây)' : (selectedMobileServer === 'beacon' ? 'hinged-butte-86.beacon.host' : 'is.gd/vOTcdJ');
+        linkTag.textContent = selectedMobileServer === 'short' ? 'is.gd/h8z8Va' : 'tung0846158166-dev.github.io/... (Bấm vào đây)';
       }
 
       // 1. Uu tien tao ma QR Vector SVG Offline noi bo (100% offline, chay muot tren Cloud/Sandbox/Chan anh mang)

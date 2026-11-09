@@ -542,6 +542,28 @@
     }
 
     input[type="file"] { display: none !important; }
+
+    /* Definite viewport: portrait camera frames must not size the whole card. */
+    .camera-box { height:clamp(340px, 58svh, 480px) !important; min-height:340px !important; flex:none; isolation:isolate; }
+    #reader { position:absolute; inset:0; width:100%; height:100%; min-height:0 !important; }
+    #reader video { position:absolute; inset:0; width:100% !important; height:100% !important; object-fit:cover; }
+    #cameraToolbar { gap:10px; }
+    #cameraToolbar button { min-height:40px; flex:none; }
+    #scannerReticle > div:first-child { font-size:10px !important; line-height:1.35; text-align:center; max-width:100%; padding:5px 8px !important; }
+    #cameraShutter button { max-width:calc(100% - 28px); min-height:44px; }
+    #cameraStartOverlay { z-index:30; }
+    .app-header { gap:10px; }
+    .app-header > div:first-child { min-width:0; }
+    .header-title { line-height:1.35; }
+    .header-sub { line-height:1.4; }
+    .conn-pill { flex:none; max-width:42%; white-space:normal; text-align:center; }
+    @media(max-width:380px) {
+      .app-header { padding:10px; }
+      .header-title { font-size:12px; }
+      .header-sub { font-size:10px; }
+      .conn-pill { font-size:10px; padding:6px 8px; }
+      .container { padding:10px; }
+    }
   </style>
 </head>
 <body>
@@ -551,7 +573,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.9.0</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.9.1</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -612,7 +634,7 @@
       <div id="shutterFlashOverlay"></div>
 
       <!-- Reticle / Target Viewfinder Frame -->
-      <div id="scannerReticle" style="position:absolute; inset:16px; pointer-events:none; border:2px dashed #22c55e; border-radius:16px; box-shadow:0 0 25px rgba(34,197,94,0.35); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:10px; z-index:10;">
+      <div id="scannerReticle" style="position:absolute; inset:64px 14px 78px; pointer-events:none; border:2px dashed #22c55e; border-radius:16px; box-shadow:0 0 25px rgba(34,197,94,0.35); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:10px; z-index:10;">
         <div style="font-size:11px; background:rgba(15,23,42,0.88); color:#22c55e; padding:4px 12px; border-radius:999px; font-weight:800; border:1px solid #22c55e; backdrop-filter:blur(4px); letter-spacing:0.3px;">
           🎯 CĂN MÃ VẠCH 1D HOẶC QR VÀO GIỮA KHUNG
         </div>
@@ -625,19 +647,12 @@
         </div>
       </div>
 
-      <!-- Top Toolbar: Flash & Zoom Pill -->
-      <div style="position:absolute; top:12px; left:12px; right:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; pointer-events:auto;">
+      <!-- Camera toolbar -->
+      <div id="cameraToolbar" style="position:absolute; top:12px; left:12px; right:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; pointer-events:auto;">
         <!-- Torch Toggle -->
         <button id="torchToggleBtn" type="button" disabled aria-pressed="false" title="Bật camera để kiểm tra đèn flash" onclick="toggleTorch()" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
           <span>⚡ Bật đèn flash</span>
         </button>
-
-        <!-- Zoom Switcher (1x, 1.8x, 2.5x) -->
-        <div style="background:rgba(15,23,42,0.85); border:1.5px solid #64748b; border-radius:999px; padding:3px 5px; display:flex; gap:3px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
-          <button type="button" id="btnZoom1" onclick="setCameraZoom(1.0)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">1x</button>
-          <button type="button" id="btnZoom18" onclick="setCameraZoom(1.8)" style="background:#38bdf8; border:none; color:#0f172a; font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; cursor:pointer; box-shadow:0 1px 5px rgba(56,189,248,0.5);">1.8x</button>
-          <button type="button" id="btnZoom25" onclick="setCameraZoom(2.5)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">2.5x</button>
-        </div>
 
         <!-- Refresh Cam -->
         <button type="button" onclick="forceRestartCamera()" title="Khởi động lại Camera" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
@@ -646,10 +661,10 @@
       </div>
 
       <!-- Bottom Floating Shutter Button [📸 CHỤP ĐỌC NGAY] -->
-      <div style="position:absolute; bottom:14px; left:0; right:0; z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto;">
+      <div id="cameraShutter" style="position:absolute; bottom:14px; left:0; right:0; z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto;">
         <button type="button" onclick="captureAndDecodeCurrentFrame()" style="background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; border:2.5px solid #ffffff; border-radius:999px; padding:8px 22px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 20px rgba(16,185,129,0.6); active:scale-95 transition:all 0.15s ease;">
           <span style="font-size:15px;">📸</span>
-          <span>CHỤP ĐỌC TỨC THÌ (NẾU RUNG TAY)</span>
+          <span>CHỤP ĐỌC MÃ</span>
         </button>
       </div>
 
@@ -1904,39 +1919,6 @@
     // v1.8.0: SUPER ENGINE MULTI-SCANNER (JSQR 2D + QUAGGA2 SUB-PIXEL 1D + NATIVE BARCODE DETECTOR)
     // Sửa triệt để 100% quét mã vạch 1D Code 128 trên điện thoại & Safari iOS
     // =========================================================================
-    async function setCameraZoom(val) {
-      currentZoomLevel = val;
-      ['btnZoom1', 'btnZoom18', 'btnZoom25'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-          btn.style.background = 'none';
-          btn.style.color = '#94a3b8';
-          btn.style.boxShadow = 'none';
-        }
-      });
-      const activeBtn = val <= 1.2 ? 'btnZoom1' : (val <= 2.0 ? 'btnZoom18' : 'btnZoom25');
-      const b = document.getElementById(activeBtn);
-      if (b) {
-        b.style.background = '#38bdf8';
-        b.style.color = '#0f172a';
-        b.style.boxShadow = '0 1px 5px rgba(56,189,248,0.5)';
-      }
-
-      if (!mediaStream) return;
-      const track = mediaStream.getVideoTracks()[0];
-      if (track && track.getCapabilities) {
-        const caps = track.getCapabilities();
-        if (caps.zoom) {
-          const target = Math.min(caps.zoom.max, Math.max(caps.zoom.min, val));
-          try {
-            await applyCameraTrackConstraints(track, { zoom: target });
-          } catch (e) {}
-        }
-      }
-    }
-
-
-    let currentZoomLevel = 1.8;
     let mediaStream = null;
     let cameraScanInterval = null;
     let isCameraScanning = false;
@@ -2270,7 +2252,6 @@
 
         document.getElementById('cameraStartOverlay').classList.add('hidden');
         wasCameraActive = true;
-        setCameraZoom(currentZoomLevel).catch(() => {});
         requestScreenWakeLock();
 
         // Bật lấy nét liên tục (continuous focus)
@@ -2434,7 +2415,7 @@
       if (decoded) {
         handleCameraFrameDecoded(decoded);
       } else {
-        alert('⚠️ Chưa nhận diện được mã. Bạn hãy đưa camera lại gần mã vạch hơn (khoảng 15-20cm) hoặc bấm nút [1.8x] hoặc [2.5x] để phóng to nhé!');
+        alert('⚠️ Chưa nhận diện được mã. Bạn hãy đưa camera lại gần mã vạch hơn (khoảng 15-20cm) và giữ mã rõ nét trong khung nhé!');
       }
       } catch (eStill) {
         showToast('Bộ đọc đang bận. Bạn hãy thử lại hoặc tải lại trang.');

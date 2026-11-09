@@ -699,7 +699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.1</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.2</span>
               </div>
             </div>
           </div>
@@ -2230,6 +2230,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <option value="THẤT THU">⚫ THẤT THU</option>
               </select>
             </div>
+
+            <!-- Bộ lọc chống trùng lặp thông minh v1.8.2 -->
+            <div class="flex items-center gap-1.5 pl-2 border-l border-teal-200">
+              <button type="button" onclick="selectOnlyNewQuickOrders()" id="btnSelectOnlyNewQuick"
+                      class="px-2.5 py-1 bg-teal-100/90 hover:bg-teal-200 text-teal-900 font-bold text-[11px] rounded-lg border border-teal-300 transition flex items-center gap-1 cursor-pointer" title="Chỉ chọn những đơn mới, tự động bỏ chọn các đơn đã có ngoài bảng">
+                <span>⚡ Chỉ chọn đơn mới</span>
+              </button>
+              <button type="button" onclick="removeDuplicateQuickOrders()" id="btnRemoveDupQuick"
+                      class="px-2.5 py-1 bg-rose-100/90 hover:bg-rose-200 text-rose-900 font-bold text-[11px] rounded-lg border border-rose-300 transition flex items-center gap-1 cursor-pointer" title="Xóa tất cả các đơn trùng lặp khỏi danh sách này">
+                <span>🛡️ Xóa đơn trùng</span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center gap-2">
@@ -2265,7 +2277,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <th class="py-2.5 px-3 w-40">Sàn TMĐT</th>
                 <th class="py-2.5 px-3 w-44">Loại Đơn / Sàn</th>
                 <th class="py-2.5 px-3 w-32">ĐVVC</th>
-                <th class="py-2.5 px-3 w-28 text-center">Trạng Thái Nhận</th>
+                <th class="py-2.5 px-3 w-36 text-center">Trạng Thái (Chống Trùng)</th>
                 <th class="w-16 text-center py-2.5 px-2">Xóa</th>
               </tr>
             </thead>
@@ -6505,7 +6517,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.1';
+    const APP_VERSION_NUMBER = '1.8.2';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8208,6 +8220,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     ];
 
     let orders = [];
+    window.orders = orders;
+    window.getOrders = function() { return orders; };
+    window.setOrders = function(newOrders) {
+      orders = newOrders;
+      window.orders = orders;
+      if (typeof saveOrders === 'function') saveOrders(true);
+      if (typeof renderAll === 'function') renderAll(true);
+      if (typeof recalcTotalsAndSummary === 'function') recalcTotalsAndSummary();
+    };
     var selectedOrdersSet = new Set();
 
     function loadOrders() {
@@ -8228,6 +8249,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {
         orders = JSON.parse(JSON.stringify(defaultSampleOrders));
       }
+      window.orders = orders;
       // Khôi phục ảnh từ bộ nhớ IndexedDB cache nếu có
       orders.forEach(o => {
         if (!o.photo && o.photoId && photoMemoryCache.has(o.photoId)) {
@@ -14276,9 +14298,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // =========================================================================
-    // TÍNH NĂNG: BẢNG TẠO ĐƠN NHANH HÀNG LOẠT (v1.8.1)
+    // TÍNH NĂNG: BẢNG TẠO ĐƠN NHANH HÀNG LOẠT & CHỐNG TRÙNG THÔNG MINH (v1.8.2)
     // =========================================================================
     let quickCreateList = [];
+
+    function findExistingMainOrder(code) {
+      if (!code || !Array.isArray(orders)) return null;
+      const clean = (typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(code) : String(code).trim()).toUpperCase();
+      if (!clean) return null;
+      const idx = orders.findIndex(o => {
+        if (!o) return false;
+        const tr = (typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(o.track) : String(o.track || '').trim()).toUpperCase();
+        const altTr = (typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(o.altTrack) : String(o.altTrack || '').trim()).toUpperCase();
+        const retTr = (typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(o.returnTrack) : String(o.returnTrack || '').trim()).toUpperCase();
+        const fwdTr = (typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(o.forwardTrack) : String(o.forwardTrack || '').trim()).toUpperCase();
+        const oid = String(o.orderId || '').trim().toUpperCase();
+        const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
+        return (tr && tr === clean) || (altTr && altTr === clean) || (retTr && retTr === clean) || (fwdTr && fwdTr === clean) || (oid && oid === clean) || (claimId && claimId === clean);
+      });
+      if (idx === -1) return null;
+      return { order: orders[idx], index: idx };
+    }
 
     function openQuickCreateOrdersModal() {
       const modal = document.getElementById('quickCreateOrdersModal');
@@ -14305,6 +14345,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const lines = raw.split(/\r?\n/);
       let addedCount = 0;
+      let dupCount = 0;
 
       lines.forEach(line => {
         let clean = line.replace(/^[\-*+#\s]+|[\-*+#\s]+$/g, '').trim();
@@ -14314,24 +14355,42 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const autoPlat = autoDetectPlatformFromCode(clean);
         const autoCarrier = (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(clean) : '') || (autoPlat === 'Shopee' ? 'SPX Express' : 'J&T Express');
 
-        // Kiểm tra không thêm trùng trong danh sách hiện tại
-        const exists = quickCreateList.some(item => item.code === clean);
-        if (!exists) {
+        // Kiểm tra không thêm trùng trong danh sách hiện tại của modal
+        const existsInList = quickCreateList.some(item => item.code.toUpperCase() === clean.toUpperCase());
+        if (!existsInList) {
+          // Kiểm tra xem đơn đã tồn tại ngoài Bảng chính chưa
+          const existingMain = findExistingMainOrder(clean);
+          const isDup = Boolean(existingMain);
+          const isReceived = isDup ? (existingMain.order.status === 'Hàng đã trả' || Boolean(existingMain.order.recvDate)) : false;
+          const recvDateStr = isDup ? (existingMain.order.recvDate || '') : '';
+          const statusText = isDup 
+            ? (isReceived ? `Đã nhận kho${recvDateStr ? ' (' + recvDateStr + ')' : ''}` : 'Chờ về (Chưa nhận)')
+            : 'Chưa nhận (Chờ về)';
+
           quickCreateList.push({
             id: 'quick_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
             code: clean,
-            platform: autoPlat,
-            orderType: 'Trả hàng/Hoàn tiền',
-            carrier: autoCarrier,
-            checked: true
+            platform: isDup ? (existingMain.order.platform || autoPlat) : autoPlat,
+            orderType: isDup ? (existingMain.order.orderType || 'Trả hàng/Hoàn tiền') : 'Trả hàng/Hoàn tiền',
+            carrier: isDup ? (existingMain.order.carrier || autoCarrier) : autoCarrier,
+            checked: !isDup, // 👈 TỰ ĐỘNG BỎ TÍCH NẾU ĐÃ CÓ TRÊN BẢNG CHÍNH ĐỂ TRÁNH NHẬP TRÙNG!
+            isDuplicate: isDup,
+            existingOrderIdx: isDup ? existingMain.index : -1,
+            existingStatusText: statusText,
+            existingIsReceived: isReceived
           });
           addedCount++;
+          if (isDup) dupCount++;
         }
       });
 
       renderQuickCreateTable();
       if (addedCount > 0) {
-        showAppToast(`✅ Đã nhận diện và tạo ${addedCount} đơn vào danh sách!`, 'success');
+        if (dupCount > 0) {
+          showAppToast(`✅ Đã nạp ${addedCount} mã: ${addedCount - dupCount} đơn mới, ${dupCount} đơn ĐÃ CÓ TRÊN BẢNG (đã tự động bỏ tích để chống trùng)!`, 'warning');
+        } else {
+          showAppToast(`✅ Đã nhận diện và tạo ${addedCount} đơn mới vào danh sách!`, 'success');
+        }
       } else {
         showAppToast('Không có mã đơn mới nào (mã bị rỗng hoặc đã có sẵn trong danh sách).', 'warning');
       }
@@ -14348,9 +14407,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!tbody) return;
 
       const total = quickCreateList.length;
+      const dupCount = quickCreateList.filter(it => it && it.isDuplicate).length;
+      const newCount = total - dupCount;
       const selectedCount = quickCreateList.filter(it => it && it.checked).length;
 
-      if (countBadge) countBadge.textContent = total + ' đơn';
+      if (countBadge) {
+        if (total === 0) {
+          countBadge.textContent = '0 đơn';
+        } else if (dupCount > 0) {
+          countBadge.innerHTML = `${total} đơn (${newCount} mới, <span class="text-amber-300 font-black">${dupCount} đã có</span>)`;
+        } else {
+          countBadge.textContent = total + ' đơn mới';
+        }
+      }
       if (selTxt) selTxt.textContent = selectedCount;
       if (chkAll) chkAll.checked = (total > 0 && selectedCount === total);
 
@@ -14370,14 +14439,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           ? 'bg-orange-50 text-orange-800 border-orange-300'
           : (item.platform === 'TikTok Shop' ? 'bg-slate-900 text-white border-slate-700' : 'bg-blue-50 text-blue-800 border-blue-300');
 
+        const rowBg = item.isDuplicate
+          ? 'bg-amber-50/70 border-l-4 border-amber-500 hover:bg-amber-100/60'
+          : 'hover:bg-teal-50/40';
+
         return `
-          <tr class="hover:bg-teal-50/40 transition">
+          <tr class="${rowBg} transition">
             <td class="text-center py-2 px-2">
               <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleQuickOrderItem('${item.id}', this.checked)" class="w-4 h-4 text-emerald-600 rounded cursor-pointer" />
             </td>
             <td class="text-center py-2 px-2 font-mono text-slate-500 font-bold">${idx + 1}</td>
-            <td class="py-2 px-3 font-mono font-black text-slate-800 text-[12px]">
-              <span class="inline-block px-2 py-0.5 bg-slate-100 rounded border border-slate-300 text-slate-900 font-mono">${escapeAttr(item.code)}</span>
+            <td class="py-2 px-3">
+              <div class="flex flex-col gap-1 items-start">
+                <span class="inline-block px-2 py-0.5 bg-slate-100 rounded border border-slate-300 text-slate-900 font-mono font-black text-[12px]">${escapeAttr(item.code)}</span>
+                ${item.isDuplicate ? `
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black ${item.existingIsReceived ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300'}">
+                    ⚠️ ĐÃ CÓ TRÊN BẢNG: ${escapeAttr(item.existingStatusText)}
+                  </span>
+                ` : ''}
+              </div>
             </td>
             <td class="py-2 px-3">
               <select onchange="updateQuickOrderItemField('${item.id}', 'platform', this.value)" class="w-full text-center font-bold text-[11px] py-1 px-1.5 rounded-lg border outline-none cursor-pointer transition ${platBg}">
@@ -14399,7 +14479,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <input type="text" value="${escapeAttr(item.carrier || '')}" onchange="updateQuickOrderItemField('${item.id}', 'carrier', this.value)" class="w-full py-1 px-2 border border-slate-200 rounded text-[11px] font-semibold text-slate-700 bg-slate-50" />
             </td>
             <td class="py-2 px-3 text-center">
-              <span class="inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] whitespace-nowrap">⏳ Chưa nhận</span>
+              ${item.isDuplicate
+                ? `<span class="inline-block px-2 py-0.5 rounded-full ${item.existingIsReceived ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300'} font-black text-[10px] whitespace-nowrap">⚠️ ${escapeAttr(item.existingStatusText)}</span>`
+                : `<span class="inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 font-bold text-[10px] whitespace-nowrap">⏳ Chưa nhận</span>`
+              }
             </td>
             <td class="text-center py-2 px-2">
               <button type="button" onclick="deleteQuickOrderItem('${item.id}')" class="p-1 hover:bg-rose-100 text-rose-600 rounded transition cursor-pointer" title="Xóa dòng này">
@@ -14409,6 +14492,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </tr>
         `;
       }).join('');
+    }
+
+    function removeDuplicateQuickOrders() {
+      const dupCount = quickCreateList.filter(it => it && it.isDuplicate).length;
+      if (dupCount === 0) {
+        showAppToast('Trong danh sách không có đơn nào bị trùng lặp với Bảng chính!', 'info');
+        return;
+      }
+      quickCreateList = quickCreateList.filter(it => !it.isDuplicate);
+      renderQuickCreateTable();
+      showAppToast(`🛡️ Đã xóa ${dupCount} đơn trùng lặp ra khỏi danh sách!`, 'success');
+    }
+
+    function selectOnlyNewQuickOrders() {
+      quickCreateList.forEach(it => {
+        it.checked = !it.isDuplicate;
+      });
+      renderQuickCreateTable();
+      showAppToast('⚡ Đã chỉ tích chọn các đơn mới (tự động bỏ tích tất cả đơn trùng)!', 'info');
     }
 
     function updateQuickOrderItemField(id, field, value) {
@@ -14497,10 +14599,45 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
 
-      const selectedIds = new Set(selected.map(it => it.id));
-      const newOrderObjects = selected.map(it => convertQuickItemToMainOrder(it));
+      const selectedDups = selected.filter(it => it.isDuplicate);
+      let shouldUpdateExisting = false;
 
-      orders.unshift(...newOrderObjects);
+      if (selectedDups.length > 0) {
+        const dupCodes = selectedDups.slice(0, 3).map(d => d.code).join(', ');
+        const moreTxt = selectedDups.length > 3 ? ` và ${selectedDups.length - 3} đơn khác` : '';
+        const choice = confirm(
+          `⚠️ CẢNH BÁO TRÙNG LẶP:\n\n` +
+          `Phát hiện có ${selectedDups.length} đơn bạn đang chọn ĐÃ TỒN TẠI trên Bảng chính (${dupCodes}${moreTxt}).\n\n` +
+          `• Bấm [OK]: Chỉ CẬP NHẬT thông tin (Sàn/Loại đơn) vào các đơn cũ đã có trên Bảng chính (KHÔNG tạo thêm dòng trùng).\n` +
+          `• Bấm [Cancel]: VẪN TẠO THÊM dòng mới cho các đơn này (nhân đôi dòng).`
+        );
+        shouldUpdateExisting = choice;
+      }
+
+      const selectedIds = new Set(selected.map(it => it.id));
+      const newOrdersToInsert = [];
+      let updatedExistingCount = 0;
+
+      selected.forEach(it => {
+        if (it.isDuplicate && shouldUpdateExisting) {
+          // Cập nhật thông tin vào đơn cũ trên Bảng chính
+          const exIdx = it.existingOrderIdx;
+          if (exIdx >= 0 && exIdx < orders.length) {
+            if (it.platform) orders[exIdx].platform = it.platform;
+            if (it.orderType) orders[exIdx].orderType = it.orderType;
+            if (it.carrier) orders[exIdx].carrier = it.carrier;
+            updatedExistingCount++;
+          }
+        } else {
+          // Tạo đơn mới đưa vào Bảng chính
+          newOrdersToInsert.push(convertQuickItemToMainOrder(it));
+        }
+      });
+
+      if (newOrdersToInsert.length > 0) {
+        orders.unshift(...newOrdersToInsert);
+      }
+
       quickCreateList = quickCreateList.filter(it => !selectedIds.has(it.id));
 
       saveOrders();
@@ -14508,8 +14645,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       recalcTotalsAndSummary();
       renderQuickCreateTable();
 
-      showAppToast(`🎉 Đã đưa ${newOrderObjects.length} đơn mới ra Bảng chính (trạng thái: Chưa nhận)!`, 'success');
-      addAuditLog('⚡ TẠO ĐƠN NHANH', `Đưa ${newOrderObjects.length} đơn tạo nhanh ra Bảng chính`);
+      let msg = '';
+      if (newOrdersToInsert.length > 0 && updatedExistingCount > 0) {
+        msg = `🎉 Đã đưa ${newOrdersToInsert.length} đơn mới ra Bảng chính & cập nhật ${updatedExistingCount} đơn đã có!`;
+      } else if (newOrdersToInsert.length > 0) {
+        msg = `🎉 Đã đưa ${newOrdersToInsert.length} đơn mới ra Bảng chính (trạng thái: Chưa nhận)!`;
+      } else {
+        msg = `🎉 Đã cập nhật thành công ${updatedExistingCount} đơn cũ trên Bảng chính!`;
+      }
+
+      showAppToast(msg, 'success');
+      addAuditLog('⚡ TẠO ĐƠN NHANH', `Đưa ${newOrdersToInsert.length} đơn mới & cập nhật ${updatedExistingCount} đơn cũ`);
 
       if (!quickCreateList.length) {
         setTimeout(() => closeQuickCreateOrdersModal(), 600);
@@ -14523,10 +14669,44 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const count = quickCreateList.length;
-      if (!confirm(`Bạn có chắc muốn đưa TOÀN BỘ ${count} đơn mới này ra Bảng chính không?`)) return;
+      const dups = quickCreateList.filter(it => it.isDuplicate);
+      let shouldUpdateExisting = false;
 
-      const newOrderObjects = quickCreateList.map(it => convertQuickItemToMainOrder(it));
-      orders.unshift(...newOrderObjects);
+      if (dups.length > 0) {
+        const dupCodes = dups.slice(0, 3).map(d => d.code).join(', ');
+        const moreTxt = dups.length > 3 ? ` và ${dups.length - 3} đơn khác` : '';
+        const choice = confirm(
+          `⚠️ CẢNH BÁO TRÙNG LẶP:\n\n` +
+          `Trong tổng số ${count} đơn, có ${dups.length} đơn ĐÃ TỒN TẠI trên Bảng chính (${dupCodes}${moreTxt}).\n\n` +
+          `• Bấm [OK]: Chỉ CẬP NHẬT thông tin vào các đơn cũ & thêm các đơn mới (KHÔNG tạo thêm dòng trùng).\n` +
+          `• Bấm [Cancel]: VẪN TẠO DÒNG MỚI cho toàn bộ (nhân đôi các đơn trùng).`
+        );
+        shouldUpdateExisting = choice;
+      } else {
+        if (!confirm(`Bạn có chắc muốn đưa TOÀN BỘ ${count} đơn mới này ra Bảng chính không?`)) return;
+      }
+
+      const newOrdersToInsert = [];
+      let updatedExistingCount = 0;
+
+      quickCreateList.forEach(it => {
+        if (it.isDuplicate && shouldUpdateExisting) {
+          const exIdx = it.existingOrderIdx;
+          if (exIdx >= 0 && exIdx < orders.length) {
+            if (it.platform) orders[exIdx].platform = it.platform;
+            if (it.orderType) orders[exIdx].orderType = it.orderType;
+            if (it.carrier) orders[exIdx].carrier = it.carrier;
+            updatedExistingCount++;
+          }
+        } else {
+          newOrdersToInsert.push(convertQuickItemToMainOrder(it));
+        }
+      });
+
+      if (newOrdersToInsert.length > 0) {
+        orders.unshift(...newOrdersToInsert);
+      }
+
       quickCreateList = [];
 
       saveOrders();
@@ -14534,8 +14714,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       recalcTotalsAndSummary();
       renderQuickCreateTable();
 
-      showAppToast(`🎉 Đã đưa toàn bộ ${count} đơn mới ra Bảng chính (trạng thái: Chưa nhận)!`, 'success');
-      addAuditLog('⚡ TẠO ĐƠN NHANH', `Đưa toàn bộ ${count} đơn tạo nhanh ra Bảng chính`);
+      let msg = '';
+      if (newOrdersToInsert.length > 0 && updatedExistingCount > 0) {
+        msg = `🎉 Đã đưa ${newOrdersToInsert.length} đơn mới ra Bảng chính & cập nhật ${updatedExistingCount} đơn đã có!`;
+      } else if (newOrdersToInsert.length > 0) {
+        msg = `🎉 Đã đưa toàn bộ ${count} đơn mới ra Bảng chính!`;
+      } else {
+        msg = `🎉 Đã cập nhật thành công ${updatedExistingCount} đơn cũ trên Bảng chính!`;
+      }
+
+      showAppToast(msg, 'success');
+      addAuditLog('⚡ TẠO ĐƠN NHANH', `Đưa toàn bộ đơn tạo nhanh ra Bảng chính`);
       setTimeout(() => closeQuickCreateOrdersModal(), 600);
     }
 

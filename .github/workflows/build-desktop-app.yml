@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.0
+          name: QuanLyHangHoan-Windows-Installer-v1.8.1
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,26 +72,27 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.0
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.0 (Xuất HTML Kiểm Hàng, Xuất Excel & Quét Mã Vạch Điện Thoại)"
+          tag_name: v1.8.1
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.1 (Tạo Đơn Nhanh Hàng Loạt, Quét Mã Vạch 40 FPS & Chuẩn Hóa Trạng Thái Chờ Về)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.0
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.1
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.0`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.0.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.8.0**:
-              1. 🌐 **Xuất file HTML Kiểm Hàng Tương Tác**:
-                 - Tích chọn đơn hàng trên bảng và bấm nút `[🌐 Xuất HTML Kiểm Hàng]`.
-                 - Bảng HTML độc lập tinh gọn chỉ hiển thị: Mã đơn hàng, Mã vận đơn, Tên sản phẩm, Màu sắc, Size, Số lượng còn lại.
-                 - Tích hợp ô tìm kiếm nhanh đa năng theo mọi trường thông tin.
-                 - Ô tích kiểm hàng độc lập ở cuối mỗi hàng theo số lượng sản phẩm (ví dụ: SL 2 thì có 2 ô [SP 1], [SP 2]).
-                 - Khi tích vào sẽ tự động trừ số lượng còn lại về 0 và chuyển trạng thái "Đã đủ (X/X)".
-                 - **Bảo mật tuyệt đối với Mật khẩu 9999**: Ô đã tích muốn bỏ tích phải nhập đúng mật khẩu 9999 mới được hoàn lại số lượng; sửa thông tin các ô cũng bắt buộc nhập mật khẩu 9999.
-              2. 📊 **Xuất Excel Đơn Đã Chọn**:
-                 - Bấm nút `[📊 Xuất Excel Đơn Đã Chọn]` để xuất file Excel (.xlsx) độc lập cho các đơn được tích chọn, kèm đầy đủ 2 Sheet (Chi tiết từng đơn & Tổng kết số lượng SKU).
-              3. 📱 **Nâng Cấp Quét Mã Vạch Điện Thoại Siêu Nhạy**:
-                 - Tự động nhận diện thanh sọc mã vạch 1D Code 128 (SPX Express, J&T...) từ camera điện thoại cả chiều ngang lẫn dọc.
-                 - Thu phóng tự động, khử mờ và xử lý tương phản cao giúp quét chính xác ngay cả với tem in mờ hoặc bóng lóa.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.1`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.1.exe`)
+            - **Các cải tiến mới nhất trong phiên bản v1.8.1**:
+              1. ⚡ **Bảng Tạo Đơn Nhanh Hàng Loạt ([⚡ TẠO ĐƠN NHANH])**:
+                 - Nút bấm nổi bật màu cam ngay trên thanh công cụ chính.
+                 - Dán danh sách mã vận đơn / mã đơn hàng hàng loạt (mỗi dòng 1 mã, tự động lọc sạch ký tự thừa hoặc dấu `-`).
+                 - Chọn Sàn TMĐT (Shopee, TikTok Shop, Lazada, Khác) và Loại đơn (Trả hàng/Hoàn tiền, Giao không thành công, Đơn hủy, THẤT THU) đồng loạt hoặc riêng lẻ từng dòng.
+                 - Bảng xem trước danh sách kèm ô checkbox để người dùng tích chọn những đơn muốn đưa ra bảng chính.
+                 - Đơn mới tạo ra bảng chính luôn giữ đúng trạng thái chuẩn **"Chưa nhận (Chờ về)"**.
+              2. ⏳ **Quy Trình Nhận Tại Kho Chuẩn Xác**:
+                 - Đơn mới tạo hoặc đơn mới nhập từ điện thoại có trạng thái Nhận Tại Kho mặc định là **"Chưa nhận (Chờ về)"**.
+                 - Chỉ khi nhân viên kho thực hiện thao tác quét mã hoàn kho thực tế trên điện thoại, trạng thái mới tự động cập nhật sang **"Đã nhận về kho"**.
+              3. 📱 **Nâng Cấp Quét Mã Vạch Điện Thoại Siêu Nhạy (40 FPS)**:
+                 - Tốc độ bắt nét và nhận diện mã vạch 1D/2D siêu tốc tương đương Salework.
+                 - Thuật toán xoay quét 90 độ hỗ trợ quét tem dán ngang, dọc linh hoạt.
+                 - Khắc phục hoàn toàn tình trạng đơ giật camera khi dùng lâu.
           files: |
             dist/*.exe
         env:

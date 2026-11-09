@@ -1708,74 +1708,26 @@
     let html5QrCode = null;
 
     // =========================================================================
-    // v1.7.5: CƠ CHẾ GIỮ YÊN 0.5S (TỐI ƯU CẢ MÃ VẠCH 1D VÀ QR CODE)
+    // v1.7.9: KÍCH HOẠT QUÉT SIÊU TỐC TỨC THÌ (INSTANT TRIGGER - 0MS DELAY)
     // =========================================================================
-    let currentHoldingCode = null;
-    let holdStartTime = 0;
-    let lastDetectedTime = 0;
-    let holdWatchdogTimer = null;
-    let holdHitCount = 0;
-    const HOLD_DURATION_MS = 500; // Giữ yên 0.5 giây chuẩn xác
-
-    function updateHoldIndicatorUI(code, progressRatio, remainingSec) {
-      const overlay = document.getElementById('holdScanOverlay');
-      const codeEl = document.getElementById('holdScanCodeText');
-      const countEl = document.getElementById('holdScanCountdown');
-      const barEl = document.getElementById('holdScanProgressBar');
-      if (!overlay) return;
-
-      if (progressRatio <= 0) {
-        overlay.style.display = 'none';
-        return;
-      }
-      overlay.style.display = 'flex';
-      if (codeEl) codeEl.textContent = code;
-      if (countEl) countEl.textContent = Math.max(0, remainingSec).toFixed(1) + 's';
-      if (barEl) barEl.style.width = Math.min(100, Math.round(progressRatio * 100)) + '%';
-    }
+    let lastScannedCode = null;
+    let lastScannedTime = 0;
 
     function handleCameraFrameDecoded(decodedText) {
       const clean = extractCleanTrackingCode(decodedText);
-      if (!clean) return;
+      if (!clean || clean.length < 6) return;
 
       const now = Date.now();
-      lastDetectedTime = now;
-
-      // Nếu phát hiện mã mới khác mã đang giữ -> Bắt đầu đếm cho mã mới
-      if (currentHoldingCode !== clean) {
-        currentHoldingCode = clean;
-        holdStartTime = now;
-        holdHitCount = 1;
-        updateHoldIndicatorUI(clean, 0.2, 0.5);
-      } else {
-        // Vẫn đang hướng camera vào đúng mã đó
-        holdHitCount++;
-        const elapsed = now - holdStartTime;
-        const remaining = Math.max(0, (HOLD_DURATION_MS - elapsed) / 1000);
-        const progress = Math.min(1, elapsed / HOLD_DURATION_MS);
-        updateHoldIndicatorUI(clean, progress, remaining);
-
-        // ĐÃ GIỮ ĐỦ 0.5S (hoặc nhận diện liên tục >= 4 khung hình trong >= 350ms) -> KÍCH HOẠT QUÉT THÀNH CÔNG!
-        if (elapsed >= HOLD_DURATION_MS || (holdHitCount >= 4 && elapsed >= 350)) {
-          currentHoldingCode = null;
-          holdStartTime = 0;
-          holdHitCount = 0;
-          updateHoldIndicatorUI(clean, 0, 0);
-          sendCodeToPc(clean);
-        }
+      // Chống quét trùng lặp liên tục cùng 1 mã trong vòng 2.2 giây nếu chưa dời camera
+      if (clean === lastScannedCode && (now - lastScannedTime < 2200)) {
+        return;
       }
 
-      // Bộ giám sát thông minh: Cho phép độ trễ an toàn 1.2s trước khi reset.
-      // Tránh việc khung hình quét mã vạch bị rớt 1 frame (300ms) làm reset về 0 liên tục!
-      if (holdWatchdogTimer) clearTimeout(holdWatchdogTimer);
-      holdWatchdogTimer = setTimeout(() => {
-        if (Date.now() - lastDetectedTime >= 1100) {
-          currentHoldingCode = null;
-          holdStartTime = 0;
-          holdHitCount = 0;
-          updateHoldIndicatorUI('', 0, 0);
-        }
-      }, 1200);
+      lastScannedCode = clean;
+      lastScannedTime = now;
+
+      // Kích hoạt phản hồi tức thì 100% không cần giữ yên!
+      sendCodeToPc(clean);
     }
 
     // =========================================================================
@@ -1851,76 +1803,111 @@
     }
 
     // =========================================================================
-    // v1.7.5: DUAL SCAN ENGINE - NATIVE BARCODE DETECTOR & HTML5-QRCODE TỐI ƯU
+    // v1.7.9: MULTI-ENGINE LIVE SCANNER: QUAGGA2 (1D) + BARCODE DETECTOR (NATIVE) + HTML5QRCODE (2D)
     // =========================================================================
-    let nativeBarcodeScannerActive = false;
-    let nativeBarcodeTimer = null;
+    let dualScanLoopActive = false;
+    let dualScanTimer = null;
+    let isDualFrameBusy = false;
+    let offscreenScanCanvas = null;
 
-    async function startNativeBarcodeDetectorLoop() {
-      if (!('BarcodeDetector' in window)) {
-        console.log('ℹ️ Trình duyệt không hỗ trợ BarcodeDetector Native, sử dụng bộ quét Html5Qrcode đa định dạng.');
-        return;
+    function startNativeBarcodeDetectorLoop() {
+      dualScanLoopActive = true;
+      if (!offscreenScanCanvas) {
+        offscreenScanCanvas = document.createElement('canvas');
       }
 
-      let detector = null;
-      try {
-        let formatsToUse = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code'];
-        if (typeof BarcodeDetector.getSupportedFormats === 'function') {
-          const supported = await BarcodeDetector.getSupportedFormats();
-          if (Array.isArray(supported) && supported.length > 0) {
-            formatsToUse = formatsToUse.filter(f => supported.includes(f));
-          }
-        }
-        detector = new BarcodeDetector({ formats: formatsToUse });
-        console.log('🚀 Đã khởi tạo Native BarcodeDetector với các định dạng:', formatsToUse);
-      } catch (err) {
+      let nativeDetector = null;
+      if ('BarcodeDetector' in window) {
         try {
-          detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] });
-        } catch (e2) {}
+          nativeDetector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code'] });
+        } catch (e) {}
       }
 
-      if (!detector) return;
-
-      nativeBarcodeScannerActive = true;
-      let isDetecting = false;
-
-      const detectFrame = async () => {
-        if (!nativeBarcodeScannerActive || !wasCameraActive) return;
+      const scanNextFrame = async () => {
+        if (!dualScanLoopActive || !wasCameraActive) return;
         const videoEl = document.querySelector('#reader video');
-        if (videoEl && !videoEl.paused && videoEl.readyState >= 2 && !isDetecting) {
-          isDetecting = true;
+
+        if (videoEl && !videoEl.paused && videoEl.readyState >= 2 && !isDualFrameBusy) {
+          isDualFrameBusy = true;
           try {
-            // Quét toàn bộ khung hình camera gốc ở độ phân giải cao nhất, không bị giới hạn bởi hộp cắt
-            const barcodes = await detector.detect(videoEl);
-            if (barcodes && barcodes.length > 0) {
-              for (const b of barcodes) {
-                if (b.rawValue && String(b.rawValue).trim()) {
-                  handleCameraFrameDecoded(b.rawValue);
-                  break;
+            // ĐỘNG CƠ 1: Hardware BarcodeDetector (nếu thiết bị có hỗ trợ)
+            if (nativeDetector) {
+              try {
+                const barcodes = await nativeDetector.detect(videoEl);
+                if (barcodes && barcodes.length > 0) {
+                  for (const b of barcodes) {
+                    if (b.rawValue && String(b.rawValue).trim()) {
+                      handleCameraFrameDecoded(b.rawValue);
+                      isDualFrameBusy = false;
+                      if (dualScanLoopActive) dualScanTimer = setTimeout(scanNextFrame, 120);
+                      return;
+                    }
+                  }
                 }
-              }
+              } catch (eNative) {}
+            }
+
+            // ĐỘNG CƠ 2: Quagga2 Sub-Pixel 1D Engine chạy trực tiếp trên khung hình video
+            // Giải mã cực nhạy cho mã vạch Shopee SPX, GHN, J&T, Viettel Post kể cả trên iPhone / Safari
+            if (typeof Quagga !== 'undefined') {
+              const vw = videoEl.videoWidth || 1280;
+              const vh = videoEl.videoHeight || 720;
+
+              // Cắt vùng ngắm trọng tâm (người dùng ngắm mã vạch vào giữa màn hình)
+              const cropW = Math.round(vw * 0.92);
+              const cropH = Math.round(vh * 0.45);
+              const cropX = Math.round((vw - cropW) / 2);
+              const cropY = Math.round((vh - cropH) / 2);
+
+              offscreenScanCanvas.width = 800;
+              offscreenScanCanvas.height = Math.round(cropH * (800 / cropW));
+              const ctx = offscreenScanCanvas.getContext('2d', { willReadFrequently: true });
+              ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, offscreenScanCanvas.width, offscreenScanCanvas.height);
+
+              const frameDataUrl = offscreenScanCanvas.toDataURL('image/jpeg', 0.85);
+
+              await new Promise(resolve => {
+                Quagga.decodeSingle({
+                  src: frameDataUrl,
+                  numOfWorkers: 0,
+                  inputStream: { size: 800 },
+                  decoder: {
+                    readers: ['code_128_reader', 'ean_reader', 'code_39_reader']
+                  },
+                  locate: true
+                }, r => {
+                  if (r && r.codeResult && r.codeResult.code) {
+                    const code = String(r.codeResult.code).trim();
+                    if (code && code.length >= 6) {
+                      handleCameraFrameDecoded(code);
+                    }
+                  }
+                  resolve();
+                });
+              });
             }
           } catch (err) {
-            // Bỏ qua lỗi từng khung hình
+            // Bỏ qua lỗi khung hình
           } finally {
-            isDetecting = false;
+            isDualFrameBusy = false;
           }
         }
 
-        if (nativeBarcodeScannerActive) {
-          nativeBarcodeTimer = setTimeout(detectFrame, 65); // ~15 khung hình/giây
+        if (dualScanLoopActive) {
+          dualScanTimer = setTimeout(scanNextFrame, 90); // ~11 khung hình/giây
         }
       };
 
-      detectFrame();
+      scanNextFrame();
     }
 
     function stopNativeBarcodeDetectorLoop() {
-      nativeBarcodeScannerActive = false;
-      if (nativeBarcodeTimer) {
-        clearTimeout(nativeBarcodeTimer);
-        nativeBarcodeTimer = null;
+      dualScanLoopActive = false;
+      if (dualScanTimer) {
+        clearTimeout(dualScanTimer);
+        dualScanTimer = null;
       }
+      isDualFrameBusy = false;
     }
 
     async function safelyStopAndClearScanner() {

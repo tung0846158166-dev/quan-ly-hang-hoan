@@ -2307,38 +2307,51 @@
 
         if (!decodedCode && typeof Html5Qrcode !== 'undefined') {
           const scanner = html5QrCode || new Html5Qrcode('reader');
-          const crops = [
-            await cropImageToBlob(img, 0.45, 0.32, 0.48, 0.42, 800, false, 0.8),
-            await cropImageToBlob(img, 0.32, 0.06, 0.62, 0.22, 950, false, 0.8),
-            await cropImageToBlob(img, 0, 0, 1, 1, 1000, false, 0.8)
-          ];
-          for (let i = 0; i < crops.length; i++) {
-            try {
-              const res = await scanner.scanFile(crops[i].file, false);
-              if (res && String(res).trim()) {
-                decodedCode = String(res).trim();
-                break;
-              }
-            } catch (err) {}
+          try {
+            const res = await scanner.scanFile(file, false);
+            if (res && String(res).trim()) {
+              decodedCode = String(res).trim();
+            }
+          } catch (fErr) {}
+          if (!decodedCode) {
+            const crops = [
+              await cropImageToBlob(img, 0.32, 0.04, 0.68, 0.25, 1200, false, 0.9),
+              await cropImageToBlob(img, 0.45, 0.32, 0.52, 0.45, 900, false, 0.9),
+              await cropImageToBlob(img, 0, 0, 1, 1, 1200, false, 0.9)
+            ];
+            for (let i = 0; i < crops.length; i++) {
+              try {
+                const res = await scanner.scanFile(crops[i].file, false);
+                if (res && String(res).trim()) {
+                  decodedCode = String(res).trim();
+                  break;
+                }
+              } catch (err) {}
+            }
           }
         }
 
-        toast.textContent = '⏳ Bước 2/2: Đang đọc chữ Mã vận đơn & Mã đơn hàng trên phiếu...';
         let ocrParsed = { track: '', orderId: '', shipDate: '', qty: 1 };
         let rawOcrText = '';
-        try {
-          if (typeof Tesseract === 'undefined') {
-            await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+        if (!decodedCode) {
+          toast.textContent = '⏳ Bước 2/2: Đang đọc chữ Mã vận đơn & Mã đơn hàng trên phiếu...';
+          try {
+            if (typeof Tesseract === 'undefined') {
+              await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+            }
+            const labelCrop = await cropImageToBlob(img, 0.03, 0.03, 0.94, 0.94, 1400, true, 0.85);
+            const result = await Promise.race([
+              Tesseract.recognize(labelCrop.dataUrl, 'vie+eng'),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('OCR Timeout')), 4000))
+            ]);
+            const text = result?.data?.text || '';
+            rawOcrText = text;
+            if (text) {
+              ocrParsed = parseShippingLabelText(text);
+            }
+          } catch (ocrErr) {
+            console.warn('Tesseract OCR error:', ocrErr);
           }
-          const labelCrop = await cropImageToBlob(img, 0.03, 0.03, 0.94, 0.94, 1400, true, 0.85);
-          const result = await Tesseract.recognize(labelCrop.dataUrl, 'vie+eng');
-          const text = result?.data?.text || '';
-          rawOcrText = text;
-          if (text) {
-            ocrParsed = parseShippingLabelText(text);
-          }
-        } catch (ocrErr) {
-          console.warn('Tesseract OCR error:', ocrErr);
         }
 
         const finalTrack = ocrParsed.track || decodedCode;

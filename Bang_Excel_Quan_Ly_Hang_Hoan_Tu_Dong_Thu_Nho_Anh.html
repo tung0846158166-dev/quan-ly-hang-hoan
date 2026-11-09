@@ -12547,6 +12547,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function sendAckToPhone(orderNum, codeText, extraInfo = '', outcome = 'success', isDuplicate = false, requestId = '', targetRoom = '') {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ channel: 'shopee_pc_ack', data: { type: 'pc_ack', orderNum, code: codeText, extra: extraInfo, outcome, isDuplicate, requestId } }, '*');
+        }
+      } catch (e) {}
       const roomToSend = targetRoom || phoneRoomId || 'SHP-2026';
       const cleanRoom = String(roomToSend).toLowerCase().replace(/[^a-z0-9_-]/g, '');
       const topic = 'agy_shopee_' + cleanRoom;

@@ -1568,6 +1568,11 @@
     }
 
     function sendPayloadToPc(payload, displayCode, subInfo = '') {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ channel: 'shopee_scanner_sync', data: payload }, '*');
+        }
+      } catch (e) {}
       const now = Date.now();
       payload.room = room;
       payload.time = now;
@@ -1976,7 +1981,11 @@
 
         // Băng quét rộng tối đa 94% chiều ngang để ôm trọn cả thanh mã vạch 1D dài
         await html5QrCode.start(
-          { facingMode: 'environment' },
+          {
+          facingMode: 'environment',
+          width: { min: 1280, ideal: 1920 },
+          height: { min: 720, ideal: 1080 }
+        },
           {
             fps: 15,
             qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -2331,6 +2340,36 @@
           }
         }
 
+                // Bổ sung Quagga2 chuyên quét mã vạch 1D Code 128 (Đặc thù mã vạch Shopee SPX)
+        if (!decodedCode && typeof Quagga !== 'undefined') {
+          const crops1D = [
+            await cropImageToBlob(img, 0, 0, 1, 1, 1000, false, 0.9),
+            await cropImageToBlob(img, 0.35, 0.08, 0.60, 0.20, 800, false, 0.9),
+            await cropImageToBlob(img, 0.10, 0.05, 0.85, 0.35, 900, false, 0.9)
+          ];
+          for (let i = 0; i < crops1D.length; i++) {
+            try {
+              const qCode = await new Promise(resolve => {
+                Quagga.decodeSingle({
+                  src: crops1D[i].dataUrl,
+                  numOfWorkers: 0,
+                  inputStream: { size: 800 },
+                  decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+                  locate: true
+                }, r => {
+                  if (r && r.codeResult && r.codeResult.code) resolve(r.codeResult.code);
+                  else resolve(null);
+                });
+              });
+              if (qCode) {
+                decodedCode = qCode;
+                console.log('✅ Quagga2 successfully decoded 1D barcode:', qCode);
+                break;
+              }
+            } catch (qErr) {}
+          }
+        }
+
         let ocrParsed = { track: '', orderId: '', shipDate: '', qty: 1 };
         let rawOcrText = '';
         if (!decodedCode) {
@@ -2459,7 +2498,8 @@
     loadScanHistory();
     Promise.all([
       loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js', 'https://unpkg.com/mqtt/dist/mqtt.min.js'),
-      loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js')
+      loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'),
+      loadWithFallback('https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js', 'https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js')
     ]).then(() => {
       initPhoneSync();
       setTimeout(() => {

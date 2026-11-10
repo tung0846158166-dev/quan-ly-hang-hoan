@@ -2059,7 +2059,9 @@
 
     async function decodeNativeCanvas(canvas, kind) {
       if (!('BarcodeDetector' in window)) return null;
-      const requested = kind === 'qr' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13'];
+      const requested = kind === 'qr' ? ['qr_code']
+        : kind === 'all' ? ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'itf', 'codabar']
+        : ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'itf', 'codabar'];
       if (!nativeReaders[kind]) {
         nativeReaders[kind] = (async () => {
           try {
@@ -2092,7 +2094,7 @@
         try {
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
           const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const qr = jsQR(pixels.data, canvas.width, canvas.height);
+          const qr = jsQR(pixels.data, canvas.width, canvas.height, { inversionAttempts: canvas.__fastScan ? 'dontInvert' : 'attemptBoth' });
           if (qr?.data && extractCleanTrackingCode(qr.data).length >= 6) return qr.data;
         } catch (eQr) {}
       }
@@ -2123,9 +2125,9 @@
       const task = new Promise(resolve => {
         try {
           Quagga.decodeSingle({
-            src: canvas.toDataURL('image/jpeg', 0.8),
+            src: canvas.toDataURL('image/jpeg', canvas.__fastScan ? 0.65 : 0.8),
             numOfWorkers: 0,
-            inputStream: { size: 1280 },
+            inputStream: { size: canvas.__fastScan ? 800 : 1280 },
             locator: { halfSample: false, patchSize: 'medium' },
             decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
             locate
@@ -2319,6 +2321,35 @@
       let barcodeSweep = 0;
       let autoNext = 'barcode';
 
+      // v1.8.6 TURBO: 1 lần detect đọc cả QR + mã vạch, cắt vùng giữa (ROI), Quagga chạy song song không chặn khung hình
+      const hasNative = ('BarcodeDetector' in window);
+      const roiCanvas = document.createElement('canvas');
+      roiCanvas.__fastScan = true;
+      let frameNo = 0;
+      let pendingQuagga = null;
+
+      const acceptCode = (code, revision) => {
+        if (code && !stillDecodeBusy && isCameraScanning && generation === scannerGeneration &&
+            revision === scannerDecodeRevision) {
+          handleCameraFrameDecoded(code);
+          return true;
+        }
+        return false;
+      };
+
+      const drawRoi = (fullFrame) => {
+        const vwRaw = videoEl.videoWidth, vhRaw = videoEl.videoHeight;
+        // Vùng giữa khung (nơi đặt mã) - 80% ngang x 60% dọc; cứ 4 khung lấy toàn ảnh 1 lần cho mã ở xa / lệch
+        const sw = fullFrame ? vwRaw : Math.round(vwRaw * 0.8);
+        const sh = fullFrame ? vhRaw : Math.round(vhRaw * 0.6);
+        const sx = Math.round((vwRaw - sw) / 2), sy = Math.round((vhRaw - sh) / 2);
+        const scale = Math.min(1, 1024 / Math.max(sw, sh));
+        const w = Math.round(sw * scale), h2 = Math.round(sh * scale);
+        if (roiCanvas.width !== w || roiCanvas.height !== h2) { roiCanvas.width = w; roiCanvas.height = h2; }
+        roiCanvas.getContext('2d', { willReadFrequently: true }).drawImage(videoEl, sx, sy, sw, sh, 0, 0, w, h2);
+        return roiCanvas;
+      };
+
       const processNextFrame = async () => {
         if (!isCameraScanning || !mediaStream || generation !== scannerGeneration) return;
 
@@ -2328,38 +2359,38 @@
           try {
             const revision = scannerDecodeRevision;
             const mode = scannerDecodeMode;
-            const kind = mode === 'auto' ? autoNext : mode;
-            if (mode === 'auto') autoNext = kind === 'barcode' ? 'qr' : 'barcode';
+            frameNo++;
 
-            // 1. TỐI ƯU SIÊU MƯỢT: Thử native BarcodeDetector trực tiếp từ video stream (0ms sao chép canvas, mượt 60 FPS)
             let detectedCode = null;
-            if ('BarcodeDetector' in window) {
-              detectedCode = await decodeNativeCanvas(videoEl, kind);
+            if (hasNative) {
+              // Đọc trực tiếp từ video, không sao chép canvas, cả QR + mã vạch trong 1 lượt
+              detectedCode = await decodeNativeCanvas(videoEl, mode === 'auto' ? 'all' : mode);
             }
 
-            // 2. Nếu BarcodeDetector chưa nhận hoặc thiết bị không hỗ trợ: Vẽ canvas và dùng jsQR / Quagga2
-            if (!detectedCode) {
-              const scale = Math.min(1, 1280 / Math.max(videoEl.videoWidth, videoEl.videoHeight));
-              const vw = Math.round(videoEl.videoWidth * scale);
-              const vh = Math.round(videoEl.videoHeight * scale);
-
-              if (scanCanvas.width !== vw || scanCanvas.height !== vh) {
-                scanCanvas.width = vw;
-                scanCanvas.height = vh;
+            if (!detectedCode && (!hasNative || frameNo % 3 === 0)) {
+              const roi = drawRoi(frameNo % 4 === 0);
+              if (mode !== 'barcode') detectedCode = await readQrFrame(roi);
+              if (!detectedCode && mode !== 'qr' && typeof Quagga !== 'undefined' && !quaggaDecodeBusy && !pendingQuagga) {
+                // Chạy Quagga nền trên bản sao ROI, không chặn vòng lặp QR
+                const copy = document.createElement('canvas');
+                copy.__fastScan = true;
+                copy.width = roi.width; copy.height = roi.height;
+                copy.getContext('2d').drawImage(roi, 0, 0);
+                const sweep = barcodeSweep++;
+                pendingQuagga = decodeBarcodeCanvas(copy, sweep % 2 === 0)
+                  .then(code => {
+                    if (!code && !quaggaDecodeBusy) return decodeBarcodeCanvas(makeBarcodeStrip(copy, sweep), false);
+                    return code;
+                  })
+                  .then(code => {
+                    if (code && String(code).trim().length >= 6) acceptCode(String(code).trim(), revision);
+                  })
+                  .catch(() => {})
+                  .finally(() => { pendingQuagga = null; });
               }
-              const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
-              ctx.drawImage(videoEl, 0, 0, vw, vh);
-
-              detectedCode = kind === 'qr'
-                ? await readQrFrame(scanCanvas)
-                : await readBarcodeFrame(scanCanvas, barcodeSweep++);
             }
 
-            if (detectedCode && !stillDecodeBusy && isCameraScanning && generation === scannerGeneration &&
-                revision === scannerDecodeRevision) {
-              handleCameraFrameDecoded(detectedCode);
-            }
-
+            acceptCode(detectedCode, revision);
           } catch (frameErr) {
             // bỏ qua lỗi frame
           } finally {
@@ -2368,8 +2399,12 @@
         }
 
         if (isCameraScanning && generation === scannerGeneration) {
-          const delay = ('BarcodeDetector' in window) ? 35 : 60;
-          cameraScanInterval = setTimeout(processNextFrame, delay);
+          // Bám nhịp khung hình camera thật thay vì chờ cố định
+          if (typeof videoEl.requestVideoFrameCallback === 'function') {
+            videoEl.requestVideoFrameCallback(() => processNextFrame());
+          } else {
+            cameraScanInterval = setTimeout(processNextFrame, hasNative ? 16 : 30);
+          }
         }
       };
 

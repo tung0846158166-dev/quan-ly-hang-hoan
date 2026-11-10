@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8" />
+  <meta charset="UTF-8" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -25,7 +25,6 @@
       position: relative;
     }
 
-    
     /* Laser Scan Animation */
     @keyframes laserSweep {
       0% { top: 10%; opacity: 0.3; }
@@ -43,6 +42,9 @@
       animation: laserSweep 2s ease-in-out infinite;
       pointer-events: none;
       z-index: 15;
+      will-change: top, opacity;
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
     }
 
     /* Shutter Flash Animation */
@@ -218,6 +220,14 @@
     .hidden {
       display: none !important;
     }
+    .decode-controls { background:#1e293b; border:1px solid #334155; border-radius:14px; padding:12px; }
+    .decode-label { font-size:12px; font-weight:800; color:#e2e8f0; margin-bottom:8px; }
+    .decode-buttons { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .decode-buttons button { padding:10px 4px; border:1px solid #475569; border-radius:9px; background:#0f172a; color:#cbd5e1; font-size:12px; font-weight:800; cursor:pointer; }
+    .decode-buttons button[aria-pressed="true"] { background:#0ea5e9; border-color:#38bdf8; color:#082f49; }
+    #decoderModeHint { margin-top:8px; line-height:1.5; }
+    #torchToggleBtn:disabled { opacity:0.55; cursor:default; }
+    #torchToggleBtn[aria-pressed="true"] { color:#fef08a !important; border-color:#facc15 !important; }
     .btn-primary-cam {
       width: 100%;
       padding: 14px 16px;
@@ -535,6 +545,28 @@
     }
 
     input[type="file"] { display: none !important; }
+
+    /* Definite viewport: portrait camera frames must not size the whole card. */
+    .camera-box { height:clamp(340px, 58svh, 480px) !important; min-height:340px !important; flex:none; isolation:isolate; }
+    #reader { position:absolute; inset:0; width:100%; height:100%; min-height:0 !important; }
+    #reader video { position:absolute; inset:0; width:100% !important; height:100% !important; object-fit:cover; }
+    #cameraToolbar { gap:10px; }
+    #cameraToolbar button { min-height:40px; flex:none; }
+    #scannerReticle > div:first-child { font-size:10px !important; line-height:1.35; text-align:center; max-width:100%; padding:5px 8px !important; }
+    #cameraShutter button { max-width:calc(100% - 28px); min-height:44px; }
+    #cameraStartOverlay { z-index:30; }
+    .app-header { gap:10px; }
+    .app-header > div:first-child { min-width:0; }
+    .header-title { line-height:1.35; }
+    .header-sub { line-height:1.4; }
+    .conn-pill { flex:none; max-width:42%; white-space:normal; text-align:center; }
+    @media(max-width:380px) {
+      .app-header { padding:10px; }
+      .header-title { font-size:12px; }
+      .header-sub { font-size:10px; }
+      .conn-pill { font-size:10px; padding:6px 8px; }
+      .container { padding:10px; }
+    }
   </style>
 </head>
 <body>
@@ -544,7 +576,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.3</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.9.1</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -588,6 +620,16 @@
       </div>
     </div>
 
+    <div class="decode-controls">
+      <div class="decode-label">Loại mã cần quét</div>
+      <div class="decode-buttons" role="group" aria-label="Loại mã cần quét">
+        <button type="button" id="decodeBarcodeBtn" aria-pressed="true" onclick="setScannerDecodeMode('barcode')">Mã vạch</button>
+        <button type="button" id="decodeQrBtn" aria-pressed="false" onclick="setScannerDecodeMode('qr')">QR</button>
+        <button type="button" id="decodeAutoBtn" aria-pressed="false" onclick="setScannerDecodeMode('auto')">Tự động</button>
+      </div>
+      <div id="decoderModeHint" class="hint-text" role="status">Chỉ đọc mã vạch; hỗ trợ hướng ngang và dọc.</div>
+    </div>
+
     <div class="camera-box" style="position:relative; overflow:hidden; border-radius:18px; border:2px solid #334155; box-shadow:0 10px 30px rgba(0,0,0,0.5); min-height:300px; background:#000;">
       <div id="reader" style="width:100%; height:100%; min-height:300px; background:#000;"></div>
       
@@ -595,7 +637,7 @@
       <div id="shutterFlashOverlay"></div>
 
       <!-- Reticle / Target Viewfinder Frame -->
-      <div id="scannerReticle" style="position:absolute; inset:16px; pointer-events:none; border:2px dashed #22c55e; border-radius:16px; box-shadow:0 0 25px rgba(34,197,94,0.35); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:10px; z-index:10;">
+      <div id="scannerReticle" style="position:absolute; inset:64px 14px 78px; pointer-events:none; border:2px dashed #22c55e; border-radius:16px; box-shadow:0 0 25px rgba(34,197,94,0.35); display:flex; flex-direction:column; justify-content:space-between; align-items:center; padding:10px; z-index:10;">
         <div style="font-size:11px; background:rgba(15,23,42,0.88); color:#22c55e; padding:4px 12px; border-radius:999px; font-weight:800; border:1px solid #22c55e; backdrop-filter:blur(4px); letter-spacing:0.3px;">
           🎯 CĂN MÃ VẠCH 1D HOẶC QR VÀO GIỮA KHUNG
         </div>
@@ -604,23 +646,16 @@
         <div class="laser-scanner-line"></div>
         
         <div style="font-size:10px; color:#cbd5e1; background:rgba(0,0,0,0.7); padding:3px 10px; border-radius:8px; backdrop-filter:blur(4px);">
-          ⚡ Tự động đọc tức thì 10-25ms • Đưa cách 15-25cm
+          Giữ rõ mã trong khung • Điều chỉnh khoảng cách để lấy nét
         </div>
       </div>
 
-      <!-- Top Toolbar: Flash & Zoom Pill -->
-      <div style="position:absolute; top:12px; left:12px; right:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; pointer-events:auto;">
+      <!-- Camera toolbar -->
+      <div id="cameraToolbar" style="position:absolute; top:12px; left:12px; right:12px; z-index:25; display:flex; justify-content:space-between; align-items:center; pointer-events:auto;">
         <!-- Torch Toggle -->
-        <button id="torchToggleBtn" type="button" onclick="toggleTorch()" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
-          <span>⚡ Bật Flash</span>
+        <button id="torchToggleBtn" type="button" disabled aria-pressed="false" title="Bật camera để kiểm tra đèn flash" onclick="toggleTorch()" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
+          <span>⚡ Bật đèn flash</span>
         </button>
-
-        <!-- Zoom Switcher (1x, 1.8x, 2.5x) -->
-        <div style="background:rgba(15,23,42,0.85); border:1.5px solid #64748b; border-radius:999px; padding:3px 5px; display:flex; gap:3px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
-          <button type="button" id="btnZoom1" onclick="setCameraZoom(1.0)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">1x</button>
-          <button type="button" id="btnZoom18" onclick="setCameraZoom(1.8)" style="background:#38bdf8; border:none; color:#0f172a; font-size:11px; font-weight:900; padding:3px 9px; border-radius:999px; cursor:pointer; box-shadow:0 1px 5px rgba(56,189,248,0.5);">1.8x</button>
-          <button type="button" id="btnZoom25" onclick="setCameraZoom(2.5)" style="background:none; border:none; color:#94a3b8; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; cursor:pointer;">2.5x</button>
-        </div>
 
         <!-- Refresh Cam -->
         <button type="button" onclick="forceRestartCamera()" title="Khởi động lại Camera" style="background:rgba(15,23,42,0.85); color:#38bdf8; border:1.5px solid #38bdf8; border-radius:999px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:4px; box-shadow:0 2px 10px rgba(0,0,0,0.5); backdrop-filter:blur(6px);">
@@ -629,10 +664,10 @@
       </div>
 
       <!-- Bottom Floating Shutter Button [📸 CHỤP ĐỌC NGAY] -->
-      <div style="position:absolute; bottom:14px; left:0; right:0; z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto;">
+      <div id="cameraShutter" style="position:absolute; bottom:14px; left:0; right:0; z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:auto;">
         <button type="button" onclick="captureAndDecodeCurrentFrame()" style="background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; border:2.5px solid #ffffff; border-radius:999px; padding:8px 22px; font-size:12px; font-weight:900; cursor:pointer; display:flex; align-items:center; gap:6px; box-shadow:0 4px 20px rgba(16,185,129,0.6); active:scale-95 transition:all 0.15s ease;">
           <span style="font-size:15px;">📸</span>
-          <span>CHỤP ĐỌC TỨC THÌ (NẾU RUNG TAY)</span>
+          <span>CHỤP ĐỌC MÃ</span>
         </button>
       </div>
 
@@ -772,6 +807,8 @@
         document.head.appendChild(s);
       });
     }
+
+    let scannerLibrariesReady = Promise.resolve();
 
     function extractRoomCode() {
       const hash = String(window.location.hash || '').replace(/^#/, '');
@@ -1131,22 +1168,27 @@
       if (!raw) return '';
       let str = String(raw).trim();
 
-      // 1. Nếu là URL, xử lý bóc tách thông minh
-      if (str.includes('http://') || str.includes('https://') || str.includes('spx.vn') || str.includes('ghn.vn')) {
-        // 1.1 Tìm trong query params: ?spx=... hoặc ?bill=... hoặc ?code=...
-        const mParam = str.match(/(?:spx|track|code|c|id|bill|order_code|tracking|tracking_number|s)=([A-Za-z0-9\.\-_]+)/i);
-        if (mParam && mParam[1]) {
-          str = mParam[1];
-        } else {
-          // 1.2 Bóc các segment trong đường dẫn URL (loại trừ http:, domain)
-          const segments = str.split(/[\/\?#&]/).filter(s => s && !s.toLowerCase().startsWith('http') && !s.includes('.') && s.length >= 6);
-          if (segments.length > 0) {
-            str = segments[segments.length - 1];
+      // QR có thể chứa URL: lấy mã từ tham số hoặc đường dẫn, không lấy "HTTPS:".
+      if (/^https?:\/\//i.test(str) || /^(?:spx|ghn)\.vn\//i.test(str)) {
+        try {
+          const url = new URL(/^https?:\/\//i.test(str) ? str : 'https://' + str);
+          const keys = /^(?:spx|track|tracking|tracking_number|tracking_no|tracking_code|waybill|waybill_no|code|c|id|bill|order_code|s)$/i;
+          for (const [key, value] of url.searchParams) {
+            if (keys.test(key) && /^[A-Za-z0-9._-]{6,50}$/.test(value)) {
+              return extractCleanTrackingCode(value);
+            }
           }
-        }
+          const segments = url.pathname.split('/').filter(Boolean).reverse();
+          for (const segment of segments) {
+            const value = decodeURIComponent(segment);
+            if (/^[A-Za-z0-9._-]{6,50}$/.test(value) && /\d/.test(value)) {
+              return extractCleanTrackingCode(value);
+            }
+          }
+        } catch (eUrl) {}
+        return '';
       }
 
-      // 2. Tìm theo mẫu các hãng vận chuyển quen thuộc
       const mSpx = str.match(/(SPXVN[0-9A-Za-z]{6,18})/i);
       if (mSpx) return mSpx[1].toUpperCase();
 
@@ -1168,18 +1210,16 @@
       const mJt = str.match(/(8[024][0-9]{10,13})/);
       if (mJt) return mJt[1];
 
-      // 3. Phân tách dấu phân cách /, |, ;
       let cleaned = str.replace(/^[\*\"\'\<\>\#\s\[\]\(\)]+|[\*\"\'\<\>\#\s\[\]\(\)]+$/g, '').trim();
       if (cleaned.includes('/') || cleaned.includes('|') || cleaned.includes(';')) {
-        const parts = cleaned.split(/[\/\|;]/).filter(p => !p.toLowerCase().startsWith('http'));
+        const parts = cleaned.split(/[\/\|;]/);
         for (const p of parts) {
           const partClean = extractCleanTrackingCode(p);
-          if (partClean && partClean.length >= 6) return partClean;
+          if (partClean) return partClean;
         }
       }
 
-      // 4. Nếu là mã alphanumeric sạch (loại trừ http:)
-      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned) && !cleaned.toLowerCase().startsWith('http')) {
+      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned)) {
         return cleaned.toUpperCase();
       }
 
@@ -1784,7 +1824,7 @@
     let html5QrCode = null;
 
     // =========================================================================
-    // v1.8.3: KÍCH HOẠT QUÉT SIÊU TỐC TỨC THÌ (INSTANT TRIGGER - 0MS DELAY)
+    // v1.8.0: KÍCH HOẠT QUÉT SIÊU TỐC TỨC THÌ (INSTANT TRIGGER - 0MS DELAY)
     // =========================================================================
     let lastScannedCode = null;
     let lastScannedTime = 0;
@@ -1879,70 +1919,254 @@
     }
 
     // =========================================================================
-    // v1.8.3: MASTER HIGH-SPEED SCANNER OVERHAUL (40 FPS SUB-PIXEL 1D + JSQR 2D + HARDWARE)
+    // v1.8.0: SUPER ENGINE MULTI-SCANNER (JSQR 2D + QUAGGA2 SUB-PIXEL 1D + NATIVE BARCODE DETECTOR)
+    // Sửa triệt để 100% quét mã vạch 1D Code 128 trên điện thoại & Safari iOS
     // =========================================================================
     let mediaStream = null;
     let cameraScanInterval = null;
     let isCameraScanning = false;
     let scanCanvas = null;
     let stripCanvas = null;
-    let nativeDetector = null;
-    let currentZoomLevel = 1.8;
-    let isTorchActive = false;
+    let nativeReaders = {};
+    let nativeReadsBusy = {};
+    let scannerGeneration = 0;
+    let quaggaDecodeBusy = false;
+    let stillDecodeBusy = false;
+    const cameraConstraintTasks = new WeakMap();
+    let scannerDecodeMode = 'barcode';
+    let scannerDecodeRevision = 0;
+    try {
+      const saved = localStorage.getItem('mobile_scanner_decode_mode_v1');
+      if (['barcode', 'qr', 'auto'].includes(saved)) scannerDecodeMode = saved;
+    } catch (eStorage) {}
 
-    async function setCameraZoom(val) {
-      currentZoomLevel = val;
-      ['btnZoom1', 'btnZoom18', 'btnZoom25'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-          btn.style.background = 'none';
-          btn.style.color = '#94a3b8';
-          btn.style.boxShadow = 'none';
+    function updateScannerModeUI() {
+      const buttons = { barcode: 'decodeBarcodeBtn', qr: 'decodeQrBtn', auto: 'decodeAutoBtn' };
+      for (const [mode, id] of Object.entries(buttons)) {
+        document.getElementById(id)?.setAttribute('aria-pressed', String(scannerDecodeMode === mode));
+      }
+      const hints = {
+        barcode: 'Chỉ đọc mã vạch; hỗ trợ hướng ngang và dọc.',
+        qr: 'Chỉ đọc QR; tự lấy mã vận đơn từ đường dẫn được hỗ trợ.',
+        auto: 'Luân phiên đọc mã vạch và QR trong cùng khung camera.'
+      };
+      document.getElementById('decoderModeHint').textContent = hints[scannerDecodeMode] + ' Áp dụng cả khi chọn ảnh phiếu.';
+    }
+
+    function setScannerDecodeMode(mode) {
+      if (!['barcode', 'qr', 'auto'].includes(mode)) return;
+      if (mode !== scannerDecodeMode) {
+        scannerDecodeRevision++;
+        lastScannedCode = null;
+        lastScannedTime = 0;
+        lastScannedRawCode = '';
+        lastScannedRawTime = 0;
+      }
+      scannerDecodeMode = mode;
+      try { localStorage.setItem('mobile_scanner_decode_mode_v1', mode); } catch (eStorage) {}
+      updateScannerModeUI();
+    }
+    updateScannerModeUI();
+
+    let torchTrack = null;
+    let torchSupported = false;
+    let torchEnabled = false;
+    let torchBusy = false;
+
+    function updateTorchUI() {
+      const button = document.getElementById('torchToggleBtn');
+      if (!button) return;
+      button.disabled = !torchSupported || torchBusy;
+      button.setAttribute('aria-pressed', String(torchEnabled));
+      button.textContent = !torchTrack ? '⚡ Bật đèn flash' :
+        !torchSupported ? '⚡ Không hỗ trợ flash' :
+        torchEnabled ? '⚡ Tắt đèn flash' : '⚡ Bật đèn flash';
+      button.title = !torchTrack ? 'Bật camera để kiểm tra đèn flash' :
+        !torchSupported ? 'Camera hoặc trình duyệt này không hỗ trợ điều khiển đèn flash' :
+        torchEnabled ? 'Tắt đèn chiếu sáng khi quét' : 'Bật đèn chiếu sáng khi quét';
+    }
+
+    function configureTorch(track) {
+      torchTrack = track || null;
+      torchSupported = false;
+      torchEnabled = false;
+      torchBusy = false;
+      try {
+        torchSupported = !!track && typeof track.applyConstraints === 'function' &&
+          track.getCapabilities?.().torch === true;
+        torchEnabled = torchSupported && track.getSettings?.().torch === true;
+      } catch (eTorch) {}
+      updateTorchUI();
+    }
+
+    function applyCameraTrackConstraints(track, changes) {
+      const previous = cameraConstraintTasks.get(track) || Promise.resolve();
+      const task = previous.catch(() => {}).then(async () => {
+        const constraints = { ...(track.getConstraints?.() || {}) };
+        const advanced = Object.assign({}, ...(constraints.advanced || []), changes);
+        for (const [key, value] of Object.entries(changes)) {
+          if (key in constraints) constraints[key] = value;
+        }
+        await track.applyConstraints({ ...constraints, advanced: [advanced] });
+        if (track === torchTrack && torchSupported) {
+          const actual = track.getSettings?.().torch;
+          if (typeof actual === 'boolean') torchEnabled = actual;
+          updateTorchUI();
         }
       });
-      const activeBtn = val <= 1.2 ? 'btnZoom1' : (val <= 2.0 ? 'btnZoom18' : 'btnZoom25');
-      const b = document.getElementById(activeBtn);
-      if (b) {
-        b.style.background = '#38bdf8';
-        b.style.color = '#0f172a';
-        b.style.boxShadow = '0 1px 5px rgba(56,189,248,0.5)';
-      }
-
-      if (!mediaStream) return;
-      const track = mediaStream.getVideoTracks()[0];
-      if (track && track.getCapabilities) {
-        const caps = track.getCapabilities();
-        if (caps.zoom) {
-          const target = Math.min(caps.zoom.max, Math.max(caps.zoom.min, val));
-          try {
-            await track.applyConstraints({ advanced: [{ zoom: target }] });
-          } catch (e) {}
-        }
-      }
+      cameraConstraintTasks.set(track, task);
+      return task;
     }
 
     async function toggleTorch() {
-      if (!mediaStream) return;
-      const track = mediaStream.getVideoTracks()[0];
-      if (!track || !track.getCapabilities) return;
-      const caps = track.getCapabilities();
-      if (caps.torch) {
-        isTorchActive = !isTorchActive;
-        try {
-          await track.applyConstraints({ advanced: [{ torch: isTorchActive }] });
-          const btn = document.getElementById('torchToggleBtn');
-          if (btn) {
-            btn.innerHTML = isTorchActive ? '<span>⚡ Tắt Flash</span>' : '<span>⚡ Bật Flash</span>';
-            btn.style.background = isTorchActive ? '#eab308' : 'rgba(15,23,42,0.85)';
-            btn.style.color = isTorchActive ? '#0f172a' : '#38bdf8';
-          }
-        } catch (e) {}
-      } else {
-        alert('Thiết bị này không hỗ trợ bật đèn Flash trực tiếp từ trình duyệt.');
+      if (!torchSupported || !torchTrack || torchBusy || !mediaStream) return;
+      const track = torchTrack;
+      const generation = scannerGeneration;
+      const enabled = !torchEnabled;
+      torchBusy = true;
+      updateTorchUI();
+      try {
+        await applyCameraTrackConstraints(track, { torch: enabled });
+        if (track === torchTrack && generation === scannerGeneration) {
+          const actual = track.getSettings?.().torch;
+          torchEnabled = typeof actual === 'boolean' ? actual : enabled;
+        }
+      } catch (eTorch) {
+        if (track === torchTrack && generation === scannerGeneration) {
+          showToast('Không đổi được đèn flash. Bạn hãy thử lại hoặc tăng ánh sáng bên ngoài.');
+        }
+      } finally {
+        if (track === torchTrack && generation === scannerGeneration) {
+          torchBusy = false;
+          updateTorchUI();
+        }
       }
     }
 
+    // Một decoder bị kẹt không được chặn các lượt quét QR tiếp theo.
+    function withScannerTimeout(task, timeoutMs = 1200) {
+      return new Promise(resolve => {
+        const timer = setTimeout(() => resolve(null), timeoutMs);
+        Promise.resolve(task).then(value => {
+          clearTimeout(timer);
+          resolve(value);
+        }, () => {
+          clearTimeout(timer);
+          resolve(null);
+        });
+      });
+    }
+
+    async function decodeNativeCanvas(canvas, kind) {
+      if (!('BarcodeDetector' in window)) return null;
+      const requested = kind === 'qr' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13'];
+      if (!nativeReaders[kind]) {
+        nativeReaders[kind] = (async () => {
+          try {
+            let formats = requested;
+            if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+              const supported = await withScannerTimeout(BarcodeDetector.getSupportedFormats(), 600);
+              formats = requested.filter(format => supported?.includes(format));
+            }
+            return formats.length ? new BarcodeDetector({ formats }) : null;
+          } catch (eNative) { return null; }
+        })();
+      }
+      const reader = await withScannerTimeout(nativeReaders[kind], 600);
+      if (!reader || nativeReadsBusy[kind]) return null;
+      const task = Promise.resolve().then(() => reader.detect(canvas));
+      nativeReadsBusy[kind] = task;
+      const clear = () => { if (nativeReadsBusy[kind] === task) nativeReadsBusy[kind] = null; };
+      task.then(clear, clear);
+      const results = await withScannerTimeout(task, 600);
+      for (const result of results || []) {
+        if (requested.includes(result.format) && extractCleanTrackingCode(result.rawValue).length >= 6) {
+          return result.rawValue;
+        }
+      }
+      return null;
+    }
+
+    async function readQrFrame(canvas) {
+      if (typeof jsQR !== 'undefined') {
+        try {
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const qr = jsQR(pixels.data, canvas.width, canvas.height);
+          if (qr?.data && extractCleanTrackingCode(qr.data).length >= 6) return qr.data;
+        } catch (eQr) {}
+      }
+      return decodeNativeCanvas(canvas, 'qr');
+    }
+
+    async function readBarcodeFrame(canvas, sweep = 0) {
+      const nativeCode = await decodeNativeCanvas(canvas, 'barcode');
+      if (nativeCode) return nativeCode;
+      let code = await decodeBarcodeCanvas(canvas);
+      if (!code && !quaggaDecodeBusy) {
+        code = await decodeBarcodeCanvas(makeBarcodeStrip(canvas, sweep), false);
+      }
+      return code && String(code).trim().length >= 6 ? String(code).trim() : null;
+    }
+
+    async function waitForScannerDecoders() {
+      const deadline = Date.now() + 2000;
+      while (quaggaDecodeBusy || Object.values(nativeReadsBusy).some(Boolean)) {
+        if (Date.now() >= deadline) throw new Error('Decoder busy');
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    async function decodeBarcodeCanvas(canvas, locate = true) {
+      if (typeof Quagga === 'undefined' || quaggaDecodeBusy) return null;
+      quaggaDecodeBusy = true;
+      const task = new Promise(resolve => {
+        try {
+          Quagga.decodeSingle({
+            src: canvas.toDataURL('image/jpeg', 0.8),
+            numOfWorkers: 0,
+            inputStream: { size: 1280 },
+            locator: { halfSample: false, patchSize: 'medium' },
+            decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
+            locate
+          }, result => {
+            quaggaDecodeBusy = false;
+            resolve(result?.codeResult?.code || null);
+          });
+        } catch (eDecode) {
+          quaggaDecodeBusy = false;
+          resolve(null);
+        }
+      });
+      // Nếu timeout, giữ busy cho tới callback thật để tránh gọi chồng Quagga.
+      return withScannerTimeout(task);
+    }
+
+    // Quét các dải ở trên / giữa / dưới theo cả hai hướng khi bộ dò vị trí bỏ sót.
+    function makeBarcodeStrip(canvas, sweep) {
+      let source = canvas;
+      if (Math.floor(sweep / 3) % 2) {
+        source = document.createElement('canvas');
+        source.width = canvas.height;
+        source.height = canvas.width;
+        const rotatedCtx = source.getContext('2d');
+        rotatedCtx.translate(source.width, 0);
+        rotatedCtx.rotate(Math.PI / 2);
+        rotatedCtx.drawImage(canvas, 0, 0);
+      }
+      const band = Math.floor(source.height / 3);
+      const top = (sweep % 3) * band;
+      const strip = document.createElement('canvas');
+      strip.width = source.width;
+      strip.height = sweep % 3 === 2 ? source.height - top : band;
+      strip.getContext('2d').drawImage(source, 0, top, strip.width, strip.height,
+        0, 0, strip.width, strip.height);
+      return strip;
+    }
+
     async function safelyStopAndClearScanner() {
+      scannerGeneration++;
+      configureTorch(null);
       isCameraScanning = false;
       if (cameraScanInterval) {
         clearTimeout(cameraScanInterval);
@@ -1955,6 +2179,11 @@
           });
         } catch (e) {}
         mediaStream = null;
+      }
+      if (typeof html5QrCode !== 'undefined' && html5QrCode) {
+        try { await html5QrCode.stop(); } catch (e) {}
+        try { await html5QrCode.clear(); } catch (e) {}
+        html5QrCode = null;
       }
       const videoEl = document.getElementById('scannerLiveVideo');
       if (videoEl) {
@@ -1972,6 +2201,11 @@
       isCameraStarting = true;
 
       try {
+        await scannerLibrariesReady;
+        if (typeof jsQR === 'undefined' && typeof Quagga === 'undefined' &&
+            !('BarcodeDetector' in window)) {
+          throw new Error('Không tải được bộ đọc mã. Hãy kiểm tra mạng rồi tải lại trang.');
+        }
         await safelyStopAndClearScanner();
 
         const videoContainer = document.getElementById('reader');
@@ -1984,17 +2218,20 @@
         videoEl.setAttribute('webkit-playsinline', 'true');
         videoEl.setAttribute('autoplay', 'true');
         videoEl.setAttribute('muted', 'true');
-        videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transform:translateZ(0);';
+        videoEl.muted = true;
+        videoEl.defaultMuted = true;
+        videoEl.playsInline = true;
+        videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transform:translateZ(0);-webkit-transform:translateZ(0);will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden;';
         videoContainer.appendChild(videoEl);
 
+        // Khởi động Camera chuẩn tuyệt đối cho iOS Safari & Android
         let stream = null;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
+              width: { ideal: 1920 }, height: { ideal: 1080 }
             }
           });
         } catch (e1) {
@@ -2012,6 +2249,7 @@
         }
 
         mediaStream = stream;
+        configureTorch(stream.getVideoTracks()[0]);
         videoEl.srcObject = stream;
         await videoEl.play();
 
@@ -2019,7 +2257,7 @@
         wasCameraActive = true;
         requestScreenWakeLock();
 
-        // Tự động bật lấy nét liên tục và Zoom 1.8x (chuẩn khoảng cách quét kho)
+        // Bật lấy nét liên tục (continuous focus)
         try {
           const track = stream.getVideoTracks()[0];
           if (track) {
@@ -2031,16 +2269,13 @@
             if (track.getCapabilities) {
               const caps = track.getCapabilities();
               if (caps.focusMode && caps.focusMode.includes('continuous')) {
-                track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
-              }
-              if (caps.zoom) {
-                const target = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.8));
-                track.applyConstraints({ advanced: [{ zoom: target }] }).catch(() => {});
+                applyCameraTrackConstraints(track, { focusMode: 'continuous' }).catch(() => {});
               }
             }
           }
         } catch (eFocus) {}
 
+        // Khởi động vòng lặp quét đa động cơ siêu nhạy
         startSuperScannerLoop(videoEl);
 
       } catch (err) {
@@ -2049,14 +2284,14 @@
           let errorMsg = '⚠️ Không thể mở Camera trực tiếp trên điện thoại.\n\n';
           const errName = err ? (err.name || '') : '';
           if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            errorMsg += '📌 Safari / Trình duyệt chưa được cấp quyền dùng Camera.\n\n' +
+            errorMsg += '📌 Nguyên nhân: Safari / Trình duyệt chưa được cấp quyền dùng Camera.\n\n' +
               '👉 Hướng dẫn khắc phục trên iPhone (Safari):\n' +
               '1. Bấm vào chữ [aA] (hoặc biểu tượng ổ khóa 🔒) ở góc trái thanh địa chỉ Safari.\n' +
               '2. Chọn "Cài đặt trang web" (Website Settings).\n' +
               '3. Mục Camera: chọn "Cho phép" (Allow).\n' +
               '4. Sau đó bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] hoặc [🔄 Làm mới Cam].';
           } else if (errName === 'NotReadableError') {
-            errorMsg += '📌 Camera đang bị ứng dụng khác (Zalo, Facebook, ứng dụng Chụp ảnh...) chiếm dụng.\n\n' +
+            errorMsg += '📌 Nguyên nhân: Camera đang bị ứng dụng khác (Zalo, Facebook, ứng dụng Chụp ảnh...) chiếm dụng.\n\n' +
               '👉 Bạn hãy vuốt tắt các ứng dụng đó rồi bấm lại [Làm mới Cam] nhé!';
           } else {
             errorMsg += '👉 Bạn hãy bấm nút [📷 BẬT CAMERA QUÉT TRỰC TIẾP] bên dưới hoặc sử dụng nút [📷 CHỤP / CHỌN ẢNH PHIẾU ĐỂ TỰ ĐỌC ĐƠN] nhé!';
@@ -2072,121 +2307,56 @@
     function startSuperScannerLoop(videoEl) {
       if (isCameraScanning) return;
       isCameraScanning = true;
+      const generation = scannerGeneration;
 
       if (!scanCanvas) scanCanvas = document.createElement('canvas');
-      if (!stripCanvas) {
-        stripCanvas = document.createElement('canvas');
-        stripCanvas.width = 480;
-        stripCanvas.height = 140;
-      }
+      if (!stripCanvas) stripCanvas = document.createElement('canvas');
 
-      if ('BarcodeDetector' in window) {
-        try {
-          nativeDetector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'qr_code', 'ean_13'] });
-        } catch (e) {
-          nativeDetector = null;
-        }
-      }
+      nativeReaders = {};
+      nativeReadsBusy = {};
 
       let isFrameProcessing = false;
+      let barcodeSweep = 0;
+      let autoNext = 'barcode';
 
       const processNextFrame = async () => {
-        if (!isCameraScanning || !mediaStream) return;
+        if (!isCameraScanning || !mediaStream || generation !== scannerGeneration) return;
 
-        if (videoEl && !videoEl.paused && videoEl.readyState >= 2 && !isFrameProcessing) {
+        if (videoEl && !videoEl.paused && videoEl.readyState >= 2 &&
+            videoEl.videoWidth > 0 && videoEl.videoHeight > 0 && !isFrameProcessing && !stillDecodeBusy) {
           isFrameProcessing = true;
           try {
-            const vw = videoEl.videoWidth || 1280;
-            const vh = videoEl.videoHeight || 720;
+            const revision = scannerDecodeRevision;
+            const mode = scannerDecodeMode;
+            const kind = mode === 'auto' ? autoNext : mode;
+            if (mode === 'auto') autoNext = kind === 'barcode' ? 'qr' : 'barcode';
 
-            scanCanvas.width = vw;
-            scanCanvas.height = vh;
-            const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
-            ctx.drawImage(videoEl, 0, 0, vw, vh);
-
+            // 1. TỐI ƯU SIÊU MƯỢT: Thử native BarcodeDetector trực tiếp từ video stream (0ms sao chép canvas, mượt 60 FPS)
             let detectedCode = null;
-
-            // 1. ENGINE 1: jsQR trên vùng giữa khung hình (10-15ms)
-            if (typeof jsQR !== 'undefined') {
-              try {
-                const cw = Math.round(vw * 0.85);
-                const ch = Math.round(vh * 0.85);
-                const cx = Math.round((vw - cw) / 2);
-                const cy = Math.round((vh - ch) / 2);
-                const imgData = ctx.getImageData(cx, cy, cw, ch);
-                const qr = jsQR(imgData.data, cw, ch);
-                if (qr && qr.data && String(qr.data).trim()) {
-                  detectedCode = String(qr.data).trim();
-                }
-              } catch (eQr) {}
+            if ('BarcodeDetector' in window) {
+              detectedCode = await decodeNativeCanvas(videoEl, kind);
             }
 
-            // 2. ENGINE 2: Hardware Native BarcodeDetector (nếu thiết bị có hỗ trợ)
-            if (!detectedCode && nativeDetector) {
-              try {
-                const barcodes = await nativeDetector.detect(scanCanvas);
-                if (barcodes && barcodes.length > 0) {
-                  for (const b of barcodes) {
-                    if (b.rawValue && String(b.rawValue).trim()) {
-                      detectedCode = String(b.rawValue).trim();
-                      break;
-                    }
-                  }
-                }
-              } catch (eBd) {}
-            }
+            // 2. Nếu BarcodeDetector chưa nhận hoặc thiết bị không hỗ trợ: Vẽ canvas và dùng jsQR / Quagga2
+            if (!detectedCode) {
+              const scale = Math.min(1, 1280 / Math.max(videoEl.videoWidth, videoEl.videoHeight));
+              const vw = Math.round(videoEl.videoWidth * scale);
+              const vh = Math.round(videoEl.videoHeight * scale);
 
-            // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine (Có Timeout chống treo + Hỗ trợ cả 2 chiều Ngang 0° & Dọc 90°)
-            if (!detectedCode && typeof Quagga !== 'undefined') {
-              const reticleW = Math.round(vw * 0.85);
-              const reticleH = Math.round(vh * 0.28);
-              const reticleX = Math.round((vw - reticleW) / 2);
-              const reticleY = Math.round((vh - reticleH) / 2);
-
-              const sCtx = stripCanvas.getContext('2d', { willReadFrequently: true });
-
-              // Hàm helper giải mã Quagga bọc timeout an toàn 250ms
-              const safeQuaggaDecode = (canvasEl) => {
-                return Promise.race([
-                  new Promise(res => {
-                    try {
-                      Quagga.decodeSingle({
-                        src: canvasEl.toDataURL('image/png'),
-                        numOfWorkers: 0,
-                        decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-                        locate: false
-                      }, r => res(r?.codeResult?.code || null));
-                    } catch (eQ) {
-                      res(null);
-                    }
-                  }),
-                  new Promise(res => setTimeout(() => res(null), 250)) // Timeout chống treo vòng lặp
-                ]);
-              };
-
-              // Thử 1: Quét chiều ngang (0°)
-              sCtx.clearRect(0, 0, 480, 140);
-              sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, 0, 0, 480, 140);
-              let qCode = await safeQuaggaDecode(stripCanvas);
-
-              // Thử 2: Nếu chưa ra mã, thử quét chiều dọc xoay 90° (để đọc mã in dọc trên kiện hàng)
-              if (!qCode) {
-                sCtx.save();
-                sCtx.clearRect(0, 0, 480, 140);
-                sCtx.translate(240, 70);
-                sCtx.rotate(Math.PI / 2);
-                // Vẽ dải trung tâm nhưng xoay 90 độ
-                sCtx.drawImage(scanCanvas, reticleX, reticleY, reticleW, reticleH, -70, -240, 140, 480);
-                sCtx.restore();
-                qCode = await safeQuaggaDecode(stripCanvas);
+              if (scanCanvas.width !== vw || scanCanvas.height !== vh) {
+                scanCanvas.width = vw;
+                scanCanvas.height = vh;
               }
+              const ctx = scanCanvas.getContext('2d', { willReadFrequently: true });
+              ctx.drawImage(videoEl, 0, 0, vw, vh);
 
-              if (qCode && String(qCode).trim().length >= 6) {
-                detectedCode = String(qCode).trim();
-              }
+              detectedCode = kind === 'qr'
+                ? await readQrFrame(scanCanvas)
+                : await readBarcodeFrame(scanCanvas, barcodeSweep++);
             }
 
-            if (detectedCode) {
+            if (detectedCode && !stillDecodeBusy && isCameraScanning && generation === scannerGeneration &&
+                revision === scannerDecodeRevision) {
               handleCameraFrameDecoded(detectedCode);
             }
 
@@ -2197,21 +2367,31 @@
           }
         }
 
-        if (isCameraScanning) {
-          cameraScanInterval = setTimeout(processNextFrame, 70); // ~14 FPS mượt mà
+        if (isCameraScanning && generation === scannerGeneration) {
+          const delay = ('BarcodeDetector' in window) ? 35 : 60;
+          cameraScanInterval = setTimeout(processNextFrame, delay);
         }
       };
 
       processNextFrame();
     }
 
-    // Nút chụp tức thì trực tiếp từ video stream nếu camera auto chưa nhận
     async function captureAndDecodeCurrentFrame() {
       const videoEl = document.getElementById('scannerLiveVideo');
       if (!videoEl || videoEl.paused || videoEl.readyState < 2) {
         alert('Camera chưa sẵn sàng. Bạn hãy hướng camera vào đơn hàng rồi bấm lại nhé!');
         return;
       }
+
+      if (stillDecodeBusy) return;
+      stillDecodeBusy = true;
+      const generation = scannerGeneration;
+      const mode = scannerDecodeMode;
+      const revision = scannerDecodeRevision;
+      try {
+        await waitForScannerDecoders();
+        if (generation !== scannerGeneration || revision !== scannerDecodeRevision ||
+            document.getElementById('scannerLiveVideo') !== videoEl) return;
 
       // Visual shutter flash
       const shutterFlash = document.getElementById('shutterFlashOverlay');
@@ -2233,87 +2413,17 @@
       ctx.drawImage(videoEl, 0, 0, vw, vh);
 
       let decoded = null;
-
-      // 1. jsQR trên toàn ảnh
-      if (typeof jsQR !== 'undefined') {
-        try {
-          const imgData = ctx.getImageData(0, 0, vw, vh);
-          const qr = jsQR(imgData.data, vw, vh);
-          if (qr && qr.data && String(qr.data).trim()) {
-            decoded = String(qr.data).trim();
-          }
-        } catch (e) {}
-      }
-
-      // 2. BarcodeDetector
-      if (!decoded && 'BarcodeDetector' in window) {
-        try {
-          const bd = new BarcodeDetector({ formats: ['code_128', 'code_39', 'qr_code', 'ean_13'] });
-          const barcodes = await bd.detect(capCanvas);
-          if (barcodes && barcodes.length > 0) {
-            decoded = barcodes[0].rawValue;
-          }
-        } catch (e) {}
-      }
-
-      // 3. Quagga2 trên 3 dải cắt
-      if (!decoded && typeof Quagga !== 'undefined') {
-        const sCanvas = document.createElement('canvas');
-        sCanvas.width = 480;
-        sCanvas.height = 140;
-        const sCtx = sCanvas.getContext('2d');
-
-        const strips = [
-          { x: Math.round(vw * 0.1), y: Math.round(vh * 0.35), w: Math.round(vw * 0.8), h: Math.round(vh * 0.3) },
-          { x: Math.round(vw * 0.35), y: Math.round(vh * 0.08), w: Math.round(vw * 0.58), h: Math.round(vh * 0.16) },
-          { x: Math.round(vw * 0.1), y: Math.round(vh * 0.15), w: Math.round(vw * 0.8), h: Math.round(vh * 0.25) }
-        ];
-
-        for (const st of strips) {
-          sCtx.clearRect(0, 0, 480, 140);
-          sCtx.drawImage(capCanvas, st.x, st.y, st.w, st.h, 0, 0, 480, 140);
-          
-          let q = await Promise.race([
-            new Promise(res => {
-              try {
-                Quagga.decodeSingle({
-                  src: sCanvas.toDataURL('image/png'),
-                  numOfWorkers: 0,
-                  decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-                  locate: false
-                }, r => res(r?.codeResult?.code || null));
-              } catch (e) { res(null); }
-            }),
-            new Promise(res => setTimeout(() => res(null), 350))
-          ]);
-
-          // Thử xoay 90 độ nếu chưa đọc được
-          if (!q) {
-            sCtx.save();
-            sCtx.clearRect(0, 0, 480, 140);
-            sCtx.translate(240, 70);
-            sCtx.rotate(Math.PI / 2);
-            sCtx.drawImage(capCanvas, st.x, st.y, st.w, st.h, -70, -240, 140, 480);
-            sCtx.restore();
-            q = await Promise.race([
-              new Promise(res => {
-                try {
-                  Quagga.decodeSingle({
-                    src: sCanvas.toDataURL('image/png'),
-                    numOfWorkers: 0,
-                    decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-                    locate: false
-                  }, r => res(r?.codeResult?.code || null));
-                } catch (e) { res(null); }
-              }),
-              new Promise(res => setTimeout(() => res(null), 350))
-            ]);
-          }
-          if (q && String(q).trim().length >= 6) {
-            decoded = String(q).trim();
-            break;
-          }
+      if (mode !== 'barcode') decoded = await readQrFrame(capCanvas);
+      if (!decoded && mode !== 'qr') {
+        decoded = await readBarcodeFrame(capCanvas, 0);
+        for (let sweep = 1; !decoded && sweep < 6 && !quaggaDecodeBusy; sweep++) {
+          decoded = await decodeBarcodeCanvas(makeBarcodeStrip(capCanvas, sweep), false);
         }
+      }
+      if (revision !== scannerDecodeRevision || generation !== scannerGeneration ||
+          document.getElementById('scannerLiveVideo') !== videoEl) {
+        toast.classList.add('hidden');
+        return;
       }
 
       toast.classList.add('hidden');
@@ -2321,7 +2431,12 @@
       if (decoded) {
         handleCameraFrameDecoded(decoded);
       } else {
-        alert('⚠️ Chưa nhận diện được mã. Bạn hãy đưa camera lại gần mã vạch hơn (khoảng 15-20cm) hoặc bấm nút [1.8x] hoặc [2.5x] để phóng to nhé!');
+        alert('⚠️ Chưa nhận diện được mã. Bạn hãy đưa camera lại gần mã vạch hơn (khoảng 15-20cm) và giữ mã rõ nét trong khung nhé!');
+      }
+      } catch (eStill) {
+        showToast('Bộ đọc đang bận. Bạn hãy thử lại hoặc tải lại trang.');
+      } finally {
+        stillDecodeBusy = false;
       }
     }
 
@@ -2409,9 +2524,8 @@
     const scannerBox = document.getElementById('scannerWrapper') || document.getElementById('reader');
     if (scannerBox) {
       scannerBox.addEventListener('click', (e) => {
-        // Chỉ khởi động lại nếu thực sự camera bị tắt hoàn toàn hoặc video bị tạm dừng
         const videoEl = document.querySelector('#reader video');
-        if (!videoEl || videoEl.paused || !videoEl.srcObject || videoEl.readyState < 2) {
+        if (!videoEl || videoEl.paused || !videoEl.srcObject) {
           forceRestartCamera().catch(() => {});
         }
       });
@@ -2579,11 +2693,16 @@
     async function scanSmartLabelImage(e) {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      if (stillDecodeBusy) { e.target.value = ''; return; }
+      stillDecodeBusy = true;
+      const decodeMode = scannerDecodeMode;
+      const decodeRevision = scannerDecodeRevision;
       const toast = document.getElementById('processingToast');
       toast.classList.remove('hidden');
       toast.textContent = '⚡ Bước 1/2: Đang quét mã QR & Mã vạch 1D trên phiếu...';
 
       try {
+        await waitForScannerDecoders();
         const { img } = await loadImageElement(file);
         const compressedPhoto = await cropImageToBlob(img, 0, 0, 1, 1, 600, false, 0.70);
 
@@ -2597,64 +2716,11 @@
         const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
         fullCtx.drawImage(img, 0, 0);
 
-        // 1. ENGINE 1: jsQR trên toàn bộ ảnh phiếu (Giải mã tức thì 40-70ms)
-        if (typeof jsQR !== 'undefined') {
-          try {
-            const fullImgData = fullCtx.getImageData(0, 0, imgW, imgH);
-            const qr = jsQR(fullImgData.data, imgW, imgH);
-            if (qr && qr.data && String(qr.data).trim()) {
-              decodedCode = String(qr.data).trim();
-              console.log('✅ jsQR successfully decoded shipping label:', decodedCode);
-            }
-          } catch (eQr) {}
-        }
-
-        // 2. ENGINE 2: Hardware Native BarcodeDetector
-        if (!decodedCode && 'BarcodeDetector' in window) {
-          try {
-            const detector = new BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e'] });
-            const barcodes = await detector.detect(fullCanvas);
-            if (barcodes && barcodes.length > 0) {
-              const spx = barcodes.find(b => /SPX|GHN|GHTK|VTP/i.test(b.rawValue));
-              decodedCode = spx ? spx.rawValue : barcodes[0].rawValue;
-            }
-          } catch (bdErr) {}
-        }
-
-        // 3. ENGINE 3: Quagga2 Sub-Pixel 1D Engine (locate: false) trên các dải cắt ngang chuẩn phiếu
-        if (!decodedCode && typeof Quagga !== 'undefined') {
-          const sCanvas = document.createElement('canvas');
-          const sCtx = sCanvas.getContext('2d', { willReadFrequently: true });
-
-          const stripSpecs = [
-            // Góc trên bên phải (khu vực mã vạch 1D chuẩn phiếu Shopee SPX)
-            { x: Math.round(imgW * 0.35), y: Math.round(imgH * 0.08), w: Math.round(imgW * 0.58), h: Math.round(imgH * 0.16) },
-            // Khu vực giữa ngang (chuẩn tem TikTok / J&T)
-            { x: Math.round(imgW * 0.10), y: Math.round(imgH * 0.35), w: Math.round(imgW * 0.80), h: Math.round(imgH * 0.25) },
-            // Khu vực trên giữa
-            { x: Math.round(imgW * 0.10), y: Math.round(imgH * 0.12), w: Math.round(imgW * 0.80), h: Math.round(imgH * 0.22) }
-          ];
-
-          for (const spec of stripSpecs) {
-            sCanvas.width = spec.w;
-            sCanvas.height = spec.h;
-            sCtx.clearRect(0, 0, spec.w, spec.h);
-            sCtx.drawImage(fullCanvas, spec.x, spec.y, spec.w, spec.h, 0, 0, spec.w, spec.h);
-
-            const qCode = await new Promise(res => {
-              Quagga.decodeSingle({
-                src: sCanvas.toDataURL('image/png'),
-                numOfWorkers: 0,
-                decoder: { readers: ['code_128_reader', 'code_39_reader', 'ean_reader'] },
-                locate: false
-              }, r => res(r?.codeResult?.code || null));
-            });
-
-            if (qCode && String(qCode).trim().length >= 6) {
-              decodedCode = String(qCode).trim();
-              console.log('✅ Quagga2 successfully decoded 1D barcode from image strip:', decodedCode);
-              break;
-            }
+        if (decodeMode !== 'barcode') decodedCode = await readQrFrame(fullCanvas);
+        if (!decodedCode && decodeMode !== 'qr') {
+          decodedCode = await readBarcodeFrame(fullCanvas, 0);
+          for (let sweep = 1; !decodedCode && sweep < 6 && !quaggaDecodeBusy; sweep++) {
+            decodedCode = await decodeBarcodeCanvas(makeBarcodeStrip(fullCanvas, sweep), false);
           }
         }
 
@@ -2664,7 +2730,7 @@
 
         let ocrParsed = { track: '', orderId: '', shipDate: '', qty: 1 };
         let rawOcrText = '';
-        if (!decodedCode) {
+        if (!decodedCode && decodeMode !== 'qr') {
           toast.textContent = '⏳ Bước 2/2: Đang đọc chữ Mã vận đơn & Mã đơn hàng trên phiếu...';
           try {
             if (typeof Tesseract === 'undefined') {
@@ -2685,7 +2751,13 @@
           }
         }
 
-        const finalTrack = ocrParsed.track || decodedCode;
+        if (decodeRevision !== scannerDecodeRevision) {
+          toast.classList.add('hidden');
+          e.target.value = '';
+          return;
+        }
+
+        const finalTrack = extractCleanTrackingCode(ocrParsed.track || decodedCode);
         const finalOrderId = ocrParsed.orderId || '';
 
         toast.classList.add('hidden');
@@ -2750,7 +2822,7 @@
         toast.classList.add('hidden');
         alert('Lỗi xử lý ảnh: ' + err);
       }
-      e.target.value = '';
+      finally { stillDecodeBusy = false; e.target.value = ''; }
     }
 
     function handleMobilePhoto(e) {
@@ -2788,15 +2860,15 @@
 
     // Initialize application
     loadScanHistory();
-    Promise.all([
+    // Các thư viện kết nối là tùy chọn; lỗi tải chúng không được chặn camera.
+    scannerLibrariesReady = Promise.allSettled([
       loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js', 'https://unpkg.com/mqtt/dist/mqtt.min.js'),
       loadWithFallback('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'),
-      loadWithFallback('https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js', 'https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js'),
-      loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js', 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js')
+      loadWithFallback('https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js', 'https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js')
     ]).then(() => {
       initPhoneSync();
       setTimeout(() => {
-        if (typeof Html5Qrcode !== 'undefined') {
+        if (typeof jsQR !== 'undefined' || typeof Quagga !== 'undefined' || 'BarcodeDetector' in window) {
           // Thử khởi động ngầm (isAutoResume = true) để KHÔNG hiện popup phiền hà nếu Safari yêu cầu chạm màn hình
           startCameraScanner(true).catch(() => {});
         }

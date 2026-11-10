@@ -797,6 +797,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </button>
 
         <!-- NÚT TẠO ĐƠN NHANH HÀNG LOẠT (v1.8.1) -->
+        <!-- NÚT KHO LƯU TRỮ ĐƠN ĐÃ VỀ KHO QUÁ 24H (v1.8.4) -->
+        <button type="button" onclick="openArchivedOrdersModal()" id="btnOpenArchivedOrders"
+                class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-purple-700 to-indigo-800 hover:from-purple-800 hover:to-indigo-900 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-purple-400"
+                title="Kho lưu trữ tự động các đơn đã về kho trên 24 giờ để bảng chính luôn nhẹ và mượt mà">
+          <span>📦 KHO LƯU TRỮ (24H)</span>
+          <span id="archivedOrdersCountBadge" class="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0 đơn</span>
+        </button>
+
         <button type="button" onclick="openQuickCreateOrdersModal()" id="btnQuickCreateOrders"
                 class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-teal-600 to-emerald-700 hover:from-teal-700 hover:to-emerald-800 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-emerald-400"
                 title="Dán danh sách mã đơn / mã vận đơn để tạo nhanh hàng loạt đơn mới">
@@ -2353,6 +2361,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </div>
 
         <!-- =============================================================== -->
+        
+  
+  </div>
+
+
         <!-- PANEL 1: CƠ CHẾ NẠP RIÊNG SÀN SHOPEE                             -->
         <!-- =============================================================== -->
         <div id="importPanel_shopee" class="space-y-3">
@@ -14728,6 +14741,604 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       setTimeout(() => closeQuickCreateOrdersModal(), 600);
     }
 
+    
+    // =========================================================================
+    // HỆ THỐNG KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO QUÁ 24H (v1.8.4)
+    // Tự động dời các đơn có ngày giờ về kho >= 24h để Bảng chính siêu nhẹ & mượt mà
+    // =========================================================================
+    function escapeArchivedHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    let archivedOrders = [];
+    const ARCHIVED_STORAGE_KEY = 'shopee_archived_orders_v1';
+    let archivedSelectedIds = new Set();
+    let archivedCurrentPage = 1;
+    const archivedPageSize = 50;
+    let filteredArchivedOrders = [];
+
+    function loadArchivedOrders() {
+      try {
+        const raw = localStorage.getItem(ARCHIVED_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            archivedOrders = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Lỗi đọc kho lưu trữ từ localStorage:', e);
+      }
+      updateArchivedOrdersBadge();
+    }
+
+    function saveArchivedOrders() {
+      try {
+        const lean = archivedOrders.map(o => {
+          if (o.photo && o.photo.length > 200) {
+            const copy = Object.assign({}, o);
+            copy.photo = '';
+            return copy;
+          }
+          return o;
+        });
+        localStorage.setItem(ARCHIVED_STORAGE_KEY, JSON.stringify(lean));
+      } catch (e) {
+        console.warn('Lỗi lưu kho lưu trữ vào localStorage:', e);
+      }
+      updateArchivedOrdersBadge();
+    }
+
+    function updateArchivedOrdersBadge() {
+      const badge = document.getElementById('archivedOrdersCountBadge');
+      if (badge) {
+        badge.textContent = `${archivedOrders.length} đơn`;
+      }
+      const modalBadge = document.getElementById('archivedModalCountBadge');
+      if (modalBadge) {
+        modalBadge.textContent = `${archivedOrders.length} đơn`;
+      }
+      const totalCount = document.getElementById('archivedTotalCount');
+      if (totalCount) {
+        totalCount.textContent = archivedOrders.length;
+      }
+    }
+
+    function isEligibleForArchive(order) {
+      if (!order) return false;
+      const isReceived = order.status === 'Hàng đã trả' || order.status === 'Đã nhận' || Boolean(order.recvDate && !/^dd[\/\-\.]mm/i.test(order.recvDate));
+      if (!isReceived || !order.recvDate) return false;
+
+      const parsedRecv = (typeof parseFullDate === 'function') ? parseFullDate(order.recvDate) : null;
+      if (!parsedRecv || isNaN(parsedRecv.getTime())) return false;
+
+      const now = new Date();
+      const elapsedMs = now.getTime() - parsedRecv.getTime();
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000; // 24 giờ = 86,400,000 ms
+      return elapsedMs >= ONE_DAY_MS;
+    }
+
+    function checkAndAutoArchiveOrders(showToastIfMoved = true) {
+      if (!orders || !orders.length) return 0;
+
+      const eligibleIndices = [];
+      const ordersToArchive = [];
+
+      orders.forEach((o, idx) => {
+        if (isEligibleForArchive(o)) {
+          eligibleIndices.push(idx);
+          const copy = Object.assign({}, o, {
+            archivedAt: (typeof getNowDateTimeString === 'function') ? getNowDateTimeString() : new Date().toLocaleString('vi-VN')
+          });
+          ordersToArchive.push(copy);
+        }
+      });
+
+      if (ordersToArchive.length === 0) return 0;
+
+      // Đưa vào archivedOrders, kiểm tra tránh trùng lặp mã đơn
+      const existingKeys = new Set(archivedOrders.map(a => `${String(a.orderId || '').trim()}|||${String(a.track || '').trim()}`));
+      let added = 0;
+      ordersToArchive.forEach(o => {
+        const key = `${String(o.orderId || '').trim()}|||${String(o.track || '').trim()}`;
+        if (!existingKeys.has(key)) {
+          archivedOrders.unshift(o);
+          existingKeys.add(key);
+          added++;
+        }
+      });
+
+      // Xóa các đơn đủ điều kiện khỏi Bảng chính
+      const removeSet = new Set(eligibleIndices);
+      orders = orders.filter((_, idx) => !removeSet.has(idx));
+
+      saveOrders(true);
+      saveArchivedOrders();
+      renderAll(true);
+      recalcTotalsAndSummary();
+
+      if (showToastIfMoved && ordersToArchive.length > 0) {
+        showAppToast(`📦 Đã tự động dời ${ordersToArchive.length} đơn đã về kho quá 24h vào Kho Lưu Trữ (Bảng chính nhẹ & mượt hơn)!`, 'info');
+        if (typeof addAuditLog === 'function') {
+          addAuditLog('📦 LƯU TRỮ TỰ ĐỘNG', `Tự động dời ${ordersToArchive.length} đơn đã về kho quá 24h sang Kho Lưu Trữ`);
+        }
+      }
+
+      return ordersToArchive.length;
+    }
+
+    function triggerManualArchiveScan() {
+      const moved = checkAndAutoArchiveOrders(false);
+      if (moved > 0) {
+        showAppToast(`🎉 Đã quét và dời thành công ${moved} đơn đã về kho quá 24h vào Kho Lưu Trữ!`, 'success');
+      } else {
+        showAppToast('ℹ️ Không có đơn nào trên Bảng chính đã về kho quá 24 giờ để dời.', 'info');
+      }
+      filterArchivedOrders();
+    }
+
+    function openArchivedOrdersModal() {
+      loadArchivedOrders();
+      // Quét tự động ngay khi mở
+      checkAndAutoArchiveOrders(false);
+      archivedSelectedIds.clear();
+      archivedCurrentPage = 1;
+      resetArchivedFilters(false);
+      filterArchivedOrders();
+
+      const modal = document.getElementById('archivedOrdersModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+    }
+
+    function closeArchivedOrdersModal() {
+      const modal = document.getElementById('archivedOrdersModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function resetArchivedFilters(rerender = true) {
+      const search = document.getElementById('archivedSearchInput');
+      if (search) search.value = '';
+      const fromDate = document.getElementById('archivedFilterFromDate');
+      if (fromDate) fromDate.value = '';
+      const fromTime = document.getElementById('archivedFilterFromTime');
+      if (fromTime) fromTime.value = '';
+      const toDate = document.getElementById('archivedFilterToDate');
+      if (toDate) toDate.value = '';
+      const toTime = document.getElementById('archivedFilterToTime');
+      if (toTime) toTime.value = '';
+      const plat = document.getElementById('archivedFilterPlatform');
+      if (plat) plat.value = 'all';
+
+      if (rerender) {
+        archivedCurrentPage = 1;
+        filterArchivedOrders();
+      }
+    }
+
+    function filterArchivedOrders() {
+      const search = (document.getElementById('archivedSearchInput')?.value || '').trim().toLowerCase();
+      const fromDateVal = document.getElementById('archivedFilterFromDate')?.value || '';
+      const fromTimeVal = document.getElementById('archivedFilterFromTime')?.value || '';
+      const toDateVal = document.getElementById('archivedFilterToDate')?.value || '';
+      const toTimeVal = document.getElementById('archivedFilterToTime')?.value || '';
+      const platVal = document.getElementById('archivedFilterPlatform')?.value || 'all';
+
+      let fromMs = null;
+      if (fromDateVal) {
+        const parts = fromDateVal.split('-');
+        const hh = fromTimeVal ? parseInt(fromTimeVal.split(':')[0], 10) : 0;
+        const mm = fromTimeVal ? parseInt(fromTimeVal.split(':')[1], 10) : 0;
+        fromMs = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), hh, mm, 0).getTime();
+      }
+
+      let toMs = null;
+      if (toDateVal) {
+        const parts = toDateVal.split('-');
+        const hh = toTimeVal ? parseInt(toTimeVal.split(':')[0], 10) : 23;
+        const mm = toTimeVal ? parseInt(toTimeVal.split(':')[1], 10) : 59;
+        toMs = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), hh, mm, 59).getTime();
+      }
+
+      filteredArchivedOrders = archivedOrders.filter(o => {
+        // Lọc theo sàn
+        if (platVal !== 'all' && o.platform !== platVal) return false;
+
+        // Lọc theo ngày giờ về kho (recvDate)
+        if (fromMs !== null || toMs !== null) {
+          const dt = (typeof parseFullDate === 'function') ? parseFullDate(o.recvDate) : null;
+          if (!dt || isNaN(dt.getTime())) return false;
+          const t = dt.getTime();
+          if (fromMs !== null && t < fromMs) return false;
+          if (toMs !== null && t > toMs) return false;
+        }
+
+        // Lọc theo tìm kiếm
+        if (search) {
+          const oid = String(o.orderId || '').toLowerCase();
+          const trk = String(o.track || '').toLowerCase();
+          const rtr = String(o.returnTrack || '').toLowerCase();
+          const crr = String(o.carrier || '').toLowerCase();
+          const unote = String(o.userNote || '').toLowerCase();
+          const bnote = String(o.buyerNote || '').toLowerCase();
+          const note = String(o.note || '').toLowerCase();
+          const prod = (o.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`).join(' ').toLowerCase();
+
+          const match = oid.includes(search) || trk.includes(search) || rtr.includes(search) ||
+                        crr.includes(search) || unote.includes(search) || bnote.includes(search) ||
+                        note.includes(search) || prod.includes(search);
+          if (!match) return false;
+        }
+
+        return true;
+      });
+
+      renderArchivedOrdersTable();
+    }
+
+    function renderArchivedOrdersTable() {
+      const tbody = document.getElementById('archivedTableBody');
+      const emptyState = document.getElementById('archivedEmptyState');
+      const visibleCountEl = document.getElementById('archivedVisibleCount');
+      const selectedCountEl = document.getElementById('archivedSelectedCount');
+      const checkAll = document.getElementById('archivedCheckAll');
+      const tableCheckAll = document.getElementById('archivedTableCheckAll');
+      const pageIndicator = document.getElementById('archivedPageIndicator');
+      const btnPrev = document.getElementById('btnArchivedPrev');
+      const btnNext = document.getElementById('btnArchivedNext');
+
+      if (!tbody) return;
+
+      const totalItems = filteredArchivedOrders.length;
+      if (visibleCountEl) visibleCountEl.textContent = totalItems;
+      if (selectedCountEl) selectedCountEl.textContent = archivedSelectedIds.size;
+
+      if (totalItems === 0) {
+        tbody.innerHTML = '';
+        if (emptyState) emptyState.classList.remove('hidden');
+        if (checkAll) checkAll.checked = false;
+        if (tableCheckAll) tableCheckAll.checked = false;
+        if (pageIndicator) pageIndicator.textContent = 'Trang 0 / 0';
+        if (btnPrev) btnPrev.disabled = true;
+        if (btnNext) btnNext.disabled = true;
+        return;
+      }
+
+      if (emptyState) emptyState.classList.add('hidden');
+
+      // Phân trang
+      const totalPages = Math.ceil(totalItems / archivedPageSize) || 1;
+      if (archivedCurrentPage > totalPages) archivedCurrentPage = totalPages;
+      if (archivedCurrentPage < 1) archivedCurrentPage = 1;
+
+      if (pageIndicator) pageIndicator.textContent = `Trang ${archivedCurrentPage} / ${totalPages}`;
+      if (btnPrev) btnPrev.disabled = (archivedCurrentPage <= 1);
+      if (btnNext) btnNext.disabled = (archivedCurrentPage >= totalPages);
+
+      const startIdx = (archivedCurrentPage - 1) * archivedPageSize;
+      const endIdx = Math.min(startIdx + archivedPageSize, totalItems);
+      const pageSlice = filteredArchivedOrders.slice(startIdx, endIdx);
+
+      // Kiểm tra xem tất cả trang hiện tại có được chọn không
+      const allSelectedOnPage = pageSlice.every(o => {
+        const id = o.orderId || o.track;
+        return archivedSelectedIds.has(id);
+      });
+      if (checkAll) checkAll.checked = allSelectedOnPage && pageSlice.length > 0;
+      if (tableCheckAll) tableCheckAll.checked = allSelectedOnPage && pageSlice.length > 0;
+
+      let html = '';
+      pageSlice.forEach((o, index) => {
+        const actualIndex = startIdx + index + 1;
+        const itemId = o.orderId || o.track || `arch_${actualIndex}`;
+        const isChecked = archivedSelectedIds.has(itemId);
+
+        const plat = o.platform || 'Shopee';
+        const isShopee = plat.toLowerCase().includes('shopee');
+        const platBadge = isShopee
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">Shopee</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-600">TikTok</span>';
+
+        const items = (o.items && o.items.length > 0) ? o.items : [{ product: 'Chưa rõ', color: '', size: '', qty: 1 }];
+        const prodHtml = items.map(it => {
+          const q = it.qty || 1;
+          const varStr = [it.color, it.size].filter(Boolean).join(' / ');
+          const safeProd = escapeArchivedHtml(it.product || 'Sản phẩm');
+          const safeVar = escapeArchivedHtml(varStr);
+          return `<div class="truncate max-w-[260px]" title="${safeProd}">
+                    <span class="font-bold">${safeProd}</span>
+                    ${varStr ? `<span class="text-[10px] text-slate-400"> (${safeVar})</span>` : ''}
+                    <span class="ml-1 px-1.5 py-0.2 rounded bg-indigo-900/60 text-indigo-300 font-mono text-[10px] font-bold">x${q}</span>
+                  </div>`;
+        }).join('');
+
+        const priceFormatted = Number(o.price || 0).toLocaleString('vi-VN') + ' đ';
+
+        html += `
+          <tr class="hover:bg-slate-800/60 transition ${isChecked ? 'bg-indigo-950/40' : ''}">
+            <td class="p-2.5 text-center">
+              <input type="checkbox" onchange="toggleSelectArchivedItem('${escapeArchivedHtml(itemId)}', this.checked)" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
+            </td>
+            <td class="p-2.5 text-center font-mono text-slate-400">${actualIndex}</td>
+            <td class="p-2.5">
+              <span class="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                <span>📅</span> ${escapeArchivedHtml(o.recvDate || '-')}
+              </span>
+            </td>
+            <td class="p-2.5 text-center">${platBadge}</td>
+            <td class="p-2.5 font-mono text-xs text-indigo-300 font-bold select-all cursor-pointer" title="Bấm đúp để bôi đen copy">
+              ${escapeArchivedHtml(o.orderId || '-')}
+            </td>
+            <td class="p-2.5 font-mono text-xs text-sky-300 select-all cursor-pointer" title="Bấm đúp để bôi đen copy">
+              ${escapeArchivedHtml(o.track || '-')}
+            </td>
+            <td class="p-2.5">${prodHtml}</td>
+            <td class="p-2.5 text-slate-300 font-medium text-[11px]">${escapeArchivedHtml(o.carrier || '-')}</td>
+            <td class="p-2.5 text-right font-mono text-slate-300">${priceFormatted}</td>
+            <td class="p-2.5 text-slate-400 text-[11px] max-w-[130px] truncate" title="${escapeArchivedHtml(o.userNote || o.note || '')}">
+              ${escapeArchivedHtml(o.userNote || o.note || '-')}
+            </td>
+            <td class="p-2.5 text-center">
+              <button type="button" onclick="restoreSingleArchivedOrder('${escapeArchivedHtml(itemId)}')"
+                      class="px-2 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-[10px] font-bold transition cursor-pointer"
+                      title="Khôi phục đơn này về Bảng chính">
+                ↩️ Khôi phục
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    function changeArchivedPage(delta) {
+      archivedCurrentPage += delta;
+      renderArchivedOrdersTable();
+    }
+
+    function toggleSelectAllArchived(checked) {
+      if (!filteredArchivedOrders.length) return;
+      if (checked) {
+        filteredArchivedOrders.forEach(o => {
+          const id = o.orderId || o.track;
+          if (id) archivedSelectedIds.add(id);
+        });
+      } else {
+        filteredArchivedOrders.forEach(o => {
+          const id = o.orderId || o.track;
+          if (id) archivedSelectedIds.delete(id);
+        });
+      }
+      renderArchivedOrdersTable();
+    }
+
+    function toggleSelectArchivedItem(id, checked) {
+      if (checked) {
+        archivedSelectedIds.add(id);
+      } else {
+        archivedSelectedIds.delete(id);
+      }
+      const selectedCountEl = document.getElementById('archivedSelectedCount');
+      if (selectedCountEl) selectedCountEl.textContent = archivedSelectedIds.size;
+    }
+
+    function restoreSingleArchivedOrder(itemId) {
+      const idx = archivedOrders.findIndex(o => (o.orderId === itemId || o.track === itemId));
+      if (idx === -1) return;
+
+      const orderToRestore = archivedOrders[idx];
+      archivedOrders.splice(idx, 1);
+      archivedSelectedIds.delete(itemId);
+
+      // Đưa lên đầu Bảng chính
+      orders.unshift(orderToRestore);
+
+      saveOrders(true);
+      saveArchivedOrders();
+      renderAll(true);
+      recalcTotalsAndSummary();
+      filterArchivedOrders();
+
+      showAppToast(`🎉 Đã khôi phục đơn [${orderToRestore.orderId || orderToRestore.track}] về Bảng chính!`, 'success');
+      if (typeof addAuditLog === 'function') {
+        addAuditLog('↩️ KHÔI PHỤC ĐƠN', `Khôi phục đơn ${orderToRestore.orderId || orderToRestore.track} từ Kho Lưu Trữ về Bảng chính`);
+      }
+    }
+
+    function restoreSelectedArchivedOrders() {
+      if (archivedSelectedIds.size === 0) {
+        alert('Vui lòng tích chọn ít nhất 1 đơn trong danh sách để khôi phục về Bảng chính!');
+        return;
+      }
+
+      const count = archivedSelectedIds.size;
+      if (!confirm(`Bạn có chắc muốn KHÔI PHỤC ${count} đơn đã chọn quay trở lại Bảng chính không?`)) {
+        return;
+      }
+
+      const restoredList = [];
+      archivedOrders = archivedOrders.filter(o => {
+        const id = o.orderId || o.track;
+        if (archivedSelectedIds.has(id)) {
+          restoredList.push(o);
+          return false;
+        }
+        return true;
+      });
+
+      if (restoredList.length > 0) {
+        orders.unshift(...restoredList);
+      }
+
+      archivedSelectedIds.clear();
+      saveOrders(true);
+      saveArchivedOrders();
+      renderAll(true);
+      recalcTotalsAndSummary();
+      filterArchivedOrders();
+
+      showAppToast(`🎉 Đã khôi phục thành công ${restoredList.length} đơn về Bảng chính!`, 'success');
+      if (typeof addAuditLog === 'function') {
+        addAuditLog('↩️ KHÔI PHỤC ĐƠN', `Khôi phục ${restoredList.length} đơn từ Kho Lưu Trữ về Bảng chính`);
+      }
+    }
+
+    function deleteSelectedArchivedOrders() {
+      if (archivedSelectedIds.size === 0) {
+        alert('Vui lòng tích chọn ít nhất 1 đơn trong danh sách để xóa khỏi Kho Lưu Trữ!');
+        return;
+      }
+
+      const count = archivedSelectedIds.size;
+      const choice = confirm(
+        `⚠️ CẢNH BÁO XÓA VĨNH VIỄN:\n\n` +
+        `Bạn có chắc chắn muốn xóa vĩnh viễn ${count} đơn đã chọn khỏi Kho Lưu Trữ không?\n` +
+        `Thao tác này KHÔNG THỂ HOÀN TÁC!`
+      );
+      if (!choice) return;
+
+      archivedOrders = archivedOrders.filter(o => {
+        const id = o.orderId || o.track;
+        return !archivedSelectedIds.has(id);
+      });
+
+      archivedSelectedIds.clear();
+      saveArchivedOrders();
+      filterArchivedOrders();
+
+      showAppToast(`🗑️ Đã xóa vĩnh viễn ${count} đơn khỏi Kho Lưu Trữ!`, 'success');
+      if (typeof addAuditLog === 'function') {
+        addAuditLog('🗑️ XÓA ĐƠN LƯU TRỮ', `Xóa vĩnh viễn ${count} đơn khỏi Kho Lưu Trữ`);
+      }
+    }
+
+    function exportArchivedOrdersToExcel() {
+      const sourceList = archivedSelectedIds.size > 0
+        ? archivedOrders.filter(o => archivedSelectedIds.has(o.orderId || o.track))
+        : filteredArchivedOrders;
+
+      if (!sourceList.length) {
+        alert('Không có dữ liệu đơn lưu trữ nào để xuất file Excel!');
+        return;
+      }
+
+      if (typeof XLSX === 'undefined') {
+        alert('Thư viện xuất Excel (XLSX) chưa sẵn sàng!');
+        return;
+      }
+
+      const rows = sourceList.map((o, idx) => {
+        const items = (o.items && o.items.length > 0) ? o.items : [{ product: '', color: '', size: '', qty: 1 }];
+        const prodName = items.map(it => it.product || '').join('; ');
+        const prodVar = items.map(it => [it.color, it.size].filter(Boolean).join(' / ')).filter(Boolean).join('; ');
+        const totalQty = items.reduce((s, it) => s + (parseInt(it.qty, 10) || 1), 0);
+
+        return {
+          'STT': idx + 1,
+          'Sàn TMĐT': o.platform || 'Shopee',
+          'Mã Đơn Hàng': o.orderId || '',
+          'Mã Vận Đơn': o.track || '',
+          'Ngày Gửi Đi': o.shipDate || '',
+          'Ngày Hoàn / Hủy': o.returnDate || '',
+          'Ngày & Giờ Về Kho': o.recvDate || '',
+          'Đơn Vị Vận Chuyển': o.carrier || '',
+          'Tên Sản Phẩm': prodName || 'Chưa rõ',
+          'Phân Loại / Size': prodVar || '-',
+          'Tổng Số Lượng': totalQty,
+          'Giá Trị (VNĐ)': Number(o.price || 0),
+          'Trạng Thái Hoàn': o.status || 'Hàng đã trả',
+          'Ghi Chú': o.userNote || o.note || '',
+          'Thời Điểm Lưu Trữ': o.archivedAt || ''
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Don_Luu_Tru_Qua_24h');
+
+      const dStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '_');
+      const fileName = `Kho_Luu_Tru_Hang_Hoan_Qua_24h_${rows.length}_don_${dStr}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      showAppToast(`📊 Đã xuất Excel thành công ${rows.length} đơn từ Kho Lưu Trữ!`, 'success');
+      if (typeof addAuditLog === 'function') {
+        addAuditLog('📊 XUẤT EXCEL KHO LƯU TRỮ', `Xuất ${rows.length} đơn ra file ${fileName}`);
+      }
+    }
+
+    function saveArchivedToHardDrive() {
+      if (!archivedOrders.length) {
+        alert('Kho lưu trữ hiện đang trống, chưa có đơn nào để lưu vào ổ cứng!');
+        return;
+      }
+
+      const dStr = new Date().toISOString().slice(0, 10);
+      const backupData = {
+        title: 'Bản Sao Lưu Kho Lưu Trữ Hàng Hoàn (Đơn Quá 24h)',
+        createdAt: (typeof getNowDateTimeString === 'function') ? getNowDateTimeString() : new Date().toLocaleString('vi-VN'),
+        totalOrders: archivedOrders.length,
+        archivedOrders: archivedOrders
+      };
+
+      if (window.desktopDiskAPI && typeof window.desktopDiskAPI.backupToCustomFolder === 'function') {
+        window.desktopDiskAPI.backupToCustomFolder(backupData).then(res => {
+          if (res && res.success) {
+            showAppToast(`💾 Đã lưu file sao lưu vào ổ cứng: ${res.path}`, 'success');
+          }
+        }).catch(err => {
+          fallbackDownloadArchivedJson(backupData, dStr);
+        });
+      } else {
+        fallbackDownloadArchivedJson(backupData, dStr);
+      }
+    }
+
+    function fallbackDownloadArchivedJson(backupData, dStr) {
+      try {
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Sao_Luu_Kho_Luu_Tru_Hang_Hoan_${dStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showAppToast('💾 Đã tải file sao lưu Kho Lưu Trữ về ổ cứng máy tính thành công!', 'success');
+      } catch (e) {
+        alert('Lỗi tạo file sao lưu: ' + e.message);
+      }
+    }
+
+    // Tự động kiểm tra và quét định kỳ mỗi 10 phút
+    setInterval(() => {
+      try {
+        checkAndAutoArchiveOrders(true);
+      } catch (e) {}
+    }, 10 * 60 * 1000);
+
+    // Lắng nghe phím ESC để đóng modal kho lưu trữ
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('archivedOrdersModal');
+        if (modal && !modal.classList.contains('hidden')) {
+          closeArchivedOrdersModal();
+        }
+      }
+    });
+
+
     async function openPhoneScannerModal() {
       if (!(await requireUnlocked('Quét Mã Bằng Điện Thoại'))) return;
       document.getElementById('phoneRoomCodeText').textContent = phoneRoomId;
@@ -14777,6 +15388,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     try {
       loadOrders();
+      loadArchivedOrders();
+      setTimeout(() => checkAndAutoArchiveOrders(false), 1200);
       loadEmbeddedDataFromFile();
       loadShopeeOrderDb();
       refreshAutocompleteDatalists();
@@ -16874,6 +17487,185 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       ✕ Bỏ chọn
     </button>
   </div>
+
+
+
+<!-- =============================================================== -->
+  <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
+  <!-- =============================================================== -->
+  <div id="archivedOrdersModal" onclick="closeArchivedOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[94vh] flex flex-col border border-indigo-500/40 overflow-hidden">
+      
+      <!-- Modal Header -->
+      <div class="px-5 py-3.5 bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-xl shadow-inner">
+            📦
+          </div>
+          <div>
+            <h2 class="font-black text-base sm:text-lg text-white flex items-center gap-2">
+              <span>KHO LƯU TRỮ ĐƠN HOÀN (ĐÃ VỀ KHO QUÁ 24H)</span>
+              <span id="archivedModalCountBadge" class="bg-amber-400 text-slate-950 text-xs px-2.5 py-0.5 rounded-full font-mono font-black shadow-xs">0 đơn</span>
+            </h2>
+            <p class="text-xs text-indigo-200 mt-0.5">
+              Tự động lưu trữ các đơn đã nhận về kho từ hôm qua để giữ Bảng chính luôn nhẹ, mượt mà và không giật lag.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="triggerManualArchiveScan()" id="btnTriggerManualArchive"
+                  class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs border border-indigo-400/40"
+                  title="Quét Bảng chính và dời ngay các đơn đã về kho quá 24h vào đây">
+            <span>⚡ Quét & Dời Đơn >24h Ngay</span>
+          </button>
+          <button type="button" onclick="closeArchivedOrdersModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold rounded-lg cursor-pointer transition">
+            ✕ Đóng (Esc)
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters & Search Toolbar -->
+      <div class="p-3.5 bg-slate-800/80 border-b border-slate-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <!-- Quick Search -->
+        <div class="flex-1 min-w-[260px] max-w-md relative">
+          <input type="text" id="archivedSearchInput" oninput="filterArchivedOrders()"
+                 placeholder="🔍 Tìm nhanh (Mã đơn, Mã vận đơn, Tên sản phẩm, Ghi chú)..."
+                 class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 transition" />
+        </div>
+
+        <!-- Date & Time Range Filters -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-600 rounded-lg px-2 py-1">
+            <span class="text-slate-400 font-bold text-[11px]">Từ:</span>
+            <input type="date" id="archivedFilterFromDate" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer" />
+            <input type="time" id="archivedFilterFromTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
+          </div>
+
+          <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-600 rounded-lg px-2 py-1">
+            <span class="text-slate-400 font-bold text-[11px]">Đến:</span>
+            <input type="date" id="archivedFilterToDate" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer" />
+            <input type="time" id="archivedFilterToTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
+          </div>
+
+          <!-- Sàn Selector -->
+          <select id="archivedFilterPlatform" onchange="filterArchivedOrders()"
+                  class="bg-slate-900 border border-slate-600 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-400 cursor-pointer font-bold">
+            <option value="all">🌐 Tất cả sàn</option>
+            <option value="Shopee">🟠 Shopee</option>
+            <option value="TikTok Shop">⚫ TikTok Shop</option>
+          </select>
+
+          <!-- Reset Filter Button -->
+          <button type="button" onclick="resetArchivedFilters()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded-lg transition text-[11px] cursor-pointer">
+            ✕ Xóa lọc
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons Bar (Bulk Actions) -->
+      <div class="px-4 py-2 bg-slate-900/95 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-300 hover:text-white select-none">
+            <input type="checkbox" id="archivedCheckAll" onchange="toggleSelectAllArchived(this.checked)" class="w-4 h-4 rounded text-indigo-600 accent-indigo-500 cursor-pointer" />
+            <span>Chọn tất cả (<span id="archivedVisibleCount">0</span> đơn hiển thị)</span>
+          </label>
+          <span class="text-slate-500">|</span>
+          <span class="text-indigo-300 font-bold">Đã chọn: <b id="archivedSelectedCount" class="text-amber-400 font-mono text-sm">0</b> đơn</span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Khôi phục về Bảng chính -->
+          <button type="button" onclick="restoreSelectedArchivedOrders()" id="btnRestoreArchived"
+                  class="px-3 py-1.5 rounded-lg font-black text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Đưa các đơn đã chọn quay trở lại Bảng chính để xử lý">
+            <span>↩️ Khôi phục về Bảng chính</span>
+          </button>
+
+          <!-- Xuất Excel -->
+          <button type="button" onclick="exportArchivedOrdersToExcel()" id="btnExportArchivedExcel"
+                  class="px-3 py-1.5 rounded-lg font-black text-xs bg-cyan-700 hover:bg-cyan-600 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Xuất các đơn đã chọn hoặc toàn bộ đơn đang lọc ra file Excel">
+            <span>📊 Xuất File Excel</span>
+          </button>
+
+          <!-- Lưu vào Ổ cứng -->
+          <button type="button" onclick="saveArchivedToHardDrive()" id="btnSaveArchivedToDisk"
+                  class="px-3 py-1.5 rounded-lg font-black text-xs bg-purple-700 hover:bg-purple-600 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Lưu bản sao lưu kho lưu trữ về ổ cứng máy tính">
+            <span>💾 Lưu vào Ổ Cứng</span>
+          </button>
+
+          <!-- Xóa đơn -->
+          <button type="button" onclick="deleteSelectedArchivedOrders()" id="btnDeleteArchived"
+                  class="px-3 py-1.5 rounded-lg font-black text-xs bg-rose-700 hover:bg-rose-600 text-white shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  title="Xóa vĩnh viễn các đơn đã chọn khỏi kho lưu trữ">
+            <span>🗑️ Xóa đơn đã chọn</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="flex-1 overflow-y-auto max-h-[58vh] bg-slate-950 p-2">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="sticky top-0 bg-slate-900 text-slate-300 font-black border-b border-slate-700 z-10 shadow-xs">
+            <tr>
+              <th class="p-2.5 w-10 text-center">
+                <input type="checkbox" id="archivedTableCheckAll" onchange="toggleSelectAllArchived(this.checked)" class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
+              </th>
+              <th class="p-2.5 w-12 text-center text-slate-400">STT</th>
+              <th class="p-2.5 min-w-[140px]">Ngày Về Kho</th>
+              <th class="p-2.5 w-24 text-center">Sàn</th>
+              <th class="p-2.5 min-w-[150px]">Mã Đơn Hàng</th>
+              <th class="p-2.5 min-w-[150px]">Mã Vận Đơn</th>
+              <th class="p-2.5 min-w-[220px]">Tên Sản Phẩm / Phân Loại</th>
+              <th class="p-2.5 w-28">ĐVVC</th>
+              <th class="p-2.5 w-24 text-right">Giá Trị</th>
+              <th class="p-2.5 min-w-[130px]">Ghi Chú</th>
+              <th class="p-2.5 w-24 text-center">Thao Tác</th>
+            </tr>
+          </thead>
+          <tbody id="archivedTableBody" class="divide-y divide-slate-800 text-slate-200">
+            <!-- Dynamic rows rendered via JavaScript -->
+          </tbody>
+        </table>
+
+        <!-- Empty State Container -->
+        <div id="archivedEmptyState" class="hidden py-16 flex flex-col items-center justify-center text-center">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-950/60 border border-indigo-500/30 flex items-center justify-center text-3xl mb-3 shadow-inner">
+            📦
+          </div>
+          <h3 class="font-black text-base text-white mb-1">Kho Lưu Trữ Trống</h3>
+          <p class="text-xs text-slate-400 max-w-md leading-relaxed">
+            Hệ thống sẽ tự động dời các đơn có <b>Ngày & Giờ về kho lớn hơn hoặc bằng 24 giờ (1 ngày)</b> vào đây.<br/>
+            Bảng chính của bạn sẽ luôn nhẹ, thao tác nhanh và không bị chậm máy!
+          </p>
+        </div>
+      </div>
+
+      <!-- Footer & Pagination -->
+      <div class="px-5 py-3 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="text-slate-400 flex items-center gap-2">
+          <span>Tổng số đơn trong kho lưu trữ: <b id="archivedTotalCount" class="text-indigo-300 font-mono font-bold">0</b> đơn</span>
+          <span>•</span>
+          <span class="text-emerald-400 font-bold">Tự động quét định kỳ mỗi 10 phút</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="changeArchivedPage(-1)" id="btnArchivedPrev" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-bold">
+            ◀ Trang trước
+          </button>
+          <span id="archivedPageIndicator" class="px-2 py-1 text-slate-300 font-mono font-bold">Trang 1 / 1</span>
+          <button type="button" onclick="changeArchivedPage(1)" id="btnArchivedNext" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed font-bold">
+            Trang sau ▶
+          </button>
+          <button type="button" onclick="closeArchivedOrdersModal()" class="ml-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg cursor-pointer transition">
+            Đóng
+          </button>
+        </div>
+      </div>
+
+    </div>
 
 </body>
 </html>

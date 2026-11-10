@@ -77,19 +77,19 @@ jobs:
           body: |
             ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.5
 
-- **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.5`)
-- **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.5.exe`)
-- **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.5**:
-  1. 🎯 **Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc**:
-     - Sửa triệt để lỗi cộng nhầm đơn "Bị mất / Hư hỏng" vào badge "Chưa nhận" trên thanh trạng thái.
-     - Khắc phục lỗi Footer "TỔNG CỘNG" và Sticky Bottom Dock hiển thị sai số lượng / tổng tiền khi đang chọn lọc tab trạng thái (Đã nhận, Chưa nhận, Bị mất...) hoặc lọc theo ngày giờ.
-     - Đồng bộ tuyệt đối giữa số đơn hiển thị trên bảng, số lượng sản phẩm, tổng tiền tiền hàng, số lượng Đã về / Chưa về theo thời gian thực (Real-time Sync).
-  2. ⚡ **Tự Động Tính Toán & Cập Nhật Tức Thì**:
-     - Khi bấm chuyển tab trạng thái hoặc chọn ngày, toàn bộ bảng thống kê và dock tóm tắt dưới đáy tự động tính toán lại ngay lập tức mà không có độ trễ.
-  3. 📦 **Kế Thừa Toàn Bộ Tính Năng v1.8.4**:
-     - Kho Lưu Trữ Đơn Quá 24 Giờ tự động dời đơn cũ giúp Bảng chính siêu nhẹ và siêu mượt.
-     - Giữ nguyên vẹn 100% giao diện và tính năng Mobile Scanner theo tùy biến của người dùng.
-files: |
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.5`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.5.exe`)
+            - **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.5**:
+              1. 🎯 **Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc**:
+                 - Sửa triệt để lỗi cộng nhầm đơn "Bị mất / Hư hỏng" vào badge "Chưa nhận" trên thanh trạng thái.
+                 - Khắc phục lỗi Footer "TỔNG CỘNG" và Sticky Bottom Dock hiển thị sai số lượng / tổng tiền khi đang chọn lọc tab trạng thái (Đã nhận, Chưa nhận, Bị mất...) hoặc lọc theo ngày giờ.
+                 - Đồng bộ tuyệt đối giữa số đơn hiển thị trên bảng, số lượng sản phẩm, tổng tiền tiền hàng, số lượng Đã về / Chưa về theo thời gian thực (Real-time Sync).
+              2. ⚡ **Tự Động Tính Toán & Cập Nhật Tức Thì**:
+                 - Khi bấm chuyển tab trạng thái hoặc chọn ngày, toàn bộ bảng thống kê và dock tóm tắt dưới đáy tự động tính toán lại ngay lập tức mà không có độ trễ.
+              3. 📦 **Kế Thừa Toàn Bộ Tính Năng v1.8.4**:
+                 - Kho Lưu Trữ Đơn Quá 24 Giờ tự động dời đơn cũ giúp Bảng chính siêu nhẹ và siêu mượt.
+                 - Giữ nguyên vẹn 100% giao diện và tính năng Mobile Scanner theo tùy biến của người dùng.
+          files: |
             dist/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

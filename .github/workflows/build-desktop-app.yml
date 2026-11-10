@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.5
+          name: QuanLyHangHoan-Windows-Installer-v1.8.6
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,14 +72,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.5
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.5 (Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc Tức Thì)"
+          tag_name: v1.8.6
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.6 (Tìm Kiếm Toàn Cục Mọi Tuần & Tự Định Vị Đơn)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.5
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.6
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.5`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.5.exe`)
-            - **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.5**:
+            - **v1.8.6**: Tìm kiếm xuyên mọi tuần/tab/sàn; tự nhảy trang, cuộn và nháy sáng đơn khớp đầu tiên.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.6`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.6.exe`)
+            - **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.6**:
               1. 🎯 **Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc**:
                  - Sửa triệt để lỗi cộng nhầm đơn "Bị mất / Hư hỏng" vào badge "Chưa nhận" trên thanh trạng thái.
                  - Khắc phục lỗi Footer "TỔNG CỘNG" và Sticky Bottom Dock hiển thị sai số lượng / tổng tiền khi đang chọn lọc tab trạng thái (Đã nhận, Chưa nhận, Bị mất...) hoặc lọc theo ngày giờ.

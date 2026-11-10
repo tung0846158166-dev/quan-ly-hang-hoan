@@ -314,6 +314,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       scroll-behavior: smooth;
     }
 
+    tr.search-locate-flash > td { background-color: #fde047 !important; transition: background-color .3s; }
+    tr.search-locate-flash { outline: 3px solid #f97316; outline-offset: -3px; }
   </style>
 </head>
 <body class="p-1 sm:p-1.5 md:p-2 bg-slate-100">
@@ -326,8 +328,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.8.5">
-          🚀 v1.8.5
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.8.6">
+          🚀 v1.8.6
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -699,7 +701,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.5</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.6</span>
               </div>
             </div>
           </div>
@@ -830,7 +832,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           id="searchInput"
           type="text"
           oninput="handleSearchInputDebounced()"
-          placeholder="Mã đơn, MVĐ, Tên SP, Màu, Size..."
+          placeholder="Tìm mọi tuần: Mã đơn, MVĐ, Tên SP, Màu, Size..."
           class="flex-1 bg-[#fef9c3] border border-[#ee4d2d] px-2 py-1 text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg h-7"
         />
         <label class="ml-2 inline-flex items-center text-[10.5px] font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
@@ -6536,6 +6538,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
       searchDebounceTimer = setTimeout(() => {
         currentPage = 1;
+        window._lastLocatedKw = null;
         renderAll(false);
       }, 150);
     }
@@ -9992,6 +9995,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // 1. Build filtered entries list
       let filteredEntries = orders.map((order, originalIndex) => ({ order, originalIndex })).filter(({ order }) => {
+        // v1.8.6: TÌM KIẾM TOÀN CỤC - đơn khớp từ khóa luôn hiện, bất kể đang ở Tuần / Tab / Sàn / Ngày nào
+        if (kw) {
+          if (isOrderMatch(order, kw)) return true;
+          if (filterOnly) return false;
+        }
         // Pipeline Status Tab Filtering
         if (currentFilterTab === 'waiting' && !isOrderPending(order)) return false;
         if (currentFilterTab === 'returned' && !isOrderReceived(order)) return false;
@@ -10091,6 +10099,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           return a.originalIndex - b.originalIndex;
         });
       }
+
+      // v1.8.6: ĐỊNH VỊ - khi gõ từ khóa mới, tự nhảy đến trang chứa đơn khớp đầu tiên
+      let searchLocateIdx = -1;
+      if (kw && kw !== window._lastLocatedKw) {
+        const pos = filteredEntries.findIndex(e => isOrderMatch(e.order, kw));
+        if (pos >= 0) {
+          searchLocateIdx = filteredEntries[pos].originalIndex;
+          if (pageSize > 0) currentPage = Math.floor(pos / pageSize) + 1;
+        }
+      }
+      window._lastLocatedKw = kw;
 
       // 3. Pagination slice for smooth 60fps rendering on 500 - 2,000+ orders
       const totalFiltered = filteredEntries.length;
@@ -10599,6 +10618,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         html = `<tr><td colspan="22" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
       tbody.innerHTML = html;
+
+      // v1.8.6: Cuộn tới & nháy sáng đơn khớp đầu tiên
+      if (searchLocateIdx >= 0) {
+        requestAnimationFrame(() => {
+          const row = document.getElementById('order_row_' + searchLocateIdx);
+          if (!row) return;
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('search-locate-flash');
+          setTimeout(() => row.classList.remove('search-locate-flash'), 2500);
+        });
+      }
 
       // v1.6.5: Đồng bộ trạng thái checkbox Chọn Tất Cả trên trang hiện tại
       const chkSelectAll = document.getElementById('chkSelectAllOrders');

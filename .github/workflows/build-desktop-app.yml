@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.3
+          name: QuanLyHangHoan-Windows-Installer-v1.8.4
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,23 +72,27 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.3
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.3 (Gom Nhóm SP Khi Xuất HTML Kiểm Hàng & Bảo Mật Mật Khẩu)"
+          tag_name: v1.8.4
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.4 (Kho Lưu Trữ Đơn Đã Về Kho Quá 24h & Tối Ưu Bảng Chính Siêu Nhẹ)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.3
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.4
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.3`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.3.exe`)
-            - **Các cải tiến mới nhất trong phiên bản v1.8.3**:
-              1. 📋 **Tối Ưu Bảng HTML Xuất Kiểm Hàng Tương Tác**:
-                 - **Tự động gom nhóm sản phẩm**: Tất cả các sản phẩm có cùng Tên sản phẩm, Màu sắc và Size sẽ được tự động gom vào 1 dòng duy nhất và cộng dồn số lượng. (Lưu ý: Chỉ gom nhóm khi cả 3 yếu tố Tên, Màu, Size đều giống nhau 100%, khác size hoặc màu sẽ tách riêng).
-                 - **Lược bỏ cột mã**: Bỏ cột Mã đơn hàng và Mã vận đơn để bảng hiển thị rộng rãi, tập trung trực quan vào: Tên sản phẩm, Màu sắc, Size, Số lượng, Ô tích trừ và Trạng thái.
-                 - **Bảo mật tuyệt đối**: Đã ẩn hoàn toàn dòng chữ hiển thị mật khẩu `9999` trên giao diện, badge và các thông báo, tránh việc nhân viên nhìn thấy mật khẩu quản lý. Mật khẩu vẫn được bảo vệ ngầm khi sửa/bỏ tích.
-              2. 🛡️ **Chống Trùng Đơn Khi Tạo Nhanh Hàng Loạt**:
-                 - Tự động nhận diện và cảnh báo đơn đã có trên Bảng chính.
-                 - Tự động bỏ tích các đơn trùng và bổ sung nút `[Lọc bỏ đơn trùng]`, `[Chỉ chọn đơn mới]`.
-              3. ⚡ **Bảng Tạo Đơn Nhanh ([⚡ TẠO ĐƠN NHANH])**:
-                 - Dán danh sách mã hàng loạt, lọc ký tự thừa, phân loại sàn TMĐT và trạng thái chờ về chuẩn xác.
+            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.4`)
+            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.4.exe`)
+            - **Tính năng đột phá mới nhất trong phiên bản v1.8.4**:
+              1. 📦 **Hệ Thống Kho Lưu Trữ Đơn Hoàn Tự Động (Đã Về Kho Quá 24 Giờ)**:
+                 - **Tự động dời đơn cũ**: Tất cả các đơn đã nhận về kho có thời gian `>= 24 giờ` (1 ngày) sẽ được tự động chuyển sang Kho Lưu Trữ riêng, không còn xuất hiện trên Bảng chính.
+                 - **Bảng chính siêu nhẹ và mượt mà**: Giúp phần mềm luôn chạy nhanh như chớp, không lo giật lag dù tích lũy hàng nghìn đơn qua nhiều tháng.
+                 - **Đầy đủ công cụ quản lý chuyên nghiệp trong Kho Lưu Trữ**:
+                   - 🔍 **Tìm kiếm tức thì**: Tra cứu nhanh theo Mã đơn, Mã vận đơn, Tên sản phẩm, Ghi chú.
+                   - 📅 **Lọc Ngày & Giờ**: Lọc chính xác theo khoảng ngày và giờ về kho (Từ ngày... đến ngày...).
+                   - 🌐 **Lọc theo Sàn**: Phân tách nhanh giữa đơn hoàn Shopee và TikTok Shop.
+                   - ☑️ **Tích chọn linh hoạt**: Chọn tất cả hoặc tích chọn từng đơn.
+                   - ↩️ **Nút Khôi phục về Bảng chính**: 1-click đưa đơn cũ quay trở lại Bảng chính khi cần xử lý khiếu nại.
+                   - 📊 **Nút Xuất File Excel**: Xuất danh sách đơn lưu trữ ra file Excel báo cáo.
+                   - 💾 **Nút Lưu vào Ổ Cứng**: Sao lưu an toàn dữ liệu kho lưu trữ về máy tính.
+                   - 🗑️ **Nút Xóa đơn**: Xóa an toàn các đơn quá hạn không còn cần thiết.
+              2. ⚡ **Tự động quét định kỳ**: Hệ thống tự động quét mỗi 10 phút và có nút bấm thủ công `[⚡ Quét & Dời Đơn >24h Ngay]`.
           files: |
             dist/*.exe
         env:

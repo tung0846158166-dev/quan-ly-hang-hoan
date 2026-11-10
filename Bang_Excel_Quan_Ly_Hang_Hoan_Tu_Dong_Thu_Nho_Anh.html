@@ -326,8 +326,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h1 class="text-xs sm:text-sm font-extrabold tracking-wide uppercase flex items-center gap-1">
           <span>📦 QUẢN LÝ HÀNG HOÀN</span>
         </h1>
-        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.6.9">
-          🚀 v1.6.9
+        <span id="appVersionBadge" onclick="showVersionInfoToast()" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30 transition cursor-pointer shadow-2xs" title="Bấm để xem thông tin phiên bản v1.8.5">
+          🚀 v1.8.5
         </span>
         <!-- Badge Lưu Trữ Thông Minh Duy Nhất (Gọn gàng, loại bỏ trùng lặp) -->
         <button type="button" id="btnSafeStorageHeader" onclick="openSafeStorageModal()"
@@ -699,7 +699,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
               <div onclick="closeAllHeaderMenus(); showVersionInfoToast();" class="px-3 py-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 hover:bg-slate-50 rounded-b-lg cursor-pointer">
                 <span>ℹ️ Phiên bản ứng dụng:</span>
-                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.3</span>
+                <span id="menuVersionText" class="font-extrabold text-[#ee4d2d] bg-orange-50 px-2 py-0.5 rounded border border-orange-200">v1.8.5</span>
               </div>
             </div>
           </div>
@@ -7027,7 +7027,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         else if (tab === 'overdue') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-600 text-white border-rose-700 shadow-2xs cursor-pointer';
         else if (tab === 'lost') activeBtn.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-800 text-white border-slate-900 shadow-2xs cursor-pointer';
       }
-      renderAll(false);
+      renderAll(true);
     }
 
     function setRecvDateFilter(filterVal) {
@@ -10983,22 +10983,44 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elKpiUnneeded) elKpiUnneeded.textContent = `${unneededQty} SP`;
       document.getElementById('kpiLostInfo').textContent = `${lostQty} SP (${formatMoney(lostVal)})`;
 
-      // Update Pipeline Filter Tabs count (tự động theo sàn được chọn)
+      // Update Pipeline Filter Tabs count (tự động theo Sàn, Tuần, Khoảng ngày giờ, Loại đơn, Đặt trước & MVĐ)
       let countAll = 0, countWaiting = 0, countReturned = 0, countUnneeded = 0, countUpcoming = 0, countOverdue = 0, countLost = 0;
       orders.forEach(o => {
         if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return;
         if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return;
+        if (!checkOrderDateTimeMatch(o)) return;
+        if (currentOrderTypeFilter === 'partial_return') {
+          const isPartial = Boolean(o.isPartialReturn || String(o.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần'));
+          if (!isPartial) return;
+        } else if (currentOrderTypeFilter !== 'all' && getOrderType(o) !== currentOrderTypeFilter) return;
+        if (currentPreOrderFilter !== 'all') {
+          const pNorm = removeVietnameseTones(o.preOrder || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isPre = (o.preOrder === 'Hàng đặt trước' || pNorm.includes('dattruoc') || pNorm.includes('preorder'));
+          const fNorm = removeVietnameseTones(currentPreOrderFilter || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const wantsPre = (currentPreOrderFilter === 'pre_order' || currentPreOrderFilter === 'Hàng đặt trước' || fNorm.includes('dattruoc') || fNorm.includes('preorder'));
+          const wantsNormal = (currentPreOrderFilter === 'normal' || currentPreOrderFilter === 'Đơn thường' || fNorm.includes('thuong') || fNorm.includes('normal'));
+          if (wantsPre && !isPre) return;
+          if (wantsNormal && isPre) return;
+        }
+        if (currentTrackingFilter !== 'all') {
+          const hasTrack = Boolean(o.track && String(o.track).trim() !== '' && String(o.track).trim() !== '-');
+          if (currentTrackingFilter === 'has_track' && !hasTrack) return;
+          if (currentTrackingFilter === 'no_track' && hasTrack) return;
+        }
+
         countAll++;
         if (isOrderReceived(o)) {
           countReturned++;
         } else if (isOrderUnneeded(o)) {
           countUnneeded++;
+        } else if (o.status === 'Bị mất' || o.status === 'Hư hỏng') {
+          // ✅ KHẮC PHỤC LỖI: Bị mất / Hư hỏng được phân loại riêng, KHÔNG bị đếm trùng vào Chưa nhận!
+          countLost++;
         } else {
           countWaiting++;
           const dlSt = getDeadlineStatus(o);
           if (dlSt === 'upcoming') countUpcoming++;
           if (dlSt === 'overdue' || isOrderOverdue(o, 72)) countOverdue++;
-          if (o.status === 'Bị mất' || o.status === 'Hư hỏng') countLost++;
         }
       });
       const elAll = document.getElementById('tabCountAll');
@@ -11028,50 +11050,80 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return true;
       }).length;
 
-      const elFootOrderCount = document.getElementById('footOrderCount');
-      if (elFootOrderCount) elFootOrderCount.textContent = countFiltered;
+// Đã chuyển sang tính toán chính xác đồng bộ theo activeDisplayOrders
 
+      // ✅ KHẮC PHỤC LỖI: Đồng bộ chính xác tuyệt đối các con số ở chân bảng và thanh dock đáy màn hình
+      // theo đúng danh sách đơn đang hiển thị / khớp bộ lọc hiện tại (window.lastFilteredEntries)
+      let activeDisplayOrders = [];
+      if (window.lastFilteredEntries && Array.isArray(window.lastFilteredEntries)) {
+        activeDisplayOrders = window.lastFilteredEntries.map(e => e.order);
+      } else {
+        activeDisplayOrders = orders.filter(o => {
+          if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
+          if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return false;
+          if (!checkOrderDateTimeMatch(o)) return false;
+          return true;
+        });
+      }
+
+      let activeCount = activeDisplayOrders.length;
+      let activeQty = 0;
+      let activePrice = 0;
+      let activeRetQty = 0;
+      let activeUnretQty = 0;
+      let activeUnneededQty = 0;
+
+      activeDisplayOrders.forEach(o => {
+        activePrice += (Number(o.price) || 0);
+        const qList = (o.items && o.items.length > 0) ? o.items : [{ qty: 1 }];
+        qList.forEach(it => {
+          const q = Number(it.qty) || 1;
+          activeQty += q;
+          if (isOrderReceived(o)) activeRetQty += q;
+          else if (isOrderUnneeded(o)) activeUnneededQty += q;
+          else if (o.status !== 'Bị mất') activeUnretQty += q;
+        });
+      });
+
+      // Cập nhật dòng TỔNG CỘNG ở chân bảng dữ liệu
       const elFootDisplayOrders = document.getElementById('footDisplayOrders');
-      if (elFootDisplayOrders) elFootDisplayOrders.textContent = countFiltered;
+      if (elFootDisplayOrders) elFootDisplayOrders.textContent = activeCount;
+      const elFootOrderCount = document.getElementById('footOrderCount');
+      if (elFootOrderCount) elFootOrderCount.textContent = activeCount;
 
       const elFootDisplayQty = document.getElementById('footDisplayQty');
-      if (elFootDisplayQty) elFootDisplayQty.textContent = totalQty;
+      if (elFootDisplayQty) elFootDisplayQty.textContent = activeQty;
+      const elFootTotalQty = document.getElementById('footTotalQty');
+      if (elFootTotalQty) elFootTotalQty.textContent = activeQty;
 
       const elFootDisplayPrice = document.getElementById('footDisplayPrice');
-      if (elFootDisplayPrice) elFootDisplayPrice.textContent = formatMoney(totalPrice);
+      if (elFootDisplayPrice) elFootDisplayPrice.textContent = formatMoney(activePrice);
+      const elFootTotalPrice = document.getElementById('footTotalPrice');
+      if (elFootTotalPrice) elFootTotalPrice.textContent = formatMoney(activePrice);
 
       const elFootDisplayReturned = document.getElementById('footDisplayReturned');
-      if (elFootDisplayReturned) elFootDisplayReturned.textContent = returnedQty;
-
+      if (elFootDisplayReturned) elFootDisplayReturned.textContent = activeRetQty;
       const elFootDisplayUnreturned = document.getElementById('footDisplayUnreturned');
-      if (elFootDisplayUnreturned) elFootDisplayUnreturned.textContent = unreturnedQty;
-
+      if (elFootDisplayUnreturned) elFootDisplayUnreturned.textContent = activeUnretQty;
       const elFootDisplayUnneeded = document.getElementById('footDisplayUnneeded');
-      if (elFootDisplayUnneeded) elFootDisplayUnneeded.textContent = unneededQty;
-
+      if (elFootDisplayUnneeded) elFootDisplayUnneeded.textContent = activeUnneededQty;
       const elFootReturnedSummary = document.getElementById('footReturnedSummary');
-      if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${returnedQty}`;
+      if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${activeRetQty}`;
 
-      const elFootTotalQty = document.getElementById('footTotalQty');
-      if (elFootTotalQty) elFootTotalQty.textContent = totalQty;
-
-      const elFootTotalPrice = document.getElementById('footTotalPrice');
-      if (elFootTotalPrice) elFootTotalPrice.textContent = formatMoney(totalPrice);
-
-      // Cập nhật View Switcher Badges & Sticky Bottom Dock Badges
-      const viewOrdBadge = document.getElementById('viewOrdersCountBadge');
-      if (viewOrdBadge) viewOrdBadge.textContent = `${orders.length} đơn`;
-
+      // Cập nhật Thanh Dock Cố Định ở đáy màn hình
       const dockOrd = document.getElementById('dockOrdersBadge');
-      if (dockOrd) dockOrd.textContent = `${orders.length} đơn`;
+      if (dockOrd) dockOrd.textContent = `${activeCount} đơn`;
       const dockQty = document.getElementById('dockQtyBadge');
-      if (dockQty) dockQty.textContent = `${totalQty} SP`;
+      if (dockQty) dockQty.textContent = `${activeQty} SP`;
       const dockRet = document.getElementById('dockReturnedBadge');
-      if (dockRet) dockRet.textContent = `🟢 Đã về: ${returnedQty}`;
+      if (dockRet) dockRet.textContent = `🟢 Đã về: ${activeRetQty}`;
       const dockUnret = document.getElementById('dockUnreturnedBadge');
-      if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${unreturnedQty}`;
+      if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${activeUnretQty}`;
       const dockP = document.getElementById('dockPriceBadge');
-      if (dockP) dockP.textContent = formatMoney(totalPrice);
+      if (dockP) dockP.textContent = formatMoney(activePrice);
+
+      const viewOrdBadge = document.getElementById('viewOrdersCountBadge');
+      if (viewOrdBadge) viewOrdBadge.textContent = `${activeCount} đơn`;
 
       renderWeeklyImportTabs();
 

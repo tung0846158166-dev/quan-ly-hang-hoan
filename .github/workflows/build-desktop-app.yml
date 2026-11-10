@@ -63,7 +63,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.4
+          name: QuanLyHangHoan-Windows-Installer-v1.8.5
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -72,28 +72,24 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.4
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.4 (Kho Lưu Trữ Đơn Đã Về Kho Quá 24h & Tối Ưu Bảng Chính Siêu Nhẹ)"
+          tag_name: v1.8.5
+          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.5 (Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc Tức Thì)"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.4
+            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.5
 
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.4`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.4.exe`)
-            - **Tính năng đột phá mới nhất trong phiên bản v1.8.4**:
-              1. 📦 **Hệ Thống Kho Lưu Trữ Đơn Hoàn Tự Động (Đã Về Kho Quá 24 Giờ)**:
-                 - **Tự động dời đơn cũ**: Tất cả các đơn đã nhận về kho có thời gian `>= 24 giờ` (1 ngày) sẽ được tự động chuyển sang Kho Lưu Trữ riêng, không còn xuất hiện trên Bảng chính.
-                 - **Bảng chính siêu nhẹ và mượt mà**: Giúp phần mềm luôn chạy nhanh như chớp, không lo giật lag dù tích lũy hàng nghìn đơn qua nhiều tháng.
-                 - **Đầy đủ công cụ quản lý chuyên nghiệp trong Kho Lưu Trữ**:
-                   - 🔍 **Tìm kiếm tức thì**: Tra cứu nhanh theo Mã đơn, Mã vận đơn, Tên sản phẩm, Ghi chú.
-                   - 📅 **Lọc Ngày & Giờ**: Lọc chính xác theo khoảng ngày và giờ về kho (Từ ngày... đến ngày...).
-                   - 🌐 **Lọc theo Sàn**: Phân tách nhanh giữa đơn hoàn Shopee và TikTok Shop.
-                   - ☑️ **Tích chọn linh hoạt**: Chọn tất cả hoặc tích chọn từng đơn.
-                   - ↩️ **Nút Khôi phục về Bảng chính**: 1-click đưa đơn cũ quay trở lại Bảng chính khi cần xử lý khiếu nại.
-                   - 📊 **Nút Xuất File Excel**: Xuất danh sách đơn lưu trữ ra file Excel báo cáo.
-                   - 💾 **Nút Lưu vào Ổ Cứng**: Sao lưu an toàn dữ liệu kho lưu trữ về máy tính.
-                   - 🗑️ **Nút Xóa đơn**: Xóa an toàn các đơn quá hạn không còn cần thiết.
-              2. ⚡ **Tự động quét định kỳ**: Hệ thống tự động quét mỗi 10 phút và có nút bấm thủ công `[⚡ Quét & Dời Đơn >24h Ngay]`.
-          files: |
+- **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.5`)
+- **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.5.exe`)
+- **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.5**:
+  1. 🎯 **Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc**:
+     - Sửa triệt để lỗi cộng nhầm đơn "Bị mất / Hư hỏng" vào badge "Chưa nhận" trên thanh trạng thái.
+     - Khắc phục lỗi Footer "TỔNG CỘNG" và Sticky Bottom Dock hiển thị sai số lượng / tổng tiền khi đang chọn lọc tab trạng thái (Đã nhận, Chưa nhận, Bị mất...) hoặc lọc theo ngày giờ.
+     - Đồng bộ tuyệt đối giữa số đơn hiển thị trên bảng, số lượng sản phẩm, tổng tiền tiền hàng, số lượng Đã về / Chưa về theo thời gian thực (Real-time Sync).
+  2. ⚡ **Tự Động Tính Toán & Cập Nhật Tức Thì**:
+     - Khi bấm chuyển tab trạng thái hoặc chọn ngày, toàn bộ bảng thống kê và dock tóm tắt dưới đáy tự động tính toán lại ngay lập tức mà không có độ trễ.
+  3. 📦 **Kế Thừa Toàn Bộ Tính Năng v1.8.4**:
+     - Kho Lưu Trữ Đơn Quá 24 Giờ tự động dời đơn cũ giúp Bảng chính siêu nhẹ và siêu mượt.
+     - Giữ nguyên vẹn 100% giao diện và tính năng Mobile Scanner theo tùy biến của người dùng.
+files: |
             dist/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

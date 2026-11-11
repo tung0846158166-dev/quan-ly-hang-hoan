@@ -1,12 +1,12 @@
 {
   "name": "quan-ly-hang-hoan",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "description": "Phan mem Quan Ly va Doi Soat Hang Hoan Shopee - TikTok Shop",
   "main": "main.js",
   "author": "Shop Owner",
   "license": "MIT",
   "scripts": {
-    "test": "node --test tests/notification-location.test.cjs",
+    "test": "node --test",
     "start": "electron .",
     "build:win": "electron-builder --win --x64 -p never"
   },

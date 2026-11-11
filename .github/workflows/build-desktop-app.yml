@@ -2,7 +2,7 @@ name: Build Windows Desktop App (.exe)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fix/audit-17-regressions ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -53,7 +53,7 @@ jobs:
             }
           "
 
-      - name: Test notification order navigation
+      - name: Test storage, phone, Excel and UI regressions
         run: npm test
 
       - name: Build Windows Executable (.exe)
@@ -66,33 +66,29 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.6
+          name: QuanLyHangHoan-Windows-Installer-v1.8.7
           path: |
             dist/*.exe
             dist/*.blockmap
+            mobile_scanner.html
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.6
-          name: "Bộ Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn v1.8.6 (Tìm Kiếm Toàn Cục Mọi Tuần & Tự Định Vị Đơn)"
+          tag_name: v1.8.7
+          name: "Quản Lý Hàng Hoàn v1.8.7 — Sửa lưu dữ liệu, ACK, ảnh và nhập TikTok"
           body: |
-            ### 🚀 Bản Cài Đặt Ứng Dụng Quản Lý Hàng Hoàn Shopee - TikTok v1.8.6
+            ### Bản sửa lỗi v1.8.7
 
-            - **v1.8.6**: Tìm kiếm xuyên mọi tuần/tab/sàn; tự nhảy trang, cuộn và nháy sáng đơn khớp đầu tiên.
-            - **Tên phần mềm**: Quản Lý Hàng Hoàn Shopee - TikTok (`v1.8.6`)
-            - **Định dạng**: Bộ cài đặt chuẩn Windows (`Quan.Ly.Hang.Hoan.Setup.1.8.6.exe`)
-            - **Các nâng cấp & sửa lỗi cốt lõi trong phiên bản v1.8.6**:
-              1. 🎯 **Đồng Bộ Chuẩn Xác 100% Bộ Thống Kê & Bộ Lọc**:
-                 - Sửa triệt để lỗi cộng nhầm đơn "Bị mất / Hư hỏng" vào badge "Chưa nhận" trên thanh trạng thái.
-                 - Khắc phục lỗi Footer "TỔNG CỘNG" và Sticky Bottom Dock hiển thị sai số lượng / tổng tiền khi đang chọn lọc tab trạng thái (Đã nhận, Chưa nhận, Bị mất...) hoặc lọc theo ngày giờ.
-                 - Đồng bộ tuyệt đối giữa số đơn hiển thị trên bảng, số lượng sản phẩm, tổng tiền tiền hàng, số lượng Đã về / Chưa về theo thời gian thực (Real-time Sync).
-              2. ⚡ **Tự Động Tính Toán & Cập Nhật Tức Thì**:
-                 - Khi bấm chuyển tab trạng thái hoặc chọn ngày, toàn bộ bảng thống kê và dock tóm tắt dưới đáy tự động tính toán lại ngay lập tức mà không có độ trễ.
-              3. 📦 **Kế Thừa Toàn Bộ Tính Năng v1.8.4**:
-                 - Kho Lưu Trữ Đơn Quá 24 Giờ tự động dời đơn cũ giúp Bảng chính siêu nhẹ và siêu mượt.
-                 - Giữ nguyên vẹn 100% giao diện và tính năng Mobile Scanner theo tùy biến của người dùng.
+            - Chờ ghi dữ liệu trước khi xác nhận; xử lý lỗi kho lưu trữ và phục hồi backup cũ.
+            - Giữ hàng đợi đến ACK khớp request; ảnh cần xác nhận lưu riêng; gửi lại không ghi trùng trong phiên PC.
+            - Liên kết ảnh/OCR theo ID ổn định, bảo vệ xóa ảnh khi khóa, render thông báo bằng văn bản an toàn.
+            - Sửa nhập TikTok: trạng thái trống, tiền nhiều SKU, size-only và Cancelled/Canceled.
+            - Cần cập nhật cả ứng dụng PC và mobile_scanner.html trên trang HTTPS đang dùng.
+            - Kiểm thử Windows/iPhone/4G thực tế cần nghiệm thu riêng; kết quả build không thay thế kiểm thử thiết bị.
           files: |
             dist/*.exe
         env:

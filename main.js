@@ -209,36 +209,44 @@ ipcMain.handle('read-hard-drive-data', async () => {
   }
 });
 
-let isWritingDisk = false;
-let pendingWriteData = null;
+// Keep each caller's immutable snapshot and receipt in FIFO order. A rejected
+// write must not poison later saves, and never falls back to overwriting live data.
+let diskWriteTail = Promise.resolve();
+let diskWriteSequence = 0;
+let quitDrainStarted = false;
+let quitDrainComplete = false;
+const MAX_DISK_SNAPSHOT_BYTES = 512 * 1024 * 1024;
 
-async function flushDiskWriteQueue() {
-  if (isWritingDisk || !pendingWriteData) return;
-  isWritingDisk = true;
-  const dataToWrite = pendingWriteData;
-  pendingWriteData = null;
+async function writeDiskSnapshot(serialized, sequence) {
   const dataFilePath = getDataFilePath();
-  const tempFilePath = dataFilePath + '.tmp';
+  const tempFilePath = `${dataFilePath}.${process.pid || 'app'}.${sequence}.tmp`;
+  let handle;
   try {
-    await fs.promises.writeFile(tempFilePath, JSON.stringify(dataToWrite), 'utf8');
+    handle = await fs.promises.open(tempFilePath, 'wx', 0o600);
+    await handle.writeFile(serialized, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = null;
     await fs.promises.rename(tempFilePath, dataFilePath);
-  } catch (err) {
-    try {
-      await fs.promises.writeFile(dataFilePath, JSON.stringify(dataToWrite), 'utf8');
-    } catch (e2) {}
+    return { success: true, path: dataFilePath, time: new Date().toLocaleTimeString('vi-VN') };
   } finally {
-    isWritingDisk = false;
-    if (pendingWriteData) {
-      flushDiskWriteQueue();
-    }
+    if (handle) await handle.close().catch(() => {});
+    await fs.promises.unlink(tempFilePath).catch(() => {});
   }
 }
 
 ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   try {
-    pendingWriteData = dataToSave;
-    flushDiskWriteQueue();
-    return { success: true, path: getDataFilePath(), time: new Date().toLocaleTimeString('vi-VN') };
+    if (quitDrainComplete) throw new Error('Ung dung dang thoat');
+    if (!Array.isArray(dataToSave)) throw new Error('Du lieu luu phai la danh sach don hang');
+    const serialized = JSON.stringify(dataToSave);
+    if (Buffer.byteLength(serialized, 'utf8') > MAX_DISK_SNAPSHOT_BYTES) {
+      throw new Error('Du lieu luu vuot qua gioi han 512 MB');
+    }
+    const sequence = ++diskWriteSequence;
+    const write = diskWriteTail.then(() => writeDiskSnapshot(serialized, sequence));
+    diskWriteTail = write.catch(() => {});
+    return await write;
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -326,8 +334,22 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   isQuitting = true;
+  if (quitDrainComplete) return;
+  event.preventDefault();
+  if (quitDrainStarted) return;
+  quitDrainStarted = true;
+  (async () => {
+    // Renderer saves arriving while a previous write drains extend the barrier.
+    let observedTail;
+    do {
+      observedTail = diskWriteTail;
+      await observedTail;
+    } while (observedTail !== diskWriteTail);
+    quitDrainComplete = true;
+    app.quit();
+  })();
 });
 
 app.on('window-all-closed', () => {

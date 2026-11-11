@@ -953,7 +953,17 @@
 
       clearTimeout(flashTimer);
 
-      if (type === 'success') {
+      if (type === 'pending') {
+        if (overlay) overlay.className = 'screen-flash';
+        if (camera) camera.dataset.flash = '';
+        if (banner) {
+          banner.className = 'scan-alert scan-not_found';
+          banner.classList.remove('hidden');
+          label.textContent = title || '⏳ ĐANG CHỜ MÁY TÍNH XÁC NHẬN';
+          codeEl.textContent = code;
+          subEl.textContent = 'Giữ kiện trong danh sách chờ tới khi máy tính lưu thành công';
+        }
+      } else if (type === 'success') {
         // NHÁY XANH
         if (overlay) {
           overlay.className = 'screen-flash flash-green';
@@ -1025,7 +1035,7 @@
         const stored = JSON.parse(localStorage.getItem(historyKey()) || '[]');
         if (Array.isArray(stored)) {
           scanHistory = stored.filter(e => e && typeof e.code === 'string').map(e => {
-            if (e.status === 'pending') e.status = 'success';
+            if (e.status === 'pending') e.synced = false;
             return e;
           });
         }
@@ -1064,10 +1074,10 @@
       if (!list) return;
 
       const totalCount = scanHistory.length;
-      const okCount = scanHistory.filter(e => e.status === 'success' || !e.status || e.status === 'pending').length;
+      const okCount = scanHistory.filter(e => !e.photoOnly && e.status === 'success' && e.synced === true).length;
       const dupCount = scanHistory.filter(e => e.status === 'duplicate').length;
       const notFoundCount = scanHistory.filter(e => e.status === 'not_found').length;
-      const unsyncedCount = scanHistory.filter(e => e && e.status === 'success' && e.synced !== true).length;
+      const unsyncedCount = scanHistory.filter(e => e && e.synced !== true).length;
 
       document.getElementById('histCountTotal').textContent = totalCount;
       document.getElementById('histCountOk').textContent = okCount;
@@ -1079,13 +1089,13 @@
 
       let filtered = scanHistory;
       if (currentHistoryFilter === 'success') {
-        filtered = scanHistory.filter(e => e.status === 'success' || !e.status || e.status === 'pending');
+        filtered = scanHistory.filter(e => !e.photoOnly && e.status === 'success' && e.synced === true);
       } else if (currentHistoryFilter === 'duplicate') {
         filtered = scanHistory.filter(e => e.status === 'duplicate');
       } else if (currentHistoryFilter === 'not_found') {
         filtered = scanHistory.filter(e => e.status === 'not_found');
       } else if (currentHistoryFilter === 'unsynced') {
-        filtered = scanHistory.filter(e => e && e.status === 'success' && e.synced !== true);
+        filtered = scanHistory.filter(e => e && e.synced !== true);
       }
 
       list.innerHTML = '';
@@ -1104,7 +1114,8 @@
         const item = document.createElement('div');
         const isDup = entry.status === 'duplicate';
         const isNotFound = entry.status === 'not_found';
-        item.className = 'history-item ' + (isDup ? 'item-duplicate' : (isNotFound ? 'item-not_found' : 'item-success'));
+        const isPending = entry.synced !== true;
+        item.className = 'history-item ' + (isDup ? 'item-duplicate' : (isNotFound || isPending ? 'item-not_found' : 'item-success'));
 
         const topRow = document.createElement('div');
         topRow.className = 'history-top-row';
@@ -1114,7 +1125,7 @@
         codeSpan.textContent = `#${totalCount - idx}. ${entry.code}`;
 
         const badgeSpan = document.createElement('span');
-        badgeSpan.className = 'history-badge ' + (isDup ? 'badge-dup' : (isNotFound ? 'badge-not_found' : 'badge-ok'));
+        badgeSpan.className = 'history-badge ' + (isDup ? 'badge-dup' : (isNotFound || isPending ? 'badge-not_found' : 'badge-ok'));
         if (isDup) {
           badgeSpan.textContent = `🔴 TRÙNG (x${entry.dupCount || 1})`;
         } else if (isNotFound) {
@@ -1253,15 +1264,51 @@
       const isDup = data.outcome === 'duplicate' || data.isDuplicate === true;
       const isNotFound = data.outcome === 'not_found' || data.status === 'not_found';
 
-      // Clear pending scan timer
-      const id = data.requestId || Array.from(pendingScans).find(([, s]) =>
-        extractCleanTrackingCode(s.code) === cleanCode)?.[0];
-      if (id && pendingScans.has(id)) {
-        clearTimeout(pendingScans.get(id).timer);
-        pendingScans.delete(id);
+      // Only the exact outstanding request may confirm its own payload.
+      const id = data.requestId;
+      const pending = id && pendingScans.get(id);
+      if (!pending || extractCleanTrackingCode(pending.code) !== cleanCode) return;
+      if (!['success', 'duplicate', 'not_found'].includes(data.outcome)) return;
+      const existing = scanHistory.find(e => e.requestId === id && extractCleanTrackingCode(e.code) === cleanCode);
+      const queued = offlineQueue.find(it => it.requestId === id && extractCleanTrackingCode(it.code) === cleanCode);
+      if (!existing || !queued) return;
+      const photoReceipt = data.ackStage === 'photo';
+      const scanAlreadyConfirmed = queued.scanConfirmed === true;
+      if (photoReceipt) {
+        if (!data.photoSaved || !queued.captureId || data.captureId !== queued.captureId) return;
+        queued.photoConfirmed = true;
+      } else {
+        queued.scanConfirmed = true;
+        queued.scanOutcome = data.outcome;
+        queued.confirmedOrderNum = data.orderNum || null;
+        if (data.photoSaved === true && queued.captureId && data.captureId === queued.captureId) queued.photoConfirmed = true;
       }
-
-      const existing = scanHistory.find(e => extractCleanTrackingCode(e.code) === cleanCode);
+      existing.synced = queued.scanConfirmed === true && (!queued.photo || queued.photoConfirmed === true);
+      if (existing.synced) {
+        clearTimeout(pending.timer);
+        pendingScans.delete(id);
+        offlineQueue = offlineQueue.filter(it => it !== queued);
+      }
+      saveOfflineQueue();
+      updateOfflineQueueUI();
+      if (!existing.synced) {
+        existing.status = queued.scanOutcome === 'not_found' ? 'not_found' : 'pending';
+        triggerScanFeedback(existing.status === 'not_found' ? 'not_found' : 'pending', cleanCode,
+          existing.status === 'not_found' ? 'Không tìm thấy đơn' : 'Đang chờ lưu đủ mã và ảnh',
+          'Dữ liệu vẫn được giữ trên điện thoại để thử lại.');
+        saveScanHistory(); renderScanHistory(); return;
+      }
+      if (queued.kind === 'new_order_scan') {
+        existing.status = 'new_order';
+        triggerScanFeedback('success', cleanCode, 'Máy tính đã lưu vào hộp đơn mới', 'Đơn đang chờ duyệt, chưa tự đánh dấu hàng đã trả.');
+        saveScanHistory(); renderScanHistory(); return;
+      }
+      if (photoReceipt || scanAlreadyConfirmed) {
+        existing.status = queued.scanOutcome === 'duplicate' ? 'duplicate' : queued.scanOutcome === 'not_found' ? 'not_found' : 'success';
+        existing.orderNum = queued.confirmedOrderNum || null;
+        triggerScanFeedback(existing.status, cleanCode, queued.photoOnly ? 'Máy tính đã lưu ảnh' : 'Máy tính đã xác nhận lưu', 'Đã nhận xác nhận khớp yêu cầu.');
+        saveScanHistory(); renderScanHistory(); return;
+      }
 
       if (isNotFound) {
         // PC XÁC NHẬN: ĐƠN KHÔNG TỒN TẠI TRÊN HỆ THỐNG ➔ TỨC THÌ NHÁY VÀNG!
@@ -1317,23 +1364,8 @@
 
       if (existing) {
         existing.status = 'success';
-        existing.synced = true;
         existing.orderNum = orderNum || existing.orderNum;
         existing.detail = data.extra || 'Đã khớp hàng đã trả';
-      }
-      if (typeof offlineQueue !== 'undefined') {
-        offlineQueue = offlineQueue.filter(it => extractCleanTrackingCode(it.code) !== cleanCode);
-        saveOfflineQueue();
-      }
-      else {
-        scanHistory.unshift({
-          code: cleanCode,
-          time: Date.now(),
-          status: 'success',
-          orderNum: orderNum,
-          dupCount: 0,
-          detail: data.extra || 'Đã khớp hàng đã trả'
-        });
       }
       saveScanHistory();
       renderScanHistory();
@@ -1369,14 +1401,29 @@
       }
     }
 
-    async function sendPhotoPacket(dataUrl, trackCode) {
+    async function sendPhotoPacket(dataUrl, trackCode, capture = null) {
       if (!dataUrl || typeof dataUrl !== 'string') return;
       const cleanCode = extractCleanTrackingCode(trackCode) || String(trackCode || '').trim().toUpperCase();
+      if (!cleanCode) return false;
       const now = Date.now();
 
+      if (!capture || !capture.requestId) {
+        const id = scanSession + '-photo-' + (++scanSequence);
+        capture = { code: cleanCode, photo: dataUrl, time: now, requestId: id, captureId: id, captureTime: now,
+          photoOnly: true, scanConfirmed: true, scanOutcome: 'success', synced: false };
+        offlineQueue.push(capture);
+        scanHistory.unshift({ ...capture, status: 'pending', detail: 'Ảnh đang chờ máy tính xác nhận lưu.' });
+        pendingScans.set(id, { code: cleanCode, timer: setTimeout(() => {}, 10000) });
+        saveOfflineQueue(); saveScanHistory(); renderScanHistory(); updateOfflineQueueUI();
+        triggerScanFeedback('pending', cleanCode, 'Đang gửi ảnh', 'Giữ ảnh tới khi máy tính xác nhận lưu.');
+      }
+      const captureId = capture.captureId || 'ph_' + now + '_' + Math.random().toString(36).slice(2);
+      const captureTime = capture.captureTime || now;
+      const requestId = capture.requestId || '';
       // 1. Gửi trọn gói qua MQTT (hỗ trợ payload lớn, tốc độ tức thì khi có kết nối WebSocket)
       const fullPhotoMsg = JSON.stringify({
         type: 'photo',
+        captureId, captureTime, requestId,
         photo: dataUrl,
         lastCode: cleanCode,
         code: cleanCode,
@@ -1401,6 +1448,7 @@
         const chunkStr = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
         const chunkPayload = JSON.stringify({
           type: 'photo_chunk',
+          captureId, captureTime, requestId,
           photoId: photoId,
           code: cleanCode,
           idx: i,
@@ -1507,7 +1555,7 @@
       const noteInput = document.getElementById('newOrderNoteInput');
       const customNote = noteInput ? noteInput.value.trim() : '';
 
-      triggerScanFeedback('success', clean, '✨ ĐÃ TẠO ĐƠN MỚI (GỬI PC)', '📦 Máy tính sẽ tự động nhận diện và phân chia đúng sàn!', null);
+      triggerScanFeedback('pending', clean, 'Đơn mới đang chờ máy tính xác nhận', 'Chưa xóa dữ liệu trước khi PC xác nhận lưu.', null);
 
       scanHistory.unshift({
         code: clean,
@@ -1537,8 +1585,9 @@
       sendPayloadToPc(newOrderPayload, clean, '✨ Đã gửi vào Bảng Đơn Mới');
 
       if (capturedPhoto) {
+        const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean && !it.photoOnly) };
         setTimeout(() => {
-          sendPhotoPacket(capturedPhoto, clean);
+          sendPhotoPacket(capturedPhoto, clean, capture);
         }, 90);
       }
       return true;
@@ -1564,6 +1613,12 @@
       const existingIdx = scanHistory.findIndex(entry => extractCleanTrackingCode(entry.code) === clean);
       if (existingIdx !== -1) {
         const existing = scanHistory[existingIdx];
+        if (existing.synced !== true) {
+          triggerScanFeedback('pending', clean, '⏳ ĐANG THỬ LẠI YÊU CẦU', 'Chờ máy tính xác nhận');
+          const queued = offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean);
+          sendPayloadToPc({ type: 'barcode', code: clean, photo: (queued && queued.photo) || existing.photo || '', requestId: (queued && queued.requestId) || existing.requestId, time: (queued && queued.time) || existing.time }, clean);
+          return true;
+        }
         if (existing.status === 'not_found') {
           // Mã này trước đó máy tính báo KHÔNG CÓ TRÊN HỆ THỐNG
           existing.dupCount = (existing.dupCount || 1) + 1;
@@ -1610,8 +1665,9 @@
         }, clean, '⚠️ Mã quét trùng');
 
         if (capturedPhoto) {
+          const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean && !it.photoOnly) };
           setTimeout(() => {
-            sendPhotoPacket(capturedPhoto, clean);
+            sendPhotoPacket(capturedPhoto, clean, capture);
           }, 90);
         }
 
@@ -1644,12 +1700,12 @@
       }
 
       // LỚP 3: ĐƠN MỚI CHƯA QUÉT ➔ TỰ ĐỘNG BẮT ẢNH, NHÁY XANH HỢP LỆ & GỬI SANG PC ĐỐI SOÁT
-      triggerScanFeedback('success', clean, '🟢 MÃ HỢP LỆ (ĐÃ GỬI PC)', capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn máy tính', null);
+      triggerScanFeedback('pending', clean, '⏳ ĐANG CHỜ MÁY TÍNH XÁC NHẬN', capturedPhoto ? '📸 Đã chụp ảnh & nạp máy tính' : '✅ Đang khớp đơn máy tính', null);
       
       scanHistory.unshift({
         code: clean,
         time: now,
-        status: 'success',
+        status: 'pending',
         orderNum: null,
         dupCount: 0,
         photo: capturedPhoto || '',
@@ -1669,8 +1725,9 @@
 
       // Luôn gửi gói ảnh chia mảnh chuyên dụng để đảm bảo 100% ảnh tới PC
       if (capturedPhoto) {
+        const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean && !it.photoOnly) };
         setTimeout(() => {
-          sendPhotoPacket(capturedPhoto, clean);
+          sendPhotoPacket(capturedPhoto, clean, capture);
         }, 80);
       }
       return true;
@@ -1684,27 +1741,31 @@
     }
 
     function sendPayloadToPc(payload, displayCode, subInfo = '') {
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ channel: 'shopee_scanner_sync', data: payload }, '*');
-        }
-      } catch (e) {}
       const now = Date.now();
       payload.room = room;
-      payload.time = now;
-
-      if (payload.type === 'barcode' || payload.type === 'smart_label') {
-        const id = scanSession + '-' + (++scanSequence);
+      payload.time = payload.time || now;
+      if (payload.type === 'barcode' || payload.type === 'smart_label' || payload.type === 'sync_item' || payload.type === 'new_order_scan') {
+        let queued = offlineQueue.find(it => !it.photoOnly && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode));
+        if (!queued) { addOfflineItem(displayCode, payload.photo); queued = offlineQueue.find(it => !it.photoOnly && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode)); }
+        const id = payload.requestId || (queued && queued.requestId) || scanSession + '-' + (++scanSequence);
         payload.requestId = id;
+        if (queued) { queued.kind = queued.kind || payload.type; queued.payload = { ...payload }; delete queued.payload.photo; queued.requestId = id; queued.captureId = queued.captureId || payload.captureId || id; queued.captureTime = queued.captureTime || payload.captureTime || payload.time; }
+        payload.captureId = payload.captureId || (queued && queued.captureId) || id;
+        payload.captureTime = payload.captureTime || (queued && queued.captureTime) || payload.time;
+        const history = scanHistory.find(it => extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode));
+        if (history) { history.requestId = id; history.synced = false; }
+        saveOfflineQueue(); saveScanHistory();
+        if (pendingScans.has(id)) clearTimeout(pendingScans.get(id).timer);
         const timer = setTimeout(() => {
-          pendingScans.delete(id);
-          const banner = document.getElementById('lastScanBanner');
-          if (banner && !banner.classList.contains('hidden') && document.getElementById('lastScanCode').textContent === displayCode) {
-            document.getElementById('lastScanSub').textContent = '⚠️ Chưa nhận được phản hồi từ PC (Kiểm tra lại WiFi / MQTT)';
-          }
+          // Retain request membership: a late exact ACK is still useful after timeout.
+          const sub = document.getElementById('lastScanSub');
+          if (sub) sub.textContent = '⚠️ Chưa nhận được phản hồi từ PC; giữ lại để thử lại';
         }, 10000);
         pendingScans.set(id, { code: displayCode, timer });
       }
+      try {
+        if (window.parent && window.parent !== window) window.parent.postMessage({ channel: 'shopee_scanner_sync', data: payload }, '*');
+      } catch (e) {}
 
       const topic = getNtfyTopic();
 
@@ -2813,11 +2874,12 @@
 
             triggerScanFeedback('duplicate', codeToSend, '🚨 MÃ ĐÃ BỊ TRÙNG!', `⚠️ Phiếu này đã quét trước đó (Trùng lần ${existing.dupCount})`, existing.orderNum);
           } else {
-            triggerScanFeedback('success', codeToSend, '🟢 MÃ HỢP LỆ (ẢNH PHIẾU)', '📸 Đã gửi ảnh phiếu & đối soát', null);
+            triggerScanFeedback('pending', codeToSend, 'Đang chờ máy tính xác nhận phiếu', 'Ảnh chưa được xác nhận lưu.', null);
             scanHistory.unshift({
               code: codeToSend,
               time: Date.now(),
-              status: 'success',
+              status: 'pending',
+              synced: false,
               orderNum: null,
               dupCount: 0,
               detail: '📸 Quét từ ảnh phiếu'
@@ -2846,12 +2908,12 @@
             time: Date.now()
           }, codeToSend, subText);
 
+          const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === codeToSend && !it.photoOnly) };
           setTimeout(() => {
-            sendPhotoPacket(compressedPhoto.dataUrl, codeToSend);
+            sendPhotoPacket(compressedPhoto.dataUrl, codeToSend, capture);
           }, 80);
         } else {
-          alert('⚠️ Không nhận diện được mã vạch trên ảnh, nhưng ĐÃ GỬI ẢNH CHỤP sang bảng Máy Tính!');
-          sendPhotoPacket(compressedPhoto.dataUrl, lastScannedRawCode);
+          alert('Không nhận diện được mã của ảnh hiện tại. Chưa gửi ảnh để tránh dùng nhầm mã cũ; hãy nhập mã rồi gửi ảnh lại.');
         }
       } catch (err) {
         toast.classList.add('hidden');
@@ -2863,6 +2925,8 @@
     function handleMobilePhoto(e) {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
+      const photoCode = extractCleanTrackingCode(prompt('Nhập chính xác mã vận đơn của ảnh hiện tại (hủy để không gửi):', '') || '');
+      if (!photoCode) { e.target.value = ''; return; }
       const reader = new FileReader();
       reader.onload = function(ev) {
         const img = new Image();
@@ -2876,8 +2940,8 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.50);
-          sendPhotoPacket(dataUrl, lastScannedRawCode);
-          triggerScanFeedback('success', lastScannedRawCode || 'ẢNH KIỆN HÀNG', '📸 ĐÃ GỬI ẢNH SANG MÁY TÍNH!', '✅ Đã đính kèm ảnh vào đơn trên máy tính');
+          sendPhotoPacket(dataUrl, photoCode);
+          triggerScanFeedback('pending', photoCode, 'Đang chờ máy tính lưu ảnh', 'Ảnh vẫn được giữ cho tới ACK khớp yêu cầu.');
         };
         img.src = ev.target.result;
       };
@@ -2927,7 +2991,7 @@
     }
 
     function getUnsyncedItems() {
-      return (scanHistory || []).filter(e => e && e.status === 'success' && e.synced !== true);
+      return (scanHistory || []).filter(e => e && e.synced !== true);
     }
 
     function removeSingleOfflineItem(code) {
@@ -3059,117 +3123,23 @@ const safeCodeAttr = String(item.code || '').replace(/'/g, "\\'");
 
     let isSyncingOffline = false;
     async function syncOfflineQueueToPc() {
-      if (isSyncingOffline) return;
-      if (!offlineQueue.length) {
-        alert('Tất cả các kiện và ảnh chụp đã được đồng bộ 100% sang máy tính!');
-        return;
-      }
-
+      if (isSyncingOffline || !offlineQueue.length) return;
       isSyncingOffline = true;
-      const progressEl = document.getElementById('syncProgressText');
       const btn = document.getElementById('btnSyncOffline');
-      if (progressEl) {
-        progressEl.style.display = 'block';
-        progressEl.textContent = 'Đang đồng bộ ' + offlineQueue.length + ' kiện & ảnh sang máy tính...';
-      }
+      const progress = document.getElementById('syncProgressText');
       if (btn) btn.disabled = true;
-
-      const topic = getNtfyTopic();
-      const itemsToSync = [...offlineQueue];
-
-      // 1. Gửi gói tổng hợp bulk_sync qua MQTT và HTTPS ntfy.sh (Siêu nhanh, nạp toàn bộ danh sách 1 lần)
-      const bulkPayload = {
-        type: 'bulk_sync',
-        items: itemsToSync.map(it => ({
-          code: it.code,
-          time: it.time,
-          photo: it.photo || '',
-          requestId: 'sync_' + it.code + '_' + it.time
-        })),
-        room: room,
-        time: Date.now()
-      };
-
-      if (client && client.connected) {
-        try {
-          client.publish('agy_shopee_return_scanner_2026/' + room, JSON.stringify(bulkPayload));
-        } catch (e) {}
-      }
-
       try {
-        await fetch('https://ntfy.sh/' + topic, {
-          method: 'POST',
-          body: JSON.stringify(bulkPayload),
-          headers: { 'Title': 'Shopee Bulk Sync' }
-        });
-      } catch (e) {}
-
-      // 2. Gửi từng kiện lẻ kèm ảnh dự phòng
-      let sentCount = 0;
-      for (let i = 0; i < itemsToSync.length; i++) {
-        const item = itemsToSync[i];
-        if (progressEl) {
-          progressEl.textContent = 'Đang gửi kiện ' + (i + 1) + '/' + itemsToSync.length + ': ' + item.code + (item.photo ? ' (Kèm ảnh)' : '');
+        for (const item of [...offlineQueue]) {
+          if (!item.photoOnly) sendPayloadToPc({ ...(item.payload || {}), type: item.kind === 'new_order_scan' ? 'new_order_scan' : 'sync_item', code: item.code, photo: item.photo || '', time: item.time,
+            requestId: item.requestId, captureId: item.captureId, captureTime: item.captureTime }, item.code);
+          if (item.photo) await sendPhotoPacket(item.photo, item.code, item);
         }
-
-        const syncPayload = {
-          type: 'sync_item',
-          code: item.code,
-          photo: item.photo || '',
-          time: item.time || Date.now(),
-          room: room,
-          requestId: 'sync_' + item.code + '_' + (item.time || Date.now())
-        };
-
-        if (client && client.connected) {
-          try {
-            client.publish('agy_shopee_return_scanner_2026/' + room, JSON.stringify(syncPayload));
-          } catch (e) {}
-        }
-
-        try {
-          await fetch('https://ntfy.sh/' + topic, {
-            method: 'POST',
-            body: JSON.stringify(syncPayload),
-            headers: { 'Title': 'Shopee Sync Item' }
-          });
-        } catch (postErr) {}
-
-        if (item.photo && item.photo.length > 50) {
-          try {
-            await sendPhotoPacket(item.photo, item.code);
-          } catch (e) {}
-        }
-
-        sentCount++;
-        await new Promise(r => setTimeout(r, 120));
+        if (progress) { progress.style.display = 'block'; progress.textContent = 'Đã gửi; giữ danh sách chờ tới khi máy tính xác nhận lưu.'; }
+      } finally {
+        if (btn) btn.disabled = false;
+        isSyncingOffline = false;
+        updateOfflineQueueUI();
       }
-
-      // 1. Xóa sạch hàng đợi offlineQueue và lưu vào localStorage
-      offlineQueue = [];
-      saveOfflineQueue();
-
-      // 2. Tự động xóa lịch sử các đơn chờ đã gửi sang máy tính khỏi scanHistory
-      const syncedCodeSet = new Set(itemsToSync.map(it => extractCleanTrackingCode(it.code) || String(it.code || '').trim().toUpperCase()));
-      scanHistory = (scanHistory || []).filter(e => {
-        const eClean = extractCleanTrackingCode(e.code) || String(e.code || '').trim().toUpperCase();
-        return !syncedCodeSet.has(eClean) && e.synced === true;
-      });
-      saveScanHistory();
-
-      // 3. Cập nhật tức thì cả 2 phần giao diện
-      updateOfflineQueueUI();
-      renderScanHistory();
-
-      if (progressEl) {
-        progressEl.textContent = '🎉 Đã gửi thành công ' + sentCount + ' kiện sang máy tính & tự động xóa sạch danh sách chờ!';
-        setTimeout(() => { progressEl.style.display = 'none'; }, 3500);
-      }
-      if (typeof showToast === 'function') {
-        showToast('🎉 Đã đồng bộ ' + sentCount + ' đơn sang máy tính & xóa danh sách chờ!');
-      }
-      if (btn) btn.disabled = false;
-      isSyncingOffline = false;
     }
 
     function autoSyncOfflineQueueIfPending() {

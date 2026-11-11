@@ -1114,7 +1114,7 @@
         const item = document.createElement('div');
         const isDup = entry.status === 'duplicate';
         const isNotFound = entry.status === 'not_found';
-        const isPending = entry.synced !== true;
+        const isPending = entry.synced !== true && entry.scanConfirmed !== true;
         item.className = 'history-item ' + (isDup ? 'item-duplicate' : (isNotFound || isPending ? 'item-not_found' : 'item-success'));
 
         const topRow = document.createElement('div');
@@ -1131,12 +1131,13 @@
         } else if (isNotFound) {
           badgeSpan.textContent = `🟡 KHÔNG CÓ TRÊN HT`;
         } else {
-          if (entry.synced !== true && !isDup && !isNotFound) {
+          if (isPending && !isDup && !isNotFound) {
           badgeSpan.textContent = entry.orderNum ? `🟢 ĐƠN #${entry.orderNum} (Chờ đồng bộ)` : '⏳ Chờ đồng bộ';
           badgeSpan.style.background = '#f59e0b';
           badgeSpan.style.color = '#0f172a';
         } else {
           badgeSpan.textContent = entry.orderNum ? `🟢 ĐƠN #${entry.orderNum}` : '🟢 HỢP LỆ';
+          if (entry.scanConfirmed && !entry.synced) badgeSpan.textContent += ' · Ảnh đang gửi';
         }
         }
 
@@ -1291,81 +1292,29 @@
       }
       saveOfflineQueue();
       updateOfflineQueueUI();
-      if (!existing.synced) {
-        existing.status = queued.scanOutcome === 'not_found' ? 'not_found' : 'pending';
-        triggerScanFeedback(existing.status === 'not_found' ? 'not_found' : 'pending', cleanCode,
-          existing.status === 'not_found' ? 'Không tìm thấy đơn' : 'Đang chờ lưu đủ mã và ảnh',
-          'Dữ liệu vẫn được giữ trên điện thoại để thử lại.');
-        saveScanHistory(); renderScanHistory(); return;
-      }
-      if (queued.kind === 'new_order_scan') {
-        existing.status = 'new_order';
-        triggerScanFeedback('success', cleanCode, 'Máy tính đã lưu vào hộp đơn mới', 'Đơn đang chờ duyệt, chưa tự đánh dấu hàng đã trả.');
-        saveScanHistory(); renderScanHistory(); return;
-      }
-      if (photoReceipt || scanAlreadyConfirmed) {
-        existing.status = queued.scanOutcome === 'duplicate' ? 'duplicate' : queued.scanOutcome === 'not_found' ? 'not_found' : 'success';
-        existing.orderNum = queued.confirmedOrderNum || null;
-        triggerScanFeedback(existing.status, cleanCode, queued.photoOnly ? 'Máy tính đã lưu ảnh' : 'Máy tính đã xác nhận lưu', 'Đã nhận xác nhận khớp yêu cầu.');
-        saveScanHistory(); renderScanHistory(); return;
-      }
-
-      if (isNotFound) {
-        // PC XÁC NHẬN: ĐƠN KHÔNG TỒN TẠI TRÊN HỆ THỐNG ➔ TỨC THÌ NHÁY VÀNG!
-        triggerScanFeedback('not_found', cleanCode, '🟡 KHÔNG CÓ TRÊN HỆ THỐNG!', data.extra || '⚠️ Mã này không tồn tại trong danh sách đơn hàng máy tính!', null);
-        
-        if (existing) {
-          existing.status = 'not_found';
-          existing.orderNum = null;
-          existing.detail = data.extra || 'Không có trên hệ thống';
-        } else {
-          scanHistory.unshift({
-            code: cleanCode,
-            time: Date.now(),
-            status: 'not_found',
-            orderNum: null,
-            dupCount: 0,
-            photo: '',
-            detail: data.extra || 'Không có trên hệ thống'
-          });
-        }
-        saveScanHistory();
-        renderScanHistory();
-        return;
-      }
-
-      if (isDup) {
-        // PC XÁC NHẬN: ĐƠN TRÙNG ➔ TỨC THÌ NHÁY ĐỎ
-        triggerScanFeedback('duplicate', cleanCode, '🚨 MÁY TÍNH BÁO: ĐƠN TRÙNG!', data.extra || '⚠️ Đơn này đã được quét nhận trả trước đó!', data.orderNum);
-        
-        if (existing) {
-          existing.status = 'duplicate';
-          existing.orderNum = data.orderNum || existing.orderNum;
-          existing.dupCount = (existing.dupCount || 1) + 1;
-          existing.detail = data.extra || 'Quét trùng';
-        } else {
-          scanHistory.unshift({
-            code: cleanCode,
-            time: Date.now(),
-            status: 'duplicate',
-            orderNum: data.orderNum,
-            dupCount: 1,
-            detail: data.extra || 'Quét trùng'
-          });
-        }
-        saveScanHistory();
-        renderScanHistory();
-        return;
-      }
-
-      // PC XÁC NHẬN: ĐƠN ĐÚNG / HỢP LỆ (KHỚP THÀNH CÔNG ĐỐI SOÁT) ➔ TỨC THÌ NHÁY XANH!
-      const orderNum = Number(data.orderNum) || null;
-      triggerScanFeedback('success', cleanCode, orderNum ? `🟢 ĐÃ KHỚP ĐƠN #${orderNum}` : '🟢 MÃ ĐÚNG HỢP LỆ', data.extra || '✅ Đã đối soát & khớp hàng đã trả', orderNum);
-
-      if (existing) {
-        existing.status = 'success';
-        existing.orderNum = orderNum || existing.orderNum;
-        existing.detail = data.extra || 'Đã khớp hàng đã trả';
+      // Scan outcome is independent of photo delivery. Keep the durable queue until both receipts.
+      if (queued.scanConfirmed) clearTimeout(pending.timer);
+      existing.scanConfirmed = queued.scanConfirmed === true;
+      existing.photoConfirmed = queued.photoConfirmed === true;
+      existing.orderNum = queued.confirmedOrderNum || null;
+      const outcome = queued.scanOutcome;
+      existing.status = !queued.scanConfirmed ? 'pending'
+        : queued.kind === 'new_order_scan' ? 'new_order'
+        : outcome === 'not_found' ? 'not_found' : outcome === 'duplicate' ? 'duplicate' : 'success';
+      const photoPending = Boolean(queued.photo) && !queued.photoConfirmed;
+      const title = existing.status === 'pending' ? 'Đang chờ máy tính xác nhận mã'
+        : existing.status === 'not_found' ? 'Không tìm thấy đơn'
+        : existing.status === 'duplicate' ? 'Máy tính báo: Đơn trùng'
+        : existing.status === 'new_order' ? 'Máy tính đã lưu vào hộp đơn mới'
+        : queued.photoOnly ? 'Máy tính đã lưu ảnh'
+        : 'Đã khớp đơn' + (existing.orderNum ? ' #' + existing.orderNum : '');
+      existing.detail = photoPending
+        ? (existing.status === 'not_found' ? 'Không gắn ảnh vì chưa tìm thấy đơn; ảnh vẫn giữ trên điện thoại.' : 'Ảnh đang gửi ngầm — bạn có thể quét đơn tiếp.')
+        : queued.photo ? 'Ảnh đã lưu trên máy tính.' : 'Máy tính đã xác nhận lưu mã.';
+      // Late receipts update their own history, never replace feedback for a newer scan.
+      if (scanHistory[0] === existing && (!photoReceipt || !scanAlreadyConfirmed)) {
+        triggerScanFeedback(existing.status === 'new_order' ? 'success' : existing.status,
+          cleanCode, title, existing.detail, existing.orderNum);
       }
       saveScanHistory();
       renderScanHistory();
@@ -1759,7 +1708,7 @@
         const timer = setTimeout(() => {
           // Retain request membership: a late exact ACK is still useful after timeout.
           const sub = document.getElementById('lastScanSub');
-          if (sub) sub.textContent = '⚠️ Chưa nhận được phản hồi từ PC; giữ lại để thử lại';
+          if (sub && scanHistory[0]?.requestId === id && !offlineQueue.find(it => it.requestId === id)?.scanConfirmed) sub.textContent = '⚠️ Chưa nhận được phản hồi từ PC; giữ lại để thử lại';
         }, 10000);
         pendingScans.set(id, { code: displayCode, timer });
       }

@@ -102,3 +102,17 @@ test('new-order inbox acknowledges verified storage and same-request retries onl
  const packet={type:'new_order_scan',code:'TEST000001',requestId:'new-req',captureId:'cap',room:'TEST',time:1,photo:'PHOTO'};
  c.processIncomingPhonePayload(packet);assert.equal(acks[0][3],'error');assert.equal(saved.size,0);fails=false;c.processIncomingPhonePayload(packet);assert.equal(acks[1][3],'success');assert.equal(c.newOrdersInbox.length,1);assert.equal(acks[1][7].photoSaved,true);assert.equal(JSON.parse(saved.get('shopee_new_orders_inbox_v1')).length,1);
 });
+test('scan receipt reports match before photo receipt and keeps photo retryable',()=>{
+ const feedback=[];const c=ctx({pendingScans:new Map([['req',{code:'TEST000001'}]]),offlineQueue:[{code:'TEST000001',requestId:'req',photo:'IMAGE',captureId:'cap'}],scanHistory:[{code:'TEST000001',requestId:'req',status:'pending',synced:false}],triggerScanFeedback:(...a)=>feedback.push(a),saveScanHistory:noop,saveOfflineQueue:noop,renderScanHistory:noop,updateOfflineQueueUI:noop});clean(c);vm.runInContext(fn(mobile,'handleScanAck'),c);
+ c.handleScanAck({type:'pc_ack',code:'TEST000001',requestId:'req',outcome:'success',ackStage:'scan',orderNum:12});
+ assert.equal(feedback[0][0],'success');assert.equal(c.scanHistory[0].status,'success');assert.match(c.scanHistory[0].detail,/ảnh/i);assert.equal(c.scanHistory[0].synced,false);assert.equal(c.offlineQueue.length,1);
+ c.scanHistory.unshift({code:'TEST000002',requestId:'next',status:'pending'});
+ c.handleScanAck({type:'pc_ack',code:'TEST000001',requestId:'req',outcome:'success',ackStage:'photo',captureId:'cap',photoSaved:true});
+ assert.equal(feedback.length,1);assert.equal(c.offlineQueue.length,0);assert.equal(c.scanHistory[1].synced,true);assert.match(c.scanHistory[1].detail,/Ảnh đã lưu/);
+});
+test('missing and duplicate scan results are immediate while their photos stay queued',()=>{
+ for(const outcome of ['not_found','duplicate']){
+ const feedback=[];const c=ctx({pendingScans:new Map([['req',{code:'TEST000001'}]]),offlineQueue:[{code:'TEST000001',requestId:'req',photo:'IMAGE',captureId:'cap'}],scanHistory:[{code:'TEST000001',requestId:'req',status:'pending',synced:false}],triggerScanFeedback:(...a)=>feedback.push(a),saveScanHistory:noop,saveOfflineQueue:noop,renderScanHistory:noop,updateOfflineQueueUI:noop});clean(c);vm.runInContext(fn(mobile,'handleScanAck'),c);
+ c.handleScanAck({type:'pc_ack',code:'TEST000001',requestId:'req',outcome,ackStage:'scan'});assert.equal(feedback[0][0],outcome);assert.equal(c.scanHistory[0].status,outcome);assert.equal(c.offlineQueue.length,1);
+ }
+});

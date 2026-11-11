@@ -53,6 +53,9 @@ jobs:
             }
           "
 
+      - name: Test notification order navigation
+        run: npm test
+
       - name: Build Windows Executable (.exe)
         run: npm run build:win
         env:

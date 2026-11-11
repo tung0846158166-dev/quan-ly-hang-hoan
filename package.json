@@ -6,6 +6,7 @@
   "author": "Shop Owner",
   "license": "MIT",
   "scripts": {
+    "test": "node --test tests/notification-location.test.cjs",
     "start": "electron .",
     "build:win": "electron-builder --win --x64 -p never"
   },

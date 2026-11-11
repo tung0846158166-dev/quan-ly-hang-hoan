@@ -13337,7 +13337,61 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (totalBadge) totalBadge.textContent = appNotifications.length;
     }
 
+    function notificationOrderUid(order) {
+      if (!order._notificationOrderUid) {
+        order._notificationOrderUid = globalThis.crypto?.randomUUID
+          ? globalThis.crypto.randomUUID()
+          : 'order_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        saveOrders(); // Persist identity with the existing storage/backup mechanism.
+      }
+      return order._notificationOrderUid;
+    }
+
+    function notificationCodeMatches(order, code) {
+      const key = String(code || '').trim().toUpperCase();
+      if (!key) return false;
+      return [order.track, order.altTrack, order.forwardTrack, order.returnTrack,
+        order.orderId, order.claimId, order.rawDetails?.claimId]
+        .some(value => String(value || '').trim().toUpperCase() === key);
+    }
+
+    function resolveNotificationOrder(item) {
+      if (!item) return { error: 'Không tìm thấy thông báo này.' };
+      // A stable identity is authoritative: never fall back to a reused code after deletion.
+      const matches = orders.map((order, index) => ({ order, index })).filter(({ order }) =>
+        item.orderUid ? order._notificationOrderUid === item.orderUid : notificationCodeMatches(order, item.code));
+      if (matches.length === 1) return { index: matches[0].index };
+      return { error: matches.length > 1
+        ? 'Có nhiều đơn trùng mã hoặc ID. Vui lòng kiểm tra mã đơn; chưa định vị để tránh chọn nhầm.'
+        : 'Đơn của thông báo không còn trong bảng hoặc mã đã thay đổi. Không định vị sang đơn khác.' };
+    }
+
+    function revealNotificationOrderFilters() {
+      // These filters were not relaxed by the shared scan highlighter.
+      currentOrderTypeFilter = 'all';
+      currentPreOrderFilter = 'all';
+      currentTrackingFilter = 'all';
+      currentCustomDateFrom = '';
+      currentCustomDateTo = '';
+      currentCustomTimeFrom = '';
+      currentCustomTimeTo = '';
+      for (const id of ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect']) {
+        const el = document.getElementById(id); if (el) el.value = 'all';
+      }
+      for (const id of ['filterDateFrom', 'filterDateTo', 'filterTimeFrom', 'filterTimeTo', 'customDateFrom', 'customDateTo']) {
+        const el = document.getElementById(id); if (el) el.value = '';
+      }
+      const dateOnly = document.getElementById('chkOnlyWithDate');
+      if (dateOnly) dateOnly.checked = false;
+      if (typeof currentMainView !== 'undefined' && currentMainView === 'summary') switchMainView('orders');
+    }
+
     function addAppNotification(notif) {
+      let target = Number.isInteger(notif.orderIdx) ? orders[notif.orderIdx] : null;
+      if (notif.code && (!target || !notificationCodeMatches(target, notif.code))) {
+        const matches = orders.filter(order => notificationCodeMatches(order, notif.code));
+        target = matches.length === 1 ? matches[0] : null;
+      }
       const item = {
         id: 'notif_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         type: notif.type || 'phone_scan', // 'phone_scan' | 'excel_update' | 'excel_import' | 'duplicate_scan' | 'unknown_scan'
@@ -13345,6 +13399,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         detail: notif.detail || '',
         code: notif.code || '',
         orderIdx: typeof notif.orderIdx === 'number' ? notif.orderIdx : null,
+        orderUid: target ? notificationOrderUid(target) : null,
         time: Date.now(),
         timeFormatted: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN')
       };
@@ -13474,7 +13529,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           icon = '⚠️';
         }
 
-        const hasTarget = typeof item.orderIdx === 'number' && item.orderIdx >= 0 && item.orderIdx < orders.length;
+        const hasTarget = Boolean(item.orderUid || (Number.isInteger(item.orderIdx) && item.orderIdx >= 0 && item.code));
 
         return `
           <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -13497,7 +13552,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </div>
             ${hasTarget ? `
               <div class="shrink-0 flex items-center justify-end">
-                <button type="button" onclick="locateOrderFromNotification(${item.orderIdx})"
+                <button type="button" onclick="locateOrderFromNotification(${escapeAttr(JSON.stringify(item.id))})"
                         class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         title="Tự động nhảy sang đúng tuần chứa đơn này và nháy xanh dòng đơn trên bảng">
                   <span>🎯</span>
@@ -13510,10 +13565,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }).join('');
     }
 
-    function locateOrderFromNotification(orderIdx) {
-      closeNotificationModal();
+    function locateOrderFromNotification(notificationId) {
       setTimeout(() => {
-        highlightAndFlashOrderRow(orderIdx);
+        // Resolve at click time, after the modal delay; orderIdx is historical display data only.
+        const item = appNotifications.find(notif => notif.id === notificationId);
+        const target = resolveNotificationOrder(item);
+        if (target.error) {
+          showToast(target.error, 'warning');
+          return;
+        }
+        closeNotificationModal();
+        revealNotificationOrderFilters();
+        highlightAndFlashOrderRow(target.index, { source: 'notification' });
       }, 100);
     }
 
@@ -13679,6 +13742,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // 4. Cuộn mượt và kích hoạt hiệu ứng NHÁY XANH NỔI BẬT (Green Flash Pulse)
       setTimeout(() => {
+        // A concurrent insert/delete must not flash a different order now occupying this index.
+        if (orders[orderIdx] !== targetOrder) return;
         const rowEl = document.getElementById('order_row_' + orderIdx);
         if (rowEl) {
           rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });

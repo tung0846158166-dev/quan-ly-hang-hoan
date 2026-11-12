@@ -238,8 +238,17 @@ async function writeDiskSnapshot(serialized, sequence) {
 ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   try {
     if (quitDrainComplete) throw new Error('Ung dung dang thoat');
-    if (!Array.isArray(dataToSave)) throw new Error('Du lieu luu phai la danh sach don hang');
-    const serialized = JSON.stringify(dataToSave);
+    let serialized;
+    if (typeof dataToSave === 'string') {
+      // The renderer sends the list already serialized (much cheaper than cloning thousands of objects over IPC).
+      if (dataToSave.slice(0, 16).trimStart()[0] !== '[' || !dataToSave.slice(-16).trimEnd().endsWith(']')) {
+        throw new Error('Du lieu luu phai la danh sach don hang');
+      }
+      serialized = dataToSave;
+    } else {
+      if (!Array.isArray(dataToSave)) throw new Error('Du lieu luu phai la danh sach don hang');
+      serialized = JSON.stringify(dataToSave);
+    }
     if (Buffer.byteLength(serialized, 'utf8') > MAX_DISK_SNAPSHOT_BYTES) {
       throw new Error('Du lieu luu vuot qua gioi han 512 MB');
     }

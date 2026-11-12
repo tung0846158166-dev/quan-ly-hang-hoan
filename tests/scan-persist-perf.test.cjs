@@ -54,6 +54,8 @@ test('photos are written once as files and kept out of the order list', async ()
   assert.deepEqual(JSON.parse(JSON.stringify(photoWrites)), [['p1']]);
   assert.equal(diskWrites[0][0].photo, '', 'main file no longer carries the photo');
   assert.equal(diskWrites[0][0].photoId, 'p1');
+  assert.equal(idbWrites.length, 0, 'IndexedDB copy is deferred, not part of the receipt');
+  await new Promise(r => setTimeout(r, 4100));
   assert.equal(idbWrites[0][0].photo, '');
   assert.equal(c.orders[0].photo, PHOTO, 'in-memory order keeps its photo');
   await c.flushPersistOrdersToDiskAndStorage();

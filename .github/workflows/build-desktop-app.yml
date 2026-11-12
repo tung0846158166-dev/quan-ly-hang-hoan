@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.9
+          name: QuanLyHangHoan-Windows-Installer-v1.8.10
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,11 +88,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.9
-          name: "Quản Lý Hàng Hoàn v1.8.9 — Sửa nhập Excel và kiện hoàn"
+          tag_name: v1.8.10
+          name: "Quản Lý Hàng Hoàn v1.8.10 — Sửa nhập Excel và kiện hoàn"
           body: |
-            ### Bản sửa 1.8.9
+            ### Bản sửa 1.8.10
 
+            - Sửa bộ lọc số lượng hoàn 0 trong file Shopee Order.cancelled/Order.failed_delivery.
             - Sửa nhận diện cột, số lượng hoàn, đơn giá/tổng tiền, trạng thái và mã hoàn bổ sung.
             - Chọn đúng sheet, nhập nhiều schema riêng, loại chồng lặp giữa file.
             - Nhập bổ sung SKU hoặc thay snapshot rõ ràng; báo kết quả sau lưu, rollback khi lỗi.

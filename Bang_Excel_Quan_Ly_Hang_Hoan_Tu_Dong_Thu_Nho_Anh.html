@@ -5397,7 +5397,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let hasExplicitReturnQty = false;
         if (returnQtyKey && row[returnQtyKey] != null && String(row[returnQtyKey]).trim() !== '') {
           const rq = parseImportedQuantity(row[returnQtyKey]);
-          if (rq === 0) { zeroReturnedGroups.add(groupKey); return; }
+          const explicitReturnContext = Boolean(rawReturnTrack || (claimIdKey && String(row[claimIdKey] || '').trim()) || (returnStatusKey && String(row[returnStatusKey] || '').trim()));
+          const cancellationOrFailedDelivery = /cancel|huy|failed_delivery|that bai|that thu/.test(removeVietnameseTones(String(row.__sourceFileName || '') + ' ' + String(statusKey ? row[statusKey] || '' : '')).toLowerCase());
+          // Order cancelled/failed-delivery reports fill return quantity with zero by default.
+          // Only an actual customer-return SKU should be excluded by that zero.
+          if (rq === 0 && (explicitReturnContext || !cancellationOrFailedDelivery)) { zeroReturnedGroups.add(groupKey); return; }
           if (rq > 0) {
             rawQty = rq;
             hasExplicitReturnQty = true;
@@ -6874,7 +6878,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.9';
+    const APP_VERSION_NUMBER = '1.8.10';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);

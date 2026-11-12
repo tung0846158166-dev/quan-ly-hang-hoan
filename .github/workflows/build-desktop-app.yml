@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.19
+          name: QuanLyHangHoan-Windows-Installer-v1.8.20
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.19
-          name: "Quản Lý Hàng Hoàn v1.8.19 — Nhập nhanh hơn, đo tốc độ kênh"
+          tag_name: v1.8.20
+          name: "Quản Lý Hàng Hoàn v1.8.20 — Xác nhận quét nhanh hơn"
           body: |
+            ### Bản sửa 1.8.20
+
+            - Bản tin quét gửi qua MQTT chỉ còn phần nhỏ (không kèm ảnh); ảnh gửi riêng đúng một lần. Trước đây ảnh bị gửi lặp nhiều lần (tới cả 3 broker) cùng bản tin quét nên xác nhận phải chờ ảnh tải lên qua 4G.
+            - Các mảnh ảnh qua ntfy chỉ dùng làm dự phòng (khi không có MQTT hoặc sau 7 giây chưa được xác nhận), không còn gửi dồn mỗi lần quét.
+            - PC vẽ lại bảng 20.000 dòng một lần cho cả loạt ảnh thay vì mỗi ảnh một lần.
+            - Phản hồi báo thêm "PC bị treo ~X ms" khi cửa sổ PC bị đứng, để biết PC có đang bận không.
+
             ### Bản sửa 1.8.19
 
             - Bỏ lượt "preflight" thừa trước mỗi lần gửi tin qua ntfy (đổi header Title thành tham số trên đường dẫn): bớt một vòng đi-về tới máy chủ ở mỗi chiều.

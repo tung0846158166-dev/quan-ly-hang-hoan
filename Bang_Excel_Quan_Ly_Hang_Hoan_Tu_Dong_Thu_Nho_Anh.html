@@ -7049,7 +7049,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.19';
+    const APP_VERSION_NUMBER = '1.8.20';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13349,7 +13349,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.19',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.20',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13698,6 +13698,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         .some(value => String(value || '').trim().toUpperCase() === code));
     }
 
+    // Redrawing a 20k-row table costs seconds. Photos arriving from the phone redraw it once per burst, not once per photo.
+    function schedulePhoneRender() {
+      const state = schedulePhoneRender.state || (schedulePhoneRender.state = { timer: null, firstAt: 0 });
+      const now = Date.now();
+      if (!state.firstAt) state.firstAt = now;
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = setTimeout(() => { state.timer = null; state.firstAt = 0; renderAll(false); }, Math.max(0, Math.min(800, 4000 - (now - state.firstAt))));
+    }
+
+    // How long the window was frozen recently (a frozen window cannot read incoming scans). Reported to the phone.
+    const pcLagSamples = [];
+    let pcLagLast = Date.now();
+    setInterval(() => {
+      const now = Date.now();
+      const lag = Math.max(0, now - pcLagLast - 250);
+      pcLagLast = now;
+      pcLagSamples.push([now, lag]);
+      while (pcLagSamples.length && now - pcLagSamples[0][0] > 6000) pcLagSamples.shift();
+    }, 250);
+    function pcRecentLagMs() {
+      return pcLagSamples.reduce((max, sample) => Math.max(max, sample[1]), 0);
+    }
+
     async function attachPhotoToOrderByCode(rawCode, photoDataUrl, capture = {}) {
       // Inbox captures are bound to their own request and never fall back to a return row.
       const inboxTargets = capture.requestId && typeof newOrdersInbox !== 'undefined' ? newOrdersInbox.filter(item =>
@@ -13736,7 +13759,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!result || result.success !== true) throw new Error('Photo persistence failed');
         if (capture.requestId && capture.captureId) sendAckToPhone(0, code, 'Đã lưu ảnh', 'success', false, capture.requestId, capture.room || '',
           { ackStage: 'photo', photoSaved: true, captureId: capture.captureId });
-        setTimeout(() => renderAll(false), 0);
+        setTimeout(typeof schedulePhoneRender === 'function' ? schedulePhoneRender : () => renderAll(false), 0);
         return { success: true };
       } catch (error) {
         sendAckToPhone(0, code, 'Chưa lưu được ảnh; giữ lại để thử lại', 'error', false, capture.requestId, capture.room || '',
@@ -14546,7 +14569,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           staged.records.forEach(args => recordCodeToActiveSession(...args));
           // processingMs / saveMs let the phone show where the time went (PC work vs. network).
           staged.receipt[7] = { ackStage: 'scan', photoSaved: photoAttached, captureId: capture.captureId || '',
-            processingMs: Date.now() - receivedAt, saveMs: Date.now() - saveStartedAt };
+            processingMs: Date.now() - receivedAt, saveMs: Date.now() - saveStartedAt,
+            lagMs: typeof pcRecentLagMs === 'function' ? pcRecentLagMs() : 0 };
           if (key) { phoneRequestReceipts.set(key, staged.receipt); phoneRequestStaged.delete(key); }
           sendAckToPhone(...staged.receipt);
           if (photoDataUrl && !photoAttached && capture.captureId) sendAckToPhone(0, cleanCode, 'Ảnh chưa ghép được đúng một kiện; giữ ảnh để kiểm tra',
@@ -14554,7 +14578,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             { ackStage: 'photo', photoSaved: false, photoStatus: 'unmatched', captureId: capture.captureId });
           setTimeout(() => {
             if (!staged.receipt.orderUid || phoneReceiptTarget(staged.receipt, cleanCode)) staged.effects.forEach(fn => fn());
-            if (photoAttached) renderAll(false);
+            if (photoAttached) (typeof schedulePhoneRender === 'function' ? schedulePhoneRender : () => renderAll(false))();
           }, 0);
           return { success: true, outcome: staged.receipt[3] };
         } catch (error) {

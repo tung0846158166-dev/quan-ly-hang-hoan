@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.19</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.20</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -1305,7 +1305,8 @@
       if (Number.isFinite(data.processingMs)) existing.pcProcessingMs = data.processingMs;
       if (pending.sentAt) existing.responseMs = Math.max(0, Date.now() - pending.sentAt);
       if (existing.responseMs !== undefined) {
-        existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms' + (data.__via ? ' (qua ' + data.__via + ')' : '') + '.';
+        existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms' + (data.__via ? ' (qua ' + data.__via + ')' : '') + '.' +
+          (Number.isFinite(data.lagMs) && data.lagMs > 150 ? ' PC bị treo ~' + data.lagMs + ' ms.' : '');
         // Breakdown: PC work (incl. saving) vs. network + waiting for the PC to be free.
         if (Number.isFinite(data.processingMs)) {
           existing.detail += ' (PC xử lý ' + data.processingMs + ' ms' + (Number.isFinite(data.saveMs) ? ', trong đó lưu ' + data.saveMs + ' ms' : '') +
@@ -1474,14 +1475,17 @@
         room: room,
         time: now
       });
-      if (client && client.connected) {
+      // Ảnh chỉ đi một lần, qua một kết nối MQTT (ưu tiên kênh phụ để kênh chính rảnh cho bản tin quét kế tiếp).
+      const photoClient = (typeof extraClients !== 'undefined' ? extraClients : []).slice().reverse().concat([client]).find(c => c && c.connected);
+      if (photoClient) {
         try {
-          client.publish('agy_shopee_return_scanner_2026/' + room, fullPhotoMsg);
+          photoClient.publish('agy_shopee_return_scanner_2026/' + room, fullPhotoMsg);
         } catch (e) {}
       }
 
       // 2. Chia ảnh thành các mảnh nhỏ < 2.6KB (2500 ký tự) để gửi qua ntfy.sh SSE
       // Vì ntfy.sh giới hạn mỗi bản tin SSE tối đa 4.096 bytes (4KB)! Chia mảnh giúp 100% ảnh luôn tới PC không bao giờ rớt!
+      const sendChunks = async () => {
       const CHUNK_SIZE = 2400;
       const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE);
       const photoId = 'ph_' + now + '_' + Math.random().toString(36).slice(2, 6);
@@ -1513,6 +1517,13 @@
           await new Promise(r => setTimeout(r, 45));
         }
       }
+      };
+      // Mảnh ntfy là đường dự phòng: dùng ngay khi không có kết nối MQTT, hoặc khi 7 giây sau PC vẫn chưa xác nhận ảnh.
+      if (!photoClient) sendChunks();
+      else setTimeout(() => {
+        const live = offlineQueue.find(item => item.requestId === requestId);
+        if (room === sendingRoom && live && !live.photoConfirmed && !live.reviewRequired) sendChunks();
+      }, 7000);
       if (typeof pollPcAcknowledgements === 'function') {
         const confirmPhoto = async attempt => {
           const pendingPhoto = offlineQueue.find(item => item.requestId === requestId);
@@ -1799,14 +1810,11 @@
         }).catch(e => console.warn('Ntfy post warn:', e));
       } catch (e) {}
 
-      // 2. Đồng thời gửi trọn gói (bao gồm cả ảnh chụp nếu có) qua MQTT WebSocket
-      const fullJsonStr = JSON.stringify(payload);
-      if (client && client.connected) {
-        try {
-          client.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr);
-        } catch (e) {}
-      }
-      (typeof extraClients !== 'undefined' ? extraClients : []).forEach(c => { if (c.connected) { try { c.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr); } catch (e) {} } });
+      // 2. MQTT mang bản tin nhỏ (không kèm ảnh) tới mọi broker. Ảnh đi riêng một lần (sendPhotoPacket), nên
+      //    xác nhận của PC không phải chờ ảnh tải lên qua 4G (trước đây ảnh bị gửi nhiều lần cùng bản tin quét).
+      [client].concat(typeof extraClients !== 'undefined' ? extraClients : []).forEach(c => {
+        if (c && c.connected) { try { c.publish('agy_shopee_return_scanner_2026/' + room, lightJsonStr); } catch (e) {} }
+      });
     }
 
     function getNtfyTopic() {

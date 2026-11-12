@@ -7049,7 +7049,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.20';
+    const APP_VERSION_NUMBER = '1.8.21';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13349,7 +13349,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.20',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.21',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13700,12 +13700,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     // Redrawing a 20k-row table costs seconds. Photos arriving from the phone redraw it once per burst, not once per photo.
     function schedulePhoneRender() {
-      const state = schedulePhoneRender.state || (schedulePhoneRender.state = { timer: null, firstAt: 0 });
+      const state = schedulePhoneRender.state || (schedulePhoneRender.state = { timer: null, firstAt: 0, lastRenderAt: 0 });
       const now = Date.now();
       if (!state.firstAt) state.firstAt = now;
+      state.requestedAt = now;
       if (state.timer) clearTimeout(state.timer);
-      state.timer = setTimeout(() => { state.timer = null; state.firstAt = 0; renderAll(false); }, Math.max(0, Math.min(800, 4000 - (now - state.firstAt))));
+      state.timer = setTimeout(() => {
+        state.timer = null; state.firstAt = 0;
+        // The scan highlight may already have redrawn the table after this photo was attached.
+        if (state.lastRenderAt >= state.requestedAt) return;
+        renderAll(false);
+        state.lastRenderAt = Date.now();
+      }, Math.max(0, Math.min(800, 4000 - (now - state.firstAt))));
     }
+    schedulePhoneRender.markRendered = () => { (schedulePhoneRender.state || (schedulePhoneRender.state = { timer: null, firstAt: 0, lastRenderAt: 0 })).lastRenderAt = Date.now(); };
 
     // How long the window was frozen recently (a frozen window cannot read incoming scans). Reported to the phone.
     const pcLagSamples = [];
@@ -14448,11 +14456,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // Cập nhật lại thanh Tab tuần và thống kê
       renderWeeklyImportTabs();
-      recalcTotalsAndSummary();
+      // renderAll(false) below already recomputes the summary (light now, full after 120 ms); doing it here
+      // as well made the window freeze twice as long for every phone scan.
+      if (!options.burstFlush) recalcTotalsAndSummary();
       renderCategorySummaryTable();
 
       // Render lại bảng để có danh sách filteredEntries mới nhất
       renderAll(false);
+      if (options.burstFlush && typeof schedulePhoneRender === 'function') schedulePhoneRender.markRendered();
 
       // 3. Tính toán trang phân trang chứa đơn hàng này
       const filteredPos = (window.lastFilteredEntries || []).findIndex(e => e.originalIndex === orderIdx);
@@ -14461,6 +14472,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentPage !== targetPage) {
           currentPage = targetPage;
           renderAll(false);
+          if (options.burstFlush && typeof schedulePhoneRender === 'function') schedulePhoneRender.markRendered();
         }
       }
 

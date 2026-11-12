@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.9.1</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.12</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -1230,7 +1230,7 @@
       const scanAlreadyConfirmed = queued.scanConfirmed === true;
       const unmatched = ['not_found', 'ambiguous'].includes(data.outcome);
       if (data.outcome === 'error') {
-        clearTimeout(pending.timer);
+        clearTimeout(pending.timer); clearTimeout(pending.retryTimer);
         existing.detail = 'PC chưa lưu thành công; giữ yêu cầu và ảnh để thử lại.';
         if (!queued.scanConfirmed) existing.status = 'error';
       } else {
@@ -1258,7 +1258,7 @@
         existing.detail = queued.reviewRequired ? 'Cần kiểm tra: ảnh vẫn giữ trên điện thoại, chưa gắn vào đơn.'
           : queued.photo && !queued.photoConfirmed ? 'Ảnh đang gửi ngầm — bạn có thể quét đơn tiếp.'
           : queued.photo ? 'Ảnh đã lưu trên máy tính.' : 'Máy tính đã xác nhận lưu mã.';
-        if (queued.scanConfirmed) clearTimeout(pending.timer);
+        if (queued.scanConfirmed) { clearTimeout(pending.timer); clearTimeout(pending.retryTimer); }
         if (existing.synced || queued.reviewRequired) {
           pendingScans.delete(id);
           if (existing.synced) offlineQueue = offlineQueue.filter(it => it !== queued);
@@ -1588,8 +1588,8 @@
       return creating === (kind === 'new_order_scan');
     }
 
-    function sendPayloadToPc(payload, displayCode, subInfo = '') {
-      if (queueHydrating) { const sourceRoom = room; queueHydration.then(() => { if (room === sourceRoom) sendPayloadToPc(payload, displayCode, subInfo); }); return; }
+    function sendPayloadToPc(payload, displayCode, subInfo = '', retryAttempt = 0) {
+      if (queueHydrating) { const sourceRoom = room; queueHydration.then(() => { if (room === sourceRoom) sendPayloadToPc(payload, displayCode, subInfo, retryAttempt); }); return; }
       const now = Date.now();
       payload.room = room;
       payload.time = payload.time || now;
@@ -1605,13 +1605,22 @@
         const history = scanHistory.find(it => it.requestId === id) || scanHistory.find(it => !it.requestId && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode));
         if (history) { history.requestId = id; history.synced = false; }
         saveOfflineQueue(); saveScanHistory();
-        if (pendingScans.has(id)) clearTimeout(pendingScans.get(id).timer);
+        const previousPending = pendingScans.get(id);
+        if (previousPending) { clearTimeout(previousPending.timer); clearTimeout(previousPending.retryTimer); }
         const timer = setTimeout(() => {
           // Retain request membership: a late exact ACK is still useful after timeout.
           const sub = document.getElementById('lastScanSub');
           if (sub && scanHistory[0]?.requestId === id && !offlineQueue.find(it => it.requestId === id)?.scanConfirmed) sub.textContent = '⚠️ Chưa nhận được phản hồi từ PC; giữ lại để thử lại';
         }, 10000);
-        pendingScans.set(id, { code: displayCode, timer, sentAt: now });
+        const sendingRoom = room;
+        const retryTimer = retryAttempt < 3 ? setTimeout(() => {
+          const live = offlineQueue.find(item => item.requestId === id);
+          if (room !== sendingRoom || !live || live.scanConfirmed || live.reviewRequired || live.photoOnly) return;
+          sendPayloadToPc({ ...(live.payload || {}), type: live.kind === 'new_order_scan' ? 'new_order_scan' : (live.payload?.type || 'barcode'),
+            code: live.code, photo: '', requestId: id, captureId: live.captureId, captureTime: live.captureTime,
+            time: live.time }, live.code, subInfo, retryAttempt + 1);
+        }, [1500, 3000, 6000][retryAttempt]) : null;
+        pendingScans.set(id, { code: displayCode, timer, retryTimer, sentAt: previousPending?.sentAt || now });
       }
       try {
         if (window.parent && window.parent !== window) window.parent.postMessage({ channel: 'shopee_scanner_sync', data: payload }, '*');
@@ -1652,6 +1661,7 @@
     function initPhoneSync() {
       loadOfflineQueue();
       const topic = getNtfyTopic();
+      const receiverRoom = room;
       const badge = document.getElementById('connBadge');
 
       // 1. Primary: EventSource to ntfy.sh (Standard HTTPS port 443, instant & zero CORS block)
@@ -1661,7 +1671,10 @@
         }
         phoneEventSource = new EventSource('https://ntfy.sh/' + topic + '/sse');
 
+        const receiver = phoneEventSource;
         phoneEventSource.onopen = () => {
+          if (receiver !== phoneEventSource || room !== receiverRoom) return;
+          autoSyncOfflineQueueIfPending();
           if (badge) {
             badge.className = 'conn-pill conn-waiting';
             badge.textContent = 'Đã nối kênh; chờ PC phản hồi';
@@ -1704,7 +1717,8 @@
             badge.textContent = 'Đã nối kênh; chờ PC phản hồi';
           }
           try {
-            client.subscribe('agy_shopee_return_scanner_2026/' + room);
+            const subscribedRoom = room;
+            client.subscribe('agy_shopee_return_scanner_2026/' + room, error => { if (!error && room === subscribedRoom) autoSyncOfflineQueueIfPending(); });
             const helloMsg = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
             client.publish('agy_shopee_return_scanner_2026/' + room, helloMsg);
           } catch (e) {}
@@ -1721,7 +1735,7 @@
 
     function changeRoomCode(newRoom) {
       room = String(newRoom || 'SHP-2026').trim().toUpperCase();
-      for (const scan of pendingScans.values()) clearTimeout(scan.timer);
+      for (const scan of pendingScans.values()) { clearTimeout(scan.timer); clearTimeout(scan.retryTimer); }
       pendingScans.clear();
       lastScannedRawCode = '';
       lastScannedRawTime = 0;
@@ -2885,13 +2899,14 @@
     // Initialize application
     loadScanHistory();
     loadOfflineQueue();
+    initPhoneSync(); // Subscribe before optional camera libraries finish loading.
     // Các thư viện kết nối là tùy chọn; lỗi tải chúng không được chặn camera.
     scannerLibrariesReady = Promise.allSettled([
       loadWithFallback('https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.5.0/mqtt.min.js', 'https://unpkg.com/mqtt/dist/mqtt.min.js'),
       loadWithFallback('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'),
       loadWithFallback('https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js', 'https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js')
     ]).then(() => {
-      initPhoneSync();
+      connectMqtt();
       setTimeout(() => {
         if (typeof jsQR !== 'undefined' || typeof Quagga !== 'undefined' || 'BarcodeDetector' in window) {
           // Thử khởi động ngầm (isAutoResume = true) để KHÔNG hiện popup phiền hà nếu Safari yêu cầu chạm màn hình
@@ -2900,7 +2915,7 @@
       }, 350);
     }).catch(err => {
       console.warn('Lib load warning:', err);
-      initPhoneSync();
+      connectMqtt();
     });
   
     // =========================================================================

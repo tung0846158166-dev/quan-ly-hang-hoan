@@ -2,7 +2,7 @@ name: Build Windows Desktop App (.exe)
 
 on:
   push:
-    branches: [ main, master, fix/audit-17-regressions, fix/return-parcels-sync ]
+    branches: [ main, master, fix/audit-17-regressions, fix/return-parcels-sync, fix/phone-ack-recovery ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.11
+          name: QuanLyHangHoan-Windows-Installer-v1.8.12
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,11 +88,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.11
-          name: "Quản Lý Hàng Hoàn v1.8.11 — Sửa nhập Excel và kiện hoàn"
+          tag_name: v1.8.12
+          name: "Quản Lý Hàng Hoàn v1.8.12 — Sửa nhập Excel và kiện hoàn"
           body: |
-            ### Bản sửa 1.8.11
+            ### Bản sửa 1.8.12
 
+            - Mở kênh nhận ACK sớm; reconnect gửi lại yêu cầu chưa xác nhận; retry cùng ID không ghi trùng.
             - Mobile mặc định quét hoàn kho, tách hàng đợi tạo mới/đối soát và trả đúng cảnh báo trùng.
             - Sửa bộ lọc số lượng hoàn 0 trong file Shopee Order.cancelled/Order.failed_delivery.
             - Sửa nhận diện cột, số lượng hoàn, đơn giá/tổng tiền, trạng thái và mã hoàn bổ sung.

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.22
+          name: QuanLyHangHoan-Windows-Installer-v1.8.23
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.22
-          name: "Quản Lý Hàng Hoàn v1.8.22 — sửa giá nhập file Shopee hoàn tiền ngay"
+          tag_name: v1.8.23
+          name: "Quản Lý Hàng Hoàn v1.8.23 — camera điện thoại bớt nóng, bớt hao pin"
           body: |
+            ### Bản sửa 1.8.23
+
+            - Điện thoại quét bớt nóng và bớt hao pin: giải mã khoảng 14 khung hình mỗi giây khi đang quét, tự hạ xuống 1 khung mỗi giây sau 25 giây không có mã mới (mã xuất hiện vẫn được đọc ngay và đánh thức lại tốc độ đầy đủ).
+
             ### Bản sửa 1.8.22
 
             - Nhập file Shopee hoàn/trả: các đơn "Hoàn tiền ngay" có cột "Tổng số tiền Hoàn trả" = 0 không còn bị nhập giá 0; app lấy cột giá kế tiếp có giá trị (Tổng Giá Trị / Đơn Giá).

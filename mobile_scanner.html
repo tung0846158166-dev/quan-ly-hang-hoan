@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.22</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.23</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -2137,6 +2137,7 @@
     // =========================================================================
     let mediaStream = null;
     let cameraScanInterval = null;
+    let scanWakeDetach = null;
     let isCameraScanning = false;
     let scanCanvas = null;
     let stripCanvas = null;
@@ -2572,6 +2573,7 @@
       scannerGeneration++;
       configureTorch(null);
       isCameraScanning = false;
+      if (scanWakeDetach) { scanWakeDetach(); scanWakeDetach = null; }
       if (cameraScanInterval) {
         clearTimeout(cameraScanInterval);
         cameraScanInterval = null;
@@ -2730,10 +2732,24 @@
       let frameNo = 0;
       let pendingQuagga = null;
       let pendingNative = null;
+      // v1.8.23 Tiết kiệm pin: giải mã ~14 khung/giây khi đang quét, còn 1 khung/giây khi 25 giây không có mã mới.
+      // Mã xuất hiện lúc rảnh vẫn được đọc (trong tối đa ~1 giây) và đánh thức lại tốc độ đầy đủ.
+      const ACTIVE_FRAME_GAP_MS = 70, IDLE_FRAME_GAP_MS = 1000, IDLE_AFTER_MS = 25000;
+      let lastActivityAt = performance.now();
+      let lastFrameAt = 0;
+      const wakeScanner = () => { lastActivityAt = performance.now(); };
+      document.addEventListener('pointerdown', wakeScanner, { passive: true });
+      document.addEventListener('touchstart', wakeScanner, { passive: true });
+      const detachWake = () => {
+        document.removeEventListener('pointerdown', wakeScanner);
+        document.removeEventListener('touchstart', wakeScanner);
+      };
+      scanWakeDetach = detachWake;
 
       const acceptCode = (code, revision) => {
         if (code && !stillDecodeBusy && isCameraScanning && generation === scannerGeneration &&
             revision === scannerDecodeRevision) {
+          wakeScanner();
           handleCameraFrameDecoded(code);
           return true;
         }
@@ -2754,7 +2770,14 @@
       };
 
       const processNextFrame = async () => {
-        if (!isCameraScanning || !mediaStream || generation !== scannerGeneration) return;
+        if (!isCameraScanning || !mediaStream || generation !== scannerGeneration) { detachWake(); return; }
+
+        // Giới hạn tốc độ giải mã để máy bớt nóng và hao pin; tự hạ xuống 1 khung/giây khi rảnh.
+        const nowTs = performance.now();
+        const gap = (nowTs - lastActivityAt > IDLE_AFTER_MS) ? IDLE_FRAME_GAP_MS : ACTIVE_FRAME_GAP_MS;
+        const waitMs = gap - (nowTs - lastFrameAt);
+        if (waitMs > 1) { cameraScanInterval = setTimeout(processNextFrame, Math.ceil(waitMs)); return; }
+        lastFrameAt = nowTs;
 
         if (videoEl && !videoEl.paused && videoEl.readyState >= 2 &&
             videoEl.videoWidth > 0 && videoEl.videoHeight > 0 && !isFrameProcessing && !stillDecodeBusy) {

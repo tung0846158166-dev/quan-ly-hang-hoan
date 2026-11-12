@@ -11,7 +11,7 @@ function context(mode = 'tong_gia_tri', onlyReturns = false) {
     detectCarrierByTrackingCode: ()=>'', extractBuyerNote: ()=>'', saveShopeeOrderDb(){}, renderShopeeDbTable(){}, autoEnrichAllMissingOrdersFromDb(){}, addAuditLog(){}, alert(){}};
   vm.createContext(c);
   vm.runInContext(source.match(/    const COMMON_COLOR_WORDS = \[[^]*?    \];/)[0], c);
-  for (const name of ['removeVietnameseTones','normalizeScientificOrderId','extractCleanTrackingCode','parseMoneyCellValue','isKnownColorName','isValidColorString','isValidSizeString','isReturnReasonText','parseSaleworkProductAndVariation','ingestTikTokOnlyRecords']) {
+  for (const name of ['removeVietnameseTones','normalizeScientificOrderId','extractCleanTrackingCode','parseMoneyCellValue','isKnownColorName','isValidColorString','isValidSizeString','isReturnReasonText','parseSaleworkProductAndVariation','getOrderTrackingCodes','parseImportedTrackingCodes','getReturnParcelId','getReturnParcelKey','isSameReturnParcel','getShopeeDbParcels','registerImportedParcel','ingestTikTokOnlyRecords']) {
     const match = source.match(new RegExp('^    (?:async )?function '+name+'\\([^]*?^    }', 'm'));
     assert(match, name); vm.runInContext(match[0], c);
   }

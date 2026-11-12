@@ -2908,6 +2908,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function savePhotoToDb(id, dataUrl) {
       if (!id || !dataUrl) return Promise.resolve(false);
       photoMemoryCache.set(id, dataUrl);
+      // Cache only a completed IndexedDB transaction, never an attempted write.
+      if (!savePhotoToDb.persistedPhotos) savePhotoToDb.persistedPhotos = new Map();
+      if (!savePhotoToDb.pendingWrites) savePhotoToDb.pendingWrites = new Map();
+      if (!savePhotoToDb.pendingMutations && !savePhotoToDb.pendingWrites.has(id) && savePhotoToDb.persistedPhotos.get(id) === dataUrl) return Promise.resolve(true);
+      savePhotoToDb.pendingWrites.set(id, (savePhotoToDb.pendingWrites.get(id) || 0) + 1);
+      savePhotoToDb.persistedPhotos.delete(id);
       return openPhotoDb().then(db => {
         if (!db) return false;
         return new Promise(resolve => {
@@ -2922,12 +2928,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             resolve(false);
           }
         });
+      }).then(saved => {
+        const remaining = savePhotoToDb.pendingWrites.get(id) - 1;
+        if (remaining) savePhotoToDb.pendingWrites.set(id, remaining);
+        else savePhotoToDb.pendingWrites.delete(id);
+        if (saved && !remaining && !savePhotoToDb.pendingMutations) savePhotoToDb.persistedPhotos.set(id, dataUrl);
+        else savePhotoToDb.persistedPhotos.delete(id);
+        return saved;
       });
     }
 
     function deletePhotoFromDb(id) {
       if (!id) return Promise.resolve(false);
       photoMemoryCache.delete(id);
+      if (savePhotoToDb.persistedPhotos) savePhotoToDb.persistedPhotos.delete(id);
+      savePhotoToDb.pendingMutations = (savePhotoToDb.pendingMutations || 0) + 1;
       return openPhotoDb().then(db => {
         if (!db) return false;
         return new Promise(resolve => {
@@ -2942,11 +2957,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             resolve(false);
           }
         });
+      }).then(result => {
+        savePhotoToDb.pendingMutations--;
+        if (savePhotoToDb.persistedPhotos) savePhotoToDb.persistedPhotos.delete(id);
+        return result;
       });
     }
 
     function clearAllPhotosFromDb() {
       photoMemoryCache.clear();
+      if (savePhotoToDb.persistedPhotos) savePhotoToDb.persistedPhotos.clear();
+      savePhotoToDb.pendingMutations = (savePhotoToDb.pendingMutations || 0) + 1;
       return openPhotoDb().then(db => {
         if (!db) return false;
         return new Promise(resolve => {
@@ -2961,6 +2982,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             resolve(false);
           }
         });
+      }).then(result => {
+        savePhotoToDb.pendingMutations--;
+        if (savePhotoToDb.persistedPhotos) savePhotoToDb.persistedPhotos.clear();
+        return result;
       });
     }
 
@@ -3528,32 +3553,110 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return cleaned.toUpperCase();
     }
 
-    function lookupShopeeDb(code) {
-      if (!code || !shopeeOrderDb) return null;
-      const clean = extractCleanTrackingCode(code);
-      if (!clean) return null;
-      if (shopeeOrderDb[clean]) return shopeeOrderDb[clean];
-      for (const k in shopeeOrderDb) {
-        const o = shopeeOrderDb[k];
-        const ot = extractCleanTrackingCode(o.track || '');
-        const oAlt = extractCleanTrackingCode(o.altTrack || '');
-        const oRet = extractCleanTrackingCode(o.returnTrack || '');
-        const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
-        const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
-        const oi = String(o.orderId || '').trim().toUpperCase().replace(/[\*\s]/g, '');
-        if (ot && ot === clean) return o;
-        if (oAlt && oAlt === clean) return o;
-        if (oRet && oRet === clean) return o;
-        if (oFwd && oFwd === clean) return o;
-        if (oClaim && oClaim === clean) return o;
-        if (oi && oi === clean) return o;
+    function getOrderTrackingCodes(order) {
+      if (!order) return [];
+      return Array.from(new Set([order.track, order.altTrack, order.forwardTrack, order.returnTrack,
+        ...(Array.isArray(order.trackingCodes) ? order.trackingCodes : [])]
+        .map(code => extractCleanTrackingCode(code || '')).filter(Boolean)));
+    }
+
+    function getPhoneOrderMatches(rawCode) {
+      const code = extractCleanTrackingCode(rawCode || '');
+      if (!code) return [];
+      const entries = orders.map((order, index) => ({ order, index }));
+      const trackingMatches = entries.filter(({order}) => getOrderTrackingCodes(order).includes(code));
+      if (trackingMatches.length) return trackingMatches;
+      return entries.filter(({order}) => [order.orderId, order.claimId, order.returnOrderId, order.rawDetails?.claimId]
+        .some(id => String(id || '').trim().toUpperCase() === code));
+    }
+
+    function getReturnParcelId(order) {
+      return String(order.returnOrderId || order.claimId || order.rawDetails?.claimId || '').trim().toUpperCase();
+    }
+
+    function getReturnParcelKey(order) {
+      const code = extractCleanTrackingCode(order.returnTrack || order.track || order.forwardTrack || '');
+      const id = getReturnParcelId(order);
+      return code ? 'TRACK:' + code + (id ? ':RETURN:' + id : '') : id ? 'RETURN:' + id : 'ORDER:' + String(order.orderId || '').trim().toUpperCase();
+    }
+
+    function isSameReturnParcel(left, right) {
+      const leftId = getReturnParcelId(left), rightId = getReturnParcelId(right);
+      if (leftId && rightId && leftId !== rightId) return false;
+      const leftPrimary = extractCleanTrackingCode(left.returnTrack || left.track || '');
+      const rightPrimary = extractCleanTrackingCode(right.returnTrack || right.track || '');
+      // Different parcel codes remain distinct even under the same return claim.
+      // A historical-code link must be explicitly supplied to replace a code.
+      if (leftPrimary && rightPrimary) {
+        if (leftPrimary === rightPrimary) return true;
+        const leftForward = extractCleanTrackingCode(left.forwardTrack || '');
+        const rightForward = extractCleanTrackingCode(right.forwardTrack || '');
+        return (rightPrimary !== leftForward && Array.isArray(left.trackingCodes) && left.trackingCodes.includes(rightPrimary)) ||
+          (leftPrimary !== rightForward && Array.isArray(right.trackingCodes) && right.trackingCodes.includes(leftPrimary));
       }
-      return null;
+      if (leftId && rightId) return leftId === rightId;
+      if (leftId || rightId || leftPrimary || rightPrimary) return false;
+      return Boolean(left.orderId && String(left.orderId).trim().toUpperCase() === String(right.orderId || '').trim().toUpperCase());
+    }
+
+    function parseImportedTrackingCodes(row) {
+      const raw = row['Tracking Codes'] || row['Mã vận đơn lịch sử'] || '';
+      if (!raw) return [];
+      let codes = raw;
+      if (typeof raw === 'string') {
+        try { codes = JSON.parse(raw); } catch (_) { codes = raw.split(/[;,|]/); }
+      }
+      return (Array.isArray(codes) ? codes : []).map(code => extractCleanTrackingCode(code || '')).filter(Boolean);
+    }
+
+    function findExistingReturnParcelIndex(orderData) {
+      const matches = orders.map((order, index) => ({order, index})).filter(({order}) => isSameReturnParcel(order, orderData));
+      return matches.length === 1 ? matches[0].index : -1;
+    }
+
+    function getShopeeDbParcels() {
+      // JSON persistence copies values stored under several index keys; dedupe by parcel identity.
+      const parcels = new Map();
+      Object.values(shopeeOrderDb || {}).forEach(order => {
+        if (order && typeof order === 'object') parcels.set(getReturnParcelKey(order), order);
+      });
+      return Array.from(parcels.values());
+    }
+
+    function registerImportedParcel(orderData) {
+      const candidates = getShopeeDbParcels().filter(order => isSameReturnParcel(order, orderData));
+      if (candidates.length === 1) {
+        orderData.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(candidates[0]), ...getOrderTrackingCodes(orderData)]));
+        Object.keys(shopeeOrderDb).forEach(key => { if (getReturnParcelKey(shopeeOrderDb[key]) === getReturnParcelKey(candidates[0])) shopeeOrderDb[key] = orderData; });
+      }
+      shopeeOrderDb['PARCEL:' + getReturnParcelKey(orderData)] = orderData;
+      getOrderTrackingCodes(orderData).forEach(code => { shopeeOrderDb[code] = orderData; });
+      [orderData.orderId, getReturnParcelId(orderData)].filter(Boolean).forEach(id => {
+        shopeeOrderDb[String(id).trim().toUpperCase()] = orderData;
+      });
+    }
+
+    function lookupShopeeDb(code) {
+      const clean = extractCleanTrackingCode(code || '');
+      if (!clean || !shopeeOrderDb) return null;
+      const candidates = getShopeeDbParcels();
+      const tracks = candidates.filter(order => getOrderTrackingCodes(order).includes(clean));
+      if (tracks.length) return tracks.length === 1 ? tracks[0] : null;
+      const ids = candidates.filter(order => [order.orderId, getReturnParcelId(order)]
+        .some(id => String(id || '').trim().toUpperCase() === clean));
+      return ids.length === 1 ? ids[0] : null;
     }
 
     function applyShopeeDbMatchToOrder(order, match, forceOverwrite = false) {
       if (!order || !match) return false;
+      if (!isSameReturnParcel(order, match)) return false;
       let changed = false;
+      const trackingCodes = Array.from(new Set([...getOrderTrackingCodes(order), ...getOrderTrackingCodes(match)]));
+      if (JSON.stringify(order.trackingCodes || []) !== JSON.stringify(trackingCodes)) {
+        order.trackingCodes = trackingCodes;
+        changed = true;
+      }
+      if (match.returnOrderId && !order.returnOrderId) { order.returnOrderId = match.returnOrderId; changed = true; }
       if (match.platform && (forceOverwrite || !order.platform || order.platform === 'Shopee')) {
         if (order.platform !== match.platform) {
           order.platform = match.platform;
@@ -3786,8 +3889,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const candidateKeys = [order.track, order.orderId, order.altTrack, order.returnTrack, order.forwardTrack].filter(Boolean);
         for (const k of candidateKeys) {
           const cleanK = extractCleanTrackingCode(k) || String(k).trim().toUpperCase();
-          const match = shopeeOrderDb[cleanK] || shopeeOrderDb[k];
-          if (match) {
+          const match = lookupShopeeDb(cleanK);
+          if (match && isSameReturnParcel(order, match)) {
             if (match.shipDate && String(match.shipDate).trim()) {
               const norm = normalizeShortDate(String(match.shipDate).trim());
               if (norm) return norm;
@@ -4026,7 +4129,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function autoEnrichAllMissingOrdersFromDb(isSilent = false) {
       let enrichedCount = 0;
       (orders || []).forEach((o, idx) => {
-        const codeToFind = o.track || o.orderId;
+        const codeToFind = getReturnParcelId(o) || o.returnTrack || o.track || o.orderId;
         if (!codeToFind) return;
         const match = lookupShopeeDb(codeToFind);
         if (match) {
@@ -4529,7 +4632,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           lastSkippedRow = false;
         }
 
-        const groupKey = isContinuationRow ? lastGroupKey : (rawOrderId || rawTrack || rawReturnOrderId || ('ROW_' + rowIdx)).toUpperCase();
+        const groupKey = isContinuationRow ? lastGroupKey : getReturnParcelKey({orderId: rawOrderId, track: rawTrack, returnOrderId: rawReturnOrderId});
         if (!isContinuationRow) {
           lastGroupKey = groupKey;
         }
@@ -4676,6 +4779,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, ...parseImportedTrackingCodes(row), ...(typeof rawAltTrack === 'string' ? [rawAltTrack] : [])].filter(Boolean)));
         // Aggregate SKU amounts as line totals; order amounts may repeat on every SKU row.
         // Presence is separate from value so an explicit zero does not trigger a fallback.
         if (!entry._importMoney) entry._importMoney = {};
@@ -4737,19 +4841,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!orderData.items.length) {
           orderData.items.push({ product: '', color: '', size: '', qty: 1 });
         }
-        if (orderData.track) {
-          const cleanTrack = extractCleanTrackingCode(orderData.track);
-          if (cleanTrack) shopeeOrderDb[cleanTrack] = orderData;
-          shopeeOrderDb[orderData.track.toUpperCase()] = orderData;
-        }
-        if (orderData.orderId) {
-          const cleanOrderId = String(orderData.orderId).trim().toUpperCase();
-          if (cleanOrderId) shopeeOrderDb[cleanOrderId] = orderData;
-        }
-        if (orderData.returnOrderId) {
-          const cleanRetId = String(orderData.returnOrderId).trim().toUpperCase();
-          if (cleanRetId) shopeeOrderDb[cleanRetId] = orderData;
-        }
+        registerImportedParcel(orderData);
       });
 
       saveShopeeOrderDb();
@@ -4766,14 +4858,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
           const cleanRetOrderId = String(orderData.returnOrderId || '').trim().toUpperCase();
 
-          const existingIdx = orders.findIndex(o => {
-            const oTrack = extractCleanTrackingCode(o.track || '');
-            const oId = String(o.orderId || '').trim().toUpperCase();
-            const oRetId = String(o.returnOrderId || '').trim().toUpperCase();
-            return (cleanTrack && oTrack && cleanTrack === oTrack) ||
-                   (cleanOrderId && oId && cleanOrderId === oId) ||
-                   (cleanRetOrderId && oRetId && cleanRetOrderId === oRetId);
-          });
+          const existingIdx = findExistingReturnParcelIndex(orderData);
 
           if (existingIdx !== -1) {
             const oldPlatStatus = orders[existingIdx].platformStatus || '';
@@ -4819,6 +4904,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               preOrder: orderData.preOrder || 'Đơn thường',
               orderId: orderData.orderId || orderData.returnOrderId || '',
               returnOrderId: orderData.returnOrderId || '',
+              trackingCodes: getOrderTrackingCodes(orderData),
               track: cleanTrack || orderData.track || '',
               altTrack: '',
               carrier: orderData.carrier || 'J&T Express',
@@ -4900,7 +4986,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // Column patterns for Shopee (Cancelled / Failed Delivery / Return-Refund Portal), TikTok Shop, and Salework
       const returnTrackKey = findKey(['mavandontrahang', 'mvdtrahang', 'returntracking']);
-      const forwardTrackKey = findKey(['mavandongiaohang', 'mavandon', 'tracking', 'mavan', 'mvd', 'matheodoi', 'makienhang', 'idgoihang', 'packageid', 'mabuugui', 'sovandon', 'trackingnumber', 'trackingid'], ['mavandontrahang', 'mvdtrahang', 'returntracking']);
+      const forwardTrackKey = findKey(['mavdchieugiaogoc', 'mavandongiaohang', 'mavandon', 'tracking', 'mavan', 'mvd', 'matheodoi', 'makienhang', 'idgoihang', 'packageid', 'mabuugui', 'sovandon', 'trackingnumber', 'trackingid'], ['mavandontrahang', 'mvdtrahang', 'returntracking']);
       const trackKey = forwardTrackKey || returnTrackKey;
       const orderIdKey = findKey(['madonhang', 'orderid', 'madon', 'iddonhang', 'iddon', 'suborderid', 'madonhangcon', 'order'], ['masokhieunai', 'makhieunai']);
       const returnCarrierKey = findKey(['donvivanchuyentrahang']);
@@ -4933,7 +5019,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       ]);
       const returnShipmentStatusKey = findKey(['trangthaitrahang'], ['trangthaitrahanghoantien']);
       const returnMethodKey = findKey(['phuongan', 'phuonganhoantien']);
-      const claimIdKey = findKey(['masokhieunai', 'makhieunai', 'claimid', 'returnid']);
+      const claimIdKey = findKey(['masokhieunai', 'makhieunai', 'claimid', 'returnid', 'returnorderid']);
       const buyerKey = findKey(['nguoimua', 'buyer', 'buyerusername', 'username', 'khachhang', 'tenkhachhang'], ['nguoiban']);
       const orderDateKey = findKey(['ngaydathang', 'thoidiemdathang', 'ngaydat', 'orderdate']);
       const claimTimeKey = findKey(['thoigiankhieunai', 'thoidiemkhieunai', 'claimtime']);
@@ -5041,7 +5127,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           lastSkippedRow = false;
         }
 
-        const groupKey = isContinuationRow ? lastGroupKey : (rawOrderId || rawTrack).toUpperCase();
+        const groupKey = isContinuationRow ? lastGroupKey : getReturnParcelKey({orderId: rawOrderId, track: rawTrack, returnTrack: rawReturnTrack, claimId: claimIdKey ? row[claimIdKey] : ''});
         if (!isContinuationRow) {
           lastGroupKey = groupKey;
         }
@@ -5414,6 +5500,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
+        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, ...parseImportedTrackingCodes(row), ...(typeof rawAltTrack === 'string' ? [rawAltTrack] : [])].filter(Boolean)));
         if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
@@ -5443,34 +5530,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!orderData.items.length) {
           orderData.items.push({ product: '', color: '', size: '', qty: 1 });
         }
-        if (orderData.track) {
-          const cleanTrack = extractCleanTrackingCode(orderData.track);
-          if (cleanTrack) shopeeOrderDb[cleanTrack] = orderData;
-          shopeeOrderDb[orderData.track.toUpperCase()] = orderData;
-        }
-        if (orderData.returnTrack) {
-          const cleanRet = extractCleanTrackingCode(orderData.returnTrack);
-          if (cleanRet) shopeeOrderDb[cleanRet] = orderData;
-          shopeeOrderDb[orderData.returnTrack.toUpperCase()] = orderData;
-        }
-        if (orderData.forwardTrack) {
-          const cleanFwd = extractCleanTrackingCode(orderData.forwardTrack);
-          if (cleanFwd) shopeeOrderDb[cleanFwd] = orderData;
-          shopeeOrderDb[orderData.forwardTrack.toUpperCase()] = orderData;
-        }
-        if (orderData.rawDetails?.claimId) {
-          const cleanClaim = String(orderData.rawDetails.claimId).trim().toUpperCase();
-          if (cleanClaim) shopeeOrderDb[cleanClaim] = orderData;
-        }
-        if (orderData.altTrack) {
-          const cleanAlt = extractCleanTrackingCode(orderData.altTrack);
-          if (cleanAlt) shopeeOrderDb[cleanAlt] = orderData;
-          shopeeOrderDb[orderData.altTrack.toUpperCase()] = orderData;
-        }
-        if (orderData.orderId) {
-          const cleanOrderId = String(orderData.orderId).trim().toUpperCase();
-          if (cleanOrderId) shopeeOrderDb[cleanOrderId] = orderData;
-        }
+        registerImportedParcel(orderData);
       });
 
       saveShopeeOrderDb();
@@ -5487,25 +5547,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const cleanAltTrack = extractCleanTrackingCode(orderData.altTrack || '');
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
 
-          const existingIdx = orders.findIndex(o => {
-            const oTrack = extractCleanTrackingCode(o.track || '');
-            const oAlt = extractCleanTrackingCode(o.altTrack || '');
-            const oRet = extractCleanTrackingCode(o.returnTrack || '');
-            const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
-            const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
-            const oId = String(o.orderId || '').trim().toUpperCase();
-
-            const cRet = extractCleanTrackingCode(orderData.returnTrack || '');
-            const cFwd = extractCleanTrackingCode(orderData.forwardTrack || '');
-            const cClaim = String(orderData.claimId || orderData.rawDetails?.claimId || '').trim().toUpperCase();
-
-            return (cleanTrack && ((oTrack && cleanTrack === oTrack) || (oAlt && cleanTrack === oAlt) || (oRet && cleanTrack === oRet) || (oFwd && cleanTrack === oFwd))) ||
-                   (cleanAltTrack && ((oTrack && cleanAltTrack === oTrack) || (oAlt && cleanAltTrack === oAlt))) ||
-                   (cRet && ((oRet && cRet === oRet) || (oTrack && cRet === oTrack))) ||
-                   (cFwd && ((oFwd && cFwd === oFwd) || (oTrack && cFwd === oTrack))) ||
-                   (cClaim && oClaim && cClaim === oClaim) ||
-                   (cleanOrderId && oId && cleanOrderId === oId);
-          });
+          const existingIdx = findExistingReturnParcelIndex(orderData);
 
           if (existingIdx !== -1) {
             const oldPlatStatus = orders[existingIdx].platformStatus || '';
@@ -5554,6 +5596,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               preOrder: orderData.preOrder || 'Đơn thường',
               deadline: orderData.deadline || '',
               orderId: orderData.orderId || '',
+              trackingCodes: getOrderTrackingCodes(orderData),
               track: cleanTrack || orderData.track || '',
               altTrack: cleanAltTrack || orderData.altTrack || '',
               forwardTrack: orderData.forwardTrack || '',
@@ -5610,7 +5653,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const uniqueMap = new Map();
       keys.forEach(k => {
         const it = shopeeOrderDb[k];
-        const uKey = (it.orderId || it.track || k).toUpperCase();
+        const uKey = getReturnParcelKey(it);
         if (!uniqueMap.has(uKey)) uniqueMap.set(uKey, it);
       });
 
@@ -5621,24 +5664,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const cleanTrack = extractCleanTrackingCode(orderData.track || '');
         const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
 
-        const existingIdx = orders.findIndex(o => {
-          const oTrack = extractCleanTrackingCode(o.track || '');
-          const oAlt = extractCleanTrackingCode(o.altTrack || '');
-          const oRet = extractCleanTrackingCode(o.returnTrack || '');
-          const oFwd = extractCleanTrackingCode(o.forwardTrack || '');
-          const oClaim = String(o.claimId || o.rawDetails?.claimId || '').trim().toUpperCase();
-          const oId = String(o.orderId || '').trim().toUpperCase();
-
-          const cRet = extractCleanTrackingCode(orderData.returnTrack || '');
-          const cFwd = extractCleanTrackingCode(orderData.forwardTrack || '');
-          const cClaim = String(orderData.claimId || orderData.rawDetails?.claimId || '').trim().toUpperCase();
-
-          return (cleanTrack && ((oTrack && cleanTrack === oTrack) || (oAlt && cleanTrack === oAlt) || (oRet && cleanTrack === oRet) || (oFwd && cleanTrack === oFwd))) ||
-                 (cRet && ((oRet && cRet === oRet) || (oTrack && cRet === oTrack))) ||
-                 (cFwd && ((oFwd && cFwd === oFwd) || (oTrack && cFwd === oTrack))) ||
-                 (cClaim && oClaim && cClaim === oClaim) ||
-                 (cleanOrderId && oId && cleanOrderId === oId);
-        });
+        const existingIdx = findExistingReturnParcelIndex(orderData);
 
         if (existingIdx !== -1) {
           const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
@@ -5661,6 +5687,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             preOrder: orderData.preOrder || 'Đơn thường',
             deadline: orderData.deadline || '',
             orderId: orderData.orderId || '',
+            returnOrderId: orderData.returnOrderId || '',
+            trackingCodes: getOrderTrackingCodes(orderData),
             track: cleanTrack || orderData.track || '',
             altTrack: orderData.altTrack || '',
             forwardTrack: orderData.forwardTrack || '',
@@ -5743,7 +5771,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const map = new Map();
       for (const k in shopeeOrderDb) {
         const it = shopeeOrderDb[k];
-        const uniqueKey = (it.orderId || it.track || k).toUpperCase();
+        const uniqueKey = getReturnParcelKey(it);
         if (!map.has(uniqueKey)) {
           map.set(uniqueKey, it);
         }
@@ -6570,7 +6598,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.7';
+    const APP_VERSION_NUMBER = '1.8.8';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8738,10 +8766,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       diskPersistDebounceTimer = null;
       const result = { success: false, localStorage: false, indexedDB: false, disk: false, errors: [] };
       const snapshot = orders.map(o => Object.assign({}, o, { photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' }));
-      const lean = snapshot.map(o => {
+      const lean = snapshot.map((o, index) => {
         if (o.photo && o.photo.length > 200) {
           if (!o.photoId) o.photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-          const original = orders.find(item => item.orderId === o.orderId && item.track === o.track);
+          const original = orders[index];
           if (original) original.photoId = o.photoId;
           return Object.assign({}, o, { photo: '' });
         }
@@ -8962,7 +8990,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const preOrderText = order.preOrder || 'Đơn thường';
       const claimText = `${order.rawDetails?.claimId || ''} ${order.claimId || ''} ${order.buyerUsername || ''} ${order.rawDetails?.buyerUsername || ''}`;
       const partialText = (order.isPartialReturn || String(order.rawDetails?.isFullReturn || '').toLowerCase().includes('một phần')) ? 'hoan 1 phan mot phan partial return' : '';
-      const hay = `${plat} ${oType} ${partialText} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''} ${itemsText}`.toLowerCase();
+      const hay = `${plat} ${oType} ${partialText} ${preOrderText} ${order.orderId || ''} ${order.track || ''} ${order.altTrack || ''} ${order.returnTrack || ''} ${order.forwardTrack || ''} ${(order.trackingCodes || []).join(' ')} ${claimText} ${order.carrier || ''} ${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''} ${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''} ${itemsText}`.toLowerCase();
       const kwLower = kwTrim.toLowerCase();
       const kwNorm = removeVietnameseTones(kwTrim).toLowerCase();
       const hayNorm = removeVietnameseTones(hay).toLowerCase();
@@ -11454,7 +11482,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Lý Do Hoàn': o.note || '',
             'Ghi Chú Người Mua': o.buyerNote || '',
             'Ghi Chú Của Tôi': o.myNote || '',
-            'Lý Do Theo Dõi': o.watchlistReason || ''
+            'Lý Do Theo Dõi': o.watchlistReason || '',
+            'Tracking Codes': JSON.stringify(getOrderTrackingCodes(o)),
+            'Return Order ID': getReturnParcelId(o),
+            'Mã vận đơn trả hàng': o.returnTrack || o.track || ''
           });
           currentRowIdx++;
         });
@@ -11575,7 +11606,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Lý Do Hoàn': o.note || '',
             'Ghi Chú Người Mua': o.buyerNote || '',
             'Ngày Gửi Đi': o.shipDate || '',
-            'Ngày Hoàn / Hủy': o.returnDate || ''
+            'Ngày Hoàn / Hủy': o.returnDate || '',
+            'Tracking Codes': JSON.stringify(getOrderTrackingCodes(o)),
+            'Return Order ID': getReturnParcelId(o),
+            'Mã vận đơn trả hàng': o.returnTrack || o.track || ''
           });
           currentRowIdx++;
         });
@@ -12403,21 +12437,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const track = String(data.track || '').trim();
       const orderId = String(data.orderId || '').trim();
 
-      let targetIdx = -1;
-      if (track || orderId) {
-        targetIdx = orders.findIndex(o => {
-          const tClean = track ? (extractCleanTrackingCode(track) || track.toUpperCase()) : '';
-          const tMatch = tClean && (
-            (extractCleanTrackingCode(o.track || '') || String(o.track || '').toUpperCase()) === tClean ||
-            (extractCleanTrackingCode(o.returnTrack || '') || String(o.returnTrack || '').toUpperCase()) === tClean ||
-            (extractCleanTrackingCode(o.forwardTrack || '') || String(o.forwardTrack || '').toUpperCase()) === tClean ||
-            (extractCleanTrackingCode(o.altTrack || '') || String(o.altTrack || '').toUpperCase()) === tClean
-          );
-          const oMatch = orderId && String(o.orderId || '').trim().toUpperCase() === orderId.toUpperCase();
-          const claimMatch = tClean && String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase() === tClean;
-          return tMatch || oMatch || claimMatch;
-        });
+      const matches = getPhoneOrderMatches(track || orderId);
+      if (matches.length > 1) {
+        showAppToast('Mã khớp nhiều kiện hoàn; chưa tự nhận hoặc gắn ảnh. Hãy quét mã hoàn riêng.', 'warning');
+        return { outcome: 'ambiguous', index: -1, isNew: false };
       }
+      let targetIdx = matches.length === 1 ? matches[0].index : -1;
 
       let isNew = false;
       if (targetIdx !== -1) {
@@ -12452,7 +12477,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           track: track,
           carrier: data.carrier || detectCarrierByTrackingCode(track) || 'SPX Express',
           price: data.price || 0,
-          status: 'HÃ ng Ä‘Ã£ tráº£',
+          status: 'Hàng đã trả',
           photo: data.photo || '',
           note: '',
           items: [{
@@ -12917,22 +12942,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }).catch(() => {});
       } catch (e) {}
 
-      if (cleanRoom !== 'shp2026') {
-        try {
-          fetch('https://ntfy.sh/agy_shopee_shp2026', {
-            method: 'POST',
-            body: ack,
-            headers: { 'Title': 'Shopee PC Ack' }
-          }).catch(() => {});
-        } catch (e) {}
-      }
-
       // 2. Also send via MQTT if connected
       if (mqttClient && mqttClient.connected) {
         try {
           mqttClient.publish(getPhoneMqttTopic(), ack);
-          mqttClient.publish('agy_shopee_return_scanner_2026/SHP-2026', ack);
-          mqttClient.publish(GLOBAL_SYNC_TOPIC, ack);
         } catch (e) {}
       }
     }
@@ -12959,6 +12972,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
         const msg = JSON.stringify({
           type: 'manifest_sync',
+          room: phoneRoomId,
           knownCodes: Array.from(new Set(known)),
           returnedCodes: Array.from(new Set(returned)),
           time: Date.now()
@@ -12971,21 +12985,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             headers: { 'Title': 'Shopee Manifest' }
           }).catch(() => {});
         } catch (e) {}
-        const cleanRoom = String(phoneRoomId || 'SHP-2026').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        if (cleanRoom !== 'shp2026') {
-          try {
-            fetch('https://ntfy.sh/agy_shopee_shp2026', {
-              method: 'POST',
-              body: msg,
-              headers: { 'Title': 'Shopee Manifest' }
-            }).catch(() => {});
-          } catch (e) {}
-        }
         if (mqttClient && mqttClient.connected) {
           try {
             mqttClient.publish(getPhoneMqttTopic(), msg);
-            mqttClient.publish('agy_shopee_return_scanner_2026/SHP-2026', msg);
-            mqttClient.publish(GLOBAL_SYNC_TOPIC, msg);
           } catch (e) {}
         }
       } catch (err) {}
@@ -13037,10 +13039,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const wrapper = JSON.parse(event.data);
             if (!wrapper) return;
             const msgId = wrapper.id || '';
-            if (msgId && processedCloudMsgIds.has(msgId)) {
-              return; // Đã xử lý rồi, bỏ qua không lặp lại!
-            }
-            if (msgId) markCloudMsgProcessed(msgId);
 
             // Trường hợp gói tin > 4KB bị ntfy.sh chuyển thành file attachment (fallback tự động tải về)
             if (wrapper.attachment && wrapper.attachment.url) {
@@ -13050,7 +13048,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   const attText = await attRes.text();
                   const attData = JSON.parse(attText);
                   if (attData && attData.type !== 'pc_ack') {
-                    processIncomingPhonePayload(attData);
+                    const result = await processIncomingPhonePayload(attData);
+                    if (result?.success && msgId) markCloudMsgProcessed(msgId);
                     return;
                   }
                 }
@@ -13079,7 +13078,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!data || data.type === 'pc_ack') return;
             if (!data.type && data.code) data.type = 'barcode';
 
-            processIncomingPhonePayload(data);
+            const result = await processIncomingPhonePayload(data);
+            if (result?.success && msgId) markCloudMsgProcessed(msgId);
           } catch (err) {
             console.warn('SSE message error:', err);
           }
@@ -13102,14 +13102,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           mqttClient.on('connect', () => {
             try {
               mqttClient.subscribe(getPhoneMqttTopic());
-              mqttClient.subscribe(GLOBAL_SYNC_TOPIC);
             } catch (e) {}
           });
           mqttClient.on('message', (t, msgBuf) => {
             try {
               const data = JSON.parse(msgBuf.toString());
               if (!data || data.type === 'pc_ack') return;
-              processIncomingPhonePayload(data);
+              processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
             } catch (e) {}
           });
         }
@@ -13120,20 +13119,61 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const incomingPhotoChunks = new Map();
     const pendingPhotosByCode = new Map();
 
+    function phoneOrderMatches(rawCode) {
+      if (typeof getPhoneOrderMatches === 'function') return getPhoneOrderMatches(rawCode);
+      const code = extractCleanTrackingCode(rawCode) || String(rawCode || '').trim().toUpperCase();
+      const rows = orders.map((order, index) => ({ order, index }));
+      const tracking = rows.filter(({ order }) => [order.track, order.altTrack, order.returnTrack, order.forwardTrack, ...(order.trackingCodes || [])]
+        .some(value => (extractCleanTrackingCode(value) || '') === code));
+      return tracking.length ? tracking : rows.filter(({ order }) => [order.orderId, order.claimId, order.rawDetails?.claimId]
+        .some(value => String(value || '').trim().toUpperCase() === code));
+    }
+
     async function attachPhotoToOrderByCode(rawCode, photoDataUrl, capture = {}) {
+      // Inbox captures are bound to their own request and never fall back to a return row.
+      const inboxTargets = capture.requestId && typeof newOrdersInbox !== 'undefined' ? newOrdersInbox.filter(item =>
+        extractCleanTrackingCode(item.track || item.code || '') === extractCleanTrackingCode(rawCode) &&
+        [ { requestId: item.requestId, captureId: item.captureId }, ...(item.phonePhotoRequests || []) ]
+          .some(req => req.requestId === capture.requestId && (!req.captureId || req.captureId === capture.captureId))) : [];
+      const inboxRequest = capture.requestId && typeof newOrdersInbox !== 'undefined' && newOrdersInbox.some(item =>
+        item.requestId === capture.requestId || (item.phonePhotoRequests || []).some(req => req.requestId === capture.requestId));
+      if (capture.kind === 'new_order_scan' || inboxRequest) {
+        const target = inboxTargets.length === 1 ? inboxTargets[0] : null;
+        let success = false;
+        if (target && typeof photoDataUrl === 'string' && /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(photoDataUrl)) {
+          if (target.photo && target.photo !== photoDataUrl) {
+            target.photoHistory = target.photoHistory || [];
+            if (!target.photoHistory.some(p => p.photo === photoDataUrl)) target.photoHistory.push({ photo: photoDataUrl, captureId: capture.captureId });
+          } else target.photo = photoDataUrl;
+          const receipt = saveNewOrdersInbox();
+          success = receipt && receipt.success === true;
+        }
+        sendAckToPhone(0, extractCleanTrackingCode(rawCode), success ? 'Đã lưu ảnh trong hộp đơn mới' : 'Ảnh hộp đơn mới chưa được lưu; giữ lại',
+          success ? 'success' : target ? 'error' : 'not_found', false, capture.requestId, capture.room || '',
+          { ackStage: 'photo', photoSaved: success, captureId: capture.captureId, photoStatus: success ? 'saved' : target ? 'pending' : 'unmatched' });
+        return { success };
+      }
       const attached = applyIncomingPhonePhoto(rawCode, photoDataUrl, capture);
       const code = extractCleanTrackingCode(rawCode);
-      if (!attached || !capture.requestId || !capture.captureId) return attached;
+      const matches = phoneOrderMatches(rawCode);
+      if (!attached) {
+        if (capture.requestId && capture.captureId) sendAckToPhone(0, code, 'Ảnh chưa ghép được đúng một kiện; giữ ảnh để kiểm tra',
+          matches.length > 1 ? 'ambiguous' : 'not_found', false, capture.requestId, capture.room || '',
+          { ackStage: 'photo', photoSaved: false, photoStatus: 'unmatched', captureId: capture.captureId });
+        return { success: false, outcome: matches.length > 1 ? 'ambiguous' : 'not_found' };
+      }
       try {
         const result = await saveOrders(true);
         if (!result || result.success !== true) throw new Error('Photo persistence failed');
-        sendAckToPhone(0, code, 'Đã lưu ảnh', 'success', false, capture.requestId, capture.room || '',
+        if (capture.requestId && capture.captureId) sendAckToPhone(0, code, 'Đã lưu ảnh', 'success', false, capture.requestId, capture.room || '',
           { ackStage: 'photo', photoSaved: true, captureId: capture.captureId });
+        setTimeout(() => renderAll(false), 0);
+        return { success: true };
       } catch (error) {
         sendAckToPhone(0, code, 'Chưa lưu được ảnh; giữ lại để thử lại', 'error', false, capture.requestId, capture.room || '',
           { ackStage: 'photo', photoSaved: false, captureId: capture.captureId });
+        return { success: false, outcome: 'error' };
       }
-      return attached;
     }
 
     function applyIncomingPhonePhoto(rawCode, photoDataUrl, capture = {}) {
@@ -13151,9 +13191,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       }
 
-      const candidates = cleanCode ? orders.map((order, index) => ({ order, index })).filter(({ order }) =>
-        [order.track, order.altTrack, order.returnTrack, order.forwardTrack, order.orderId, order.claimId, order.rawDetails?.claimId]
-          .some(value => (extractCleanTrackingCode(value) || String(value || '').trim().toUpperCase()) === cleanCode)) : [];
+      const candidates = cleanCode ? phoneOrderMatches(cleanCode) : [];
       // A missing/ambiguous code must never attach to the selected or last row.
       if (candidates.length !== 1) return false;
       const targetIdx = candidates[0].index;
@@ -13163,7 +13201,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (target.photo && target.photo !== photoDataUrl) {
           if (!Array.isArray(target.photoHistory)) target.photoHistory = [];
           if (!target.photoHistory.some(item => item.photo === photoDataUrl)) target.photoHistory.push({ photo: photoDataUrl, captureId: capture.captureId || '', captureTime: Number(capture.captureTime) || 0 });
-          if (!capture.captureTime || !target.phonePhotoCaptureTime || Number(capture.captureTime) <= target.phonePhotoCaptureTime) { saveOrders(); return true; }
+          if (!capture.captureTime || !target.phonePhotoCaptureTime || Number(capture.captureTime) <= target.phonePhotoCaptureTime) { return true; }
           target.photoHistory.push({ photo: target.photo, captureId: target.phonePhotoCaptureId || '', captureTime: target.phonePhotoCaptureTime });
         }
         target.phonePhotoCaptureTime = Number(capture.captureTime) || 0;
@@ -13172,21 +13210,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!orders[targetIdx].photoId) {
           orders[targetIdx].photoId = 'p_' + (orders[targetIdx].track || orders[targetIdx].orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
         }
-        savePhotoToDb(orders[targetIdx].photoId, photoDataUrl);
-        saveOrders();
-
-        // Cập nhật trực tiếp ô ảnh trên bảng ngay lập tức (không cần đợi render lại toàn bộ)
-        const photoBox = document.getElementById('photoBoxOrder_' + targetIdx);
-        if (photoBox) {
-          photoBox.innerHTML = `<img src="${escapeAttr(photoDataUrl)}" alt="Ảnh đơn" title="Bấm để phóng to / Ctrl+V để thay ảnh" class="w-full h-full object-cover" />
-             <div class="photo-overlay absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
-               <span class="text-white text-[10px]" title="Phóng to">🔍</span>
-               <button type="button" onclick="event.stopPropagation(); triggerPcOcrForOrder(${targetIdx})" class="bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-bold px-1 py-0.5 rounded shadow" title="Đọc chữ từ ảnh tem này">⚡</button>
-             </div>`;
-        } else {
-          renderAll();
-        }
-        appendPhoneLiveLog(`📸 Đã lưu ảnh tự chụp kiện hàng vào Đơn #${targetIdx + 1} (${cleanCode || orders[targetIdx].track || ''})`);
         return true;
       }
       return false;
@@ -13198,7 +13221,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!entry) {
         entry = {
           code: data.code || '',
-          captureId: data.captureId || '', captureTime: data.captureTime || 0, requestId: data.requestId || '', room: data.room || '',
+          captureId: data.captureId || '', captureTime: data.captureTime || 0, requestId: data.requestId || '', room: data.room || '', kind: data.kind || '',
           total: Number(data.total) || 1,
           parts: new Array(Number(data.total) || 1).fill(null),
           received: 0,
@@ -13215,7 +13238,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const fullDataUrl = entry.parts.join('');
         incomingPhotoChunks.delete(data.photoId);
         if (fullDataUrl.startsWith('data:image')) {
-          attachPhotoToOrderByCode(entry.code, fullDataUrl, entry);
+          return attachPhotoToOrderByCode(entry.code, fullDataUrl, entry);
         }
       }
       // Dọn dẹp các mảnh quá 60 giây
@@ -13225,34 +13248,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
-    function processIncomingPhonePayload(data) {
-      if (!data) return;
+    async function processIncomingPhonePayload(data) {
+      if (!data || !data.room || data.room !== phoneRoomId) return { success: false, outcome: 'wrong_room' };
       if (data.type === 'photo_chunk') {
-        handleIncomingPhotoChunk(data);
-        return;
+        return handleIncomingPhotoChunk(data);
       }
       // Không chặn gói tin có mang theo ảnh nếu gói trước đó chưa có ảnh!
       if (!data.requestId && data.time && data.time === lastMsgTimestamp && data.type !== 'photo' && !data.photo && data.type !== 'bulk_sync') return;
       if (data.time) lastMsgTimestamp = data.time;
 
-      if (data.room && data.room !== phoneRoomId) {
-        phoneRoomId = data.room;
-        try { localStorage.setItem('shopee_phone_room_id', phoneRoomId); } catch (e) {}
-      }
-
       // v1.6.5: Hỗ trợ Đồng Bộ Hàng Loạt từ Điện Thoại (bulk_sync)
       if (data.type === 'bulk_sync' && Array.isArray(data.items)) {
         // Per-item receipts only: an aggregate upload does not prove any item committed.
-        data.items.forEach(item => handleIncomingPhoneBarcode(item.code, item.requestId || '', item.photo || '', data.room || '', item));
-        return;
+        const results = [];
+        for (const item of data.items) results.push(await processIncomingPhonePayload({ ...item, room: item.room || data.room, type: item.type || 'sync_item' }));
+        return { success: results.every(result => result?.success === true) };
       }
 
       if (data.type === 'sync_item') {
         const syncCode = String(data.code || '').trim();
         const syncPhoto = data.photo || '';
         appendPhoneLiveLog(`⚡ ĐỒNG BỘ OFFLINE: Nhận kiện [${syncCode}]` + (syncPhoto ? ' (Kèm 100% Ảnh chụp)' : ''));
-        handleIncomingPhoneBarcode(syncCode, data.requestId || '', syncPhoto, data.room || '', data);
-        return;
+        return handleIncomingPhoneBarcode(syncCode, data.requestId || '', syncPhoto, data.room || '', data);
       }
 
       
@@ -13267,6 +13284,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             newOrdersInbox[existingInboxIdx].photo = data.photo;
           }
           const existing = newOrdersInbox[existingInboxIdx];
+          existing.phonePhotoRequests = existing.phonePhotoRequests || [];
+          if (data.requestId && !existing.phonePhotoRequests.some(r => r.requestId === data.requestId && r.captureId === data.captureId)) existing.phonePhotoRequests.push({ requestId: data.requestId, captureId: data.captureId || '' });
           if (data.photo && existing.photo !== data.photo) {
             existing.photoHistory = existing.photoHistory || [];
             if (!existing.photoHistory.some(p => p.photo === data.photo)) existing.photoHistory.push({ photo: data.photo, captureId: data.captureId || '' });
@@ -13275,14 +13294,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           sendAckToPhone(0, trackCode, saved.success ? 'ĐƠN MỚI ĐÃ CÓ TRONG HỘP CHỜ' : 'Chưa lưu được hộp đơn mới',
             saved.success ? (existing.requestId === data.requestId ? 'success' : 'duplicate') : 'error', false, data.requestId || '', data.room || '',
             { ackStage: 'scan', photoSaved: saved.success && Boolean(data.photo), captureId: data.captureId || '' });
-          return;
+          return { success: saved.success === true };
         }
 
         const autoPlat = (data.platform && data.platform !== 'auto') ? data.platform : autoDetectPlatformFromCode(trackCode);
         const autoCarrier = data.carrier || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(trackCode) : '') || (autoPlat === 'Shopee' ? 'SPX Express' : 'J&T Express');
 
         const newEntry = {
-          requestId: data.requestId || '',
+          requestId: data.requestId || '', captureId: data.captureId || '',
           id: 'inbox_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
           track: trackCode,
           orderId: data.orderId || trackCode,
@@ -13301,7 +13320,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         newOrdersInbox.unshift(newEntry);
         const saved = saveNewOrdersInbox();
-        if (!saved.success) { sendAckToPhone(0, trackCode, 'Chưa lưu được hộp đơn mới', 'error', false, data.requestId || '', data.room || ''); return; }
+        if (!saved.success) { sendAckToPhone(0, trackCode, 'Chưa lưu được hộp đơn mới', 'error', false, data.requestId || '', data.room || ''); return { success: false }; }
         playScanSuccessTone();
         showAppToast(`📥 Nhận đơn mới từ điện thoại: ${trackCode} [${autoPlat}]`, 'success');
         appendPhoneLiveLog(`📥 ĐƠN MỚI: Nhận đơn [${trackCode}] ➔ Tự động phân sàn: [${autoPlat}]`);
@@ -13312,7 +13331,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           detail: `Điện thoại quét tạo đơn mới mã [${trackCode}] ➔ Tự động phân sàn [${autoPlat}], đã lưu vào Bảng Đơn Mới chờ duyệt`,
           code: trackCode
         });
-        return;
+        return { success: true };
       }
 
       if (data.type === 'phone_connected') {
@@ -13322,11 +13341,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         sendAckToPhone(0, '', 'ĐÃ KẾT NỐI VỚI MÁY TÍNH', 'success', false, '', data.room || '');
         setTimeout(() => broadcastManifestToPhone(), 120);
       } else if (data.type === 'barcode' && data.code) {
-        handleIncomingPhoneBarcode(String(data.code).trim(), data.requestId || '', data.photo || '', data.room || '', data);
+        return handleIncomingPhoneBarcode(String(data.code).trim(), data.requestId || '', data.photo || '', data.room || '', data);
       } else if (data.type === 'smart_label') {
-        handleIncomingSmartLabel(data);
+        return handleIncomingSmartLabel(data);
       } else if (data.type === 'photo' && data.photo) {
-        handleIncomingPhonePhoto(data.photo, data.lastCode || data.code || '', data);
+        return handleIncomingPhonePhoto(data.photo, data.lastCode || data.code || '', data);
       }
     }
 
@@ -13421,7 +13440,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const key = String(code || '').trim().toUpperCase();
       if (!key) return false;
       return [order.track, order.altTrack, order.forwardTrack, order.returnTrack,
-        order.orderId, order.claimId, order.rawDetails?.claimId]
+        order.orderId, order.claimId, order.rawDetails?.claimId, ...(order.trackingCodes || [])]
         .some(value => String(value || '').trim().toUpperCase() === key);
     }
 
@@ -13847,49 +13866,49 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const matches = orders.filter(o => o._notificationOrderUid === receipt.orderUid);
       if (matches.length !== 1) return null;
       const order = matches[0];
-      const codes = [order.track, order.altTrack, order.returnTrack, order.forwardTrack, order.orderId, order.claimId, order.rawDetails?.claimId];
-      if (!codes.some(value => (extractCleanTrackingCode(value) || String(value || '').trim().toUpperCase()) === code)) return null;
+      if (!phoneOrderMatches(code).some(match => match.order === order)) return null;
       if (order.status !== receipt.targetStatus || (receipt.targetRecvDate && order.recvDate !== receipt.targetRecvDate)) return null;
       return order;
     }
 
     function handleIncomingPhoneBarcode(rawCode, requestId = '', photoDataUrl = '', clientRoom = '', capture = {}, labelInfo = null) {
       const cleanCode = extractCleanTrackingCode(rawCode);
-      if (!cleanCode) return Promise.resolve();
+      if (!cleanCode) return Promise.resolve({ success: false });
       capture = { ...capture, requestId, room: clientRoom };
       const cachedPhoto = pendingPhotosByCode.get(cleanCode);
       if (!photoDataUrl && cachedPhoto && cachedPhoto.requestId === requestId && requestId &&
           cachedPhoto.room === clientRoom && capture.captureId && cachedPhoto.captureId === capture.captureId) photoDataUrl = cachedPhoto.photo;
       const key = requestId ? JSON.stringify([clientRoom, requestId]) : '';
-      if (photoDataUrl && key && (phoneRequestReceipts.has(key) || phoneRequestStaged.has(key) || phoneRequestInflight.has(key))) attachPhotoToOrderByCode(cleanCode, photoDataUrl, capture);
-      if (key && phoneRequestReceipts.has(key)) {
-        const receipt = phoneRequestReceipts.get(key);
-        if (receipt[1] === cleanCode) {
-          if (receipt.orderUid && !phoneReceiptTarget(receipt, cleanCode)) sendAckToPhone(0, cleanCode, 'Đơn đã thay đổi hoặc bị xóa; cần kiểm tra lại.', 'error', false, requestId, clientRoom);
-          else sendAckToPhone(...receipt);
-        }
-        return Promise.resolve();
-      }
-      if (key && phoneRequestInflight.has(key)) return phoneRequestInflight.get(key).then(() => {
-        const receipt = phoneRequestReceipts.get(key);
-        if (receipt && receipt[1] === cleanCode && (!receipt.orderUid || phoneReceiptTarget(receipt, cleanCode))) sendAckToPhone(...receipt);
-      });
+      if (key && phoneRequestInflight.has(key)) return phoneRequestInflight.get(key).then(() =>
+        handleIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture, labelInfo));
       const work = Promise.resolve().then(async () => {
+        const cached = key && phoneRequestReceipts.get(key);
+        if (cached) {
+          if (cached[1] !== cleanCode || (cached.orderUid && !phoneReceiptTarget(cached, cleanCode))) {
+            sendAckToPhone(0, cleanCode, 'Đơn đã thay đổi hoặc bị xóa; cần kiểm tra lại.', 'error', false, requestId, clientRoom);
+            return { success: false };
+          }
+          // Negative and ambiguous receipts are resolved again against the current collection.
+          if (cached.orderUid) {
+            sendAckToPhone(...cached);
+            if (photoDataUrl) return attachPhotoToOrderByCode(cleanCode, photoDataUrl, capture);
+            return { success: true };
+          }
+          phoneRequestReceipts.delete(key);
+        }
         let staged = key && phoneRequestStaged.get(key);
-        if (staged && staged.code !== cleanCode) return;
+        if (staged && staged.code !== cleanCode) return { success: false };
         if (!staged) {
-          staged = { code: cleanCode, receipt: null, records: [] };
+          staged = { code: cleanCode, receipt: null, records: [], effects: [] };
           if (labelInfo?.enrichOnly) {
-            const matches = orders.map((order, index) => ({ order, index })).filter(({ order }) =>
-              [order.track, order.orderId].some(value => (extractCleanTrackingCode(value) || '') === cleanCode));
+            const matches = phoneOrderMatches(cleanCode);
             if (matches.length === 1) {
               applyLabelInfoToOrder(matches[0].order, { ...labelInfo, photo: '' });
-              if (photoDataUrl) attachPhotoToOrderByCode(cleanCode, photoDataUrl, capture);
               staged.receipt = [matches[0].index + 1, cleanCode, 'Đã bổ sung thông tin phiếu', 'success', false, requestId, clientRoom];
-            } else staged.receipt = [0, cleanCode, 'Không tìm thấy đúng một đơn', 'not_found', false, requestId, clientRoom];
+            } else staged.receipt = [0, cleanCode, 'Không tìm thấy đúng một đơn', matches.length > 1 ? 'ambiguous' : 'not_found', false, requestId, clientRoom];
           } else {
-            applyIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture,
-              (...args) => { staged.receipt = args; }, (...args) => staged.records.push(args), () => {});
+            applyIncomingPhoneBarcode(rawCode, requestId, '', clientRoom, capture,
+              (...args) => { staged.receipt = args; }, (...args) => staged.records.push(args), () => {}, fn => staged.effects.push(fn));
           }
           if (staged.receipt?.[0] > 0) {
             const target = orders[staged.receipt[0] - 1];
@@ -13900,27 +13919,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
           if (key) phoneRequestStaged.set(key, staged);
         }
-        if (!staged.receipt) return;
+        if (!staged.receipt) return { success: false };
         if (staged.receipt.orderUid && !phoneReceiptTarget(staged.receipt, cleanCode)) {
           sendAckToPhone(0, cleanCode, 'Đơn đã thay đổi hoặc bị xóa; chưa xác nhận lưu.', 'error', false, requestId, clientRoom);
-          return;
+          return { success: false };
         }
+        let photoAttached = false;
+        if (photoDataUrl) photoAttached = applyIncomingPhonePhoto(cleanCode, photoDataUrl, capture);
         try {
           const persisted = await saveOrders(true);
           if (!persisted || persisted.success !== true) throw new Error('Không lưu được dữ liệu');
           staged.records.forEach(args => recordCodeToActiveSession(...args));
-          staged.receipt[7] = { ackStage: 'scan', photoSaved: false, captureId: capture.captureId || '' };
+          staged.receipt[7] = { ackStage: 'scan', photoSaved: photoAttached, captureId: capture.captureId || '' };
           if (key) { phoneRequestReceipts.set(key, staged.receipt); phoneRequestStaged.delete(key); }
           sendAckToPhone(...staged.receipt);
+          if (photoDataUrl && !photoAttached && capture.captureId) sendAckToPhone(0, cleanCode, 'Ảnh chưa ghép được đúng một kiện; giữ ảnh để kiểm tra',
+            staged.receipt[3] === 'ambiguous' ? 'ambiguous' : 'not_found', false, requestId, clientRoom,
+            { ackStage: 'photo', photoSaved: false, photoStatus: 'unmatched', captureId: capture.captureId });
+          setTimeout(() => {
+            if (!staged.receipt.orderUid || phoneReceiptTarget(staged.receipt, cleanCode)) staged.effects.forEach(fn => fn());
+            if (photoAttached) renderAll(false);
+          }, 0);
+          return { success: true, outcome: staged.receipt[3] };
         } catch (error) {
           sendAckToPhone(0, cleanCode, 'Chưa lưu được; giữ lại và thử lại', 'error', false, requestId, clientRoom);
+          return { success: false, outcome: 'error' };
         }
       }).finally(() => { if (key) phoneRequestInflight.delete(key); });
       if (key) phoneRequestInflight.set(key, work);
       return work;
     }
 
-    function applyIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture, sendAckToPhone, recordCodeToActiveSession, saveOrders) {
+    function applyIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture, sendAckToPhone, recordCodeToActiveSession, saveOrders, deferUi = fn => fn()) {
       if (!rawCode) return;
       const cleanCode = extractCleanTrackingCode(rawCode);
       if (!cleanCode) return;
@@ -13937,15 +13967,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const autoCarrier = detectCarrierByTrackingCode(cleanCode) || 'SPX Express';
 
       // Check if order with this tracking code, altTrack, or orderId already exists in table
-      const existingIdx = orders.findIndex(o => {
-        const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
-        const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
-        const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
-        const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
-        const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
-        const oid = String(o.orderId || '').trim().toUpperCase();
-        return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
-      });
+      const matches = phoneOrderMatches(cleanCode);
+      if (matches.length > 1) {
+        sendAckToPhone(0, cleanCode, 'Có nhiều kiện trùng mã; cần kiểm tra thủ công', 'ambiguous', false, requestId, clientRoom);
+        return;
+      }
+      const existingIdx = matches.length === 1 ? matches[0].index : -1;
 
       if (mode === 'smart_auto' && existingIdx !== -1) {
         const order = orders[existingIdx];
@@ -13960,14 +13987,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
           playScanDuplicateTone(); recordCodeToActiveSession(cleanCode, existingIdx, true);
           sendAckToPhone(existingIdx + 1, cleanCode, '⚠️ ĐÃ TRẢ TỪ TRƯỚC (QUÉT TRÙNG)', 'duplicate', true, requestId, clientRoom);
-          addAppNotification({
+          deferUi(() => addAppNotification({
             type: 'duplicate_scan',
             title: '🚨 Quét ĐT Trùng Lặp (Đã Trả Trước Đó)',
             detail: `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} đã trả từ trước!`,
             code: cleanCode,
-            orderIdx: existingIdx
-          });
-          highlightAndFlashOrderRow(existingIdx, { isDuplicate: true, source: 'phone' });
+            orderIdx: orders.indexOf(order)
+          }));
+          deferUi(() => highlightAndFlashOrderRow(orders.indexOf(order), { isDuplicate: true, source: 'phone' }));
           return;
         }
 
@@ -13989,19 +14016,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         playScanSuccessTone(); recordCodeToActiveSession(cleanCode, existingIdx, false);
         sendAckToPhone(existingIdx + 1, cleanCode, 'ĐÃ KHỚP ĐƠN #' + (existingIdx + 1) + ' (Hàng đã trả)', 'success', false, requestId, clientRoom);
         saveOrders();
-        addAppNotification({
+        deferUi(() => addAppNotification({
           type: 'phone_scan',
           title: '📱 Quét ĐT Khớp Đơn #' + (existingIdx + 1),
           detail: `Khớp mã [${cleanCode}] ➔ Chuyển sang [🟢 Hàng đã trả] lúc ${getNowDateTimeString()}`,
           code: cleanCode,
-          orderIdx: existingIdx
-        });
-        highlightAndFlashOrderRow(existingIdx, { isDuplicate: false, source: 'phone' });
+          orderIdx: orders.indexOf(order)
+        }));
+        deferUi(() => highlightAndFlashOrderRow(orders.indexOf(order), { isDuplicate: false, source: 'phone' }));
         return;
       }
 
       if (mode === 'fill_active' && activePhotoOrderIndex !== null && orders[activePhotoOrderIndex]) {
         const targetIdx = activePhotoOrderIndex;
+        const targetOrder = orders[targetIdx];
         orders[targetIdx].track = cleanCode;
         if (autoCarrier) orders[targetIdx].carrier = autoCarrier;
         orders[targetIdx].status = 'Hàng đã trả';
@@ -14016,7 +14044,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         playScanSuccessTone(); recordCodeToActiveSession(cleanCode, targetIdx, false);
         sendAckToPhone(targetIdx + 1, cleanCode, 'ĐÃ ĐIỀN VÀO ĐƠN #' + (targetIdx + 1), 'success', false, requestId, clientRoom);
         saveOrders();
-        highlightAndFlashOrderRow(targetIdx, { isDuplicate: false, source: 'phone' });
+        deferUi(() => highlightAndFlashOrderRow(orders.indexOf(targetOrder), { isDuplicate: false, source: 'phone' }));
         return;
       }
 
@@ -14026,13 +14054,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       appendPhoneLiveLog(`🟡 KHÔNG CÓ TRÊN HT: Mã [${cleanCode}] chưa có trong danh sách!`);
       playScanUnknownTone(); recordCodeToActiveSession(cleanCode, -1, false);
       sendAckToPhone(0, cleanCode, '⚠️ KHÔNG TÌM THẤY ĐƠN HÀNG TRÊN HỆ THỐNG!', 'not_found', false, requestId, clientRoom);
-      addAppNotification({
+      deferUi(() => addAppNotification({
         type: 'unknown_scan',
         title: '⚠️ Quét ĐT Không Có Trên HT',
         detail: `Mã [${cleanCode}] chưa có trong danh sách đơn hàng máy tính!`,
         code: cleanCode,
         orderIdx: null
-      });
+      }));
     }
 
     // Parse OCR text of a shipping label -> Order ID, Product (matched with shop catalog), Color, Size, Qty
@@ -14168,7 +14196,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function handleIncomingPhonePhoto(photoDataUrl, relatedCode, capture = {}) {
       if (!photoDataUrl) return;
       playBeepSound(980, 120);
-      attachPhotoToOrderByCode(relatedCode, photoDataUrl, capture);
+      return attachPhotoToOrderByCode(relatedCode, photoDataUrl, capture);
     }
 
     const detectCarrierFromCode = (code) => typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(code) : '';
@@ -16177,103 +16205,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (isCatchingUpCloud) return;
       isCatchingUpCloud = true;
       const topic = getNtfyTopic();
+      let committed = 0;
+      let failed = 0;
       try {
-        if (showToast) appendPhoneLiveLog('⏳ Đang kiểm tra mã & ảnh quét lúc tắt máy từ đám mây (12h qua)...');
         const res = await fetch(`https://ntfy.sh/${topic}/json?poll=1&since=12h`);
-        if (!res.ok) {
-          isCatchingUpCloud = false;
-          return;
-        }
+        if (!res.ok) return;
         const text = await res.text();
-        const lines = text.trim().split('\n');
-        let newOrdersProcessed = 0;
-        let photosReassembled = 0;
-
-        for (const line of lines) {
+        for (const line of text.trim().split('\n')) {
           if (!line.trim()) continue;
           try {
             const ev = JSON.parse(line);
-            if (ev.event === 'message' && ev.message) {
-              const msgId = ev.id || '';
-              // Nếu gói tin này đã được xử lý trong quá khứ -> bỏ qua hoàn toàn!
-              if (msgId && processedCloudMsgIds.has(msgId)) {
-                continue;
-              }
-              const payload = JSON.parse(ev.message);
-              if (payload && typeof payload === 'object') {
-                if (payload.type === 'pc_ack') {
-                  if (msgId) markCloudMsgProcessed(msgId);
-                  continue;
-                }
-                if (payload.type === 'barcode' || payload.type === 'sync_item') {
-                  const cleanCode = extractCleanTrackingCode(payload.code);
-                  if (cleanCode) {
-                    // Kiểm tra xem đơn hàng này đã nhận từ trước chưa
-                    const existingIdx = orders.findIndex(o => {
-                      const tr = extractCleanTrackingCode(o.track) || String(o.track || '').trim().toUpperCase();
-                      const altTr = extractCleanTrackingCode(o.altTrack) || String(o.altTrack || '').trim().toUpperCase();
-                      const retTr = extractCleanTrackingCode(o.returnTrack) || String(o.returnTrack || '').trim().toUpperCase();
-                      const fwdTr = extractCleanTrackingCode(o.forwardTrack) || String(o.forwardTrack || '').trim().toUpperCase();
-                      const claimId = String(o.rawDetails?.claimId || o.claimId || '').trim().toUpperCase();
-                      const oid = String(o.orderId || '').trim().toUpperCase();
-                      return (tr && tr === cleanCode) || (altTr && altTr === cleanCode) || (retTr && retTr === cleanCode) || (fwdTr && fwdTr === cleanCode) || (oid && oid === cleanCode) || (claimId && claimId === cleanCode);
-                    });
-
-                    if (existingIdx !== -1) {
-                      const o = orders[existingIdx];
-                      // NẾU ĐƠN ĐÃ TRẢ TỪ TRƯỚC (Đã nhận thành công từ phiên trước) -> BỎ QUA, KHÔNG BÁO LẶP LẠI!
-                      if (o.status === 'Hàng đã trả' && o.recvDate) {
-                        if (payload.photo && !o.photo) {
-                          o.photo = payload.photo;
-                          if (!o.photoId) o.photoId = 'p_' + (o.track || o.orderId || Date.now());
-                          savePhotoToDb(o.photoId, payload.photo);
-                          photosReassembled++;
-                        }
-                        if (msgId) markCloudMsgProcessed(msgId);
-                        continue;
-                      }
-
-                      // ĐÂY LÀ ĐƠN MỚI CHƯA NHẬN ĐƯỢC QUÉT LÚC TẮT MÁY! NẠP CHUẨN VÀO BẢNG!
-                      o.status = 'Hàng đã trả';
-                      if (!o.recvDate) o.recvDate = getNowDateTimeString();
-                      if (payload.photo) {
-                        o.photo = payload.photo;
-                        if (!o.photoId) o.photoId = 'p_' + (o.track || o.orderId || Date.now());
-                        savePhotoToDb(o.photoId, payload.photo);
-                        photosReassembled++;
-                      }
-                      newOrdersProcessed++;
-                      if (msgId) markCloudMsgProcessed(msgId);
-                      sendAckToPhone(existingIdx + 1, cleanCode, '✅ ĐÃ ĐỒNG BỘ TỪ LÚC TẮT MÁY', 'success', false, payload.requestId || '', payload.room || '');
-                      continue;
-                    }
-                  }
-                }
-
-                if (payload.type === 'photo_chunk' || payload.type === 'photo') {
-                  processIncomingPhonePayload(payload);
-                  if (msgId) markCloudMsgProcessed(msgId);
-                  photosReassembled++;
-                }
-              }
-            }
-          } catch (lineErr) {}
+            if (ev.event !== 'message') continue;
+            let payload;
+            if (ev.attachment?.url) {
+              const attached = await fetch(ev.attachment.url);
+              if (!attached.ok) { failed++; continue; }
+              payload = JSON.parse(await attached.text());
+            } else if (ev.message) payload = JSON.parse(ev.message);
+            if (!payload || payload.type === 'pc_ack') continue;
+            // Replaying even a processed transport message recovers a lost ACK.
+            const result = await processIncomingPhonePayload(payload);
+            if (result?.success === true) {
+              if (ev.id) markCloudMsgProcessed(ev.id);
+              committed++;
+            } else failed++;
+          } catch (lineErr) { failed++; }
         }
-
-        if (newOrdersProcessed > 0) {
-          saveOrders();
-          recalcTotalsAndSummary();
-          renderCategorySummaryTable();
-          renderAll(false);
-          addAuditLog('📥 ĐỒNG BỘ NGOẠI TUYẾN', `Đã tự động nạp ${newOrdersProcessed} kiện hàng được quét lúc máy tính tắt (Kèm ảnh chụp đối soát)!`);
-          appendPhoneLiveLog(`🎉 ĐÃ ĐỒNG BỘ: ${newOrdersProcessed} kiện quét lúc tắt máy đã được nạp chuẩn vào bảng!`);
-          playScanSuccessTone();
-          if (showToast) {
-            alert(`🎉 ĐỒNG BỘ THÀNH CÔNG ${newOrdersProcessed} KIỆN QUÉT LÚC TẮT MÁY!\n\nToàn bộ mã vận đơn và hình ảnh chụp lúc máy tính đang tắt đã được nạp đầy đủ vào hệ thống.`);
-          }
-        } else if (showToast) {
-          alert('✅ Bộ nhớ đám mây không có kiện mới nào chưa nhận. Hệ thống đang đồng bộ 100%!');
-        }
+        if (showToast) appendPhoneLiveLog(`Đối soát đám mây: ${committed} gói đã xử lý; ${failed} gói cần kiểm tra/thử lại.`);
       } catch (err) {
         console.warn('syncCloudCatchup error:', err);
       } finally {
@@ -16413,7 +16371,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             'Lý Do Hoàn': o.note || '',
             'Ghi Chú Người Mua': o.buyerNote || '',
             'Ghi Chú Của Tôi': o.myNote || '',
-            'Lý Do Theo Dõi': o.watchlistReason || ''
+            'Lý Do Theo Dõi': o.watchlistReason || '',
+            'Tracking Codes': JSON.stringify(getOrderTrackingCodes(o)),
+            'Return Order ID': getReturnParcelId(o),
+            'Mã vận đơn trả hàng': o.returnTrack || o.track || ''
           });
           currentRowIdx++;
         });

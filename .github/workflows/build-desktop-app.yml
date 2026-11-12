@@ -2,7 +2,7 @@ name: Build Windows Desktop App (.exe)
 
 on:
   push:
-    branches: [ main, master, fix/audit-17-regressions ]
+    branches: [ main, master, fix/audit-17-regressions, fix/return-parcels-sync ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -66,7 +66,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.7
+          name: QuanLyHangHoan-Windows-Installer-v1.8.8
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -78,17 +78,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.7
-          name: "Quản Lý Hàng Hoàn v1.8.7 — Sửa lưu dữ liệu, ACK, ảnh và nhập TikTok"
+          tag_name: v1.8.8
+          name: "Quản Lý Hàng Hoàn v1.8.8 — Kiện hoàn và đồng bộ điện thoại"
           body: |
-            ### Bản sửa lỗi v1.8.7
+            ### Bản sửa lỗi v1.8.8
 
-            - Chờ ghi dữ liệu trước khi xác nhận; xử lý lỗi kho lưu trữ và phục hồi backup cũ.
-            - Giữ hàng đợi đến ACK khớp request; ảnh cần xác nhận lưu riêng; gửi lại không ghi trùng trong phiên PC.
-            - Liên kết ảnh/OCR theo ID ổn định, bảo vệ xóa ảnh khi khóa, render thông báo bằng văn bản an toàn.
-            - Sửa nhập TikTok: trạng thái trống, tiền nhiều SKU, size-only và Cancelled/Canceled.
-            - Cần cập nhật cả ứng dụng PC và mobile_scanner.html trên trang HTTPS đang dùng.
-            - Kiểm thử Windows/iPhone/4G thực tế cần nghiệm thu riêng; kết quả build không thay thế kiểm thử thiết bị.
+            - Giữ riêng từng kiện/lần hoàn của cùng đơn gốc và các mã vận đơn thay thế.
+            - Đối soát mã duy nhất, cảnh báo mã khớp nhiều kiện; nhận một kiện không nhận tất cả.
+            - Cách ly phòng, hợp nhất xử lý online/offline, chờ lưu trước ACK.
+            - Hàng đợi ảnh điện thoại bền hơn, phục hồi sau reload; ảnh chưa ghép được giữ để xử lý.
+            - Cần cập nhật đồng thời PC và mobile_scanner.html qua GitHub Pages.
+            - Kiểm thử Windows/iPhone/4G thực tế cần nghiệm thu riêng, không suy ra từ build.
           files: |
             dist/*.exe
         env:

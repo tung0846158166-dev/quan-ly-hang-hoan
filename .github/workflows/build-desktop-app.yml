@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.21
+          name: QuanLyHangHoan-Windows-Installer-v1.8.22
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.21
-          name: "Quản Lý Hàng Hoàn v1.8.21 — PC bớt đứng khi quét"
+          tag_name: v1.8.22
+          name: "Quản Lý Hàng Hoàn v1.8.22 — sửa giá nhập file Shopee hoàn tiền ngay"
           body: |
+            ### Bản sửa 1.8.22
+
+            - Nhập file Shopee hoàn/trả: các đơn "Hoàn tiền ngay" có cột "Tổng số tiền Hoàn trả" = 0 không còn bị nhập giá 0; app lấy cột giá kế tiếp có giá trị (Tổng Giá Trị / Đơn Giá).
+
             ### Bản sửa 1.8.21
 
             - PC bớt bị đứng mỗi lần quét: bỏ một lần tính lại toàn bộ bảng tổng hợp bị lặp, và không vẽ lại bảng lần thứ hai cho ảnh nếu bảng vừa được vẽ lại sau khi ảnh tới.

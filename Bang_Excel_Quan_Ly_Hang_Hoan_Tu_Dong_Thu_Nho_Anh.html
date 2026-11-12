@@ -5616,7 +5616,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             ? (priceTotals.has(column.key) ? previous : value)
             : previous + value * (column.kind === 'unit' ? rawQty : 1));
         }
-        const chosenPriceColumn = priceColumns.find(column => priceTotals.has(column.key));
+        // Cột giá bằng 0 (vd "Tổng số tiền Hoàn trả" = 0 khi hoàn tiền ngay) coi như chưa có giá: dùng cột kế tiếp có giá > 0.
+        const chosenPriceColumn = priceColumns.find(column => (priceTotals.get(column.key) || 0) > 0) || priceColumns.find(column => priceTotals.has(column.key));
         const rawPrice = chosenPriceColumn ? priceTotals.get(chosenPriceColumn.key) : 0;
 
         // Trích xuất Ngày gửi đi (thử lần lượt các cột Thời gian gửi -> Thời gian đóng -> Thời gian xử lý -> Ngày tạo đơn)
@@ -7049,7 +7050,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.21';
+    const APP_VERSION_NUMBER = '1.8.22';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13349,7 +13350,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.21',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.22',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

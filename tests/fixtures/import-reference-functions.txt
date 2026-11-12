@@ -1,0 +1,191 @@
+// Original (scan-everything) implementations from v1.8.17, kept as the reference for equivalence tests.
+    function extractCleanTrackingCode(raw) {
+      if (!raw) return '';
+      let str = String(raw).trim();
+
+      // If URL, parse out possible tracking code params
+      if (str.includes('http://') || str.includes('https://') || str.includes('spx.vn') || str.includes('ghn.vn')) {
+        const mParam = str.match(/(?:spx|track|code|c|id|bill|order_code|s)=([A-Za-z0-9\.\-_]+)/i);
+        if (mParam && mParam[1]) {
+          str = mParam[1];
+        }
+      }
+
+      // 1. SPX Express: SPXVN + alphanumeric (6-18 chars) or VN26... (SPX Instant)
+      const mSpx = str.match(/(SPXVN[0-9A-Za-z]{6,18}|VN2[4-9][0-9A-Za-z]{8,14})/i);
+      if (mSpx) return mSpx[1].toUpperCase();
+
+      // 2. Shopee SOC: SOC + alphanumeric
+      const mSoc = str.match(/(SOC[0-9A-Za-z]{6,16})/i);
+      if (mSoc) return mSoc[1].toUpperCase();
+
+      // 3. Ninja Van: NIVN, NLVN, SHPVN
+      const mNinja = str.match(/((?:NIVN|NLVN|SHPVN)[0-9A-Za-z]{6,16})/i);
+      if (mNinja) return mNinja[1].toUpperCase();
+
+      // 3b. Best Express / TikTok: TTVN...
+      const mTtvn = str.match(/(TTVN[0-9A-Za-z]{6,16})/i);
+      if (mTtvn) return mTtvn[1].toUpperCase();
+
+      // 4. Viettel Post: SHOPEEVTP..., VTP..., VT...
+      const mVtp = str.match(/(SHOPEEVTP[0-9A-Za-z]{6,18}|VTP?[0-9A-Za-z]{6,15})/i);
+      if (mVtp) return mVtp[1].toUpperCase();
+
+      // 5. GHN: GHN..., G8..., GY... (8-char GHN code)
+      const mGhn = str.match(/(GHN[0-9A-Za-z]{6,14}|G8[0-9A-Za-z]{6,14}|GY[0-9A-Za-z]{6,10})/i);
+      if (mGhn) return mGhn[1].toUpperCase();
+
+      // 6. GHTK: S\d+...
+      const mGhtk = str.match(/(S\d+[\.\-][0-9A-Za-z\.\-]{6,24})/i);
+      if (mGhtk) return mGhtk[1].toUpperCase();
+
+      // 7. J&T Express: 86..., 84..., 82..., 80... (10 to 14 pure digits)
+      const mJt = str.match(/(8[0246][0-9]{10,13})/);
+      if (mJt) return mJt[1];
+
+      // 8. Stripping delimiters and handling compound strings like "HAN-DDA/SPXVN..."
+      let cleaned = str.replace(/^[\*\"\'\<\>\#\s\[\]\(\)]+|[\*\"\'\<\>\#\s\[\]\(\)]+$/g, '').trim();
+      if (cleaned.includes('/') || cleaned.includes('|') || cleaned.includes(';')) {
+        const parts = cleaned.split(/[\/\|;]/);
+        for (const p of parts) {
+          const partClean = extractCleanTrackingCode(p);
+          if (partClean) return partClean;
+        }
+      }
+
+      // If it's a clean tracking token (alphanumeric 6-30 chars without whitespace)
+      if (/^[A-Za-z0-9\.\-_]{6,30}$/.test(cleaned)) {
+        return cleaned.toUpperCase();
+      }
+
+      return cleaned.toUpperCase();
+    }
+
+    function getOrderTrackingCodes(order) {
+      if (!order) return [];
+      // Cleaning codes runs ~15 regexes per field; with 20k orders it dominated every phone scan.
+      // The result is cached per order and recomputed only when one of the source fields changes.
+      const cache = getOrderTrackingCodes.cache || (getOrderTrackingCodes.cache = new WeakMap());
+      const extra = Array.isArray(order.trackingCodes) ? order.trackingCodes : [];
+      const signature = [order.track, order.altTrack, order.forwardTrack, order.returnTrack, ...extra].join('\u0001');
+      const hit = cache.get(order);
+      if (hit && hit.signature === signature) return hit.codes.slice();
+      const codes = Array.from(new Set([order.track, order.altTrack, order.forwardTrack, order.returnTrack, ...extra]
+        .map(code => extractCleanTrackingCode(code || '')).filter(Boolean)));
+      cache.set(order, { signature, codes });
+      return codes.slice();
+    }
+
+    function getReturnParcelId(order) {
+      return String(order.returnOrderId || order.claimId || order.rawDetails?.claimId || '').trim().toUpperCase();
+    }
+
+    function getReturnParcelKey(order) {
+      const code = extractCleanTrackingCode(order.returnTrack || order.track || order.forwardTrack || '');
+      const id = getReturnParcelId(order);
+      return code ? 'TRACK:' + code + (id ? ':RETURN:' + id : '') : id ? 'RETURN:' + id : 'ORDER:' + String(order.orderId || '').trim().toUpperCase();
+    }
+
+    function isSameReturnParcel(left, right) {
+      const leftId = getReturnParcelId(left), rightId = getReturnParcelId(right);
+      if (leftId && rightId && leftId !== rightId) return false;
+      const leftReturn = extractCleanTrackingCode(left.returnTrack || '');
+      const rightReturn = extractCleanTrackingCode(right.returnTrack || '');
+      const sameOrder = left.orderId && String(left.orderId).trim().toUpperCase() === String(right.orderId || '').trim().toUpperCase();
+      if (sameOrder && leftId && leftId === rightId) {
+        if (!leftReturn && rightReturn && right.forwardTrack && extractCleanTrackingCode(left.track || '') === extractCleanTrackingCode(right.forwardTrack)) return true;
+        if (!rightReturn && leftReturn && left.forwardTrack && extractCleanTrackingCode(right.track || '') === extractCleanTrackingCode(left.forwardTrack)) return true;
+      }
+      const leftPrimary = extractCleanTrackingCode(left.returnTrack || left.track || '');
+      const rightPrimary = extractCleanTrackingCode(right.returnTrack || right.track || '');
+      // Different parcel codes remain distinct even under the same return claim.
+      // A historical-code link must be explicitly supplied to replace a code.
+      if (leftPrimary && rightPrimary) {
+        if (leftPrimary === rightPrimary) return true;
+        const leftForward = extractCleanTrackingCode(left.forwardTrack || '');
+        const rightForward = extractCleanTrackingCode(right.forwardTrack || '');
+        return (rightPrimary !== leftForward && Array.isArray(left.trackingCodes) && left.trackingCodes.includes(rightPrimary)) ||
+          (leftPrimary !== rightForward && Array.isArray(right.trackingCodes) && right.trackingCodes.includes(leftPrimary));
+      }
+      if (leftId && rightId) return leftId === rightId;
+      if (leftId || rightId || leftPrimary || rightPrimary) return false;
+      return Boolean(left.orderId && String(left.orderId).trim().toUpperCase() === String(right.orderId || '').trim().toUpperCase());
+    }
+
+    function findExistingReturnParcelIndex(orderData) {
+      const matches = orders.map((order, index) => ({order, index})).filter(({order}) => isSameReturnParcel(order, orderData));
+      return matches.length === 1 ? matches[0].index : -1;
+    }
+
+    function getShopeeDbParcels() {
+      // JSON persistence copies values stored under several index keys; dedupe by parcel identity.
+      const parcels = new Map();
+      Object.values(shopeeOrderDb || {}).forEach(order => {
+        if (order && typeof order === 'object') parcels.set(getReturnParcelKey(order), order);
+      });
+      return Array.from(parcels.values());
+    }
+
+    function registerImportedParcel(orderData) {
+      if (orderData.priceHasValue) orderData.priceNeedsReview = false;
+      const candidates = getShopeeDbParcels().filter(order => isSameReturnParcel(order, orderData));
+      if (candidates.length === 1) {
+        if (orderData.priceHasValue === false) { orderData.price = candidates[0].price || 0; orderData.priceModes = candidates[0].priceModes; orderData.priceNeedsReview = true; }
+        const repeatedInBatch = activeImportBatch?.parcelKeys?.has(getReturnParcelKey(candidates[0]));
+        const incomingItemCount = (orderData.items || []).length;
+        orderData.items = mergeImportedItems(candidates[0].items, orderData.items, repeatedInBatch ? 'supplement' : getImportProductMode());
+        reconcileImportPrices(candidates[0], orderData, orderData.items.length > incomingItemCount);
+        orderData.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(candidates[0]), ...getOrderTrackingCodes(orderData)]));
+        Object.keys(shopeeOrderDb).forEach(key => { if (getReturnParcelKey(shopeeOrderDb[key]) === getReturnParcelKey(candidates[0])) shopeeOrderDb[key] = orderData; });
+      }
+      if (activeImportBatch) { activeImportBatch.parcelKeys = activeImportBatch.parcelKeys || new Set(); activeImportBatch.parcelKeys.add(getReturnParcelKey(orderData)); }
+      shopeeOrderDb['PARCEL:' + getReturnParcelKey(orderData)] = orderData;
+      getOrderTrackingCodes(orderData).forEach(code => { shopeeOrderDb[code] = orderData; });
+      [orderData.orderId, getReturnParcelId(orderData)].filter(Boolean).forEach(id => {
+        shopeeOrderDb[String(id).trim().toUpperCase()] = orderData;
+      });
+    }
+
+    function lookupShopeeDb(code) {
+      const clean = extractCleanTrackingCode(code || '');
+      if (!clean || !shopeeOrderDb) return null;
+      const candidates = getShopeeDbParcels();
+      const tracks = candidates.filter(order => getOrderTrackingCodes(order).includes(clean));
+      if (tracks.length) return tracks.length === 1 ? tracks[0] : null;
+      const ids = candidates.filter(order => [order.orderId, getReturnParcelId(order)]
+        .some(id => String(id || '').trim().toUpperCase() === clean));
+      return ids.length === 1 ? ids[0] : null;
+    }
+
+    function mergeImportedItems(previous, incoming, mode = getImportProductMode()) {
+      if (mode === 'replace') return JSON.parse(JSON.stringify(incoming || []));
+      const key = item => item.sku || item.sellerSku || item.skuId ? 'SKU:' + String(item.sku || item.sellerSku || item.skuId).trim() :
+        JSON.stringify([item.product || '', item.color || '', item.size || '']);
+      const replacements = new Map();
+      (incoming || []).forEach(item => { const k = key(item); if (!replacements.has(k)) replacements.set(k, []); replacements.get(k).push(item); });
+      const result = [], seen = new Set();
+      (previous || []).forEach(item => { const k = key(item); if (replacements.has(k)) { if (!seen.has(k)) result.push(...replacements.get(k)); } else result.push(item); seen.add(k); });
+      replacements.forEach((items, k) => { if (!seen.has(k)) result.push(...items); });
+      return JSON.parse(JSON.stringify(result));
+    }
+
+    function reconcileImportPrices(previous, incoming, retained) {
+      if (!retained) return;
+      if (incoming.importPriceBasis === 'line') {
+        if (incoming.items.every(item => Number.isFinite(item.importLineAmount))) incoming.price = incoming.items.reduce((sum, item) => sum + item.importLineAmount, 0);
+        else { incoming.price = previous.price || 0; incoming.priceNeedsReview = true; }
+      }
+      if (incoming.importModeSlots) {
+        incoming.priceModes = incoming.priceModes || {};
+        for (const [mode, slot] of Object.entries(incoming.importModeSlots)) {
+          if (!slot) continue; // An explicit order total is a snapshot, not a line sum.
+          if (incoming.items.every(item => Number.isFinite(item.importPrices?.[slot]))) incoming.priceModes[mode] = incoming.items.reduce((sum, item) => sum + item.importPrices[slot], 0);
+          else { incoming.priceModes[mode] = previous.priceModes?.[mode] ?? previous.price ?? 0; incoming.priceNeedsReview = true; }
+        }
+        incoming.price = incoming.priceModes[incoming.importSelectedPriceMode] ?? incoming.price;
+      }
+    }
+
+    function getImportProductMode() {
+      return document.getElementById('importProductUpdateMode')?.value === 'replace' ? 'replace' : 'supplement';
+    }

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.16
+          name: QuanLyHangHoan-Windows-Installer-v1.8.17
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.16
-          name: "Quản Lý Hàng Hoàn v1.8.16 — Phản hồi quét nhanh hơn"
+          tag_name: v1.8.17
+          name: "Quản Lý Hàng Hoàn v1.8.17 — Kết nối nhanh hơn"
           body: |
+            ### Bản sửa 1.8.17
+
+            - Điện thoại và PC kết nối đồng thời tới 3 broker MQTT công cộng (EMQX, HiveMQ, Mosquitto); kênh nào về trước thì dùng, bản trùng tự bỏ.
+            - Điện thoại ghi rõ phản hồi đến qua kênh nào (ntfy, emqx, hivemq, mosquitto) để biết kênh nào nhanh nhất.
+
             ### Bản sửa 1.8.16
 
             - Gộp vẽ lại bảng khi quét liên tiếp, hoãn bản sao IndexedDB, gửi dữ liệu lưu dạng chuỗi JSON để PC phản hồi nhanh hơn.

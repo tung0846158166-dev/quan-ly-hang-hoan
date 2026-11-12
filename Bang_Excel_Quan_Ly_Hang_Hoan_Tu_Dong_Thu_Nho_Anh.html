@@ -6907,7 +6907,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.15';
+    const APP_VERSION_NUMBER = '1.8.17';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13180,6 +13180,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try { localStorage.setItem(PHONE_ROOM_KEY, phoneRoomId); } catch (e) {}
     }
     let mqttClient = null;
+    let extraMqttClients = [];
     let phoneScanCount = 0;
     let lastScannedCode = '';
     let lastScannedTime = 0;
@@ -13206,7 +13207,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.15',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.17',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13353,6 +13354,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           });
         } catch (error) { reportDeliveryFailure('MQTT', 'không gửi được'); }
       }
+      (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish('agy_shopee_return_scanner_2026/' + roomToSend, ack); } catch (e) {} } });
       return httpDelivery;
     }
 
@@ -13515,6 +13517,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               const data = JSON.parse(msgBuf.toString());
               if (!data || data.type === 'pc_ack') return;
               processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
+            } catch (e) {}
+          });
+          extraMqttClients.forEach(c => { try { c.end(true); } catch (e) {} });
+          extraMqttClients = [];
+          ['wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081/'].forEach(url => {
+            try {
+              const extra = mqtt.connect(url, { reconnectPeriod: 3000, connectTimeout: 8000 });
+              extra.on('connect', () => { try { extra.subscribe(getPhoneMqttTopic()); } catch (e) {} });
+              extra.on('message', (t, msgBuf) => {
+                try {
+                  const data = JSON.parse(msgBuf.toString());
+                  if (!data || data.type === 'pc_ack') return;
+                  processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
+                } catch (e) {}
+              });
+              extra.on('error', () => {});
+              extraMqttClients.push(extra);
             } catch (e) {}
           });
         }

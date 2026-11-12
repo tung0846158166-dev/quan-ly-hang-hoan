@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.15</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.17</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -799,6 +799,8 @@
 
     const GLOBAL_TOPIC = 'agy_shopee_return_scanner_2026/GLOBAL_SYNC';
     let client = null;
+    // Extra public brokers race the main one; whichever delivers first wins, duplicates are ignored by request id.
+    let extraClients = [];
     const pendingScans = new Map();
     let scanHistory = [];
     let currentHistoryFilter = 'all';
@@ -1269,7 +1271,7 @@
       if (Number.isFinite(data.processingMs)) existing.pcProcessingMs = data.processingMs;
       if (pending.sentAt) existing.responseMs = Math.max(0, Date.now() - pending.sentAt);
       if (existing.responseMs !== undefined) {
-        existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms.';
+        existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms' + (data.__via ? ' (qua ' + data.__via + ')' : '') + '.';
         // Breakdown: PC work (incl. saving) vs. network + waiting for the PC to be free.
         if (Number.isFinite(data.processingMs)) {
           existing.detail += ' (PC xử lý ' + data.processingMs + ' ms' + (Number.isFinite(data.saveMs) ? ', trong đó lưu ' + data.saveMs + ' ms' : '') +
@@ -1772,6 +1774,7 @@
           client.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr);
         } catch (e) {}
       }
+      (typeof extraClients !== 'undefined' ? extraClients : []).forEach(c => { if (c.connected) { try { c.publish('agy_shopee_return_scanner_2026/' + room, fullJsonStr); } catch (e) {} } });
     }
 
     function getNtfyTopic() {
@@ -1812,7 +1815,7 @@
             let data = null;
             try { data = JSON.parse(wrapper.message); } catch (e) { return; }
             if (!data) return;
-
+            data.__via = 'ntfy';
             handleScanAck(data);
           } catch (e) {}
         };
@@ -1849,10 +1852,27 @@
         client.on('message', (t, msgBuf) => {
           try {
             const data = JSON.parse(msgBuf.toString());
-            if (t === 'agy_shopee_return_scanner_2026/' + room) handleScanAck(data);
+            if (t === 'agy_shopee_return_scanner_2026/' + room) { data.__via = 'emqx'; handleScanAck(data); }
           } catch (e) {}
         });
       } catch (e) {}
+      extraClients.forEach(c => { try { c.end(true); } catch (e) {} });
+      extraClients = [];
+      ['wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081/'].forEach(url => {
+        try {
+          const extra = mqtt.connect(url, { reconnectPeriod: 3000, connectTimeout: 8000 });
+          const name = url.indexOf('hivemq') >= 0 ? 'hivemq' : 'mosquitto';
+          extra.on('connect', () => { try { extra.subscribe('agy_shopee_return_scanner_2026/' + room); } catch (e) {} });
+          extra.on('message', (t, msgBuf) => {
+            try {
+              const data = JSON.parse(msgBuf.toString());
+              if (t === 'agy_shopee_return_scanner_2026/' + room) { data.__via = name; handleScanAck(data); }
+            } catch (e) {}
+          });
+          extra.on('error', () => {});
+          extraClients.push(extra);
+        } catch (e) {}
+      });
     }
 
     function changeRoomCode(newRoom) {

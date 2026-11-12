@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.17
+          name: QuanLyHangHoan-Windows-Installer-v1.8.18
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.17
-          name: "Quản Lý Hàng Hoàn v1.8.17 — Kết nối nhanh hơn"
+          tag_name: v1.8.18
+          name: "Quản Lý Hàng Hoàn v1.8.18 — Nhập dữ liệu sàn nhanh hơn"
           body: |
+            ### Bản sửa 1.8.18
+
+            - Nhập file Shopee/TikTok nhanh hơn rất nhiều khi bảng đã có hàng chục nghìn đơn (100 dòng vào bảng 20.000 đơn: từ ~12,7 giây xuống ~0,5 giây).
+            - Tra mã trong dữ liệu sàn (kể cả khi quét điện thoại) gần như tức thì thay vì ~100 ms mỗi lần.
+            - Kết quả ghép đơn không đổi; có test so sánh trực tiếp với cách cũ.
+
             ### Bản sửa 1.8.17
 
             - Điện thoại và PC kết nối đồng thời tới 3 broker MQTT công cộng (EMQX, HiveMQ, Mosquitto); kênh nào về trước thì dùng, bản trùng tự bỏ.

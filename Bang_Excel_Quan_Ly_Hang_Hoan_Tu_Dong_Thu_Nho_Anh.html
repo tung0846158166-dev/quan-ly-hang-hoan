@@ -6878,7 +6878,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.12';
+    const APP_VERSION_NUMBER = '1.8.13';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13091,7 +13091,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.12',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.13',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13215,21 +13215,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       } catch (notifErr) {}
 
-      // 1. Primary: Post to ntfy.sh (HTTPS port 443)
+      const reportDeliveryFailure = (channel, reason) => {
+        const message = '⚠️ Đơn đã được xử lý nhưng kênh phản hồi điện thoại ' + channel + ' lỗi: ' + reason;
+        if (typeof appendPhoneLiveLog === 'function') appendPhoneLiveLog(message);
+        console.warn(message);
+      };
+      let httpDelivery = Promise.resolve(false);
+      // 1. Record acceptance by the HTTP service; this is not proof that the phone received it.
       try {
-        fetch('https://ntfy.sh/' + topic, {
-          method: 'POST',
-          body: ack,
-          headers: { 'Title': 'Shopee PC Ack' }
-        }).catch(() => {});
-      } catch (e) {}
-
-      // 2. Also send via MQTT if connected
+        httpDelivery = fetch('https://ntfy.sh/' + topic, {
+          method: 'POST', body: ack, headers: { 'Title': 'Shopee PC Ack' }
+        }).then(response => {
+          if (!response.ok) { reportDeliveryFailure('ntfy', 'HTTP ' + response.status); return false; }
+          return true;
+        }).catch(error => { reportDeliveryFailure('ntfy', 'không kết nối được'); return false; });
+      } catch (error) { reportDeliveryFailure('ntfy', 'không kết nối được'); }
+      // 2. Route to the room that originated this exact transaction, even if UI room changed meanwhile.
       if (mqttClient && mqttClient.connected) {
         try {
-          mqttClient.publish(getPhoneMqttTopic(), ack);
-        } catch (e) {}
+          mqttClient.publish('agy_shopee_return_scanner_2026/' + roomToSend, ack, { qos: 1 }, error => {
+            if (error) reportDeliveryFailure('MQTT', 'không gửi được');
+          });
+        } catch (error) { reportDeliveryFailure('MQTT', 'không gửi được'); }
       }
+      return httpDelivery;
     }
 
     function broadcastManifestToPhone() {

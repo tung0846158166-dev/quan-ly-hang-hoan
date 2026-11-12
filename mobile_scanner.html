@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.12</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.13</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -661,6 +661,7 @@
     </div>
 
     <!-- Scan Alert Result Banner -->
+    <div id="lastPcResult" class="hidden" role="status" aria-live="polite" style="padding:8px 10px;margin-bottom:8px;border:1px solid #334155;border-radius:8px;font-size:12px;color:#e2e8f0;background:#0f172a"></div>
     <div id="lastScanBanner" class="scan-alert hidden">
       <div class="scan-alert-label" id="lastScanLabel">---</div>
       <div id="lastScanCode" class="scan-alert-code">---</div>
@@ -1230,7 +1231,7 @@
       const scanAlreadyConfirmed = queued.scanConfirmed === true;
       const unmatched = ['not_found', 'ambiguous'].includes(data.outcome);
       if (data.outcome === 'error') {
-        clearTimeout(pending.timer); clearTimeout(pending.retryTimer);
+        clearTimeout(pending.timer); clearTimeout(pending.retryTimer); clearTimeout(pending.finalReceiptTimer);
         existing.detail = 'PC chưa lưu thành công; giữ yêu cầu và ảnh để thử lại.';
         if (!queued.scanConfirmed) existing.status = 'error';
       } else {
@@ -1258,7 +1259,7 @@
         existing.detail = queued.reviewRequired ? 'Cần kiểm tra: ảnh vẫn giữ trên điện thoại, chưa gắn vào đơn.'
           : queued.photo && !queued.photoConfirmed ? 'Ảnh đang gửi ngầm — bạn có thể quét đơn tiếp.'
           : queued.photo ? 'Ảnh đã lưu trên máy tính.' : 'Máy tính đã xác nhận lưu mã.';
-        if (queued.scanConfirmed) { clearTimeout(pending.timer); clearTimeout(pending.retryTimer); }
+        if (queued.scanConfirmed) { clearTimeout(pending.timer); clearTimeout(pending.retryTimer); clearTimeout(pending.finalReceiptTimer); }
         if (existing.synced || queued.reviewRequired) {
           pendingScans.delete(id);
           if (existing.synced) offlineQueue = offlineQueue.filter(it => it !== queued);
@@ -1267,12 +1268,51 @@
       if (Number.isFinite(data.processingMs)) existing.pcProcessingMs = data.processingMs;
       if (pending.sentAt) existing.responseMs = Math.max(0, Date.now() - pending.sentAt);
       if (existing.responseMs !== undefined) existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms.';
+      if (!photoReceipt && queued.scanConfirmed) {
+        const latestResult = document.getElementById('lastPcResult');
+        if (latestResult) {
+          latestResult.classList.remove('hidden');
+          const text = {success:'Đơn đã về kho',duplicate:'Đơn đã về kho — quét trùng',not_found:'Không tồn tại trong danh sách',ambiguous:'Nhiều kiện cùng mã — cần kiểm tra',new_order:'Đã lưu vào hộp đơn mới'}[existing.status] || existing.detail;
+          latestResult.textContent = 'PC xác nhận: ' + cleanCode + ' — ' + text;
+        }
+      }
       if (scanHistory[0] === existing && (!photoReceipt || !scanAlreadyConfirmed)) {
-        const titles = { error: 'PC chưa lưu được', ambiguous: 'Có nhiều đơn phù hợp — cần kiểm tra', not_found: 'Không tìm thấy đơn', duplicate: 'Máy tính báo: Đơn trùng', pending: 'Đang chờ máy tính', new_order: 'Máy tính đã lưu đơn mới', success: 'Đã khớp đơn' };
+        const titles = { error: 'PC chưa lưu được', ambiguous: 'Có nhiều kiện phù hợp — cần kiểm tra', not_found: 'Không tồn tại trong danh sách', duplicate: 'Đơn đã về kho — quét trùng', pending: 'Đang chờ PC đối chiếu', new_order: 'Máy tính đã lưu đơn mới', success: 'Đơn đã về kho' };
         triggerScanFeedback(['ambiguous', 'error'].includes(existing.status) ? 'not_found' : existing.status === 'new_order' ? 'success' : existing.status,
           cleanCode, titles[existing.status] || 'Máy tính đã lưu ảnh', existing.detail, existing.orderNum);
       }
       saveOfflineQueue(); saveScanHistory(); updateOfflineQueueUI(); renderScanHistory();
+    }
+
+    async function pollPcAcknowledgements(requestId = '') {
+      const pollingRoom = room;
+      if (!offlineQueue.some(item => !item.reviewRequired && (!requestId || item.requestId === requestId))) return false;
+      if (!pollPcAcknowledgements.inflight) pollPcAcknowledgements.inflight = new Map();
+      if (pollPcAcknowledgements.inflight.has(pollingRoom)) return pollPcAcknowledgements.inflight.get(pollingRoom);
+      const work = (async () => {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeout = controller ? setTimeout(() => controller.abort(), 5000) : null;
+        try {
+          const response = await fetch('https://ntfy.sh/' + getNtfyTopic() + '/json?poll=1&since=10m&title=Shopee%20PC%20Ack',
+            { cache: 'no-store', ...(controller ? { signal: controller.signal } : {}) });
+          if (!response.ok) return false;
+          const lines = (await response.text()).split('\n');
+          if (room !== pollingRoom) return false;
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const wrapper = JSON.parse(line);
+              const data = JSON.parse(wrapper.message || '{}');
+              if (data.type === 'pc_ack') handleScanAck(data);
+            } catch (error) { /* A bad unrelated record cannot confirm this request. */ }
+          }
+          return true;
+        } catch (error) { return false; }
+        finally { if (timeout) clearTimeout(timeout); }
+      })();
+      pollPcAcknowledgements.inflight.set(pollingRoom, work);
+      try { return await work; }
+      finally { pollPcAcknowledgements.inflight.delete(pollingRoom); }
     }
 
     let pcReceiptExpiry = null;
@@ -1391,6 +1431,18 @@
           await new Promise(r => setTimeout(r, 45));
         }
       }
+      if (typeof pollPcAcknowledgements === 'function') {
+        const confirmPhoto = async attempt => {
+          const pendingPhoto = offlineQueue.find(item => item.requestId === requestId);
+          if (room !== sendingRoom || !pendingPhoto || pendingPhoto.photoConfirmed || pendingPhoto.reviewRequired) return;
+          await pollPcAcknowledgements(requestId);
+          if (attempt < 2 && room === sendingRoom && offlineQueue.some(item => item.requestId === requestId && !item.photoConfirmed && !item.reviewRequired)) {
+            setTimeout(() => confirmPhoto(attempt + 1), 1500 * (attempt + 2));
+          }
+        };
+        setTimeout(() => confirmPhoto(0), 1500);
+      }
+
     }
 
     
@@ -1606,21 +1658,35 @@
         if (history) { history.requestId = id; history.synced = false; }
         saveOfflineQueue(); saveScanHistory();
         const previousPending = pendingScans.get(id);
-        if (previousPending) { clearTimeout(previousPending.timer); clearTimeout(previousPending.retryTimer); }
+        if (previousPending) { clearTimeout(previousPending.timer); clearTimeout(previousPending.retryTimer); clearTimeout(previousPending.finalReceiptTimer); }
         const timer = setTimeout(() => {
           // Retain request membership: a late exact ACK is still useful after timeout.
           const sub = document.getElementById('lastScanSub');
           if (sub && scanHistory[0]?.requestId === id && !offlineQueue.find(it => it.requestId === id)?.scanConfirmed) sub.textContent = '⚠️ Chưa nhận được phản hồi từ PC; giữ lại để thử lại';
         }, 10000);
         const sendingRoom = room;
-        const retryTimer = retryAttempt < 3 ? setTimeout(() => {
+        const retryTimer = retryAttempt < 3 ? setTimeout(async () => {
           const live = offlineQueue.find(item => item.requestId === id);
           if (room !== sendingRoom || !live || live.scanConfirmed || live.reviewRequired || live.photoOnly) return;
+          if (typeof pollPcAcknowledgements === 'function') await pollPcAcknowledgements(id);
+          if (room !== sendingRoom || live.scanConfirmed || live.reviewRequired || !offlineQueue.includes(live)) return;
           sendPayloadToPc({ ...(live.payload || {}), type: live.kind === 'new_order_scan' ? 'new_order_scan' : (live.payload?.type || 'barcode'),
             code: live.code, photo: '', requestId: id, captureId: live.captureId, captureTime: live.captureTime,
             time: live.time }, live.code, subInfo, retryAttempt + 1);
         }, [1500, 3000, 6000][retryAttempt]) : null;
-        pendingScans.set(id, { code: displayCode, timer, retryTimer, sentAt: previousPending?.sentAt || now });
+        const pendingRecord = { code: displayCode, timer, retryTimer, sentAt: previousPending?.sentAt || now };
+        pendingScans.set(id, pendingRecord);
+        if (retryAttempt === 3 && typeof pollPcAcknowledgements === 'function') {
+          const lookupFinalReceipt = async attempt => {
+            const current = offlineQueue.find(item => item.requestId === id);
+            if (room !== sendingRoom || pendingScans.get(id) !== pendingRecord || !current || current.scanConfirmed || current.reviewRequired) return;
+            await pollPcAcknowledgements(id);
+            if (attempt < 2 && room === sendingRoom && pendingScans.get(id) === pendingRecord && !current.scanConfirmed && !current.reviewRequired) {
+              pendingRecord.finalReceiptTimer = setTimeout(() => lookupFinalReceipt(attempt + 1), [3000, 6000][attempt]);
+            }
+          };
+          pendingRecord.finalReceiptTimer = setTimeout(() => lookupFinalReceipt(0), 1500);
+        }
       }
       try {
         if (window.parent && window.parent !== window) window.parent.postMessage({ channel: 'shopee_scanner_sync', data: payload }, '*');
@@ -1735,11 +1801,13 @@
 
     function changeRoomCode(newRoom) {
       room = String(newRoom || 'SHP-2026').trim().toUpperCase();
-      for (const scan of pendingScans.values()) { clearTimeout(scan.timer); clearTimeout(scan.retryTimer); }
+      for (const scan of pendingScans.values()) { clearTimeout(scan.timer); clearTimeout(scan.retryTimer); clearTimeout(scan.finalReceiptTimer); }
       pendingScans.clear();
       lastScannedRawCode = '';
       lastScannedRawTime = 0;
       document.getElementById('lastScanBanner').classList.add('hidden');
+      const previousResult = document.getElementById('lastPcResult');
+      if (previousResult) { previousResult.textContent = ''; previousResult.classList.add('hidden'); }
       loadScanHistory();
       initPhoneSync();
     }
@@ -2111,7 +2179,7 @@
       return null;
     }
 
-    async function readQrFrame(canvas) {
+    async function readQrFrame(canvas, nativeFallback = true) {
       if (typeof jsQR !== 'undefined') {
         try {
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -2120,7 +2188,7 @@
           if (qr?.data && extractCleanTrackingCode(qr.data).length >= 6) return qr.data;
         } catch (eQr) {}
       }
-      return decodeNativeCanvas(canvas, 'qr');
+      return nativeFallback ? decodeNativeCanvas(canvas, 'qr') : null;
     }
 
     async function readBarcodeFrame(canvas, sweep = 0) {
@@ -2349,6 +2417,7 @@
       roiCanvas.__fastScan = true;
       let frameNo = 0;
       let pendingQuagga = null;
+      let pendingNative = null;
 
       const acceptCode = (code, revision) => {
         if (code && !stillDecodeBusy && isCameraScanning && generation === scannerGeneration &&
@@ -2384,14 +2453,18 @@
             frameNo++;
 
             let detectedCode = null;
-            if (hasNative) {
-              // Đọc trực tiếp từ video, không sao chép canvas, cả QR + mã vạch trong 1 lượt
-              detectedCode = await decodeNativeCanvas(videoEl, mode === 'auto' ? 'all' : mode);
+            if (hasNative && !pendingNative) {
+              // Native chạy nền: thiết bị có API nhưng detect chậm không được chặn jsQR / Quagga.
+              pendingNative = decodeNativeCanvas(videoEl, mode === 'auto' ? 'all' : mode)
+                .then(code => acceptCode(code, revision))
+                .catch(() => {})
+                .finally(() => { pendingNative = null; });
             }
 
-            if (!detectedCode && (!hasNative || frameNo % 3 === 0)) {
+            if (!hasNative || (frameNo - 1) % 3 === 0) {
               const roi = drawRoi(frameNo % 4 === 0);
-              if (mode !== 'barcode') detectedCode = await readQrFrame(roi);
+              // Native đã chạy ở trên; không chờ thêm một lượt native QR trước mã vạch.
+              if (mode !== 'barcode') detectedCode = await readQrFrame(roi, false);
               if (!detectedCode && mode !== 'qr' && typeof Quagga !== 'undefined' && !quaggaDecodeBusy && !pendingQuagga) {
                 // Chạy Quagga nền trên bản sao ROI, không chặn vòng lặp QR
                 const copy = document.createElement('canvas');

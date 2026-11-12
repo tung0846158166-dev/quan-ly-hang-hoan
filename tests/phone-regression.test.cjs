@@ -12,7 +12,7 @@ function fn(source, name) {
  return next < 0 ? rest : rest.slice(0, next + 1);
 }
 const noop = () => {};
-function ctx(extra={}) { return vm.createContext({console, Date, Math, Map, Set, JSON, Number, String, Array, room:'TEST',offlineQueue:[],queueHydrating:false,queueStorageError:false,markPcReceipt:noop, clearTimeout:noop, setTimeout:()=>1, ...extra}); }
+function ctx(extra={}) { return vm.createContext({console, Date, Math, Map, Set, JSON, Number, String, Array, room:'TEST',document:{getElementById:()=>null},offlineQueue:[],queueHydrating:false,queueStorageError:false,markPcReceipt:noop, clearTimeout:noop, setTimeout:()=>1, ...extra}); }
 function clean(c) { vm.runInContext(fn(mobile, 'extractCleanTrackingCode'), c); vm.runInContext(fn(desktop,'phoneOrderMatches'),c); vm.runInContext(fn(mobile,'sameMobileScanIntent'),c); }
 test('failed offline upload retains snapshot, concurrent items and unrelated history', async () => {
  const queue=[{code:'TEST000001',time:1,photo:''}]; const history=[{code:'TEST000001',synced:false},{code:'TEST000002',synced:false}];

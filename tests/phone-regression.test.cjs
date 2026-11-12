@@ -13,7 +13,7 @@ function fn(source, name) {
 }
 const noop = () => {};
 function ctx(extra={}) { return vm.createContext({console, Date, Math, Map, Set, JSON, Number, String, Array, room:'TEST',offlineQueue:[],queueHydrating:false,queueStorageError:false,markPcReceipt:noop, clearTimeout:noop, setTimeout:()=>1, ...extra}); }
-function clean(c) { vm.runInContext(fn(mobile, 'extractCleanTrackingCode'), c); vm.runInContext(fn(desktop,'phoneOrderMatches'),c); }
+function clean(c) { vm.runInContext(fn(mobile, 'extractCleanTrackingCode'), c); vm.runInContext(fn(desktop,'phoneOrderMatches'),c); vm.runInContext(fn(mobile,'sameMobileScanIntent'),c); }
 test('failed offline upload retains snapshot, concurrent items and unrelated history', async () => {
  const queue=[{code:'TEST000001',time:1,photo:''}]; const history=[{code:'TEST000001',synced:false},{code:'TEST000002',synced:false}];
  const c=ctx({offlineQueue:queue,scanHistory:history,isSyncingOffline:false,room:'TEST',setTimeout:(f)=>{f();return 1},document:{getElementById:()=>null},sendPayloadToPc:()=>queue.push({code:'TEST000003'}),updateOfflineQueueUI:noop,sendPhotoPacket:async()=>{}, getNtfyTopic:()=> 'TEST',client:null,fetch:async()=>{if(queue.length===1)queue.push({code:'TEST000003'});throw Error('offline')},saveOfflineQueue:noop,saveScanHistory:noop,renderScanHistory:noop,alert:noop}); clean(c); vm.runInContext(fn(mobile,'syncOfflineQueueToPc'),c); await c.syncOfflineQueueToPc(); assert.equal(c.offlineQueue.length,2);assert.equal(c.scanHistory.length,2);
@@ -93,7 +93,7 @@ test('standalone photo stays queued until its exact durable photo receipt',async
  c.handleScanAck({type:'pc_ack',room:c.room,code:'TEST000001',requestId:item.requestId,captureId:item.captureId,ackStage:'photo',photoSaved:true,outcome:'success'});assert.equal(c.offlineQueue.length,0);assert.equal(c.scanHistory[0].synced,true);
 });
 test('new-order requests also retain an exact pending receipt instead of early success',()=>{
- const c=ctx({offlineQueue:[{code:'TEST000001',photo:''}],scanHistory:[{code:'TEST000001',status:'new_order',synced:false}],pendingScans:new Map(),scanSession:'session',scanSequence:0,room:'TEST',window:{},document:{getElementById:()=>null},setTimeout:()=>1,saveOfflineQueue:noop,saveScanHistory:noop,renderScanHistory:noop,updateOfflineQueueUI:noop,triggerScanFeedback:noop,getNtfyTopic:()=> 'TEST',client:null,fetch:async()=>({ok:true})});clean(c);vm.runInContext(fn(mobile,'sendPayloadToPc')+'\n'+fn(mobile,'handleScanAck'),c);
+ const c=ctx({offlineQueue:[{code:'TEST000001',photo:'',kind:'new_order_scan'}],scanHistory:[{code:'TEST000001',status:'new_order',synced:false}],pendingScans:new Map(),scanSession:'session',scanSequence:0,room:'TEST',window:{},document:{getElementById:()=>null},setTimeout:()=>1,saveOfflineQueue:noop,saveScanHistory:noop,renderScanHistory:noop,updateOfflineQueueUI:noop,triggerScanFeedback:noop,getNtfyTopic:()=> 'TEST',client:null,fetch:async()=>({ok:true})});clean(c);vm.runInContext(fn(mobile,'sendPayloadToPc')+'\n'+fn(mobile,'handleScanAck'),c);
  c.sendPayloadToPc({type:'new_order_scan',code:'TEST000001'},'TEST000001');const item=c.offlineQueue[0];assert(item.requestId);assert(c.pendingScans.has(item.requestId));assert.equal(item.kind,'new_order_scan');
  c.handleScanAck({type:'pc_ack',room:c.room,code:'TEST000001',requestId:item.requestId,outcome:'success',ackStage:'scan'});assert.equal(c.offlineQueue.length,0);assert.equal(c.scanHistory[0].status,'new_order');assert.equal(c.scanHistory[0].synced,true);
 });

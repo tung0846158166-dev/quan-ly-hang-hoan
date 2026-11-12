@@ -1253,7 +1253,7 @@
         existing.reviewRequired = queued.reviewRequired === true;
         existing.orderNum = queued.confirmedOrderNum || null;
         existing.status = queued.reviewRequired ? queued.scanOutcome : !queued.scanConfirmed ? 'pending'
-          : queued.kind === 'new_order_scan' ? 'new_order' : queued.scanOutcome || 'success';
+          : queued.kind === 'new_order_scan' && queued.scanOutcome === 'success' ? 'new_order' : queued.scanOutcome || 'success';
         existing.synced = queued.scanConfirmed === true && !queued.reviewRequired && (!queued.photo || queued.photoConfirmed === true);
         existing.detail = queued.reviewRequired ? 'Cần kiểm tra: ảnh vẫn giữ trên điện thoại, chưa gắn vào đơn.'
           : queued.photo && !queued.photoConfirmed ? 'Ảnh đang gửi ngầm — bạn có thể quét đơn tiếp.'
@@ -1397,7 +1397,7 @@
     // =========================================================================
     // CHẾ ĐỘ TẠO ĐƠN MỚI TỪ ĐIỆN THOẠI (v1.7.5)
     // =========================================================================
-    let currentMobileMode = localStorage.getItem('mobile_scan_mode') || 'return';
+    let currentMobileMode = 'return'; // Creation requires an explicit choice in this scanner session.
     let currentNewOrderPlatform = localStorage.getItem('mobile_new_order_platform') || 'TikTok Shop';
 
     function showToast(msg, duration = 2500) {
@@ -1412,8 +1412,10 @@
     }
 
     function switchMobileScanMode(mode) {
+      mode = mode === 'new_order' ? 'new_order' : 'return';
       currentMobileMode = mode;
-      localStorage.setItem('mobile_scan_mode', mode);
+      lastScannedRawCode = ''; lastScannedRawTime = 0;
+      if (typeof lastScannedCode !== 'undefined') { lastScannedCode = null; lastScannedTime = 0; }
       const btnRet = document.getElementById('btnModeReturn');
       const btnNew = document.getElementById('btnModeNewOrder');
       const panel = document.getElementById('newOrderOptionsPanel');
@@ -1506,7 +1508,7 @@
       sendPayloadToPc(newOrderPayload, clean, '✨ Đã gửi vào Bảng Đơn Mới');
 
       if (capturedPhoto) {
-        const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
+        const capture = { ...offlineQueue.find(it => sameMobileScanIntent(it, 'new_order_scan') && extractCleanTrackingCode(it.code) === clean && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
         setTimeout(() => {
           sendPhotoPacket(capturedPhoto, clean, capture);
         }, 90);
@@ -1532,7 +1534,7 @@
         return handleNewOrderScan(clean, capturedPhoto);
       }
       // Only an outstanding request is retried locally; all outcomes come from PC.
-      const outstanding = offlineQueue.find(it => !it.photoOnly && !it.reviewRequired && !it.scanConfirmed && extractCleanTrackingCode(it.code) === clean);
+      const outstanding = offlineQueue.find(it => sameMobileScanIntent(it, 'barcode') && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed && extractCleanTrackingCode(it.code) === clean);
       if (outstanding) {
         triggerScanFeedback('pending', clean, 'Đang thử lại yêu cầu', 'Chờ máy tính xác nhận');
         sendPayloadToPc({ ...(outstanding.payload || {}), type: outstanding.kind || 'barcode', code: clean,
@@ -1566,7 +1568,7 @@
 
       // Luôn gửi gói ảnh chia mảnh chuyên dụng để đảm bảo 100% ảnh tới PC
       if (capturedPhoto) {
-        const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === clean && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
+        const capture = { ...offlineQueue.find(it => sameMobileScanIntent(it, 'barcode') && extractCleanTrackingCode(it.code) === clean && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
         setTimeout(() => {
           sendPhotoPacket(capturedPhoto, clean, capture);
         }, 80);
@@ -1581,20 +1583,26 @@
       inp.value = '';
     }
 
+    function sameMobileScanIntent(item, kind) {
+      const creating = item.kind === 'new_order_scan' || item.payload?.type === 'new_order_scan';
+      return creating === (kind === 'new_order_scan');
+    }
+
     function sendPayloadToPc(payload, displayCode, subInfo = '') {
       if (queueHydrating) { const sourceRoom = room; queueHydration.then(() => { if (room === sourceRoom) sendPayloadToPc(payload, displayCode, subInfo); }); return; }
       const now = Date.now();
       payload.room = room;
       payload.time = payload.time || now;
       if (payload.type === 'barcode' || payload.type === 'smart_label' || payload.type === 'sync_item' || payload.type === 'new_order_scan') {
-        let queued = offlineQueue.find(it => !it.photoOnly && !it.reviewRequired && (payload.requestId ? it.requestId === payload.requestId : !it.scanConfirmed && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode)));
-        if (!queued) { addOfflineItem(displayCode, payload.photo); queued = offlineQueue.find(it => !it.photoOnly && !it.reviewRequired && !it.scanConfirmed && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode)); }
+        if (payload.requestId && offlineQueue.some(it => it.requestId === payload.requestId && !sameMobileScanIntent(it, payload.type))) payload = { ...payload, requestId: '', captureId: '', captureTime: now };
+        let queued = offlineQueue.find(it => sameMobileScanIntent(it, payload.type) && !it.photoOnly && !it.reviewRequired && (payload.requestId ? it.requestId === payload.requestId : !it.scanConfirmed && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode)));
+        if (!queued) { addOfflineItem(displayCode, payload.photo, payload.type); queued = offlineQueue.find(it => sameMobileScanIntent(it, payload.type) && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode)); }
         const id = payload.requestId || (queued && queued.requestId) || scanSession + '-' + (++scanSequence);
         payload.requestId = id;
         if (queued) { queued.photo = queued.photo || payload.photo || ''; queued.kind = queued.kind || payload.type; queued.payload = { ...payload }; delete queued.payload.photo; queued.requestId = id; queued.captureId = queued.captureId || payload.captureId || id; queued.captureTime = queued.captureTime || payload.captureTime || payload.time; }
         payload.captureId = payload.captureId || (queued && queued.captureId) || id;
         payload.captureTime = payload.captureTime || (queued && queued.captureTime) || payload.time;
-        const history = scanHistory.find(it => extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode));
+        const history = scanHistory.find(it => it.requestId === id) || scanHistory.find(it => !it.requestId && extractCleanTrackingCode(it.code) === extractCleanTrackingCode(displayCode));
         if (history) { history.requestId = id; history.synced = false; }
         saveOfflineQueue(); saveScanHistory();
         if (pendingScans.has(id)) clearTimeout(pendingScans.get(id).timer);
@@ -1878,11 +1886,11 @@
       return task;
     }
 
-    function addOfflineItem(code, capturedPhoto) {
+    function addOfflineItem(code, capturedPhoto, kind = 'barcode') {
       const clean = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
       if (!clean) return;
       
-      const existing = offlineQueue.find(item => !item.photoOnly && !item.reviewRequired && !item.scanConfirmed && extractCleanTrackingCode(item.code) === clean);
+      const existing = offlineQueue.find(item => !item.photoOnly && !item.reviewRequired && !item.scanConfirmed && sameMobileScanIntent(item, kind) && extractCleanTrackingCode(item.code) === clean);
       if (existing) {
         if (capturedPhoto && !existing.photo) {
           existing.photo = capturedPhoto;
@@ -1893,7 +1901,7 @@
 
       offlineQueue.unshift({
         id: 'off_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        code: clean,
+        code: clean, kind,
         time: Date.now(),
         photo: capturedPhoto || '',
         synced: false
@@ -2825,7 +2833,7 @@
             time: Date.now()
           }, codeToSend, subText);
 
-          const capture = { ...offlineQueue.find(it => extractCleanTrackingCode(it.code) === codeToSend && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
+          const capture = { ...offlineQueue.find(it => sameMobileScanIntent(it, 'smart_label') && extractCleanTrackingCode(it.code) === codeToSend && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed) };
           setTimeout(() => {
             sendPhotoPacket(compressedPhoto.dataUrl, codeToSend, capture);
           }, 80);

@@ -2370,7 +2370,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <!-- PANEL 1: CƠ CHẾ NẠP RIÊNG SÀN SHOPEE                             -->
         <!-- =============================================================== -->
-        <div id="importPanel_shopee" class="space-y-3">
+                        <label class="block text-xs font-bold mb-2">Cập nhật sản phẩm khi nhập file
+                  <select id="importProductUpdateMode" class="border rounded px-2 py-1 text-slate-900">
+                    <option value="supplement">Nhập bổ sung — giữ sản phẩm không có trong file mới</option>
+                    <option value="replace">Thay toàn bộ sản phẩm của từng kiện có trong file</option>
+                  </select>
+                </label>
+            <div id="importPanel_shopee" class="space-y-3">
           <div class="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-950 flex flex-wrap items-center justify-between gap-2">
             <div>
               🟠 <b>Cơ chế chuyên biệt Sàn Shopee:</b> Tự động nhận diện chuẩn 3 mẫu file xuất từ Shopee Seller Center:
@@ -2389,6 +2395,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 <p class="text-[11px] text-slate-600 mb-2">
                   Bấm vào đây để chọn 1 hoặc nhiều file xuất từ <b>Shopee Kênh Người Bán</b> (Có thể chọn cùng lúc cả 3 file Hủy + Giao thất bại + Trả hàng hoàn tiền!)
                 </p>
+
                 <input id="shopeeOnlyFileInput" type="file" multiple accept=".xlsx,.xls,.csv" class="hidden" onchange="handlePlatformExcelUpload(event, 'Shopee')" />
               </div>
               <div class="mt-2.5 px-3 py-2 bg-[#ee4d2d] text-white font-extrabold text-xs rounded-lg group-hover:bg-orange-700 text-center shadow-xs">
@@ -3455,14 +3462,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       updateShopeeDbBadge();
     }
 
-    function saveShopeeOrderDb() {
+    function saveShopeeOrderDb(force = false) {
+      if (activeImportBatch && !force) return true;
       try {
         localStorage.setItem(SHOPEE_DB_KEY, JSON.stringify(shopeeOrderDb));
         markUnsavedToFile();
       } catch (e) {
         console.warn('Storage full for Shopee DB:', e);
+        return false;
       }
       updateShopeeDbBadge();
+      return true;
     }
 
     function updateShopeeDbBadge() {
@@ -3553,6 +3563,91 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return cleaned.toUpperCase();
     }
 
+    let activeImportBatch = null;
+
+    function parseImportedQuantity(value, fallback = 0) {
+      if (value == null || String(value).trim() === '') return fallback;
+      let text = String(value).trim().replace(/\s/g, '');
+      if (/^\d+[.,]0{1,2}$/.test(text)) text = text.split(/[.,]/)[0];
+      else if (/^\d{1,3}(?:,\d{3})+$/.test(text)) text = text.replace(/,/g, '');
+      const quantity = Number(text);
+      if (!Number.isSafeInteger(quantity) || quantity < 0) throw new Error('Số lượng không hợp lệ: ' + value + '. Cần số nguyên không âm.');
+      return quantity;
+    }
+
+    function getImportProductMode() {
+      return document.getElementById('importProductUpdateMode')?.value === 'replace' ? 'replace' : 'supplement';
+    }
+
+    function mergeImportedItems(previous, incoming, mode = getImportProductMode()) {
+      if (mode === 'replace') return JSON.parse(JSON.stringify(incoming || []));
+      const key = item => item.sku || item.sellerSku || item.skuId ? 'SKU:' + String(item.sku || item.sellerSku || item.skuId).trim() :
+        JSON.stringify([item.product || '', item.color || '', item.size || '']);
+      const replacements = new Map();
+      (incoming || []).forEach(item => { const k = key(item); if (!replacements.has(k)) replacements.set(k, []); replacements.get(k).push(item); });
+      const result = [], seen = new Set();
+      (previous || []).forEach(item => { const k = key(item); if (replacements.has(k)) { if (!seen.has(k)) result.push(...replacements.get(k)); } else result.push(item); seen.add(k); });
+      replacements.forEach((items, k) => { if (!seen.has(k)) result.push(...items); });
+      return JSON.parse(JSON.stringify(result));
+    }
+
+    function reconcileImportPrices(previous, incoming, retained) {
+      if (!retained) return;
+      if (incoming.importPriceBasis === 'line') {
+        if (incoming.items.every(item => Number.isFinite(item.importLineAmount))) incoming.price = incoming.items.reduce((sum, item) => sum + item.importLineAmount, 0);
+        else { incoming.price = previous.price || 0; incoming.priceNeedsReview = true; }
+      }
+      if (incoming.importModeSlots) {
+        incoming.priceModes = incoming.priceModes || {};
+        for (const [mode, slot] of Object.entries(incoming.importModeSlots)) {
+          if (!slot) continue; // An explicit order total is a snapshot, not a line sum.
+          if (incoming.items.every(item => Number.isFinite(item.importPrices?.[slot]))) incoming.priceModes[mode] = incoming.items.reduce((sum, item) => sum + item.importPrices[slot], 0);
+          else { incoming.priceModes[mode] = previous.priceModes?.[mode] ?? previous.price ?? 0; incoming.priceNeedsReview = true; }
+        }
+        incoming.price = incoming.priceModes[incoming.importSelectedPriceMode] ?? incoming.price;
+      }
+    }
+
+    function runImportUi(name, ...args) {
+      const effect = () => globalThis[name]?.(...args);
+      if (activeImportBatch) { activeImportBatch.effects = activeImportBatch.effects || []; activeImportBatch.effects.push(effect); return; }
+      return effect();
+    }
+
+    function captureImportState() {
+      if (typeof diskPersistDebounceTimer !== 'undefined' && diskPersistDebounceTimer) { clearTimeout(diskPersistDebounceTimer); diskPersistDebounceTimer = null; }
+      return { orders: JSON.parse(JSON.stringify(orders)), db: JSON.parse(JSON.stringify(shopeeOrderDb)), notifications: typeof appNotifications === 'undefined' ? null : JSON.parse(JSON.stringify(appNotifications)), unread: typeof unreadNotifCount === 'undefined' ? 0 : unreadNotifCount };
+    }
+
+    async function rollbackImportState(snapshot) {
+      orders = snapshot.orders; shopeeOrderDb = snapshot.db;
+      if (snapshot.notifications && typeof appNotifications !== 'undefined') { appNotifications = snapshot.notifications; unreadNotifCount = snapshot.unread; if (typeof saveAppNotifications === 'function') saveAppNotifications(); }
+      let dbRestored = false, diskRestored = false;
+      try { dbRestored = saveShopeeOrderDb(true) === true; } catch (e) {}
+      try { diskRestored = (await saveOrders(true, true))?.success === true; } catch (e) {}
+      try { renderAll(); renderShopeeDbTable(); } catch (e) {}
+      return dbRestored && diskRestored;
+    }
+
+    async function commitImportState(snapshot) {
+      try {
+        if (saveShopeeOrderDb(true) !== true) throw new Error('Không lưu được kho dữ liệu nhập.');
+        if ((await saveOrders(true, true))?.success !== true) throw new Error('Không lưu được danh sách đơn an toàn.');
+        return true;
+      } catch (error) {
+        const restored = await rollbackImportState(snapshot);
+        alert('❌ Chưa xác nhận nhập thành công: ' + error.message + (restored ? '\nĐã phục hồi dữ liệu trước khi nhập.' : '\nĐã khôi phục dữ liệu trong phiên, nhưng chưa xác nhận lưu phục hồi. Giữ ứng dụng mở và sao lưu ngay.'));
+        return false;
+      }
+    }
+
+    function notifyImportResult(message) {
+      const reviewCount = orders.filter(order => order.priceNeedsReview).length;
+      if (reviewCount) message += '\n⚠️ Có ' + reviewCount + ' kiện cần đối chiếu giá: dữ liệu cũ thiếu đơn giá từng SKU; tổng cũ được giữ, không cộng đoán.';
+      if (activeImportBatch) activeImportBatch.messages.push(message);
+      else alert(message);
+    }
+
     function getOrderTrackingCodes(order) {
       if (!order) return [];
       return Array.from(new Set([order.track, order.altTrack, order.forwardTrack, order.returnTrack,
@@ -3583,6 +3678,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function isSameReturnParcel(left, right) {
       const leftId = getReturnParcelId(left), rightId = getReturnParcelId(right);
       if (leftId && rightId && leftId !== rightId) return false;
+      const leftReturn = extractCleanTrackingCode(left.returnTrack || '');
+      const rightReturn = extractCleanTrackingCode(right.returnTrack || '');
+      const sameOrder = left.orderId && String(left.orderId).trim().toUpperCase() === String(right.orderId || '').trim().toUpperCase();
+      if (sameOrder && leftId && leftId === rightId) {
+        if (!leftReturn && rightReturn && right.forwardTrack && extractCleanTrackingCode(left.track || '') === extractCleanTrackingCode(right.forwardTrack)) return true;
+        if (!rightReturn && leftReturn && left.forwardTrack && extractCleanTrackingCode(right.track || '') === extractCleanTrackingCode(left.forwardTrack)) return true;
+      }
       const leftPrimary = extractCleanTrackingCode(left.returnTrack || left.track || '');
       const rightPrimary = extractCleanTrackingCode(right.returnTrack || right.track || '');
       // Different parcel codes remain distinct even under the same return claim.
@@ -3624,11 +3726,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function registerImportedParcel(orderData) {
+      if (orderData.priceHasValue) orderData.priceNeedsReview = false;
       const candidates = getShopeeDbParcels().filter(order => isSameReturnParcel(order, orderData));
       if (candidates.length === 1) {
+        if (orderData.priceHasValue === false) { orderData.price = candidates[0].price || 0; orderData.priceModes = candidates[0].priceModes; orderData.priceNeedsReview = true; }
+        const repeatedInBatch = activeImportBatch?.parcelKeys?.has(getReturnParcelKey(candidates[0]));
+        const incomingItemCount = (orderData.items || []).length;
+        orderData.items = mergeImportedItems(candidates[0].items, orderData.items, repeatedInBatch ? 'supplement' : getImportProductMode());
+        reconcileImportPrices(candidates[0], orderData, orderData.items.length > incomingItemCount);
         orderData.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(candidates[0]), ...getOrderTrackingCodes(orderData)]));
         Object.keys(shopeeOrderDb).forEach(key => { if (getReturnParcelKey(shopeeOrderDb[key]) === getReturnParcelKey(candidates[0])) shopeeOrderDb[key] = orderData; });
       }
+      if (activeImportBatch) { activeImportBatch.parcelKeys = activeImportBatch.parcelKeys || new Set(); activeImportBatch.parcelKeys.add(getReturnParcelKey(orderData)); }
       shopeeOrderDb['PARCEL:' + getReturnParcelKey(orderData)] = orderData;
       getOrderTrackingCodes(orderData).forEach(code => { shopeeOrderDb[code] = orderData; });
       [orderData.orderId, getReturnParcelId(orderData)].filter(Boolean).forEach(id => {
@@ -3651,6 +3760,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!order || !match) return false;
       if (!isSameReturnParcel(order, match)) return false;
       let changed = false;
+      for (const key of ['importPriceBasis', 'importModeSlots', 'importSelectedPriceMode', 'priceNeedsReview', 'priceHasValue']) if (match[key] !== undefined) order[key] = match[key];
       const trackingCodes = Array.from(new Set([...getOrderTrackingCodes(order), ...getOrderTrackingCodes(match)]));
       if (JSON.stringify(order.trackingCodes || []) !== JSON.stringify(trackingCodes)) {
         order.trackingCodes = trackingCodes;
@@ -3711,11 +3821,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           changed = true;
         }
       }
+      if (typeof match.isPartialReturn === 'boolean' && order.isPartialReturn !== match.isPartialReturn) { order.isPartialReturn = match.isPartialReturn; changed = true; }
       if (match.priceModes && typeof match.priceModes === 'object') {
         order.priceModes = Object.assign({}, order.priceModes || {}, match.priceModes);
         changed = true;
       }
-      if (match.price && (forceOverwrite || !order.price || order.price === 0)) {
+      if (match.priceHasValue !== false && typeof match.price === 'number' && Number.isFinite(match.price) && (forceOverwrite || !order.price || order.price === 0)) {
         if (order.price !== match.price) {
           order.price = match.price;
           changed = true;
@@ -3783,7 +3894,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const curFirst = order.items && order.items[0];
         const isCurBlank = !curFirst || (!curFirst.product && !curFirst.color && !curFirst.size);
         if (forceOverwrite || isCurBlank || (match.items.length > (order.items ? order.items.length : 0))) {
-          order.items = JSON.parse(JSON.stringify(match.items));
+          order.items = mergeImportedItems(order.items, match.items);
           (order.items || []).forEach(it => {
             if (it.size && isReturnReasonText(it.size)) {
               if (!order.note) order.note = it.size;
@@ -4243,83 +4354,166 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function readWorkbookRowsFromBuffer(arrayBuffer, isCsv) {
-      let workbook;
-      if (isCsv) {
-        const text = new TextDecoder('utf-8').decode(new Uint8Array(arrayBuffer));
-        workbook = XLSX.read(text, { type: 'string', raw: true });
-      } else {
-        const data = new Uint8Array(arrayBuffer);
-        workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
+      const workbook = isCsv
+        ? XLSX.read(new TextDecoder('utf-8').decode(new Uint8Array(arrayBuffer)), { type: 'string', raw: true })
+        : XLSX.read(new Uint8Array(arrayBuffer), { type: 'array', codepage: 65001 });
+      if (!workbook || !Array.isArray(workbook.SheetNames) || !workbook.Sheets) {
+        throw new Error('Không đọc được cấu trúc bảng tính.');
       }
-      // Tìm sheet có dữ liệu đơn hàng (không chỉ lấy cứng sheet đầu tiên nếu sheet 1 rỗng)
-      for (const sName of workbook.SheetNames) {
-        const ws = workbook.Sheets[sName];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false });
-        if (rows && rows.length > 0) {
-          return rows;
+      const normalize = value => removeVietnameseTones(String(value || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const identities = new Set(['orderid', 'madonhang', 'iddonhang', 'madon', 'trackingid', 'trackingnumber', 'mavandon', 'mavandontrahang', 'mvdtrahang', 'returnlogisticstrackingid', 'returntrackingid', 'returnorderid', 'returnid', 'masokhieunai', 'makhieunai']);
+      const products = new Set(['productname', 'product', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname', 'sellersku', 'masku', 'skuname', 'tenphanloai', 'variation']);
+      const quantities = new Set(['quantity', 'qty', 'soluong', 'returnquantity', 'soluonghoan', 'skuquantityofreturn']);
+      const statuses = new Set(['orderstatus', 'returnstatus', 'trangthaidonhang', 'trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaihoan']);
+      let best = null;
+      let hasCells = false;
+      for (const name of workbook.SheetNames) {
+        const sheet = workbook.Sheets[name];
+        if (!sheet) continue;
+        // Inspect physical rows so titles and instructions before the header are harmless.
+        const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0, defval: '', raw: false, blankrows: true });
+        for (let index = 0; index < matrix.length; index++) {
+          const cells = Array.isArray(matrix[index]) ? matrix[index] : Object.values(matrix[index] || {});
+          if (cells.some(value => String(value || '').trim())) hasCells = true;
+          const keys = cells.map(normalize);
+          const identityCount = keys.filter(key => identities.has(key)).length;
+          const categories = [products, quantities, statuses].filter(set => keys.some(key => set.has(key))).length;
+          if (!identityCount || !categories) continue;
+          const rows = XLSX.utils.sheet_to_json(sheet, { range: index, defval: '', raw: false });
+          const usefulRows = rows.filter(row => Object.values(row).some(value => String(value ?? '').trim()));
+          const score = categories * 10 + identityCount;
+          if (usefulRows.length && (!best || score > best.score)) best = { rows: usefulRows, score };
         }
       }
+      if (best) return best.rows;
+      if (hasCells) throw new Error('Không tìm thấy trang tính có tiêu đề dữ liệu đơn hàng và dòng dữ liệu.');
       return [];
     }
 
+    function preparePlatformImportGroups(files) {
+      const normalize = value => removeVietnameseTones(String(value || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Equivalent labels have one fingerprint, while return and forward tracking stay distinct.
+      const aliases = [
+        ['orderid', 'madonhang', 'iddonhang', 'madon'],
+        ['returnorderid', 'returnid', 'masokhieunai', 'makhieunai', 'mayeucautrahang'],
+        ['returnlogisticstrackingid', 'returntrackingid', 'returntracking', 'mavandontrahang', 'mvdtrahang'],
+        ['trackingid', 'trackingnumber', 'tracking', 'mavandon', 'mvd'],
+        ['productname', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname'],
+        ['quantity', 'qty', 'soluong'],
+        ['returnquantity', 'soluonghoan', 'skuquantityofreturn'],
+        ['variation', 'skuname', 'tenphanloai', 'tenphanloaitrensan'],
+        ['sellersku', 'masanphamsalework', 'skuphanloai'],
+        ['orderstatus', 'trangthaidonhang'],
+        ['returnstatus', 'trangthaihoan', 'trangthaitrahanghoantien']
+      ];
+      const canonicalKey = key => { const normalized = normalize(key); const group = aliases.find(list => list.includes(normalized)); return group ? group[0] : normalized; };
+      const groups = new Map();
+      const previousCounts = new Map();
+      let duplicateCount = 0;
+      files.forEach((file, fileIndex) => {
+        const counts = new Map();
+        let inheritedIdentity = {};
+        let inheritedIdentityCells = {};
+        let inheritedStatusCells = {};
+        const fileRows = [];
+        for (const original of file.rows) {
+          if (!original || typeof original !== 'object') continue;
+          const entries = Object.entries(original).filter(([key]) => !key.startsWith('__source'));
+          const canonical = {};
+          for (const [key, value] of entries) canonical[canonicalKey(key)] = String(value ?? '').trim();
+          const identityKeys = ['orderid', 'returnorderid', 'returnlogisticstrackingid', 'trackingid'];
+          const identity = Object.fromEntries(identityKeys.filter(key => canonical[key]).map(key => [key, canonical[key]]));
+          if (Object.keys(identity).length) {
+            inheritedIdentity = identity;
+            inheritedStatusCells = Object.fromEntries(entries.filter(([key, value]) => /status|trangthai/.test(canonicalKey(key)) && String(value ?? '').trim()));
+            inheritedIdentityCells = Object.fromEntries(entries.filter(([key, value]) => identityKeys.includes(canonicalKey(key)) && String(value ?? '').trim()));
+          } else Object.assign(canonical, inheritedIdentity);
+          // Rows with no parcel identity must still reach the parser's validation path.
+          const hasIdentity = Object.keys(inheritedIdentity).length > 0;
+          const fingerprint = JSON.stringify(Object.entries(canonical).sort(([a], [b]) => a.localeCompare(b)));
+          const count = (counts.get(fingerprint) || 0) + 1;
+          counts.set(fingerprint, count);
+          if (hasIdentity && count <= (previousCounts.get(fingerprint) || 0)) { duplicateCount++; continue; }
+          fileRows.push({ ...original, ...(Object.keys(identity).length ? {} : { ...inheritedIdentityCells, ...Object.fromEntries(Object.entries(inheritedStatusCells).filter(([key]) => !String(original[key] ?? '').trim())) }), __sourceFileName: file.name, __sourceFileId: String(fileIndex) });
+        }
+        for (const [key, count] of counts) previousCounts.set(key, Math.max(previousCounts.get(key) || 0, count));
+        // A parser chooses columns once per call. Keep different physical schemas separate.
+        const schema = JSON.stringify(Array.from(new Set(file.rows.flatMap(row => Object.keys(row || {}).filter(key => !key.startsWith('__source'))))).sort());
+        if (!groups.has(schema)) groups.set(schema, []);
+        groups.get(schema).push(...fileRows);
+      });
+      return { groups: Array.from(groups.values()).filter(rows => rows.length), duplicateCount };
+    }
+
     async function handlePlatformExcelUpload(e, forcedPlatform = null) {
+      const target = e && e.target;
+      if (handlePlatformExcelUpload.busy) {
+        alert('⚠️ Đang nạp dữ liệu. Vui lòng chờ hoàn tất.');
+        if (target) target.value = '';
+        return { success: false };
+      }
+      handlePlatformExcelUpload.busy = true;
+      try {
       if (isLocked) {
-        alert('🔒 BẢNG ĐANG KHÓA BẢO MẬT!\n\nVui lòng bấm nút [🔒 Đang Khóa] trên thanh tiêu đề để mở khóa bảng trước khi nạp file Excel!');
-        if (e && e.target) e.target.value = '';
-        return;
+        alert('🔒 BẢNG ĐANG KHÓA BẢO MẬT!\n\nVui lòng mở khóa bảng trước khi nạp file Excel!');
+        if (target) target.value = '';
+        return { success: false };
       }
       const actionLabel = forcedPlatform === 'TikTok Shop' ? 'Nạp File Đơn Sàn TikTok / Salework' : 'Nạp File Đơn Sàn Shopee';
-      if (!(await requireUnlocked(actionLabel))) {
-        if (e && e.target) e.target.value = '';
-        return;
-      }
-      const fileList = e.target.files ? Array.from(e.target.files) : [];
-      if (!fileList.length) return;
-
-      let combinedRows = [];
-      for (const file of fileList) {
-        try {
-          const isCsv = /\.csv$/i.test(file.name || '');
-          const buf = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = evt => resolve(evt.target.result);
-            reader.onerror = err => reject(err);
-            reader.readAsArrayBuffer(file);
-          });
-          const rows = readWorkbookRowsFromBuffer(buf, isCsv);
-          if (rows && rows.length > 0) {
-            rows.forEach(r => {
-              if (r && typeof r === 'object') r.__sourceFileName = file.name || '';
+      if (!(await requireUnlocked(actionLabel))) { if (target) target.value = ''; return { success: false }; }
+      const fileList = target && target.files ? Array.from(target.files) : [];
+      if (!fileList.length) return { success: false };
+      // Parse the complete selection before mutating orders. A bad file cannot leave a partial batch.
+      const parsedFiles = [];
+      try {
+        for (const file of fileList) {
+          let rows;
+          try {
+            const buffer = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = event => resolve(event.target.result);
+              reader.onerror = () => reject(reader.error || new Error('Không đọc được file.'));
+              reader.onabort = () => reject(new Error('Đã hủy đọc file.'));
+              reader.readAsArrayBuffer(file);
             });
-            combinedRows = combinedRows.concat(rows);
-          }
-        } catch (err) {
-          alert(`❌ Lỗi khi đọc file "${file.name}": ` + (err.message || err));
+            rows = readWorkbookRowsFromBuffer(buffer, /\.csv$/i.test(file.name || ''));
+          } catch (error) { throw new Error('File "' + file.name + '": ' + (error.message || error)); }
+          if (!rows.length) throw new Error('File "' + file.name + '" không có dữ liệu đơn hàng.');
+          parsedFiles.push({ name: file.name || '', rows });
         }
-      }
-      e.target.value = '';
-
-      if (!combinedRows.length) {
-        alert('⚠️ File Excel không có dữ liệu dòng nào!');
-        return;
-      }
-
-      const sampleKeys = Object.keys(combinedRows[0] || {});
-      const isTikTokFile = sampleKeys.some(k => {
-        const kn = removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, '');
-        return kn === 'returnorderid' || kn === 'returnlogisticstrackingid' || kn === 'returnreason' ||
-               kn === 'cancelationreturntype' || kn === 'skuquantityofreturn' || kn === 'cancelreason' ||
-               kn === 'rtstime' || kn === 'ordersubstatus' ||
-               (kn.includes('orderid') && sampleKeys.some(k2 => removeVietnameseTones(k2).toLowerCase().includes('cancelreason')));
-      });
-
-      if (forcedPlatform === 'TikTok Shop' || isTikTokFile) {
-        await ingestTikTokOnlyRecords(combinedRows);
-      } else if (forcedPlatform === 'Shopee') {
-        await ingestShopeeOnlyRecords(combinedRows);
-      } else {
-        await ingestShopeeRecords(combinedRows);
-      }
+      } catch (error) {
+        alert('❌ Chưa nạp dữ liệu: ' + (error.message || error));
+        return { success: false };
+      } finally { if (target) target.value = ''; }
+      const prepared = preparePlatformImportGroups(parsedFiles);
+      if (!prepared.groups.length) { alert('⚠️ Không có dòng dữ liệu đơn hàng để nạp.'); return { success: false }; }
+      if (activeImportBatch) { alert('⚠️ Đang nạp dữ liệu. Vui lòng chờ hoàn tất.'); return { success: false }; }
+      const snapshot = captureImportState();
+      activeImportBatch = { messages: [] };
+      try {
+        for (const rows of prepared.groups) {
+          const sampleKeys = Object.keys(rows[0] || {}).map(key => removeVietnameseTones(key).toLowerCase().replace(/[^a-z0-9]/g, ''));
+          const isTikTokFile = sampleKeys.some(key => ['returnorderid', 'returnlogisticstrackingid', 'returnreason', 'cancelationreturntype', 'skuquantityofreturn', 'cancelreason', 'rtstime', 'ordersubstatus'].includes(key));
+          let result;
+          if (forcedPlatform === 'TikTok Shop') result = await ingestTikTokOnlyRecords(rows);
+          else if (forcedPlatform === 'Shopee') result = await ingestShopeeOnlyRecords(rows);
+          else if (isTikTokFile) result = await ingestTikTokOnlyRecords(rows);
+          else result = await ingestShopeeRecords(rows);
+          if (result && result.success === false) throw new Error('Bộ nạp không hoàn tất xử lý dữ liệu.');
+        }
+        if (!(await commitImportState(snapshot))) return { success: false };
+        const messages = activeImportBatch.messages.slice();
+        const effects = activeImportBatch.effects || [];
+        activeImportBatch = null;
+        effects.forEach(effect => { try { effect(); } catch (error) { console.warn('Import display update failed:', error); } });
+        alert(messages.join('\n\n') + (prepared.duplicateCount ? '\n\nĐã bỏ qua ' + prepared.duplicateCount + ' dòng trùng giữa các file.' : ''));
+        return { success: true, fileCount: parsedFiles.length, duplicateCount: prepared.duplicateCount };
+      } catch (error) {
+        await rollbackImportState(snapshot);
+        alert('❌ Chưa nạp dữ liệu: ' + (error.message || error));
+        return { success: false };
+      } finally { activeImportBatch = null; }
+      } finally { handlePlatformExcelUpload.busy = false; }
     }
 
     // =========================================================================
@@ -4330,7 +4524,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // =========================================================================
     async function ingestTikTokOnlyRecords(rawRows) {
       if (!(await requireUnlocked('Nạp Đơn Sàn TikTok / Salework'))) return;
-      if (!rawRows || !rawRows.length) return;
+      if (!rawRows || !rawRows.length) return { success: false };
+      const importState = activeImportBatch ? null : captureImportState();
 
       // Tập hợp toàn bộ tên cột từ 50 dòng đầu để không bao giờ bị sót cột
       const keySet = new Set();
@@ -4402,8 +4597,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['ordersubstatus', 'substatus']
       );
       const skuQuantityOfReturnKey = findKeyExactOrIncludes(
-        ['Sku Quantity of return', 'Số lượng hoàn'],
-        ['skuquantityofreturn', 'soluonghoan']
+        ['Sku Quantity of return', 'Return Quantity', 'Số lượng hoàn'],
+        ['skuquantityofreturn', 'returnquantity', 'soluonghoan']
       );
       const shippedTimeKey = findKeyExactOrIncludes(
         ['Shipped Time', 'Thời gian gửi'],
@@ -4423,6 +4618,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['Mã vận đơn', 'Tracking ID', 'Mã vận đơn trả hàng', 'Mã vận đơn giao hàng', 'Return Logistics Tracking ID'],
         ['mavandon', 'trackingid', 'trackingnumber', 'tracking', 'mvd', 'sovandon', 'mabuugui']
       );
+      const forwardTrackKey = findKeyExactOrIncludes(
+        ['Tracking ID', 'Mã vận đơn giao hàng', 'Mã vận đơn'],
+        ['forwardtracking', 'mavandongiaohang'],
+        ['return', 'trahang']
+      );
+      const orderedQtyKey = findKeyExactOrIncludes(['Quantity', 'Số lượng'], ['orderedquantity'], ['return', 'hoan']);
       const orderIdKey = findKeyExactOrIncludes(
         ['Order ID', 'Mã đơn hàng', 'ID đơn hàng'],
         ['orderid', 'madonhang', 'iddonhang', 'madon'],
@@ -4446,6 +4647,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['Seller SKU', 'Mã sản phẩm Salework', 'SKU phân loại'],
         ['sellersku', 'masanphamsalework', 'skuphanloai']
       );
+      const skuIdKey = findKeyExactOrIncludes(['SKU ID', 'Sku ID', 'Mã SKU'], ['skuid', 'masku']);
       const qtyKey = findKeyExactOrIncludes(
         ['Return Quantity', 'Quantity', 'Số lượng', 'Số lượng hoàn'],
         ['returnquantity', 'quantity', 'soluong', 'qty'],
@@ -4453,7 +4655,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       );
 
       // Cột giá tiền
-      const priceTongGiaTriKey = findKeyExactOrIncludes(['Order Amount', 'Order Total', 'Tổng giá trị', 'Return unit price'], ['orderamount', 'ordertotal', 'tonggiatri', 'returnunitprice']);
+      const priceTongGiaTriKey = findKeyExactOrIncludes(['Order Amount', 'Order Total', 'Tổng giá trị'], ['orderamount', 'ordertotal', 'tonggiatri']);
       const priceSauChietKhauKey = findKeyExactOrIncludes(['SKU Subtotal After Discount', 'Tổng tiền hàng sau chiết khấu'], ['skusubtotalafterdiscount', 'tongtienhangsauchietkhau']);
       const priceGiaSanTmdtKey = findKeyExactOrIncludes(['SKU Unit Original Price', 'Giá sàn TMĐT', 'Đơn giá'], ['skuunitoriginalprice', 'giasantmdt']);
       const priceTongTienHangKey = findKeyExactOrIncludes(['Tổng tiền hàng', 'SKU Subtotal Before Discount'], ['tongtienhang'], ['sauchietkhau']);
@@ -4550,6 +4752,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const isSkuSubtotalColumn = key => /skusubtotal/.test(removeVietnameseTones(key || '').replace(/[^a-z0-9]/g, ''));
       const tempMap = new Map();
+      const zeroReturnedGroups = new Set();
       let addedCount = 0;
       let withTrackCount = 0;
       let emptyTrackCancelCount = 0;
@@ -4559,8 +4762,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let failedDeliveryCount = 0;
       let lastGroupKey = '';
       let lastSkippedRow = false;
+      let lastSourceFileId;
 
       rawRows.forEach((row, rowIdx) => {
+        if (row.__sourceFileId !== lastSourceFileId) {
+          lastGroupKey = '';
+          lastSkippedRow = false;
+          lastSourceFileId = row.__sourceFileId;
+        }
         // 1. Trích xuất Mã vận đơn
         let rawTrack = '';
         if (trackKey && row[trackKey] !== undefined && row[trackKey] !== '') {
@@ -4598,7 +4807,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const rawSubStatusText = (returnSubStatusKey && row[returnSubStatusKey]) ? String(row[returnSubStatusKey]).trim() : (orderSubstatusKey && row[orderSubstatusKey] ? String(row[orderSubstatusKey]).trim() : '');
         const rawCancelReason = noteKey ? String(row[noteKey] || '').trim() : '';
         const rawCancelType = returnTypeKey ? String(row[returnTypeKey] || '').trim() : '';
-        const rawRetQty = skuQuantityOfReturnKey ? parseInt(String(row[skuQuantityOfReturnKey] || '0').replace(/[^\d]/g, ''), 10) : 0;
+        const hasReturnQty = Boolean(skuQuantityOfReturnKey && row[skuQuantityOfReturnKey] !== undefined && row[skuQuantityOfReturnKey] !== null && String(row[skuQuantityOfReturnKey]).trim() !== '');
+        const rawRetQty = hasReturnQty ? parseImportedQuantity(row[skuQuantityOfReturnKey]) : 0;
+        // Zero means this SKU was not returned; blank means the export omitted return quantity.
+        if (hasReturnQty && rawRetQty === 0) {
+          const skippedGroupKey = isContinuationRow ? lastGroupKey : getReturnParcelKey({orderId: rawOrderId, track: rawTrack, returnOrderId: rawReturnOrderId});
+          zeroReturnedGroups.add(skippedGroupKey);
+          lastGroupKey = skippedGroupKey;
+          if (tempMap.has(skippedGroupKey)) tempMap.get(skippedGroupKey).isPartialReturn = true;
+          lastSkippedRow = false;
+          return;
+        }
+        const orderedQty = orderedQtyKey ? parseImportedQuantity(row[orderedQtyKey]) : 0;
 
         const rawOrderStNorm = removeVietnameseTones(rawStatusText).toLowerCase();
         const rawSubStNorm = removeVietnameseTones(rawSubStatusText).toLowerCase();
@@ -4608,27 +4828,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         // Kiểm tra hủy bằng word boundary để tránh nhầm chữ "chuyen" (vận chuyển/trung chuyển) với "huy"
         const isCancelledWord = /\bhuy\b/i.test(rawOrderStNorm) || /\bcancel(?:led|ed)?\b/i.test(rawOrderStNorm) || /\bhuy\b/i.test(rawSubStNorm) || /\bcancel(?:led|ed)?\b/i.test(rawSubStNorm) || rawCancelTypeNorm.includes('cancel');
         const isFailedDelivery = rawCancelReasonNorm.includes('giao goi hang that bai') || rawCancelReasonNorm.includes('that bai') || rawCancelReasonNorm.includes('fail');
-        const isReturnOrRefund = rawOrderStNorm.includes('hoan') || rawOrderStNorm.includes('tra') || rawOrderStNorm.includes('return') || rawRetQty > 0 || isTikTokReturnRefundFile;
+        const returnStatusWords = /\b(?:hoan|tra|return(?:ed|ing)?|refund(?:ed|ing)?)\b/i;
+        const hasReturnIdentity = Boolean(rawReturnOrderId || (returnLogisticsTrackKey && String(row[returnLogisticsTrackKey] ?? '').trim()));
+        const isReturnOrRefund = returnStatusWords.test(rawOrderStNorm) || returnStatusWords.test(rawSubStNorm) || rawRetQty > 0 || hasReturnIdentity;
 
         const isReturnOrCancel = isFailedDelivery || isCancelledWord || isReturnOrRefund || rawOrderStNorm.includes('that thu');
 
-        if (!isTikTokReturnRefundFile) {
-          if (!isContinuationRow) {
-            if (onlyReturns) {
-              if (!isReturnOrCancel) {
-                skippedCount++;
-                lastSkippedRow = true;
-                return;
-              }
-            }
-            if (skipUnshippedCancel && !rawTrack && isCancelledWord) {
-              skippedCount++;
-              lastSkippedRow = true;
-              return;
-            }
-            lastSkippedRow = false;
+        if (!isContinuationRow) {
+          if ((onlyReturns && !isReturnOrCancel) || (skipUnshippedCancel && !rawTrack && isCancelledWord)) {
+            skippedCount++;
+            lastSkippedRow = true;
+            return;
           }
-        } else {
           lastSkippedRow = false;
         }
 
@@ -4639,9 +4850,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         let rawQty = 1;
         if (qtyKey && row[qtyKey] !== undefined && row[qtyKey] !== '') {
-          const qVal = parseInt(String(row[qtyKey]).replace(/[^\d]/g, ''), 10);
+          const qVal = parseImportedQuantity(row[qtyKey]);
           if (qVal > 0) rawQty = qVal;
         }
+
+        if (hasReturnQty && rawRetQty > 0) rawQty = rawRetQty;
 
         let rawPreOrder = 'Đơn thường';
         if (preOrderKey && row[preOrderKey] !== undefined && row[preOrderKey] !== '') {
@@ -4742,8 +4955,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const isTikTokPartial = Boolean(
-          (valUnitPrice > 0 && valZ > 0 && valUnitPrice < (valZ * 0.95)) ||
-          (row['Return Quantity'] && row['Quantity'] && parseInt(row['Return Quantity'], 10) < parseInt(row['Quantity'], 10)) ||
+          (hasReturnQty && rawRetQty > 0 && orderedQty > rawRetQty) ||
           rawCancelTypeNorm.includes('partial') ||
           rawCancelReasonNorm.includes('mot phan')
         );
@@ -4779,16 +4991,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
-        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, ...parseImportedTrackingCodes(row), ...(typeof rawAltTrack === 'string' ? [rawAltTrack] : [])].filter(Boolean)));
+        const returnTrack = returnLogisticsTrackKey ? extractCleanTrackingCode(normalizeScientificOrderId(row[returnLogisticsTrackKey])) : '';
+        if (returnTrack && !entry.returnTrack) entry.returnTrack = returnTrack;
+        const forwardTrack = forwardTrackKey ? extractCleanTrackingCode(normalizeScientificOrderId(row[forwardTrackKey])) : '';
+        if (forwardTrack && !entry.forwardTrack) entry.forwardTrack = forwardTrack;
+        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, forwardTrack, ...parseImportedTrackingCodes(row)].filter(Boolean)));
         // Aggregate SKU amounts as line totals; order amounts may repeat on every SKU row.
         // Presence is separate from value so an explicit zero does not trigger a fallback.
         if (!entry._importMoney) entry._importMoney = {};
+        const lineMoney = {};
         const collectMoney = (slot, key, value, sum) => {
           if (!key || row[key] === undefined || row[key] === null || String(row[key]).trim() === '') return;
+          if (sum) lineMoney[slot] = value;
           if (sum) entry._importMoney[slot] = (entry._importMoney[slot] ?? 0) + value;
           else if (entry._importMoney[slot] === undefined) entry._importMoney[slot] = value;
         };
-        collectMoney('unitReturn', returnUnitPriceKey, valUnitPrice, false);
+        collectMoney('unitReturn', returnUnitPriceKey, valUnitPrice * rawQty, true);
         collectMoney('total', priceTongGiaTriKey, valZ, false);
         collectMoney('discounted', priceSauChietKhauKey, valAM, isSkuSubtotalColumn(priceSauChietKhauKey));
         collectMoney('originalUnit', priceGiaSanTmdtKey, valK * rawQty, true);
@@ -4817,26 +5035,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             product: cleanProd,
             color: color,
             size: size,
-            qty: rawQty
+            qty: rawQty,
+            importPrices: lineMoney,
+            ...(rawSellerSku ? {sellerSku: rawSellerSku} : {}),
+            ...(skuIdKey && row[skuIdKey] ? {skuId: String(row[skuIdKey]).trim()} : {})
           });
         }
       });
 
       // Lưu vào bộ nhớ tra cứu & đẩy ra bảng chính
       tempMap.forEach(orderData => {
+        if (zeroReturnedGroups.has(getReturnParcelKey(orderData))) orderData.isPartialReturn = true;
         const money = orderData._importMoney;
+        orderData.priceHasValue = Object.keys(money || {}).length > 0;
         const priceVal = money.unitReturn ?? money.discounted ?? money.total ?? money.originalUnit ?? money.subtotal ?? 0;
         orderData.priceModes = {
           tong_gia_tri: priceVal,
           sau_chiet_khau: money.discounted ?? priceVal,
           gia_salework: money.subtotal ?? money.saleworkUnit ?? priceVal,
           doanh_thu_uoc_tinh: money.revenue ?? priceVal,
-          hasOrderLevelZ: money.total !== undefined || money.unitReturn !== undefined,
+          hasOrderLevelZ: money.unitReturn === undefined && money.total !== undefined,
           hasOrderLevelAM: money.discounted !== undefined && !isSkuSubtotalColumn(priceSauChietKhauKey),
           hasOrderLevelAO: money.subtotal !== undefined && !isSkuSubtotalColumn(priceTongTienHangKey),
           hasOrderLevelL: money.revenue !== undefined
         };
         orderData.price = orderData.priceModes[selectedPriceMode] ?? priceVal;
+        const baseSlots = ['unitReturn','discounted','total','originalUnit','subtotal'];
+        const firstSlot = slots => slots.find(slot => money[slot] !== undefined);
+        const slotsByMode = { tong_gia_tri: baseSlots, sau_chiet_khau: ['discounted', ...baseSlots], gia_salework: ['subtotal','saleworkUnit', ...baseSlots], doanh_thu_uoc_tinh: ['revenue', ...baseSlots] };
+        orderData.importModeSlots = {};
+        for (const [mode, slots] of Object.entries(slotsByMode)) {
+          const slot = firstSlot(slots);
+          const orderLevel = slot === 'total' || slot === 'revenue' || (slot === 'discounted' && !isSkuSubtotalColumn(priceSauChietKhauKey)) || (slot === 'subtotal' && !isSkuSubtotalColumn(priceTongTienHangKey));
+          orderData.importModeSlots[mode] = orderLevel ? null : slot;
+        }
+        orderData.importSelectedPriceMode = selectedPriceMode;
         delete orderData._importMoney;
         if (!orderData.items.length) {
           orderData.items.push({ product: '', color: '', size: '', qty: 1 });
@@ -4845,7 +5078,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       saveShopeeOrderDb();
-      renderShopeeDbTable();
+      runImportUi('renderShopeeDbTable');
 
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
@@ -4876,7 +5109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               } else {
                 detailMsg += ' Cập nhật dữ liệu chi tiết từ sàn TikTok Shop.';
               }
-              addAppNotification({
+              runImportUi('addAppNotification',{
                 type: 'excel_update',
                 title: '🔄 Cập Nhật Trạng Thái Đơn #' + (existingIdx + 1),
                 detail: detailMsg,
@@ -4904,11 +5137,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               preOrder: orderData.preOrder || 'Đơn thường',
               orderId: orderData.orderId || orderData.returnOrderId || '',
               returnOrderId: orderData.returnOrderId || '',
+              forwardTrack: orderData.forwardTrack || '',
+              returnTrack: orderData.returnTrack || '',
               trackingCodes: getOrderTrackingCodes(orderData),
               track: cleanTrack || orderData.track || '',
               altTrack: '',
               carrier: orderData.carrier || 'J&T Express',
               price: orderData.price || 0,
+              importPriceBasis: orderData.importPriceBasis, priceNeedsReview: orderData.priceNeedsReview,
+              importPriceBasis: orderData.importPriceBasis, importModeSlots: orderData.importModeSlots, importSelectedPriceMode: orderData.importSelectedPriceMode, priceNeedsReview: orderData.priceNeedsReview,
               priceModes: orderData.priceModes ? Object.assign({}, orderData.priceModes) : undefined,
               status: (orderData.orderType === 'Đơn hủy' && (!cleanTrack && !orderData.track)) ? 'Không cần nhận' : 'Chưa về',
               photo: '',
@@ -4928,27 +5165,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         });
 
-        saveOrders();
+        if (importState && !(await commitImportState(importState))) return { success: false };
         
         // TỰ ĐỘNG CHUYỂN NGAY SANG KHÔNG GIAN SÀN TIKTOK SHOP ĐỂ QUẢN LÝ RIÊNG!
-        setPlatformFilter('TikTok Shop');
-        renderAll();
+        runImportUi('setPlatformFilter','TikTok Shop');
+        runImportUi('renderAll');
         if (enrichedTableCount > 0) {
-          showAppToast(`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn TikTok có sẵn!`, 'info', 4000);
+          runImportUi('showAppToast',`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn TikTok có sẵn!`, 'info', 4000);
           try { playBeepSound(1300, 150); } catch (e) {}
         }
       } else {
         autoEnrichAllMissingOrdersFromDb(true);
+        if (importState && !(await commitImportState(importState))) return { success: false };
       }
 
-      addAuditLog('📥 NẠP ĐƠN TIKTOK SHOP', `Đã nạp thành công ${addedCount} đơn TikTok (Có MVD: ${withTrackCount}, Bom/Giao thất bại: ${failedDeliveryCount}, SP Premium: ${premiumItemCount})`);
+      runImportUi('addAuditLog','📥 NẠP ĐƠN TIKTOK SHOP', `Đã nạp thành công ${addedCount} đơn TikTok (Có MVD: ${withTrackCount}, Bom/Giao thất bại: ${failedDeliveryCount}, SP Premium: ${premiumItemCount})`);
       
       let fileTypeLabel = 'File Báo Cáo Trả Hàng / Hoàn Tiền TikTok Shop Seller Center';
       if (isTikTokOrderListFile) {
         fileTypeLabel = 'File Danh Sách Đơn Hàng TikTok Shop Seller Center (Đơn hoàn / Giao thất bại)';
       }
 
-      alert(
+      notifyImportResult(
         `🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SÀN TIKTOK SHOP!\n\n` +
         `  Nhận diện chuẩn: ${fileTypeLabel}\n` +
         `  Đơn có Mã Vận Đơn giao / hoàn: ${withTrackCount} đơn\n` +
@@ -4959,6 +5197,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         (skippedCount > 0 ? `  Đã tự động lọc bỏ ${skippedCount} đơn vận chuyển thông thường (không phải đơn hoàn)\n` : '') +
         '\n👉 Hệ thống đã tự động chuyển giao diện sang tab [⚫ SÀN TIKTOK SHOP] để bạn theo dõi riêng biệt!'
       );
+      return { success: true };
     }
 
     async function ingestShopeeOnlyRecords(rawRows) {
@@ -4967,7 +5206,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function ingestShopeeRecords(rawRows, forcedPlatform = null) {
       if (!(await requireUnlocked('Nhập Dữ Liệu Đơn Hàng'))) return;
-      if (!rawRows || !rawRows.length) return;
+      if (!rawRows || !rawRows.length) return { success: false };
+      const importState = activeImportBatch ? null : captureImportState();
       const keySet = new Set();
       rawRows.forEach(r => { if (r && typeof r === "object") Object.keys(r).forEach(k => keySet.add(k)); });
       const keys = Array.from(keySet);
@@ -5001,6 +5241,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['maphanloai', 'masanpham', 'masku', 'skuid', 'skuphanloai', 'idbienthe', 'idphanloai', 'idgoihang', 'packageid']
       );
       const sellerSkuKey = findKey(['masanphamsalework', 'skuphanloai', 'sellersku', 'maskuphanloai', 'masku', 'masanpham', 'skusanpham']);
+      const skuIdKey = findKey(['skuid', 'idbienthe', 'maphanloai']);
       // Tìm cột màu sắc và kích cỡ riêng biệt nếu có trong file Excel
       const explicitColorKey = findKey(['mausac', 'mau', 'color', 'colour'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra', 'maphanloai']);
       const explicitSizeKey = findKey(['kichthuoc', 'kichco', 'size'], ['masku', 'skuid', 'id', 'lydo', 'reason', 'note', 'ghichu', 'chitiet', 'huy', 'hoan', 'tra', 'status', 'trangthai', 'maphanloai']);
@@ -5040,16 +5281,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const returnShippingFeeKey = findKey(['phivanchuyenchieuhoantra']);
       const refundAmountKey = findKey(['tongsotienhoantra', 'sotienhoantra', 'refundamount']);
       const refundTimeKey = findKey(['thoigianhoantien', 'ngayhoantien', 'refundtime']);
-      // Ưu tiên cột Số lượng Hoàn (trong file Trả hàng/Hoàn tiền Shopee) hoặc Số lượng sản phẩm được hoàn trả, nếu trống hoặc = 0 mới lấy cột Số lượng đặt
-      const returnQtyKey = findKey(['soluonghoan', 'soluongsanphamduochoantra']);
-      const orderQtyKey = findKey(['soluong', 'quantity', 'sl', 'soluongmathang', 'itemquantity', 'qty'], ['soluonghoan', 'soluongsanphamduochoantra', 'tongsoluong']);
-      // Danh sách các cột giá tiền theo thứ tự ưu tiên (nếu cột đầu tiên = 0 như "Tổng số tiền Hoàn trả = 0" ở đơn Hoàn tiền ngay thì tự động lấy cột tiếp theo!)
-      const priceCandidateKeys = [
-        findKey(['tonggiatridonhang', 'tongtienhangsauchietkhau', 'doanhthuuoctinh', 'tongsotiennguoimuathanhtoan', 'tongtienthanhtoan']),
-        findKey(['tongsotienhoantra']),
-        findKey(['tonggiatri', 'thanhtien', 'tonggiaban', 'totalamount', 'orderamount']),
-        findKey(['giauda', 'giaban', 'giatien', 'tongtien', 'dongia', 'skuunitprice', 'price', 'giasantmdt', 'giasalework', 'giagoc', 'giabanle'])
-      ].filter(Boolean);
+      // Chỉ dùng số lượng đặt khi ô số lượng hoàn trống; số 0 là SKU khách giữ lại.
+      const returnQtyPatterns = ['soluonghoan', 'soluongsanphamduochoantra', 'returnquantity', 'returnedquantity', 'returnqty', 'returnedqty'];
+      const returnQtyKey = findKey(returnQtyPatterns);
+      const orderQtyKey = findKey(['soluong', 'quantity', 'sl', 'soluongmathang', 'itemquantity', 'qty'], [...returnQtyPatterns, 'tongsoluong']);
+      // Match complete monetary headers: "dongia" must never match "mavandongiaohang".
+      const moneyHeader = key => removeVietnameseTones(key).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/(?:vnd|usd|vnđ)$/, '');
+      const priceColumns = [];
+      const priceGroups = [
+        ['order', ['tonggiatridonhang', 'tongtienhangsauchietkhau', 'doanhthuuoctinh', 'tongsotiennguoimuathanhtoan', 'tongtienthanhtoan', 'ordertotal']],
+        ['order', ['tongsotienhoantra', 'refundamount']],
+        ['order', ['tonggiatri', 'totalamount', 'orderamount', 'tongtien']],
+        ['line', ['thanhtien', 'tonggiaban', 'linesubtotal', 'linetotal', 'itemsubtotal', 'subtotal']],
+        ['unit', ['giauda', 'giauudai', 'giaban', 'giatien', 'dongia', 'skuunitprice', 'unitprice', 'price', 'giasantmdt', 'giasalework', 'giagoc', 'giabanle']]
+      ];
+      priceGroups.forEach(([kind, aliases]) => aliases.forEach(alias => {
+        const key = keys.find(k => moneyHeader(k) === alias);
+        if (key && !priceColumns.some(column => column.key === key)) priceColumns.push({key, kind});
+      }));
+      const priceByGroup = new Map();
       // Các cột ngày gửi / đóng / xử lý / tạo đơn theo thứ tự ưu tiên để luôn lấy được ngày kể cả khi cột Thời gian gửi bị trống (như trên Salework)
       const shipDateCandidateKeys = [
         findKey(['thoigiangui', 'ngaygui', 'shippedtime']),
@@ -5070,6 +5320,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const onlyReturns = document.getElementById('chkFilterOnlyReturns')?.checked ?? true;
 
       const tempMap = new Map();
+      const zeroReturnedGroups = new Set();
       let addedCount = 0;
       let shopeeAddedCount = 0;
       let tiktokAddedCount = 0;
@@ -5077,8 +5328,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let skippedSuccessCount = 0;
       let lastGroupKey = '';
       let lastSkippedRow = false;
+      let lastSourceFileId;
 
       rawRows.forEach(row => {
+        if (row.__sourceFileId !== lastSourceFileId) {
+          lastGroupKey = '';
+          lastSkippedRow = false;
+          lastSourceFileId = row.__sourceFileId;
+        }
         const rawReturnTrack = returnTrackKey ? extractCleanTrackingCode(String(row[returnTrackKey] || '').trim()) : '';
         const rawForwardTrack = forwardTrackKey ? extractCleanTrackingCode(String(row[forwardTrackKey] || '').trim()) : '';
         // Ưu tiên Mã vận đơn trả hàng (nếu có trên kiện hoàn về), nếu chưa có thì lấy Mã vận đơn giao hàng; và lưu cả 2 mã để quét mã nào cũng khớp!
@@ -5090,12 +5347,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const rawVarInput = varKey ? String(row[varKey] || '').trim() : '';
         const rawSellerSku = sellerSkuKey ? String(row[sellerSkuKey] || '').trim() : '';
 
+        const rawClaimId = claimIdKey ? String(row[claimIdKey] || '').trim() : '';
         let isContinuationRow = false;
         if (!rawTrack && !rawOrderId) {
-          // Hỗ trợ đơn nhiều sản phẩm của Salework / TikTok / Shopee: dòng SP thứ 2, 3 để trống Mã đơn & Mã vận đơn nhưng có Tên SP hoặc Mã SKU
-          if (lastGroupKey && !lastSkippedRow && tempMap.has(lastGroupKey) && (rawProdInput || rawVarInput || rawSellerSku)) {
+          const previous = tempMap.get(lastGroupKey);
+          const previousClaim = String(previous?.rawDetails?.claimId || '').trim().toUpperCase();
+          const sameClaim = !rawClaimId || rawClaimId.toUpperCase() === previousClaim;
+          // An explicit different claim starts its own parcel even when tracking is blank.
+          if (previous && !lastSkippedRow && sameClaim && (rawProdInput || rawVarInput || rawSellerSku)) {
             isContinuationRow = true;
-          } else {
+          } else if (!rawClaimId) {
             return;
           }
         }
@@ -5107,7 +5368,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!isContinuationRow && onlyReturns) {
           const rawOrderSt = statusKey ? removeVietnameseTones(String(row[statusKey] || '')).toLowerCase() : '';
           const rawRetSt = returnStatusKey ? removeVietnameseTones(String(row[returnStatusKey] || '')).toLowerCase() : '';
-          const retQtyVal = returnQtyKey ? (parseInt(String(row[returnQtyKey] || '').replace(/[^\d]/g, ''), 10) || 0) : 0;
+          const retQtyVal = returnQtyKey ? (parseImportedQuantity(row[returnQtyKey]) || 0) : 0;
 
           // Giữ 100% dữ liệu gốc trong file Excel (kể cả yêu cầu đã hủy) để đối soát & xem chi tiết đầy đủ 289 dòng
 
@@ -5134,15 +5395,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         let rawQty = 1;
         let hasExplicitReturnQty = false;
-        if (returnQtyKey && row[returnQtyKey] !== undefined && row[returnQtyKey] !== '') {
-          const rq = parseInt(String(row[returnQtyKey]).replace(/[^\d]/g, ''), 10);
+        if (returnQtyKey && row[returnQtyKey] != null && String(row[returnQtyKey]).trim() !== '') {
+          const rq = parseImportedQuantity(row[returnQtyKey]);
+          if (rq === 0) { zeroReturnedGroups.add(groupKey); return; }
           if (rq > 0) {
             rawQty = rq;
             hasExplicitReturnQty = true;
           }
         }
         if (!hasExplicitReturnQty && orderQtyKey && row[orderQtyKey] !== undefined && row[orderQtyKey] !== '') {
-          const oq = parseInt(String(row[orderQtyKey]).replace(/[^\d]/g, ''), 10);
+          const oq = parseImportedQuantity(row[orderQtyKey]);
           if (oq > 0) rawQty = oq;
         }
 
@@ -5157,7 +5419,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         let isPartialQty = false;
         if (hasExplicitReturnQty && orderQtyKey && row[orderQtyKey] !== undefined && row[orderQtyKey] !== '') {
-          const oq = parseInt(String(row[orderQtyKey]).replace(/[^\d]/g, ''), 10);
+          const oq = parseImportedQuantity(row[orderQtyKey]);
           if (oq > rawQty) isPartialQty = true;
         }
 
@@ -5169,16 +5431,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         }
 
-        let rawPrice = 0;
-        for (const pk of priceCandidateKeys) {
-          if (row[pk] !== undefined && row[pk] !== '') {
-            const pVal = parseMoneyCellValue(row[pk]);
-            if (pVal > 0) {
-              rawPrice = pVal;
-              break;
-            }
-          }
+        let priceTotals = priceByGroup.get(groupKey);
+        if (!priceTotals) {
+          priceTotals = new Map();
+          priceByGroup.set(groupKey, priceTotals);
         }
+        for (const column of priceColumns) {
+          if (row[column.key] == null || String(row[column.key]).trim() === '') continue;
+          const value = parseMoneyCellValue(row[column.key]);
+          if (!Number.isFinite(value) || value < 0) continue;
+          const previous = priceTotals.get(column.key) || 0;
+          priceTotals.set(column.key, column.kind === 'order'
+            ? (priceTotals.has(column.key) ? previous : value)
+            : previous + value * (column.kind === 'unit' ? rawQty : 1));
+        }
+        const chosenPriceColumn = priceColumns.find(column => priceTotals.has(column.key));
+        const rawPrice = chosenPriceColumn ? priceTotals.get(chosenPriceColumn.key) : 0;
 
         // Trích xuất Ngày gửi đi (thử lần lượt các cột Thời gian gửi -> Thời gian đóng -> Thời gian xử lý -> Ngày tạo đơn)
         let rawShipDate = '';
@@ -5361,7 +5629,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const stNormForType = removeVietnameseTones(rawStatusText).toLowerCase();
         const retStNormForType = returnStatusKey ? removeVietnameseTones(String(row[returnStatusKey] || '')).toLowerCase() : '';
         const cancelNormForType = removeVietnameseTones(`${cancelReasonText} ${mainReason} ${rawNote}`).toLowerCase();
-        const hasReturnQtyColVal = returnQtyKey && (parseInt(String(row[returnQtyKey] || '').replace(/[^\d]/g, ''), 10) || 0) > 0;
+        const hasReturnQtyColVal = returnQtyKey && (parseImportedQuantity(row[returnQtyKey]) || 0) > 0;
 
         let detectedOrderType = 'Trả hàng/Hoàn tiền';
         if (stNormForType === 'that thu' || stNormForType.includes('that thu')) {
@@ -5501,6 +5769,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const entry = tempMap.get(groupKey);
         entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, ...parseImportedTrackingCodes(row), ...(typeof rawAltTrack === 'string' ? [rawAltTrack] : [])].filter(Boolean)));
+        entry.priceHasValue = Boolean(chosenPriceColumn);
+        entry.importPriceBasis = chosenPriceColumn?.kind === 'order' ? 'order' : 'line';
         if (isShopeePartial || isPartialQty) entry.isPartialReturn = true;
         if (!entry.platformStatus && extractedPlatformStatus) entry.platformStatus = extractedPlatformStatus;
         if (rawPreOrder === 'Hàng đặt trước') entry.preOrder = rawPreOrder;
@@ -5509,7 +5779,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (rawTrack && !entry.track) entry.track = rawTrack;
         if (rawAltTrack && !entry.altTrack) entry.altTrack = rawAltTrack;
         if (rawOrderId && !entry.orderId) entry.orderId = rawOrderId;
-        if (rawPrice && !entry.price) entry.price = rawPrice;
+        entry.price = rawPrice;
         if (rawShipDate && !entry.shipDate) entry.shipDate = rawShipDate;
         if (rawReturnDate && !entry.returnDate) entry.returnDate = rawReturnDate;
         if (rawNote && !entry.note) entry.note = rawNote;
@@ -5519,6 +5789,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (cleanProd || color || size) {
           entry.items.push({
             product: cleanProd,
+            sku: rawSellerSku || (skuIdKey ? String(row[skuIdKey] || '').trim() : ''),
+            ...(chosenPriceColumn && chosenPriceColumn.kind !== 'order' && row[chosenPriceColumn.key] !== '' ? { importLineAmount: parseMoneyCellValue(row[chosenPriceColumn.key]) * (chosenPriceColumn.kind === 'unit' ? rawQty : 1) } : {}),
             color: color,
             size: size,
             qty: rawQty
@@ -5527,6 +5799,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       tempMap.forEach(orderData => {
+        if (zeroReturnedGroups.has(getReturnParcelKey(orderData))) orderData.isPartialReturn = true;
         if (!orderData.items.length) {
           orderData.items.push({ product: '', color: '', size: '', qty: 1 });
         }
@@ -5534,7 +5807,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       saveShopeeOrderDb();
-      renderShopeeDbTable();
+      runImportUi('renderShopeeDbTable');
 
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
@@ -5568,7 +5841,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               if (!detailMsg.includes('Trạng thái') && !detailMsg.includes('MVĐ')) {
                 detailMsg += ' Cập nhật hạn xử lý & dữ liệu chi tiết từ sàn.';
               }
-              addAppNotification({
+              runImportUi('addAppNotification',{
                 type: 'excel_update',
                 title: '🔄 Cập Nhật Trạng Thái Đơn #' + (existingIdx + 1),
                 detail: detailMsg,
@@ -5605,6 +5878,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               forwardCarrier: orderData.forwardCarrier || '',
               returnCarrier: orderData.returnCarrier || '',
               price: orderData.price || 0,
+              importPriceBasis: orderData.importPriceBasis, priceNeedsReview: orderData.priceNeedsReview,
               status: (orderData.orderType === 'Đơn hủy' && (!cleanTrack && !orderData.track)) ? 'Không cần nhận' : (orderData.rawDetails?.returnStatus?.includes('hủy') ? 'Không cần nhận' : 'Chưa trả'),
               photo: '',
               note: orderData.note || '',
@@ -5624,22 +5898,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         });
 
-        saveOrders();
-        renderAll();
+        if (importState && !(await commitImportState(importState))) return { success: false };
+        runImportUi('renderAll');
         if (enrichedTableCount > 0) {
-          showAppToast(`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn Shopee có sẵn!`, 'info', 4000);
+          runImportUi('showAppToast',`🔄 Đã cập nhật đè trạng thái cho ${enrichedTableCount} đơn Shopee có sẵn!`, 'info', 4000);
           try { playBeepSound(1300, 150); } catch (e) {}
         }
       } else {
         autoEnrichAllMissingOrdersFromDb(true);
+        if (importState && !(await commitImportState(importState))) return { success: false };
       }
 
-      addAuditLog('🟠 NẠP ĐƠN SÀN SHOPEE', `Đã nạp ${addedCount} đơn hàng (🟠 Shopee: ${shopeeAddedCount} đơn, ⚫ TikTok: ${tiktokAddedCount} đơn | Đẩy mới: ${newTableCount}, cập nhật: ${enrichedTableCount}, gộp ${multiItemAppendedCount} SP phụ)`);
-      alert(`🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SHOPEE!\n\n` +
+      runImportUi('addAuditLog','🟠 NẠP ĐƠN SÀN SHOPEE', `Đã nạp ${addedCount} đơn hàng (🟠 Shopee: ${shopeeAddedCount} đơn, ⚫ TikTok: ${tiktokAddedCount} đơn | Đẩy mới: ${newTableCount}, cập nhật: ${enrichedTableCount}, gộp ${multiItemAppendedCount} SP phụ)`);
+      notifyImportResult(`🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SHOPEE!\n\n` +
             `• Phân loại sàn: 🟠 Sàn Shopee (${shopeeAddedCount} đơn)${tiktokAddedCount > 0 ? ` | ⚫ Sàn TikTok Shop (${tiktokAddedCount} đơn)` : ''}\n` +
             (pushToMain ? `• Đã tự động đẩy ${newTableCount} đơn mới ra Bảng chính (Trạng thái: 🟡 Chưa trả - Đang chờ)!\n• Cập nhật đè thông tin cho: ${enrichedTableCount} đơn có sẵn\n` : '') +
             (multiItemAppendedCount > 0 ? `• Đã tự động gộp ${multiItemAppendedCount} sản phẩm thứ 2, 3 vào đúng đơn hàng nhiều SP!\n` : '') +
             (skippedSuccessCount > 0 ? `• Đã tự động lọc bỏ ${skippedSuccessCount} dòng đơn giao thành công hoặc yêu cầu trả hàng đã hủy.\n` : ''));
+      return { success: true };
     }
 
     async function pushAllDbOrdersToMainTable() {
@@ -6598,7 +6874,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.8';
+    const APP_VERSION_NUMBER = '1.8.9';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8761,7 +9037,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    async function flushPersistOrdersToDiskAndStorage() {
+    async function flushPersistOrdersToDiskAndStorage(importCommit = false) {
+      if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return { success: false, deferred: true };
       if (diskPersistDebounceTimer) clearTimeout(diskPersistDebounceTimer);
       diskPersistDebounceTimer = null;
       const result = { success: false, localStorage: false, indexedDB: false, disk: false, errors: [] };
@@ -8801,10 +9078,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return result;
     }
 
-    function saveOrders(immediate = false) {
+    function saveOrders(immediate = false, importCommit = false) {
+      if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return Promise.resolve({ success: false, deferred: true });
       markUnsavedToFile();
       if (immediate) {
-        return flushPersistOrdersToDiskAndStorage();
+        return flushPersistOrdersToDiskAndStorage(importCommit);
       }
       if (diskPersistDebounceTimer) clearTimeout(diskPersistDebounceTimer);
       diskPersistDebounceTimer = setTimeout(() => {
@@ -13250,6 +13528,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function processIncomingPhonePayload(data) {
       if (!data || !data.room || data.room !== phoneRoomId) return { success: false, outcome: 'wrong_room' };
+      if (typeof activeImportBatch !== 'undefined' && activeImportBatch && ['barcode','sync_item','bulk_sync','smart_label','photo','photo_chunk','new_order_scan'].includes(data.type)) {
+        if (data.type === 'bulk_sync') { for (const item of data.items || []) if (item.requestId && item.code) sendAckToPhone(0,item.code,'PC đang nhập file; giữ yêu cầu và thử lại.','error',false,item.requestId,data.room,{ackStage:'scan',photoSaved:false,captureId:item.captureId || ''}); return {success:false}; }
+        sendAckToPhone(0, data.code, 'PC đang nhập file; giữ yêu cầu và thử lại sau.', 'error', false, data.requestId, data.room,
+          { ackStage: data.type === 'photo' || data.type === 'photo_chunk' ? 'photo' : 'scan', photoSaved: false, captureId: data.captureId || '' });
+        return { success: false };
+      }
+
       if (data.type === 'photo_chunk') {
         return handleIncomingPhotoChunk(data);
       }

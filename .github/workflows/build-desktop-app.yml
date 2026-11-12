@@ -53,8 +53,18 @@ jobs:
             }
           "
 
+      - name: Acquire production SheetJS engine for real workbook tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $enginePath = Join-Path $env:RUNNER_TEMP 'sheetjs-engine.cjs'
+          Invoke-WebRequest -Uri 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js' -OutFile $enginePath
+          node -e "const x=require(process.argv[1]); if(x.version!=='0.20.1') throw new Error('Unexpected SheetJS engine version: '+x.version); console.log('SheetJS '+x.version);" $enginePath
+
       - name: Test storage, phone, Excel and UI regressions
         run: npm test
+        env:
+          XLSX_ENGINE_PATH: ${{ runner.temp }}/sheetjs-engine.cjs
 
       - name: Build Windows Executable (.exe)
         run: npm run build:win
@@ -66,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.8
+          name: QuanLyHangHoan-Windows-Installer-v1.8.9
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -78,17 +88,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.8
-          name: "Quản Lý Hàng Hoàn v1.8.8 — Kiện hoàn và đồng bộ điện thoại"
+          tag_name: v1.8.9
+          name: "Quản Lý Hàng Hoàn v1.8.9 — Sửa nhập Excel và kiện hoàn"
           body: |
-            ### Bản sửa lỗi v1.8.8
+            ### Bản sửa 1.8.9
 
-            - Giữ riêng từng kiện/lần hoàn của cùng đơn gốc và các mã vận đơn thay thế.
-            - Đối soát mã duy nhất, cảnh báo mã khớp nhiều kiện; nhận một kiện không nhận tất cả.
-            - Cách ly phòng, hợp nhất xử lý online/offline, chờ lưu trước ACK.
-            - Hàng đợi ảnh điện thoại bền hơn, phục hồi sau reload; ảnh chưa ghép được giữ để xử lý.
-            - Cần cập nhật đồng thời PC và mobile_scanner.html qua GitHub Pages.
-            - Kiểm thử Windows/iPhone/4G thực tế cần nghiệm thu riêng, không suy ra từ build.
+            - Sửa nhận diện cột, số lượng hoàn, đơn giá/tổng tiền, trạng thái và mã hoàn bổ sung.
+            - Chọn đúng sheet, nhập nhiều schema riêng, loại chồng lặp giữa file.
+            - Nhập bổ sung SKU hoặc thay snapshot rõ ràng; báo kết quả sau lưu, rollback khi lỗi.
+            - Bao gồm sửa kiện hoàn và đồng bộ điện thoại của 1.8.8; cần cập nhật cả PC/mobile.
+            - Kiểm thử thực tế Windows/iPhone/4G cần nghiệm thu riêng.
           files: |
             dist/*.exe
         env:

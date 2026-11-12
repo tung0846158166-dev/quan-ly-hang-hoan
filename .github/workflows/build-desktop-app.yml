@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.20
+          name: QuanLyHangHoan-Windows-Installer-v1.8.21
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.20
-          name: "Quản Lý Hàng Hoàn v1.8.20 — Xác nhận quét nhanh hơn"
+          tag_name: v1.8.21
+          name: "Quản Lý Hàng Hoàn v1.8.21 — PC bớt đứng khi quét"
           body: |
+            ### Bản sửa 1.8.21
+
+            - PC bớt bị đứng mỗi lần quét: bỏ một lần tính lại toàn bộ bảng tổng hợp bị lặp, và không vẽ lại bảng lần thứ hai cho ảnh nếu bảng vừa được vẽ lại sau khi ảnh tới.
+            - Điện thoại không gửi thêm yêu cầu ntfy cho mỗi lần quét khi MQTT đang chạy và ntfy chưa từng nhận được tin nào trên máy này (ntfy có thể bị chặn); tự gửi lại nếu MQTT mất kết nối.
+
             ### Bản sửa 1.8.20
 
             - Bản tin quét gửi qua MQTT chỉ còn phần nhỏ (không kèm ảnh); ảnh gửi riêng đúng một lần. Trước đây ảnh bị gửi lặp nhiều lần (tới cả 3 broker) cùng bản tin quét nên xác nhận phải chờ ảnh tải lên qua 4G.

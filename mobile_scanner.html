@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.20</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.21</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -805,6 +805,7 @@
     let client = null;
     // Extra public brokers race the main one; whichever delivers first wins, duplicates are ignored by request id.
     let extraClients = [];
+    let ntfyHasDelivered = false;
     const pendingScans = new Map();
     let scanHistory = [];
     let currentHistoryFilter = 'all';
@@ -1803,12 +1804,17 @@
       }
       const lightJsonStr = JSON.stringify(lightPayload);
 
-      try {
-        fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Scan', {
-          method: 'POST',
-          body: lightJsonStr
-        }).catch(e => console.warn('Ntfy post warn:', e));
-      } catch (e) {}
+      // ntfy is the backup channel. While MQTT is connected and ntfy has never delivered a message to this page
+      // (it can be blocked on some networks), skip the extra request; it returns automatically if MQTT drops.
+      const mqttUp = [client].concat(typeof extraClients !== 'undefined' ? extraClients : []).some(c => c && c.connected);
+      if (!mqttUp || ntfyHasDelivered) {
+        try {
+          fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Scan', {
+            method: 'POST',
+            body: lightJsonStr
+          }).catch(e => console.warn('Ntfy post warn:', e));
+        } catch (e) {}
+      }
 
       // 2. MQTT mang bản tin nhỏ (không kèm ảnh) tới mọi broker. Ảnh đi riêng một lần (sendPhotoPacket), nên
       //    xác nhận của PC không phải chờ ảnh tải lên qua 4G (trước đây ảnh bị gửi nhiều lần cùng bản tin quét).
@@ -1855,6 +1861,7 @@
             let data = null;
             try { data = JSON.parse(wrapper.message); } catch (e) { return; }
             if (!data) return;
+            ntfyHasDelivered = true;
             data.__via = 'ntfy';
             handleScanAck(data);
           } catch (e) {}

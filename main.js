@@ -252,6 +252,77 @@ ipcMain.handle('save-hard-drive-data', async (event, dataToSave) => {
   }
 });
 
+// Photos live in their own files so the main order list stays small and every
+// scan no longer rewrites hundreds of MB of base64. A photo file is written
+// (tmp + fsync + rename) BEFORE the renderer drops it from the order list.
+function getPhotosDir() {
+  const dir = path.join(getDataDir(), 'photos');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+function photoFilePath(id) {
+  const hash = require('crypto').createHash('sha1').update(String(id)).digest('hex');
+  return path.join(getPhotosDir(), hash + '.json');
+}
+async function writePhotoFile(id, data, sequence) {
+  const target = photoFilePath(id);
+  const serialized = JSON.stringify({ id, data });
+  try {
+    // Already stored with identical content (e.g. after an app restart): nothing to rewrite.
+    if ((await fs.promises.stat(target)).size === Buffer.byteLength(serialized, 'utf8') &&
+        await fs.promises.readFile(target, 'utf8') === serialized) return;
+  } catch (e) { /* missing file: write it below */ }
+  const temp = `${target}.${process.pid || 'app'}.${sequence}.tmp`;
+  let handle;
+  try {
+    handle = await fs.promises.open(temp, 'wx', 0o600);
+    await handle.writeFile(serialized, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await fs.promises.rename(temp, target);
+  } finally {
+    if (handle) await handle.close().catch(() => {});
+    await fs.promises.unlink(temp).catch(() => {});
+  }
+}
+
+ipcMain.handle('save-photo-files', async (event, photos) => {
+  try {
+    if (quitDrainComplete) throw new Error('Ung dung dang thoat');
+    if (!Array.isArray(photos)) throw new Error('Danh sach anh khong hop le');
+    const items = photos.filter(p => p && p.id && typeof p.data === 'string' && p.data);
+    const sequence = ++diskWriteSequence;
+    const write = diskWriteTail.then(async () => {
+      const saved = [];
+      for (const item of items) {
+        try { await writePhotoFile(item.id, item.data, sequence); saved.push(item.id); } catch (e) { /* reported via saved list */ }
+      }
+      return saved;
+    });
+    diskWriteTail = write.catch(() => {});
+    const saved = await write;
+    return { success: saved.length === items.length, saved };
+  } catch (err) {
+    return { success: false, saved: [], error: err.message };
+  }
+});
+
+ipcMain.handle('read-photo-files', async (event, ids) => {
+  const photos = {};
+  try {
+    for (const id of Array.isArray(ids) ? ids : []) {
+      try {
+        const parsed = JSON.parse(await fs.promises.readFile(photoFilePath(id), 'utf8'));
+        if (parsed && parsed.id === id && typeof parsed.data === 'string') photos[id] = parsed.data;
+      } catch (e) { /* missing photo file is not an error */ }
+    }
+    return { success: true, photos };
+  } catch (err) {
+    return { success: false, photos, error: err.message };
+  }
+});
+
 ipcMain.handle('open-data-folder', async () => {
   try {
     const dataFilePath = getDataFilePath();

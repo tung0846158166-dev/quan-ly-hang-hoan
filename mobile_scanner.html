@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.13</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.14</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -661,6 +661,7 @@
     </div>
 
     <!-- Scan Alert Result Banner -->
+    <div id="unconfirmedBar" class="hidden" role="status" aria-live="polite" style="padding:8px 10px;margin-bottom:8px;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;font-weight:800;color:#fde68a;background:#1e293b"></div>
     <div id="lastPcResult" class="hidden" role="status" aria-live="polite" style="padding:8px 10px;margin-bottom:8px;border:1px solid #334155;border-radius:8px;font-size:12px;color:#e2e8f0;background:#0f172a"></div>
     <div id="lastScanBanner" class="scan-alert hidden">
       <div class="scan-alert-label" id="lastScanLabel">---</div>
@@ -1315,8 +1316,47 @@
       finally { pollPcAcknowledgements.inflight.delete(pollingRoom); }
     }
 
+    // Quét liên tục không bắt buộc chờ PC, nhưng không để quá nhiều mã "chưa được PC xác nhận" tồn đọng
+    // mà người quét không biết. Khi PC đang online nhưng chậm, quá ngưỡng này sẽ tạm dừng nhận mã mới.
+    const MAX_UNCONFIRMED_SCANS = 5;
+    const PC_ALIVE_WINDOW_MS = 45000;
+    let lastPcReceiptAt = 0;
+    function getUnconfirmedScans() {
+      return (offlineQueue || []).filter(item => !item.photoOnly && !item.reviewRequired && !item.scanConfirmed);
+    }
+    function isPcRecentlyAlive() {
+      return Date.now() - lastPcReceiptAt < PC_ALIVE_WINDOW_MS;
+    }
+    function shouldPauseForUnconfirmed(cleanCode) {
+      const unconfirmed = getUnconfirmedScans();
+      if (unconfirmed.length < MAX_UNCONFIRMED_SCANS) return false;
+      // PC không phản hồi (đang tắt): giữ chế độ hàng đợi offline, vẫn cho quét để đồng bộ sau.
+      if (!isPcRecentlyAlive()) return false;
+      // Mã đang chờ được gửi lại thì không bị chặn.
+      return !unconfirmed.some(item => extractCleanTrackingCode(item.code) === cleanCode);
+    }
+    function updateUnconfirmedBar() {
+      const bar = document.getElementById('unconfirmedBar');
+      if (!bar) return;
+      const unconfirmed = getUnconfirmedScans();
+      if (!unconfirmed.length) { bar.classList.add('hidden'); return; }
+      const now = Date.now();
+      const oldest = Math.max(...unconfirmed.map(item => now - (item.time || now)));
+      const slow = oldest > 10000;
+      const alive = isPcRecentlyAlive();
+      const paused = alive && unconfirmed.length >= MAX_UNCONFIRMED_SCANS;
+      bar.classList.remove('hidden');
+      bar.style.borderColor = slow || paused ? '#ef4444' : '#f59e0b';
+      bar.style.color = slow || paused ? '#fecaca' : '#fde68a';
+      bar.textContent = (alive ? '⏳ Chờ PC xác nhận: ' : '📴 PC chưa phản hồi — đã lưu chờ đồng bộ: ') + unconfirmed.length + ' mã' +
+        (slow ? ' · lâu nhất ' + Math.round(oldest / 1000) + ' giây' : '') +
+        (paused ? ' · TẠM DỪNG nhận mã mới, chờ PC' : '');
+    }
+    setInterval(updateUnconfirmedBar, 1000);
+
     let pcReceiptExpiry = null;
     function markPcReceipt() {
+      lastPcReceiptAt = Date.now();
       const badge = document.getElementById('connBadge');
       if (badge) { badge.className = 'conn-pill conn-ok'; badge.textContent = '🟢 PC vừa phản hồi'; }
       clearTimeout(pcReceiptExpiry);
@@ -1578,6 +1618,15 @@
       if (clean === lastScannedRawCode && now - lastScannedRawTime < 1200) return false;
       lastScannedRawCode = clean;
       lastScannedRawTime = now;
+
+      if (typeof shouldPauseForUnconfirmed === 'function' && shouldPauseForUnconfirmed(clean)) {
+        lastScannedRawCode = '';
+        lastScannedRawTime = 0;
+        beepWarning();
+        showToast('⏸ Đang chờ máy tính xác nhận ' + getUnconfirmedScans().length + ' mã. Quét tiếp khi PC phản hồi.', 3000);
+        updateUnconfirmedBar();
+        return false;
+      }
 
       const capturedPhoto = captureCurrentVideoFrame();
 
@@ -3093,6 +3142,7 @@
     }
 
     function updateOfflineQueueUI() {
+      if (typeof updateUnconfirmedBar === 'function') updateUnconfirmedBar();
       const card = document.getElementById('offlineQueueCard');
       const badge = document.getElementById('offlineCountBadge');
       const photoBadge = document.getElementById('offlinePhotoCountBadge');

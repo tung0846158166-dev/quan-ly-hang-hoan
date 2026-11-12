@@ -3022,6 +3022,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
+    // Photos are stored as separate files by the desktop app. If the browser database lost them
+    // (cleared storage, new profile), bring them back from those files in small batches.
+    async function restoreMissingPhotosFromDisk() {
+      const api = window.desktopDiskAPI;
+      if (!api || typeof api.readPhotoFiles !== 'function') return false;
+      let restored = 0;
+      for (;;) {
+        const missing = orders.filter(o => o.photoId && !o.photo && !photoMemoryCache.has(o.photoId) && !restoreMissingPhotosFromDisk.tried.has(o.photoId)).slice(0, 25);
+        if (!missing.length) break;
+        missing.forEach(o => restoreMissingPhotosFromDisk.tried.add(o.photoId));
+        const reply = await api.readPhotoFiles(missing.map(o => o.photoId));
+        const photos = (reply && reply.photos) || {};
+        missing.forEach(o => {
+          if (photos[o.photoId]) { o.photo = photos[o.photoId]; photoMemoryCache.set(o.photoId, photos[o.photoId]); savePhotoToDb(o.photoId, photos[o.photoId]); restored++; }
+        });
+      }
+      restoreMissingPhotosFromDisk.tried.clear();
+      return restored;
+    }
+    restoreMissingPhotosFromDisk.tried = new Set();
+
     // =========================================================================
     // SAO LƯU DỰ PHÒNG & PHỤC HỒI DỮ LIỆU (BACKUP & RESTORE JSON)
     // =========================================================================
@@ -3650,9 +3671,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function getOrderTrackingCodes(order) {
       if (!order) return [];
-      return Array.from(new Set([order.track, order.altTrack, order.forwardTrack, order.returnTrack,
-        ...(Array.isArray(order.trackingCodes) ? order.trackingCodes : [])]
+      // Cleaning codes runs ~15 regexes per field; with 20k orders it dominated every phone scan.
+      // The result is cached per order and recomputed only when one of the source fields changes.
+      const cache = getOrderTrackingCodes.cache || (getOrderTrackingCodes.cache = new WeakMap());
+      const extra = Array.isArray(order.trackingCodes) ? order.trackingCodes : [];
+      const signature = [order.track, order.altTrack, order.forwardTrack, order.returnTrack, ...extra].join('\u0001');
+      const hit = cache.get(order);
+      if (hit && hit.signature === signature) return hit.codes.slice();
+      const codes = Array.from(new Set([order.track, order.altTrack, order.forwardTrack, order.returnTrack, ...extra]
         .map(code => extractCleanTrackingCode(code || '')).filter(Boolean)));
+      cache.set(order, { signature, codes });
+      return codes.slice();
     }
 
     function getPhoneOrderMatches(rawCode) {
@@ -6878,7 +6907,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.13';
+    const APP_VERSION_NUMBER = '1.8.14';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -9041,45 +9070,116 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    async function flushPersistOrdersToDiskAndStorage(importCommit = false) {
-      if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return { success: false, deferred: true };
+    function flushPersistOrdersToDiskAndStorage(importCommit = false) {
+      if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return Promise.resolve({ success: false, deferred: true });
       if (diskPersistDebounceTimer) clearTimeout(diskPersistDebounceTimer);
       diskPersistDebounceTimer = null;
-      const result = { success: false, localStorage: false, indexedDB: false, disk: false, errors: [] };
-      const snapshot = orders.map(o => Object.assign({}, o, { photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' }));
-      const lean = snapshot.map((o, index) => {
-        if (o.photo && o.photo.length > 200) {
-          if (!o.photoId) o.photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-          const original = orders[index];
-          if (original) original.photoId = o.photoId;
-          return Object.assign({}, o, { photo: '' });
-        }
-        return o;
-      });
-      const attempt = async (name, action) => {
-        try { result[name] = (await action()) !== false; }
-        catch (err) { result.errors.push(name + ': ' + err.message); }
-      };
-      await Promise.all([
-        attempt('localStorage', () => { localStorage.setItem(STORAGE_KEY, JSON.stringify(lean)); return true; }),
-        attempt('indexedDB', () => saveOrdersToSafeStore(snapshot)),
-        ...snapshot.filter(o => o.photo && o.photoId).map(o => attempt('photos', () => savePhotoToDb(o.photoId, o.photo))),
-        attempt('disk', async () => {
-          if (!window.desktopDiskAPI || typeof window.desktopDiskAPI.saveToDisk !== 'function') return false;
-          const receipt = await window.desktopDiskAPI.saveToDisk(snapshot);
-          if (!receipt || !receipt.success) throw new Error('Không ghi được dữ liệu vào ổ cứng');
-          updateDiskNoticeStatus(true, receipt.time);
+      // Group commit: saves requested while a write is running share ONE follow-up write.
+      // The follow-up snapshots `orders` only after the running write ends, so every waiter's
+      // change is included before its receipt resolves (a receipt still means "saved").
+      const state = flushPersistOrdersToDiskAndStorage.state || (flushPersistOrdersToDiskAndStorage.state =
+        { running: null, queued: null, queuedImport: false, diskPhotos: new Map(), migrating: false, localTimer: null });
+      const runOnce = async () => {
+        const result = { success: false, localStorage: false, indexedDB: false, disk: false, errors: [] };
+        const api = window.desktopDiskAPI;
+        const desktop = Boolean(api && typeof api.saveToDisk === 'function');
+        const photoFiles = Boolean(desktop && typeof api.savePhotoFiles === 'function');
+        const snapshot = orders.map(o => Object.assign({}, o, { photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' }));
+        snapshot.forEach((o, index) => {
+          if (o.photo && o.photo.length > 200 && !o.photoId) {
+            o.photoId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+            if (orders[index]) orders[index].photoId = o.photoId;
+          }
+        });
+        const attempt = async (name, action) => {
+          try { result[name] = (await action()) !== false; }
+          catch (err) { result.errors.push(name + ': ' + err.message); }
+        };
+        const withPhoto = snapshot.filter(o => o.photo && o.photoId);
+        const photoDbOk = new Set();
+        const diskPhotos = state.diskPhotos;
+        // Photo ids that were already stored before this session (set once at start-up) move to files in the background.
+        const legacy = flushPersistOrdersToDiskAndStorage.legacyPhotoIds || new Set();
+        const notOnDisk = photoFiles ? withPhoto.filter(o => o.photo.length > 200 && diskPhotos.get(o.photoId) !== o.photo) : [];
+        const needFile = notOnDisk.filter(o => !legacy.has(o.photoId)).slice(0, 20);
+        const writePhotoFiles = async list => {
+          const reply = await api.savePhotoFiles(list.map(o => ({ id: o.photoId, data: o.photo })));
+          const saved = new Set((reply && reply.saved) || []);
+          list.forEach(o => { if (saved.has(o.photoId)) diskPhotos.set(o.photoId, o.photo); });
+          return Boolean(reply && reply.success);
+        };
+        // Step 1: only photos that are new or changed are written (each once, as its own file).
+        await Promise.all([
+          ...withPhoto.map(o => attempt('photos', async () => {
+            const ok = await savePhotoToDb(o.photoId, o.photo);
+            if (ok !== false) photoDbOk.add(o.photoId);
+            return ok;
+          })),
+          ...(needFile.length ? [attempt('photoFiles', () => writePhotoFiles(needFile))] : [])
+        ]);
+        // Step 2: the order list itself no longer carries photos that are already stored separately.
+        const stripIf = (o, stored) => (stored && o.photo && o.photo.length > 200 ? Object.assign({}, o, { photo: '' }) : o);
+        const forIndexedDb = snapshot.map(o => stripIf(o, photoDbOk.has(o.photoId)));
+        const forDisk = snapshot.map(o => stripIf(o, photoFiles && diskPhotos.get(o.photoId) === o.photo));
+        const writeLocalStorage = () => {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(orders.map(o => (o.photo && o.photo.length > 200 ? Object.assign({}, o, { photo: '' }) : o))));
           return true;
-        })
-      ]);
-      const desktop = window.desktopDiskAPI && typeof window.desktopDiskAPI.saveToDisk === 'function';
-      result.success = desktop ? result.disk : (result.indexedDB || (result.localStorage && !snapshot.some(o => o.photo && o.photo.length > 200)));
-      updateSafeStorageHeaderBadge();
-      if (!result.success || result.errors.length) {
-        console.warn('Lỗi lưu dữ liệu:', result);
-        if (typeof showAppToast === 'function') showAppToast(result.success ? '⚠️ Một nơi lưu dữ liệu gặp lỗi; dữ liệu đã được lưu ở nơi khác.' : '❌ Chưa lưu được dữ liệu an toàn. Hãy sao lưu và thử lại.', 'error');
+        };
+        await Promise.all([
+          // Desktop: localStorage is only a redundant copy, so it is refreshed shortly after, off the receipt path.
+          desktop ? Promise.resolve() : attempt('localStorage', writeLocalStorage),
+          attempt('indexedDB', () => saveOrdersToSafeStore(forIndexedDb)),
+          attempt('disk', async () => {
+            if (!desktop) return false;
+            const receipt = await api.saveToDisk(forDisk);
+            if (!receipt || !receipt.success) throw new Error('Không ghi được dữ liệu vào ổ cứng');
+            updateDiskNoticeStatus(true, receipt.time);
+            return true;
+          })
+        ]);
+        if (desktop && !state.localTimer) {
+          state.localTimer = setTimeout(() => {
+            state.localTimer = null;
+            try { writeLocalStorage(); } catch (err) { /* quota: IndexedDB and disk already hold the data */ }
+          }, 5000);
+          if (state.localTimer && state.localTimer.unref) state.localTimer.unref();
+        }
+        result.localStorage = result.localStorage || desktop;
+        result.success = desktop ? result.disk : (result.indexedDB || (result.localStorage && !snapshot.some(o => o.photo && o.photo.length > 200)));
+        updateSafeStorageHeaderBadge();
+        if (!result.success || result.errors.length) {
+          console.warn('Lỗi lưu dữ liệu:', result);
+          if (typeof showAppToast === 'function') showAppToast(result.success ? '⚠️ Một nơi lưu dữ liệu gặp lỗi; dữ liệu đã được lưu ở nơi khác.' : '❌ Chưa lưu được dữ liệu! Hãy kiểm tra ổ đĩa và sao lưu ngay.', 'error');
+        }
+        // Photos that existed before this session are moved to their own files in small background chunks.
+        const remaining = notOnDisk.filter(o => !needFile.includes(o));
+        if (photoFiles && remaining.length && !state.migrating) {
+          state.migrating = true;
+          const step = async () => {
+            try {
+              const chunk = orders.map(o => ({ photoId: o.photoId, photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' }))
+                .filter(o => o.photoId && o.photo && o.photo.length > 200 && diskPhotos.get(o.photoId) !== o.photo).slice(0, 8);
+              if (!chunk.length) { state.migrating = false; flushPersistOrdersToDiskAndStorage(); return; }
+              const wrote = await writePhotoFiles(chunk);
+              if (!wrote) { state.migrating = false; return; }
+              const timer = setTimeout(step, 250);
+              if (timer && timer.unref) timer.unref();
+            } catch (err) { state.migrating = false; }
+          };
+          const first = setTimeout(step, 1500);
+          if (first && first.unref) first.unref();
+        }
+        return result;
+      };
+      const start = () => {
+        state.running = runOnce().finally(() => { state.running = null; });
+        return state.running;
+      };
+      if (!state.running) return start();
+      if (!state.queued) {
+        state.queued = state.running.catch(() => {}).then(() => { state.queued = null; return start(); });
       }
-      return result;
+      return state.queued;
     }
 
     function saveOrders(immediate = false, importCommit = false) {
@@ -13091,7 +13191,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.13',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.14',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -15979,6 +16079,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         });
         if (reRenderNeeded) renderAll();
+        flushPersistOrdersToDiskAndStorage.legacyPhotoIds = new Set(photoMemoryCache.keys());
+        // Wait for the boot-time disk load, then recover any photo only present as a disk file.
+        setTimeout(() => restoreMissingPhotosFromDisk().then(count => { if (count) renderAll(false); }).catch(() => {}), 1500);
       });
       try {
         initPcPhoneReceiver();

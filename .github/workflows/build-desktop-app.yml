@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.13
+          name: QuanLyHangHoan-Windows-Installer-v1.8.14
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.13
-          name: "Quản Lý Hàng Hoàn v1.8.13 — Sửa nhập Excel và kiện hoàn"
+          tag_name: v1.8.14
+          name: "Quản Lý Hàng Hoàn v1.8.14 — Phản hồi quét nhanh hơn"
           body: |
+            ### Bản sửa 1.8.14
+
+            - PC xác nhận mã quét nhanh hơn rất nhiều khi có hàng chục nghìn đơn: ảnh lưu thành từng file riêng, file dữ liệu chính không còn chứa ảnh.
+            - Các lần lưu liên tiếp được gộp, tra cứu mã vận đơn có bộ nhớ đệm.
+            - Điện thoại hiện số mã chưa được PC xác nhận và tạm dừng nhận mã mới khi PC online nhưng quá chậm.
+            - Vẫn chỉ báo "đã về kho" sau khi dữ liệu đã được ghi xuống ổ cứng.
+
             ### Bản sửa 1.8.13
 
             - Trả rõ kết quả nhận kho/không tồn tại, lấy receipt dự phòng khi realtime bị mất; ảnh gửi ngầm.

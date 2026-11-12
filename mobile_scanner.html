@@ -58,47 +58,6 @@
       transition: opacity 0.15s ease-out;
     }
 
-    /* Screen Flash Overlay (Nháy Xanh khi Đúng, Nháy Đỏ khi Trùng) */
-    .screen-flash {
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.12s ease-out;
-    }
-    .screen-flash.flash-green {
-      background: radial-gradient(circle, rgba(34, 197, 94, 0.45) 0%, rgba(34, 197, 94, 0.8) 100%);
-      box-shadow: inset 0 0 60px rgba(34, 197, 94, 0.95);
-      opacity: 1;
-    }
-    .screen-flash.flash-red {
-      background: radial-gradient(circle, rgba(239, 68, 68, 0.5) 0%, rgba(220, 38, 38, 0.85) 100%);
-      box-shadow: inset 0 0 70px rgba(239, 68, 68, 0.95);
-      opacity: 1;
-      animation: pulseRedFlash 0.6s ease-in-out;
-    }
-    @keyframes pulseRedFlash {
-      0% { opacity: 0; }
-      20% { opacity: 1; }
-      40% { opacity: 0.25; }
-      60% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    .screen-flash.flash-yellow {
-      background: radial-gradient(circle, rgba(234, 179, 8, 0.55) 0%, rgba(202, 138, 4, 0.88) 100%);
-      box-shadow: inset 0 0 70px rgba(234, 179, 8, 0.95);
-      opacity: 1;
-      animation: pulseYellowFlash 0.6s ease-in-out;
-    }
-    @keyframes pulseYellowFlash {
-      0% { opacity: 0; }
-      20% { opacity: 1; }
-      40% { opacity: 0.25; }
-      60% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-
     .app-header {
       background: linear-gradient(135deg, #ee4d2d 0%, #d73211 100%);
       padding: 13px 16px;
@@ -185,20 +144,32 @@
       box-shadow: 0 8px 25px rgba(14, 165, 233, 0.2);
       transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .camera-box[data-flash="success"] {
-      border: 5px solid #22c55e !important;
-      box-shadow: 0 0 35px rgba(34, 197, 94, 0.85) !important;
+    /* Status feedback stays inside the camera border; video and page remain clear. */
+    .camera-box::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border: 5px solid transparent;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      box-sizing: border-box;
     }
-    .camera-box[data-flash="duplicate"],
-    .camera-box[data-flash="error"] {
-      border: 5px solid #ef4444 !important;
-      box-shadow: 0 0 40px rgba(239, 68, 68, 0.95) !important;
-      animation: cameraShake 0.4s ease-in-out;
+    .camera-box[data-flash="success"]::after { border-color: #22c55e; }
+    .camera-box[data-flash="duplicate"]::after,
+    .camera-box[data-flash="error"]::after { border-color: #ef4444; }
+    .camera-box[data-flash="not_found"]::after { border-color: #eab308; }
+    .camera-box[data-flash="success"]::after,
+    .camera-box[data-flash="duplicate"]::after,
+    .camera-box[data-flash="error"]::after,
+    .camera-box[data-flash="not_found"]::after {
+      animation: scannerBorderFlash 750ms ease-in-out;
     }
-    @keyframes cameraShake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-6px); }
-      40%, 80% { transform: translateX(6px); }
+    @keyframes scannerBorderFlash {
+      0%, 100% { opacity: 0; }
+      15%, 55% { opacity: 1; }
+      35% { opacity: 0.25; }
     }
 
     #reader {
@@ -571,7 +542,6 @@
 </head>
 <body>
   <!-- Full Screen Flash Overlay (Nháy Xanh / Nháy Đỏ) -->
-  <div id="screenFlashOverlay" class="screen-flash"></div>
 
   <div class="app-header">
     <div>
@@ -944,7 +914,6 @@
 
     /* Visual Flash Feedback: 'success' (Green) | 'duplicate' (Red) | 'not_found' (Yellow) */
     function triggerScanFeedback(type, code, title, detail, orderNum = null) {
-      const overlay = document.getElementById('screenFlashOverlay');
       const camera = document.querySelector('.camera-box');
       const banner = document.getElementById('lastScanBanner');
       const label = document.getElementById('lastScanLabel');
@@ -954,7 +923,6 @@
       clearTimeout(flashTimer);
 
       if (type === 'pending') {
-        if (overlay) overlay.className = 'screen-flash';
         if (camera) camera.dataset.flash = '';
         if (banner) {
           banner.className = 'scan-alert scan-not_found';
@@ -965,9 +933,6 @@
         }
       } else if (type === 'success') {
         // NHÁY XANH
-        if (overlay) {
-          overlay.className = 'screen-flash flash-green';
-        }
         if (camera) {
           camera.dataset.flash = 'success';
         }
@@ -982,9 +947,6 @@
         }
       } else if (type === 'duplicate') {
         // NHÁY ĐỎ
-        if (overlay) {
-          overlay.className = 'screen-flash flash-red';
-        }
         if (camera) {
           camera.dataset.flash = 'duplicate';
         }
@@ -999,9 +961,6 @@
         }
       } else if (type === 'not_found' || type === 'yellow') {
         // NHÁY VÀNG: ĐƠN KHÔNG TỒN TẠI TRÊN HỆ THỐNG
-        if (overlay) {
-          overlay.className = 'screen-flash flash-yellow';
-        }
         if (camera) {
           camera.dataset.flash = 'not_found';
         }
@@ -1017,7 +976,6 @@
       }
 
       flashTimer = setTimeout(() => {
-        if (overlay) overlay.className = 'screen-flash';
         if (camera) delete camera.dataset.flash;
       }, 750);
     }

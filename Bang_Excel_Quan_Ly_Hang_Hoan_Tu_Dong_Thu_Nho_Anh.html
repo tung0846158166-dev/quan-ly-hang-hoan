@@ -9078,7 +9078,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // The follow-up snapshots `orders` only after the running write ends, so every waiter's
       // change is included before its receipt resolves (a receipt still means "saved").
       const state = flushPersistOrdersToDiskAndStorage.state || (flushPersistOrdersToDiskAndStorage.state =
-        { running: null, queued: null, queuedImport: false, diskPhotos: new Map(), migrating: false, localTimer: null });
+        { running: null, queued: null, queuedImport: false, diskPhotos: new Map(), migrating: false, localTimer: null, idbTimer: null, photoDbOk: new Set() });
       const runOnce = async () => {
         const result = { success: false, localStorage: false, indexedDB: false, disk: false, errors: [] };
         const api = window.desktopDiskAPI;
@@ -9119,7 +9119,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ]);
         // Step 2: the order list itself no longer carries photos that are already stored separately.
         const stripIf = (o, stored) => (stored && o.photo && o.photo.length > 200 ? Object.assign({}, o, { photo: '' }) : o);
-        const forIndexedDb = snapshot.map(o => stripIf(o, photoDbOk.has(o.photoId)));
+        photoDbOk.forEach(id => state.photoDbOk.add(id));
+        const forIndexedDb = () => snapshot.map(o => stripIf(o, photoDbOk.has(o.photoId)));
         const forDisk = snapshot.map(o => stripIf(o, photoFiles && diskPhotos.get(o.photoId) === o.photo));
         const writeLocalStorage = () => {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(orders.map(o => (o.photo && o.photo.length > 200 ? Object.assign({}, o, { photo: '' }) : o))));
@@ -9128,15 +9129,28 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         await Promise.all([
           // Desktop: localStorage is only a redundant copy, so it is refreshed shortly after, off the receipt path.
           desktop ? Promise.resolve() : attempt('localStorage', writeLocalStorage),
-          attempt('indexedDB', () => saveOrdersToSafeStore(forIndexedDb)),
+          // Desktop: the browser-database copy is redundant, and cloning 20k orders into it blocks the window
+          // for hundreds of ms, so it is refreshed shortly after instead of before the receipt.
+          desktop ? Promise.resolve() : attempt('indexedDB', () => saveOrdersToSafeStore(forIndexedDb())),
           attempt('disk', async () => {
             if (!desktop) return false;
-            const receipt = await api.saveToDisk(forDisk);
+            // A string crosses the process boundary far faster than 20k objects (no structured clone).
+            const receipt = await api.saveToDisk(api.isDesktopApp ? JSON.stringify(forDisk) : forDisk);
             if (!receipt || !receipt.success) throw new Error('Không ghi được dữ liệu vào ổ cứng');
             updateDiskNoticeStatus(true, receipt.time);
             return true;
           })
         ]);
+        if (desktop && !state.idbTimer) {
+          state.idbTimer = setTimeout(() => {
+            state.idbTimer = null;
+            const stored = state.photoDbOk;
+            saveOrdersToSafeStore(orders.map(o => (o.photo && o.photo.length > 200 && stored.has(o.photoId)
+              ? Object.assign({}, o, { photo: '' }) : Object.assign({}, o, { photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' }))))
+              .catch(() => {});
+          }, 4000);
+          if (state.idbTimer && state.idbTimer.unref) state.idbTimer.unref();
+        }
         if (desktop && !state.localTimer) {
           state.localTimer = setTimeout(() => {
             state.localTimer = null;
@@ -9145,6 +9159,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (state.localTimer && state.localTimer.unref) state.localTimer.unref();
         }
         result.localStorage = result.localStorage || desktop;
+        result.indexedDB = result.indexedDB || desktop;
         result.success = desktop ? result.disk : (result.indexedDB || (result.localStorage && !snapshot.some(o => o.photo && o.photo.length > 200)));
         updateSafeStorageHeaderBadge();
         if (!result.success || result.errors.length) {
@@ -14150,6 +14165,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const targetOrder = orders[orderIdx];
       if (!targetOrder) return;
 
+      // Phone scans arrive back-to-back. Redrawing a 20k-row table after every one blocks the window
+      // exactly when the next scan arrives, so a burst is drawn once, shortly after the last scan.
+      if (options.source === 'phone' && !options.burstFlush) {
+        const burst = highlightAndFlashOrderRow.burst || (highlightAndFlashOrderRow.burst = { timer: null, firstAt: 0, order: null, options: null });
+        const now = Date.now();
+        if (!burst.firstAt) burst.firstAt = now;
+        burst.order = targetOrder;
+        burst.options = options;
+        if (burst.timer) clearTimeout(burst.timer);
+        burst.timer = setTimeout(() => {
+          const latest = burst.order, latestOptions = burst.options;
+          burst.timer = null; burst.firstAt = 0; burst.order = null; burst.options = null;
+          const index = orders.indexOf(latest);
+          if (index >= 0) highlightAndFlashOrderRow(index, { ...latestOptions, burstFlush: true });
+        }, Math.max(0, Math.min(600, 3000 - (now - burst.firstAt))));
+        return;
+      }
+
       const isDup = Boolean(options.isDuplicate);
       const targetWeek = getOrderImportWeek(targetOrder);
 
@@ -14279,6 +14312,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const key = requestId ? JSON.stringify([clientRoom, requestId]) : '';
       if (key && phoneRequestInflight.has(key)) return phoneRequestInflight.get(key).then(() =>
         handleIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture, labelInfo));
+      const receivedAt = Date.now();
       const work = Promise.resolve().then(async () => {
         const cached = key && phoneRequestReceipts.get(key);
         if (cached) {
@@ -14325,10 +14359,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let photoAttached = false;
         if (photoDataUrl) photoAttached = applyIncomingPhonePhoto(cleanCode, photoDataUrl, capture);
         try {
+          const saveStartedAt = Date.now();
           const persisted = await saveOrders(true);
           if (!persisted || persisted.success !== true) throw new Error('Không lưu được dữ liệu');
           staged.records.forEach(args => recordCodeToActiveSession(...args));
-          staged.receipt[7] = { ackStage: 'scan', photoSaved: photoAttached, captureId: capture.captureId || '' };
+          // processingMs / saveMs let the phone show where the time went (PC work vs. network).
+          staged.receipt[7] = { ackStage: 'scan', photoSaved: photoAttached, captureId: capture.captureId || '',
+            processingMs: Date.now() - receivedAt, saveMs: Date.now() - saveStartedAt };
           if (key) { phoneRequestReceipts.set(key, staged.receipt); phoneRequestStaged.delete(key); }
           sendAckToPhone(...staged.receipt);
           if (photoDataUrl && !photoAttached && capture.captureId) sendAckToPhone(0, cleanCode, 'Ảnh chưa ghép được đúng một kiện; giữ ảnh để kiểm tra',

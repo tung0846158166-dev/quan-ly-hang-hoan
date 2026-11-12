@@ -1268,7 +1268,14 @@
       }
       if (Number.isFinite(data.processingMs)) existing.pcProcessingMs = data.processingMs;
       if (pending.sentAt) existing.responseMs = Math.max(0, Date.now() - pending.sentAt);
-      if (existing.responseMs !== undefined) existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms.';
+      if (existing.responseMs !== undefined) {
+        existing.detail += ' Phản hồi: ' + existing.responseMs + ' ms.';
+        // Breakdown: PC work (incl. saving) vs. network + waiting for the PC to be free.
+        if (Number.isFinite(data.processingMs)) {
+          existing.detail += ' (PC xử lý ' + data.processingMs + ' ms' + (Number.isFinite(data.saveMs) ? ', trong đó lưu ' + data.saveMs + ' ms' : '') +
+            '; mạng + chờ ' + Math.max(0, existing.responseMs - data.processingMs) + ' ms.)';
+        }
+      }
       if (!photoReceipt && queued.scanConfirmed) {
         const latestResult = document.getElementById('lastPcResult');
         if (latestResult) {

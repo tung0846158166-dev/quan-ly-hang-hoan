@@ -3524,6 +3524,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function extractCleanTrackingCode(raw) {
       if (!raw) return '';
+      // Pure function of its input and called millions of times during an import: remember results.
+      const memo = extractCleanTrackingCode.memo || (extractCleanTrackingCode.memo = new Map());
+      const memoKey = typeof raw === 'string' ? raw : String(raw);
+      const remembered = memo.get(memoKey);
+      if (remembered !== undefined) return remembered;
+      const computed = (() => {
       let str = String(raw).trim();
 
       // If URL, parse out possible tracking code params
@@ -3582,6 +3588,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       return cleaned.toUpperCase();
+      })();
+      if (memo.size > 100000) memo.clear();
+      memo.set(memoKey, computed);
+      return computed;
     }
 
     let activeImportBatch = null;
@@ -3741,46 +3751,172 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function findExistingReturnParcelIndex(orderData) {
-      const matches = orders.map((order, index) => ({order, index})).filter(({order}) => isSameReturnParcel(order, orderData));
-      return matches.length === 1 ? matches[0].index : -1;
+      // Importing used to compare every incoming row with every order (rows x orders). The index only narrows
+      // the candidates; isSameReturnParcel still decides, so the result is the same as comparing against all.
+      const upper = value => String(value || '').trim().toUpperCase();
+      const add = (map, key, position) => {
+        if (!key) return;
+        const list = map.get(key);
+        if (list) list.push(position); else map.set(key, [position]);
+      };
+      const indexOrder = (index, order, position) => {
+        if (!order || typeof order !== 'object') return;
+        add(index.byOrder, upper(order.orderId), position);
+        add(index.byPrimary, extractCleanTrackingCode(order.returnTrack || order.track || ''), position);
+        add(index.byId, getReturnParcelId(order), position);
+        if (Array.isArray(order.trackingCodes)) order.trackingCodes.forEach(code => { if (typeof code === 'string') add(index.byCode, code, position); });
+      };
+      let index = findExistingReturnParcelIndex.index;
+      const length = orders.length;
+      if (index && index.arr === orders && index.len > 0 && length >= index.len && orders[0] === index.first) {
+        // Rows appended (or the last blank row replaced) since the last call: index only the tail.
+        const from = orders[index.len - 1] === index.last ? index.len : index.len - 1;
+        for (let position = from; position < length; position++) indexOrder(index, orders[position], position);
+        index.len = length; index.last = orders[length - 1];
+      } else if (!index || index.arr !== orders || index.len !== length || orders[0] !== index.first || orders[length - 1] !== index.last) {
+        index = { arr: orders, len: length, first: orders[0], last: orders[length - 1], byOrder: new Map(), byPrimary: new Map(), byId: new Map(), byCode: new Map(), position: new Map() };
+        for (let position = 0; position < length; position++) indexOrder(index, orders[position], position);
+        findExistingReturnParcelIndex.index = index;
+      }
+      // Called after an existing order is updated in place: its tracking codes may have grown.
+      findExistingReturnParcelIndex.touch = (order, hint) => {
+        const current = findExistingReturnParcelIndex.index;
+        if (!current || current.arr !== orders) return;
+        const known = typeof hint === 'number' && orders[hint] === order ? hint : orders.indexOf(order);
+        if (known >= 0) indexOrder(current, order, known);
+      };
+      const candidates = new Set();
+      const take = list => { if (list) list.forEach(position => candidates.add(position)); };
+      const rightPrimary = extractCleanTrackingCode(orderData.returnTrack || orderData.track || '');
+      take(index.byOrder.get(upper(orderData.orderId)));
+      take(index.byPrimary.get(rightPrimary));
+      take(index.byId.get(getReturnParcelId(orderData)));
+      take(index.byCode.get(rightPrimary));
+      if (Array.isArray(orderData.trackingCodes)) orderData.trackingCodes.forEach(code => take(index.byPrimary.get(code)));
+      let found = -1, count = 0;
+      for (const position of candidates) {
+        if (isSameReturnParcel(orders[position], orderData)) { found = position; if (++count > 1) return -1; }
+      }
+      return count === 1 ? found : -1;
     }
 
-    function getShopeeDbParcels() {
+    function getShopeeDbParcels(wantIndex) {
       // JSON persistence copies values stored under several index keys; dedupe by parcel identity.
-      const parcels = new Map();
-      Object.values(shopeeOrderDb || {}).forEach(order => {
-        if (order && typeof order === 'object') parcels.set(getReturnParcelKey(order), order);
-      });
-      return Array.from(parcels.values());
+      // Every register/lookup used to rebuild this list from the whole database (thousands of regex runs per call).
+      // The index is built once per database object and kept current by registerImportedParcel.
+      let index = getShopeeDbParcels.index;
+      if (!index || index.db !== shopeeOrderDb) {
+        index = { db: shopeeOrderDb, parcelsByKey: new Map(), keysOf: new Map(), keyOfDb: new Map(),
+          byTrack: new Map(), byIdent: new Map(), byOrder: new Map(), byPrimary: new Map(), byId: new Map(), byCode: new Map(),
+          sequence: new Map(), nextSequence: 0 };
+        const addTo = (map, key, parcelKey) => {
+          if (!key) return;
+          const set = map.get(key);
+          if (set) set.add(parcelKey); else map.set(key, new Set([parcelKey]));
+        };
+        index.addParcel = (parcelKey, order) => {
+          getOrderTrackingCodes(order).forEach(code => addTo(index.byTrack, code, parcelKey));
+          [order.orderId, getReturnParcelId(order)].forEach(id => addTo(index.byIdent, String(id || '').trim().toUpperCase(), parcelKey));
+          addTo(index.byOrder, String(order.orderId || '').trim().toUpperCase(), parcelKey);
+          addTo(index.byPrimary, extractCleanTrackingCode(order.returnTrack || order.track || ''), parcelKey);
+          addTo(index.byId, getReturnParcelId(order), parcelKey);
+          if (Array.isArray(order.trackingCodes)) order.trackingCodes.forEach(code => { if (typeof code === 'string') addTo(index.byCode, code, parcelKey); });
+        };
+        // Of several database keys holding the same parcel, the one created last decides which copy is used
+        // (the same rule as scanning Object.values in order).
+        index.refreshWinner = parcelKey => {
+          const keys = index.keysOf.get(parcelKey);
+          if (!keys || !keys.size) { index.keysOf.delete(parcelKey); index.parcelsByKey.delete(parcelKey); return; }
+          let best = null, bestSequence = -1;
+          keys.forEach(dbKey => { const sequence = index.sequence.get(dbKey); if (sequence > bestSequence) { bestSequence = sequence; best = dbKey; } });
+          const order = shopeeOrderDb[best];
+          if (index.parcelsByKey.get(parcelKey) !== order) { index.parcelsByKey.set(parcelKey, order); index.addParcel(parcelKey, order); }
+        };
+        // Point one database key at a parcel and keep every map consistent.
+        index.setEntry = (dbKey, order) => {
+          if (!index.sequence.has(dbKey)) index.sequence.set(dbKey, index.nextSequence++);
+          const previousKey = index.keyOfDb.get(dbKey);
+          if (previousKey !== undefined) {
+            const keys = index.keysOf.get(previousKey);
+            if (keys) keys.delete(dbKey);
+            shopeeOrderDb[dbKey] = order;
+            index.refreshWinner(previousKey);
+          }
+          shopeeOrderDb[dbKey] = order;
+          if (!order || typeof order !== 'object') { index.keyOfDb.delete(dbKey); return; }
+          const parcelKey = getReturnParcelKey(order);
+          index.keyOfDb.set(dbKey, parcelKey);
+          if (!index.keysOf.has(parcelKey)) index.keysOf.set(parcelKey, new Set());
+          index.keysOf.get(parcelKey).add(dbKey);
+          index.refreshWinner(parcelKey);
+        };
+        Object.keys(shopeeOrderDb || {}).forEach(dbKey => {
+          index.sequence.set(dbKey, index.nextSequence++);
+          const order = shopeeOrderDb[dbKey];
+          if (!order || typeof order !== 'object') return;
+          const parcelKey = getReturnParcelKey(order);
+          index.keyOfDb.set(dbKey, parcelKey);
+          if (!index.keysOf.has(parcelKey)) index.keysOf.set(parcelKey, new Set());
+          index.keysOf.get(parcelKey).add(dbKey);
+          index.parcelsByKey.set(parcelKey, order);
+        });
+        index.parcelsByKey.forEach((order, parcelKey) => index.addParcel(parcelKey, order));
+        getShopeeDbParcels.index = index;
+      }
+      return wantIndex === true ? index : Array.from(index.parcelsByKey.values());
     }
 
     function registerImportedParcel(orderData) {
       if (orderData.priceHasValue) orderData.priceNeedsReview = false;
-      const candidates = getShopeeDbParcels().filter(order => isSameReturnParcel(order, orderData));
+      const index = getShopeeDbParcels(true);
+      // Narrow to parcels that share an order id, claim id, tracking code or history code, then let
+      // isSameReturnParcel decide exactly as before.
+      const keys = new Set();
+      const take = set => { if (set) set.forEach(key => keys.add(key)); };
+      const incomingPrimary = extractCleanTrackingCode(orderData.returnTrack || orderData.track || '');
+      take(index.byOrder.get(String(orderData.orderId || '').trim().toUpperCase()));
+      take(index.byPrimary.get(incomingPrimary));
+      take(index.byId.get(getReturnParcelId(orderData)));
+      take(index.byCode.get(incomingPrimary));
+      if (Array.isArray(orderData.trackingCodes)) orderData.trackingCodes.forEach(code => take(index.byPrimary.get(code)));
+      const candidates = [];
+      keys.forEach(key => {
+        const parcel = index.parcelsByKey.get(key);
+        if (parcel && isSameReturnParcel(parcel, orderData)) candidates.push(parcel);
+      });
       if (candidates.length === 1) {
         if (orderData.priceHasValue === false) { orderData.price = candidates[0].price || 0; orderData.priceModes = candidates[0].priceModes; orderData.priceNeedsReview = true; }
-        const repeatedInBatch = activeImportBatch?.parcelKeys?.has(getReturnParcelKey(candidates[0]));
+        const candidateKey = getReturnParcelKey(candidates[0]);
+        const repeatedInBatch = activeImportBatch?.parcelKeys?.has(candidateKey);
         const incomingItemCount = (orderData.items || []).length;
         orderData.items = mergeImportedItems(candidates[0].items, orderData.items, repeatedInBatch ? 'supplement' : getImportProductMode());
         reconcileImportPrices(candidates[0], orderData, orderData.items.length > incomingItemCount);
         orderData.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(candidates[0]), ...getOrderTrackingCodes(orderData)]));
-        Object.keys(shopeeOrderDb).forEach(key => { if (getReturnParcelKey(shopeeOrderDb[key]) === getReturnParcelKey(candidates[0])) shopeeOrderDb[key] = orderData; });
+        Array.from(index.keysOf.get(candidateKey) || []).forEach(dbKey => index.setEntry(dbKey, orderData));
       }
       if (activeImportBatch) { activeImportBatch.parcelKeys = activeImportBatch.parcelKeys || new Set(); activeImportBatch.parcelKeys.add(getReturnParcelKey(orderData)); }
-      shopeeOrderDb['PARCEL:' + getReturnParcelKey(orderData)] = orderData;
-      getOrderTrackingCodes(orderData).forEach(code => { shopeeOrderDb[code] = orderData; });
+      index.setEntry('PARCEL:' + getReturnParcelKey(orderData), orderData);
+      getOrderTrackingCodes(orderData).forEach(code => { index.setEntry(code, orderData); });
       [orderData.orderId, getReturnParcelId(orderData)].filter(Boolean).forEach(id => {
-        shopeeOrderDb[String(id).trim().toUpperCase()] = orderData;
+        index.setEntry(String(id).trim().toUpperCase(), orderData);
       });
     }
 
     function lookupShopeeDb(code) {
       const clean = extractCleanTrackingCode(code || '');
       if (!clean || !shopeeOrderDb) return null;
-      const candidates = getShopeeDbParcels();
-      const tracks = candidates.filter(order => getOrderTrackingCodes(order).includes(clean));
+      const index = getShopeeDbParcels(true);
+      const resolve = (map, test) => {
+        const found = [];
+        (map.get(clean) || new Set()).forEach(key => {
+          const order = index.parcelsByKey.get(key);
+          if (order && test(order)) found.push(order);
+        });
+        return found;
+      };
+      const tracks = resolve(index.byTrack, order => getOrderTrackingCodes(order).includes(clean));
       if (tracks.length) return tracks.length === 1 ? tracks[0] : null;
-      const ids = candidates.filter(order => [order.orderId, getReturnParcelId(order)]
+      const ids = resolve(index.byIdent, order => [order.orderId, getReturnParcelId(order)]
         .some(id => String(id || '').trim().toUpperCase() === clean));
       return ids.length === 1 ? ids[0] : null;
     }
@@ -5115,6 +5251,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
+        findExistingReturnParcelIndex.index = null;
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
@@ -5126,6 +5263,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const oldPlatStatus = orders[existingIdx].platformStatus || '';
             const newPlatStatus = orderData.platformStatus || '';
             const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
+            if (typeof findExistingReturnParcelIndex.touch === 'function') findExistingReturnParcelIndex.touch(orders[existingIdx], existingIdx);
             if (orderData.platformStatus && orderData.platformStatus !== oldPlatStatus) {
               orders[existingIdx].platformStatus = orderData.platformStatus;
             }
@@ -5848,6 +5986,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
+        findExistingReturnParcelIndex.index = null;
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanAltTrack = extractCleanTrackingCode(orderData.altTrack || '');
@@ -5862,6 +6001,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             const newRetTrack = orderData.returnTrack || '';
 
             const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
+            if (typeof findExistingReturnParcelIndex.touch === 'function') findExistingReturnParcelIndex.touch(orders[existingIdx], existingIdx);
             if (changed) {
               enrichedTableCount++;
               let detailMsg = 'Cập nhật đơn trùng:';
@@ -5969,6 +6109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let addedCount = 0;
       let enrichedCount = 0;
 
+      findExistingReturnParcelIndex.index = null;
       uniqueMap.forEach(orderData => {
         const cleanTrack = extractCleanTrackingCode(orderData.track || '');
         const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
@@ -5977,6 +6118,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         if (existingIdx !== -1) {
           const changed = applyShopeeDbMatchToOrder(orders[existingIdx], orderData, true);
+            if (typeof findExistingReturnParcelIndex.touch === 'function') findExistingReturnParcelIndex.touch(orders[existingIdx], existingIdx);
           if (changed) enrichedCount++;
         } else {
           let targetIdx = orders.length;
@@ -6907,7 +7049,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.17';
+    const APP_VERSION_NUMBER = '1.8.18';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13207,7 +13349,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.17',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.18',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

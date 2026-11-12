@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.15
+          name: QuanLyHangHoan-Windows-Installer-v1.8.16
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.15
-          name: "Quản Lý Hàng Hoàn v1.8.15 — Đọc mã vạch nhanh hơn"
+          tag_name: v1.8.16
+          name: "Quản Lý Hàng Hoàn v1.8.16 — Phản hồi quét nhanh hơn"
           body: |
+            ### Bản sửa 1.8.16
+
+            - Gộp vẽ lại bảng khi quét liên tiếp, hoãn bản sao IndexedDB, gửi dữ liệu lưu dạng chuỗi JSON để PC phản hồi nhanh hơn.
+            - Điện thoại hiển thị thời gian PC xử lý và thời gian mạng + chờ.
+
             ### Bản sửa 1.8.15
 
             - Điện thoại đọc mã vạch Code 128 (đa số mã vận đơn) bằng bộ đọc nhanh thuần JS, không còn phải chờ Quagga; mã không đọc được vẫn chuyển sang bộ đọc cũ.

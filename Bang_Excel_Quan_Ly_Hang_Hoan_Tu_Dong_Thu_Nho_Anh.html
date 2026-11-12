@@ -13339,8 +13339,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       let httpDelivery = Promise.resolve(false);
       // 1. Record acceptance by the HTTP service; this is not proof that the phone received it.
       try {
-        httpDelivery = fetch('https://ntfy.sh/' + topic, {
-          method: 'POST', body: ack, headers: { 'Title': 'Shopee PC Ack' }
+        httpDelivery = fetch('https://ntfy.sh/' + topic + '?title=Shopee%20PC%20Ack', {
+          method: 'POST', body: ack
         }).then(response => {
           if (!response.ok) { reportDeliveryFailure('ntfy', 'HTTP ' + response.status); return false; }
           return true;
@@ -13387,10 +13387,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
         const topic = getNtfyTopic();
         try {
-          fetch('https://ntfy.sh/' + topic, {
+          fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Manifest', {
             method: 'POST',
-            body: msg,
-            headers: { 'Title': 'Shopee Manifest' }
+            body: msg
           }).catch(() => {});
         } catch (e) {}
         if (mqttClient && mqttClient.connected) {
@@ -13486,6 +13485,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (!data || data.type === 'pc_ack') return;
             if (!data.type && data.code) data.type = 'barcode';
 
+            data.__via = 'ntfy';
             const result = await processIncomingPhonePayload(data);
             if (result?.success && msgId) markCloudMsgProcessed(msgId);
           } catch (err) {
@@ -13516,6 +13516,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             try {
               const data = JSON.parse(msgBuf.toString());
               if (!data || data.type === 'pc_ack') return;
+              data.__via = 'emqx';
               processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
             } catch (e) {}
           });
@@ -13529,6 +13530,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 try {
                   const data = JSON.parse(msgBuf.toString());
                   if (!data || data.type === 'pc_ack') return;
+                  data.__via = url.indexOf('hivemq') >= 0 ? 'hivemq' : 'mosquitto';
                   processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
                 } catch (e) {}
               });
@@ -13674,7 +13676,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function processIncomingPhonePayload(data) {
+      if (data && data.type === 'latency_pong') return { success: false };
       if (!data || !data.room || data.room !== phoneRoomId) return { success: false, outcome: 'wrong_room' };
+      if (data.type === 'latency_ping') {
+        // Speed probe from the phone: answer once per channel the ping arrived on, on every channel, so the
+        // phone can time each channel's round trip.
+        const seen = processIncomingPhonePayload.pings || (processIncomingPhonePayload.pings = new Set());
+        const pingKey = data.pingId + '|' + (data.__via || '');
+        if (!seen.has(pingKey)) {
+          seen.add(pingKey);
+          if (seen.size > 200) seen.clear();
+          const pong = JSON.stringify({ type: 'latency_pong', pingId: data.pingId, uplinkVia: data.__via || '', room: data.room, time: Date.now() });
+          const pongTopic = 'agy_shopee_' + String(data.room).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          try { fetch('https://ntfy.sh/' + pongTopic + '?title=Pong', { method: 'POST', body: pong }).catch(() => {}); } catch (e) {}
+          const mqttTopic = 'agy_shopee_return_scanner_2026/' + data.room;
+          if (mqttClient && mqttClient.connected) { try { mqttClient.publish(mqttTopic, pong); } catch (e) {} }
+          (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(mqttTopic, pong); } catch (e) {} } });
+        }
+        return { success: true };
+      }
       if (typeof activeImportBatch !== 'undefined' && activeImportBatch && ['barcode','sync_item','bulk_sync','smart_label','photo','photo_chunk','new_order_scan'].includes(data.type)) {
         if (data.type === 'bulk_sync') { for (const item of data.items || []) if (item.requestId && item.code) sendAckToPhone(0,item.code,'PC đang nhập file; giữ yêu cầu và thử lại.','error',false,item.requestId,data.room,{ackStage:'scan',photoSaved:false,captureId:item.captureId || ''}); return {success:false}; }
         sendAckToPhone(0, data.code, 'PC đang nhập file; giữ yêu cầu và thử lại sau.', 'error', false, data.requestId, data.room,
@@ -16648,7 +16668,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const topic = getNtfyTopic();
       const helloMsg = JSON.stringify({ type: 'pc_hello', room: phoneRoomId, time: Date.now() });
       try {
-        fetch('https://ntfy.sh/' + topic, { method: 'POST', body: helloMsg, headers: { 'Title': 'Shopee PC Ready' } }).catch(() => {});
+        fetch('https://ntfy.sh/' + topic + '?title=Shopee%20PC%20Ready', { method: 'POST', body: helloMsg }).catch(() => {});
       } catch (e) {}
       if (typeof client !== 'undefined' && client && client.connected) {
         try {

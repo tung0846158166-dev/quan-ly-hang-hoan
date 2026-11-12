@@ -661,6 +661,10 @@
     </div>
 
     <!-- Scan Alert Result Banner -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <button type="button" id="latencyProbeBtn" onclick="runLatencyProbe()" style="flex:none;padding:6px 10px;border-radius:8px;border:1.5px solid #38bdf8;background:#0f172a;color:#7dd3fc;font-size:12px;font-weight:800">⏱ Đo tốc độ kênh</button>
+      <div id="latencyProbeResult" style="font-size:12px;color:#94a3b8;font-weight:700"></div>
+    </div>
     <div id="unconfirmedBar" class="hidden" role="status" aria-live="polite" style="padding:8px 10px;margin-bottom:8px;border:1.5px solid #f59e0b;border-radius:8px;font-size:12px;font-weight:800;color:#fde68a;background:#1e293b"></div>
     <div id="lastPcResult" class="hidden" role="status" aria-live="polite" style="padding:8px 10px;margin-bottom:8px;border:1px solid #334155;border-radius:8px;font-size:12px;color:#e2e8f0;background:#0f172a"></div>
     <div id="lastScanBanner" class="scan-alert hidden">
@@ -1207,8 +1211,38 @@
     /* Receiving PC Acknowledgement */
     let knownSystemCodes = new Set();
 
+    // Speed probe: ping the PC and time the answer on each channel (same channel up and down).
+    let latencyProbe = null;
+    function runLatencyProbe() {
+      const id = 'ping_' + Date.now();
+      latencyProbe = { id, sentAt: Date.now(), results: {} };
+      const out = document.getElementById('latencyProbeResult');
+      if (out) out.textContent = 'Đang đo…';
+      const msg = JSON.stringify({ type: 'latency_ping', pingId: id, room: room, time: Date.now() });
+      try { fetch('https://ntfy.sh/' + getNtfyTopic() + '?title=Ping', { method: 'POST', body: msg }).catch(() => {}); } catch (e) {}
+      if (client && client.connected) { try { client.publish('agy_shopee_return_scanner_2026/' + room, msg); } catch (e) {} }
+      extraClients.forEach(c => { if (c.connected) { try { c.publish('agy_shopee_return_scanner_2026/' + room, msg); } catch (e) {} } });
+      setTimeout(() => renderLatencyProbe(id, true), 8000);
+    }
+    function renderLatencyProbe(id, final) {
+      if (!latencyProbe || latencyProbe.id !== id) return;
+      const out = document.getElementById('latencyProbeResult');
+      if (!out) return;
+      const parts = ['ntfy', 'emqx', 'hivemq', 'mosquitto'].map(name => {
+        const ms = latencyProbe.results[name];
+        return name + ': ' + (ms !== undefined ? ms + ' ms' : (final ? 'không phản hồi' : '…'));
+      });
+      out.textContent = parts.join(' · ');
+    }
+    function recordLatencyPong(data) {
+      if (!latencyProbe || data.pingId !== latencyProbe.id || !data.__via || data.uplinkVia !== data.__via) return;
+      if (latencyProbe.results[data.__via] === undefined) latencyProbe.results[data.__via] = Date.now() - latencyProbe.sentAt;
+      renderLatencyProbe(latencyProbe.id, false);
+    }
+
     function handleScanAck(data) {
       if (!data || data.room !== room) return;
+      if (data.type === 'latency_pong') { recordLatencyPong(data); return; }
       if (data.type === 'pc_hello' || data.type === 'pc_heartbeat') {
         markPcReceipt();
         setTimeout(() => autoSyncOfflineQueueIfPending(), 300);
@@ -1468,10 +1502,9 @@
           time: now + i
         });
         try {
-          await fetch('https://ntfy.sh/' + topic, {
+          await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Photo%20Chunk', {
             method: 'POST',
-            body: chunkPayload,
-            headers: { 'Title': 'Shopee Photo Chunk' }
+            body: chunkPayload
           });
         } catch (err) {
           console.warn('Photo chunk send warn:', err);
@@ -1760,10 +1793,9 @@
       const lightJsonStr = JSON.stringify(lightPayload);
 
       try {
-        fetch('https://ntfy.sh/' + topic, {
+        fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Scan', {
           method: 'POST',
-          body: lightJsonStr,
-          headers: { 'Title': 'Shopee Scan' }
+          body: lightJsonStr
         }).catch(e => console.warn('Ntfy post warn:', e));
       } catch (e) {}
 
@@ -1805,7 +1837,7 @@
             badge.textContent = 'Đã nối kênh; chờ PC phản hồi';
           }
           const hello = JSON.stringify({ type: 'phone_connected', room: room, time: Date.now() });
-          fetch('https://ntfy.sh/' + topic, { method: 'POST', body: hello, headers: { 'Title': 'Shopee Connect' } }).catch(() => {});
+          fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Connect', { method: 'POST', body: hello }).catch(() => {});
         };
 
         phoneEventSource.onmessage = (event) => {

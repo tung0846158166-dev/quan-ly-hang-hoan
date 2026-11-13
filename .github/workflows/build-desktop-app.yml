@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.23
+          name: QuanLyHangHoan-Windows-Installer-v1.8.24
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.23
-          name: "Quản Lý Hàng Hoàn v1.8.23 — camera điện thoại bớt nóng, bớt hao pin"
+          tag_name: v1.8.24
+          name: "Quản Lý Hàng Hoàn v1.8.24 — bảng theo dõi đơn đặc biệt hiện đủ cột"
           body: |
+            ### Bản sửa 1.8.24
+
+            - Bảng theo dõi đơn hàng đặc biệt: mở rộng theo chiều ngang và dọc màn hình, các cột (Nhận Tại Kho, Thao Tác) hiện đủ, tên sản phẩm / lý do / trạng thái sàn xuống dòng thay vì bị cắt.
+
             ### Bản sửa 1.8.23
 
             - Điện thoại quét bớt nóng và bớt hao pin: giải mã khoảng 14 khung hình mỗi giây khi đang quét, tự hạ xuống 1 khung mỗi giây sau 25 giây không có mã mới (mã xuất hiện vẫn được đọc ngay và đánh thức lại tốc độ đầy đủ).

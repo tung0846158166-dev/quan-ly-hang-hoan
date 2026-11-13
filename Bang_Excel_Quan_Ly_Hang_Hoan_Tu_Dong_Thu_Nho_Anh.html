@@ -1319,7 +1319,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <!-- Watchlist Modal (Bảng Theo Dõi Đơn Hàng Đặc Biệt v1.6.5) -->
   <div id="watchlistModal" onclick="closeWatchlistModal()" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-[100] hidden flex items-center justify-center p-3 sm:p-5 select-none transition-all">
-    <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+    <div class="relative w-full max-w-[98vw] h-[94vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
       <!-- Header -->
       <div class="bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 text-white px-5 py-3 flex items-center justify-between shadow-xs">
         <div class="flex items-center gap-2.5">
@@ -1385,20 +1385,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       </div>
 
       <!-- Bảng Danh Sách Đơn Theo Dõi -->
-      <div class="flex-1 overflow-x-auto overflow-y-auto max-h-[62vh] min-h-[320px] bg-white">
+      <div class="flex-1 min-h-0 overflow-auto bg-white">
         <table class="w-full text-xs text-left border-collapse">
           <thead class="bg-slate-900 text-white text-[11px] uppercase sticky top-0 z-10">
             <tr>
-              <th class="w-10 py-2 text-center border-r border-slate-700">STT</th>
-              <th class="w-32 py-2 px-2 border-r border-slate-700">Mã Đơn Hàng</th>
-              <th class="w-36 py-2 px-2 border-r border-slate-700">Mã Vận Đơn</th>
-              <th class="min-w-[200px] py-2 px-2 border-r border-slate-700">Sản Phẩm & Phân Loại</th>
-              <th class="w-48 py-2 px-2 border-r border-slate-700">Lý Do Theo Dõi</th>
-              <th class="w-32 py-2 text-center border-r border-slate-700">Ngày Hủy</th>
-              <th class="w-40 py-2 text-center border-r border-slate-700">Hạn Cần Xử Lý</th>
-              <th class="w-32 py-2 text-center border-r border-slate-700">Trạng Thái Sàn</th>
-              <th class="w-28 py-2 text-center border-r border-slate-700">Nhận Tại Kho</th>
-              <th class="w-28 py-2 text-center">Thao Tác</th>
+              <th class="w-9 py-2 text-center border-r border-slate-700">STT</th>
+              <th class="w-[120px] py-2 px-2 border-r border-slate-700">Mã Đơn Hàng</th>
+              <th class="w-[130px] py-2 px-2 border-r border-slate-700">Mã Vận Đơn</th>
+              <th class="min-w-[170px] py-2 px-2 border-r border-slate-700">Sản Phẩm & Phân Loại</th>
+              <th class="w-[150px] py-2 px-2 border-r border-slate-700">Lý Do Theo Dõi</th>
+              <th class="w-[100px] py-2 text-center border-r border-slate-700">Ngày Hủy</th>
+              <th class="w-[110px] py-2 text-center border-r border-slate-700">Hạn Cần Xử Lý</th>
+              <th class="w-[120px] py-2 text-center border-r border-slate-700">Trạng Thái Sàn</th>
+              <th class="w-[90px] py-2 text-center border-r border-slate-700">Nhận Tại Kho</th>
+              <th class="w-[90px] py-2 text-center">Thao Tác</th>
             </tr>
           </thead>
           <tbody id="watchlistModalTableBody" class="divide-y divide-slate-200">
@@ -7050,7 +7050,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.23';
+    const APP_VERSION_NUMBER = '1.8.24';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13350,7 +13350,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.23',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.24',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -18072,14 +18072,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </td>
             <td class="py-2 px-2">${trackHtml}</td>
             <td class="py-2 px-2">
-              <div class="truncate max-w-[220px] font-medium text-slate-800" title="${escapeAttr(itemDesc)}">
+              <div class="max-w-[280px] break-words leading-tight font-medium text-slate-800" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" title="${escapeAttr(itemDesc)}">
                 ${escapeAttr(itemDesc)}
               </div>
               <div class="text-[10px] text-slate-500 mt-0.5">${escapeAttr(order.platform || 'Shopee')} • ${escapeAttr(order.carrier || '')}</div>
             </td>
             <td class="py-2 px-2 max-w-[200px]">
               <div class="flex items-center justify-between gap-1 group bg-amber-50/70 p-1 rounded border border-amber-200/60">
-                <span class="text-[11px] font-semibold text-amber-950 truncate flex-1" title="${escapeAttr(order.watchlistReason || 'Chưa có ghi chú lý do')}">
+                <span class="text-[11px] font-semibold text-amber-950 break-words leading-tight flex-1" title="${escapeAttr(order.watchlistReason || 'Chưa có ghi chú lý do')}">
                   ${order.watchlistReason ? `⭐ ${escapeAttr(order.watchlistReason)}` : '<span class="text-slate-400 italic">Chưa ghi lý do</span>'}
                 </span>
                 <button type="button" onclick="editSingleWatchlistReason(${originalIndex})"
@@ -18096,7 +18096,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               ${deadlineBadgeHtml}
             </td>
             <td class="py-2 text-center px-1">
-              <span class="inline-block px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-semibold max-w-[120px] truncate" title="${escapeAttr(platformStatusText)}">
+              <span class="inline-block px-1.5 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 text-[10px] font-semibold max-w-[115px] leading-tight whitespace-normal break-words" title="${escapeAttr(platformStatusText)}">
                 ${escapeAttr(platformStatusText)}
               </span>
             </td>

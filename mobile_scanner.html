@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.26</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.28</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -2732,7 +2732,7 @@
       let frameNo = 0;
       let pendingQuagga = null;
       let pendingNative = null;
-      // v1.8.26 Tiết kiệm pin: giải mã ~14 khung/giây khi đang quét, còn 1 khung/giây khi 25 giây không có mã mới.
+      // v1.8.28 Tiết kiệm pin: giải mã ~14 khung/giây khi đang quét, còn 1 khung/giây khi 25 giây không có mã mới.
       // Mã xuất hiện lúc rảnh vẫn được đọc (trong tối đa ~1 giây) và đánh thức lại tốc độ đầy đủ.
       const ACTIVE_FRAME_GAP_MS = 70, IDLE_FRAME_GAP_MS = 1000, IDLE_AFTER_MS = 25000;
       let lastActivityAt = performance.now();

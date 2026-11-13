@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.27
+          name: QuanLyHangHoan-Windows-Installer-v1.8.28
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.27
-          name: "Quản Lý Hàng Hoàn v1.8.27 — nhập file Salework có mã trả hàng"
+          tag_name: v1.8.28
+          name: "Quản Lý Hàng Hoàn v1.8.28 — sửa mã đơn Shopee bị phình số 0, nhập Salework có mã trả hàng"
           body: |
+            ### Bản sửa 1.8.28
+
+            - Mã đơn Shopee dạng "số + E + số" (vd 26111238E12345) không còn bị hiểu nhầm là số khoa học và nối thêm hàng nghìn số 0 làm bảng rộng bất thường; các đơn đã bị hỏng được tự khôi phục khi mở app.
+
             ### Bản sửa 1.8.27
 
             - Nhập file Salework (don_hoan_...xlsx): đọc cột "Mã trả hàng" làm mã vận đơn hoàn về, để quét mã hoàn về tìm ra đúng đơn.

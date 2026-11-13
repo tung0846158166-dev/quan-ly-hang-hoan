@@ -3569,7 +3569,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (mGhtk) return mGhtk[1].toUpperCase();
 
       // 7. J&T Express: 86..., 84..., 82..., 80... (10 to 14 pure digits)
-      const mJt = str.match(/(8[0246][0-9]{10,13})/);
+      const mJt = str.match(/(?<![0-9])(8[0246][0-9]{10,13})(?![0-9])/); // không cắt mã đơn TikTok dài 18-19 số
       if (mJt) return mJt[1];
 
       // 8. Stripping delimiters and handling compound strings like "HAN-DDA/SPXVN..."
@@ -7050,7 +7050,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.24';
+    const APP_VERSION_NUMBER = '1.8.25';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13350,7 +13350,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.24',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.25',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

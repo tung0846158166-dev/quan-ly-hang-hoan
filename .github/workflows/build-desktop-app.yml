@@ -89,11 +89,13 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v1.8.26
-          name: "Quản Lý Hàng Hoàn v1.8.26 — tìm kiếm ghi rõ đơn khớp ở trường nào"
+          name: "Quản Lý Hàng Hoàn v1.8.26 — tìm kiếm ghi rõ khớp ở đâu, lọc giờ 24h"
           body: |
             ### Bản sửa 1.8.26
 
             - Ô tìm kiếm: thanh kết quả ghi rõ đơn khớp ở trường nào (mã vận đơn hoàn về, tên người mua, ghi chú, sản phẩm...).
+            - Bộ lọc giờ (cả bảng chính và kho lưu trữ) dùng định dạng 24 giờ HH:mm, không còn AM/PM.
+            - Quét mã khớp nhiều dòng của cùng một đơn (có yêu cầu hoàn đã hủy "Không cần nhận"): nếu chỉ còn 1 dòng cần nhận thì tự chọn dòng đó, không báo trùng.
 
             ### Bản sửa 1.8.25
 

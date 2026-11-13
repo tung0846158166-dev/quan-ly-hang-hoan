@@ -995,9 +995,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <input type="date" id="filterDateTo" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-slate-300 rounded px-0.5 py-0.2 outline-none text-slate-800 w-[122px]" title="Đến ngày" />
 
           <span class="text-[9px] font-bold text-amber-800">Giờ:</span>
-          <input type="time" id="filterTimeFrom" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[72px]" title="Từ giờ (HH:mm)" />
+          <input type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:mm" oninput="formatTime24Input(this)" id="filterTimeFrom" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[72px]" title="Từ giờ (HH:mm)" />
           <span class="text-amber-400 text-[8px]">➔</span>
-          <input type="time" id="filterTimeTo" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[72px]" title="Đến giờ (HH:mm)" />
+          <input type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:mm" oninput="formatTime24Input(this)" id="filterTimeTo" onchange="applyDateTimeFilter()" class="text-[9.5px] bg-white border border-amber-300 rounded px-0.5 py-0.2 outline-none text-slate-800 font-mono w-[72px]" title="Đến giờ (HH:mm)" />
 
           <button type="button" onclick="clearDateTimeFilter()" class="text-rose-500 hover:text-white hover:bg-rose-600 rounded px-1 py-0.2 text-[10px] font-extrabold transition cursor-pointer" title="Xóa toàn bộ lọc ngày & giờ">
             ✕
@@ -3698,10 +3698,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const code = extractCleanTrackingCode(rawCode || '');
       if (!code) return [];
       const entries = orders.map((order, index) => ({ order, index }));
+      // Nhiều dòng cùng mã (vd đơn có nhiều yêu cầu hoàn, một số đã hủy "Không cần nhận"): nếu chỉ còn đúng 1 dòng
+      // cần nhận thì chọn dòng đó thay vì báo trùng.
+      const preferActive = list => {
+        if (list.length < 2) return list;
+        const active = list.filter(({order}) => order.status !== 'Không cần nhận');
+        return active.length === 1 ? active : list;
+      };
       const trackingMatches = entries.filter(({order}) => getOrderTrackingCodes(order).includes(code));
-      if (trackingMatches.length) return trackingMatches;
-      return entries.filter(({order}) => [order.orderId, order.claimId, order.returnOrderId, order.rawDetails?.claimId]
-        .some(id => String(id || '').trim().toUpperCase() === code));
+      if (trackingMatches.length) return preferActive(trackingMatches);
+      return preferActive(entries.filter(({order}) => [order.orderId, order.claimId, order.returnOrderId, order.rawDetails?.claimId]
+        .some(id => String(id || '').trim().toUpperCase() === code)));
     }
 
     function getReturnParcelId(order) {
@@ -10494,6 +10501,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
     }
 
+    // Ô giờ dạng 24 giờ (HH:mm), không phụ thuộc cài đặt AM/PM của hệ điều hành.
+    function formatTime24Input(el) {
+      if (!el) return;
+      let digits = String(el.value || '').replace(/\D/g, '').slice(0, 4);
+      if (digits.length >= 2) {
+        const hh = Math.min(Number(digits.slice(0, 2)), 23);
+        digits = String(hh).padStart(2, '0') + digits.slice(2);
+      }
+      if (digits.length === 4) {
+        const mm = Math.min(Number(digits.slice(2)), 59);
+        digits = digits.slice(0, 2) + String(mm).padStart(2, '0');
+      }
+      const text = digits.length > 2 ? digits.slice(0, 2) + ':' + digits.slice(2) : digits;
+      el.value = text;
+      if (text === '' || text.length === 5) el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function readTime24Value(el) {
+      const value = el ? String(el.value || '').trim() : '';
+      return /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : '';
+    }
+
     function applyDateTimeFilter() {
       const fromDateEl = document.getElementById('filterDateFrom') || document.getElementById('customDateFrom');
       const toDateEl = document.getElementById('filterDateTo') || document.getElementById('customDateTo');
@@ -10502,8 +10530,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       currentCustomDateFrom = fromDateEl ? fromDateEl.value : '';
       currentCustomDateTo = toDateEl ? toDateEl.value : '';
-      currentCustomTimeFrom = fromTimeEl ? fromTimeEl.value : '';
-      currentCustomTimeTo = toTimeEl ? toTimeEl.value : '';
+      currentCustomTimeFrom = readTime24Value(fromTimeEl);
+      currentCustomTimeTo = readTime24Value(toTimeEl);
 
       currentRecvDateFilter = 'all';
       const sel = document.getElementById('recvDateFilterSelect');
@@ -15876,9 +15904,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function filterArchivedOrders() {
       const search = (document.getElementById('archivedSearchInput')?.value || '').trim().toLowerCase();
       const fromDateVal = document.getElementById('archivedFilterFromDate')?.value || '';
-      const fromTimeVal = document.getElementById('archivedFilterFromTime')?.value || '';
+      const fromTimeVal = readTime24Value(document.getElementById('archivedFilterFromTime'));
       const toDateVal = document.getElementById('archivedFilterToDate')?.value || '';
-      const toTimeVal = document.getElementById('archivedFilterToTime')?.value || '';
+      const toTimeVal = readTime24Value(document.getElementById('archivedFilterToTime'));
       const platVal = document.getElementById('archivedFilterPlatform')?.value || 'all';
 
       let fromMs = null;
@@ -18423,13 +18451,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-600 rounded-lg px-2 py-1">
             <span class="text-slate-400 font-bold text-[11px]">Từ:</span>
             <input type="date" id="archivedFilterFromDate" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer" />
-            <input type="time" id="archivedFilterFromTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
+            <input type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:mm" oninput="formatTime24Input(this)" id="archivedFilterFromTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
           </div>
 
           <div class="flex items-center gap-1 bg-slate-900/90 border border-slate-600 rounded-lg px-2 py-1">
             <span class="text-slate-400 font-bold text-[11px]">Đến:</span>
             <input type="date" id="archivedFilterToDate" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer" />
-            <input type="time" id="archivedFilterToTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
+            <input type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:mm" oninput="formatTime24Input(this)" id="archivedFilterToTime" onchange="filterArchivedOrders()" class="bg-transparent text-white text-xs focus:outline-none cursor-pointer border-l border-slate-700 pl-1" />
           </div>
 
           <!-- Sàn Selector -->

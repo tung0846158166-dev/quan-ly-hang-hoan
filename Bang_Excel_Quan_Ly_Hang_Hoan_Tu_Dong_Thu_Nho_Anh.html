@@ -4754,6 +4754,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['Return Logistics Tracking ID', 'Mã vận đơn trả hàng', 'Return Tracking ID', 'Return Tracking'],
         ['returnlogisticstrackingid', 'mvdtrahang', 'returntracking']
       );
+      // File Salework (don_hoan_...xlsx) ghi mã vận đơn hoàn về ở cột "Mã trả hàng".
+      const saleworkReturnTrackKey = returnLogisticsTrackKey ? '' : findKeyExactOrIncludes(['Mã trả hàng', 'Mã vận đơn hoàn', 'Mã vận đơn hoàn về']);
       const returnTypeKey = findKeyExactOrIncludes(
         ['Return Type', 'Cancelation/Return Type', 'Loại yêu cầu', 'Loại hủy'],
         ['returntype', 'cancelationreturntype', 'canceltype', 'loaiyeucau']
@@ -5187,11 +5189,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
         const entry = tempMap.get(groupKey);
-        const returnTrack = returnLogisticsTrackKey ? extractCleanTrackingCode(normalizeScientificOrderId(row[returnLogisticsTrackKey])) : '';
+        const returnTrackSourceKey = returnLogisticsTrackKey || saleworkReturnTrackKey;
+        const returnTrack = returnTrackSourceKey ? extractCleanTrackingCode(normalizeScientificOrderId(row[returnTrackSourceKey])) : '';
         if (returnTrack && !entry.returnTrack) entry.returnTrack = returnTrack;
         const forwardTrack = forwardTrackKey ? extractCleanTrackingCode(normalizeScientificOrderId(row[forwardTrackKey])) : '';
         if (forwardTrack && !entry.forwardTrack) entry.forwardTrack = forwardTrack;
-        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, forwardTrack, ...parseImportedTrackingCodes(row)].filter(Boolean)));
+        entry.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(entry), rawTrack, forwardTrack, returnTrack, ...parseImportedTrackingCodes(row)].filter(Boolean)));
         // Aggregate SKU amounts as line totals; order amounts may repeat on every SKU row.
         // Presence is separate from value so an explicit zero does not trigger a fallback.
         if (!entry._importMoney) entry._importMoney = {};
@@ -7081,7 +7084,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.26';
+    const APP_VERSION_NUMBER = '1.8.27';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13435,7 +13438,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.26',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.27',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

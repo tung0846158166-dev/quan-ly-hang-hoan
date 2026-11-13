@@ -31,3 +31,11 @@ test('TikTok keeps explicit forward tracking with return tracking',async()=>{con
 test('TikTok source file boundary prevents orphan SKU attaching to prior file',async()=>{const c=await run([{...base,__sourceFileId:'file1'},{'Product Name':'Orphan SKU',Quantity:2,__sourceFileId:'file2'}]);assert.equal(c.orders.length,1);assert.equal(c.orders[0].items.length,1);});
 test('TikTok preserves stable seller and platform SKU identities',async()=>{const c=await run([{...base,'Seller SKU':'SELLER001','SKU ID':'SKU001'}]);assert.equal(c.orders[0].items[0].sellerSku,'SELLER001');assert.equal(c.orders[0].items[0].skuId,'SKU001');assert.equal(c.orders[0].forwardTrack,'');});
 test('TikTok stores forward identity even before return tracking is supplied',async()=>{const c=await run([{...base,'Return Logistics Tracking ID':'','Tracking ID':'FORWARD001'}]);assert.equal(c.orders[0].forwardTrack,'FORWARD001');assert.equal(c.orders[0].returnTrack,'');assert.equal(c.orders[0].track,'FORWARD001');});
+test('Salework return file keeps the "Mã trả hàng" return tracking code',async()=>{
+ const row={'Mã đơn hàng':'587139504996779037','Trạng thái':'THẤT THU','Mã sản phẩm':'DELAX_Den_M','Số lượng':1,'Giá Salework':700000,'Tên sản phẩm trên sàn':'Áo Polo Len - Đen, M - Premium Cao Cấp','Tổng COD':390150,'Mã vận đơn':'862799512623','Đơn vị vận chuyển':'J&T Express','Mã trả hàng':'854170248243'};
+ const c=await run([row,{...row,'Mã đơn hàng':'587139219296323354','Mã vận đơn':'862762232763','Mã trả hàng':''}]);
+ assert.equal(c.orders.length,2);
+ assert.equal(c.orders[0].returnTrack,'854170248243');assert.equal(c.orders[0].track,'862799512623');
+ assert.ok(c.orders[0].trackingCodes.includes('854170248243'));
+ assert.equal(c.orders[1].returnTrack,'');
+});

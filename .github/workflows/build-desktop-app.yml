@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.25
+          name: QuanLyHangHoan-Windows-Installer-v1.8.26
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.25
-          name: "Quản Lý Hàng Hoàn v1.8.25 — không cắt nhầm mã đơn TikTok dài khi quét"
+          tag_name: v1.8.26
+          name: "Quản Lý Hàng Hoàn v1.8.26 — tìm kiếm ghi rõ đơn khớp ở trường nào"
           body: |
+            ### Bản sửa 1.8.26
+
+            - Ô tìm kiếm: thanh kết quả ghi rõ đơn khớp ở trường nào (mã vận đơn hoàn về, tên người mua, ghi chú, sản phẩm...).
+
             ### Bản sửa 1.8.25
 
             - Quét/nhập mã: mã đơn TikTok dài 18-19 số không còn bị cắt thành mã vận đơn J&T giả (trên điện thoại và máy tính).

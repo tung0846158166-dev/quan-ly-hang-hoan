@@ -7050,7 +7050,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.25';
+    const APP_VERSION_NUMBER = '1.8.26';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -9521,6 +9521,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return map[field] || field;
     }
 
+    // Liệt kê các trường của đơn chứa từ khóa tìm kiếm (để thanh kết quả ghi rõ "khớp ở: ...").
+    function getOrderMatchFieldLabels(order, kw) {
+      const kwTrim = String(kw || '').trim();
+      if (!kwTrim || !order) return [];
+      const kwLower = kwTrim.toLowerCase();
+      const kwNorm = removeVietnameseTones(kwTrim).toLowerCase();
+      const has = value => {
+        const text = String(value == null ? '' : value).toLowerCase();
+        return text.includes(kwLower) || removeVietnameseTones(text).includes(kwNorm);
+      };
+      const itemsText = (order.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`).join(' ');
+      const fields = [
+        ['mã đơn hàng', order.orderId],
+        ['mã vận đơn', order.track],
+        ['mã vận đơn phụ', order.altTrack],
+        ['mã vận đơn hoàn về', order.returnTrack],
+        ['mã vận đơn giao', order.forwardTrack],
+        ['các mã vận đơn khác', (order.trackingCodes || []).join(' ')],
+        ['mã yêu cầu hoàn', `${order.rawDetails?.claimId || ''} ${order.claimId || ''}`],
+        ['tên người mua', `${order.buyerUsername || ''} ${order.rawDetails?.buyerUsername || ''}`],
+        ['ghi chú', `${order.note || ''} ${order.buyerNote || ''} ${order.myNote || ''} ${order.watchlistReason || ''}`],
+        ['sản phẩm / phân loại', itemsText],
+        ['đơn vị vận chuyển', order.carrier],
+        ['ngày', `${order.shipDate || ''} ${order.returnDate || ''} ${order.recvDate || ''}`],
+        ['sàn / loại đơn', `${getOrderPlatform(order)} ${getOrderType(order)} ${order.preOrder || ''}`]
+      ];
+      return fields.filter(([, value]) => has(value)).map(([label]) => label);
+    }
+
     function isOrderMatch(order, kw) {
       if (!kw) return false;
       const kwTrim = String(kw).trim();
@@ -11815,7 +11844,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         previewEl.classList.remove('hidden');
         const spSummary = (firstMatch.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join('; ');
-        previewEl.innerHTML = `✅ Tìm thấy <b>${matchCount} đơn</b> khớp! Đơn đầu tiên (#${firstMatchIdx}): Mã đơn <b>${escapeAttr(firstMatch.orderId)}</b> | MVĐ: <b>${escapeAttr(firstMatch.track)}</b> | Ngày bấm hoàn: <b>${escapeAttr(firstMatch.returnDate)}</b> | Gồm ${firstMatch.items.length} SP: <b>${escapeAttr(spSummary)}</b> | Trạng thái: <b>[${firstMatch.status}]</b>`;
+        previewEl.innerHTML = `✅ Tìm thấy <b>${matchCount} đơn</b> khớp! Đơn đầu tiên (#${firstMatchIdx}): Mã đơn <b>${escapeAttr(firstMatch.orderId)}</b> | MVĐ: <b>${escapeAttr(firstMatch.track)}</b> | Ngày bấm hoàn: <b>${escapeAttr(firstMatch.returnDate)}</b> | Gồm ${firstMatch.items.length} SP: <b>${escapeAttr(spSummary)}</b> | Trạng thái: <b>[${firstMatch.status}]</b>` + (() => { const where = getOrderMatchFieldLabels(firstMatch, kw); return where.length ? ` | Khớp ở: <b>${escapeAttr(where.join(', '))}</b>` : ''; })();
       }
 
       // Filter criteria for the 300+ SKU Summary Table
@@ -13350,7 +13379,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.25',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.26',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

@@ -4128,12 +4128,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // Chuyển đổi mã đơn hàng bị Excel xuất dạng số khoa học (VD: 5.8702686118684454e+17 -> 587026861186844540)
+    // Khôi phục mã đơn Shopee dạng "26111238E12345" đã bị biến thành "26111238" + hàng nghìn số 0 do lỗi cũ.
+    function repairScientificOrderId(id) {
+      const text = String(id == null ? '' : id).trim();
+      if (!/^\d{20,}$/.test(text)) return text;
+      const trailingZeros = (text.match(/0+$/) || [''])[0].length;
+      if (trailingZeros < 8) return text;
+      for (let z = trailingZeros; z >= 1; z--) {
+        const mantissa = text.slice(0, text.length - z);
+        if (mantissa.length + 1 + String(z).length === 14) return mantissa + 'E' + z;
+      }
+      return text;
+    }
+    function repairScientificOrderIds(list) {
+      let fixed = 0;
+      (Array.isArray(list) ? list : []).forEach(order => {
+        if (!order || typeof order.orderId !== 'string' || order.orderId.length < 20) return;
+        const repaired = repairScientificOrderId(order.orderId);
+        if (repaired !== order.orderId) { order.orderId = repaired; fixed++; }
+      });
+      return fixed;
+    }
+
     function normalizeScientificOrderId(val) {
       if (val === null || val === undefined) return '';
       let s = String(val).trim().replace(/^[\'\"]+|[\'\"]+$/g, '').trim();
       if (!s) return '';
       const mSci = s.match(/^([+-]?\d+)(?:\.(\d+))?[eE]\+?(\d+)$/);
-      if (mSci) {
+      // Chỉ coi là số khoa học do Excel/CSV làm hỏng khi có dấu "." hoặc "+" (vd 5.87E+17). Mã đơn Shopee thật dạng
+      // "26111238E12" (số + E + số) phải giữ nguyên, nếu không sẽ bị nối thêm hàng trăm số 0.
+      if (mSci && /[.+]/.test(s) && parseInt(mSci[3], 10) <= 40) {
         const intPart = mSci[1].replace(/^[+-]/, '');
         const fracPart = mSci[2] || '';
         const exp = parseInt(mSci[3], 10);
@@ -8779,6 +8803,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
             orders = parsed;
+            repairScientificOrderIds(orders);
           } else {
             orders = [];
           }
@@ -8810,6 +8835,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (safeRes && Array.isArray(safeRes.data) && safeRes.data.length > orders.length) {
           console.log('Khôi phục dữ liệu an toàn từ IndexedDB Safe Store, số đơn:', safeRes.data.length);
           orders = safeRes.data;
+          repairScientificOrderIds(orders);
           renderAll();
           updateSafeStorageHeaderBadge();
         }
@@ -9417,6 +9443,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const res = await window.desktopDiskAPI.loadFromDisk();
         if (res && res.success && Array.isArray(res.data)) {
           orders = res.data;
+          repairScientificOrderIds(orders);
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(orders.map(o => {
               if (o.photo && o.photo.length > 200) {
@@ -13242,6 +13269,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!hasLocalOrders || fileData.savedAt >= localTs) {
           if (Array.isArray(fileData.orders)) {
             orders = fileData.orders;
+            repairScientificOrderIds(orders);
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(orders)); } catch (e) {}
           }
           if (Array.isArray(fileData.catalogItems)) {

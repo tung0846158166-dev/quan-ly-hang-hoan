@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.26
+          name: QuanLyHangHoan-Windows-Installer-v1.8.27
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.26
-          name: "Quản Lý Hàng Hoàn v1.8.26 — tìm kiếm ghi rõ khớp ở đâu, lọc giờ 24h"
+          tag_name: v1.8.27
+          name: "Quản Lý Hàng Hoàn v1.8.27 — nhập file Salework có mã trả hàng"
           body: |
+            ### Bản sửa 1.8.27
+
+            - Nhập file Salework (don_hoan_...xlsx): đọc cột "Mã trả hàng" làm mã vận đơn hoàn về, để quét mã hoàn về tìm ra đúng đơn.
+
             ### Bản sửa 1.8.26
 
             - Ô tìm kiếm: thanh kết quả ghi rõ đơn khớp ở trường nào (mã vận đơn hoàn về, tên người mua, ghi chú, sản phẩm...).

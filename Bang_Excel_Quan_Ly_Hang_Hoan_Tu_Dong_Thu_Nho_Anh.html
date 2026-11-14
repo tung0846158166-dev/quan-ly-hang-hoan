@@ -782,6 +782,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="archivedOrdersCountBadge" class="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0 đơn</span>
         </button>
 
+        <button type="button" onclick="openCancelledOrdersModal()" id="btnOpenCancelledOrders"
+                class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-rose-700 to-red-800 hover:from-rose-800 hover:to-red-900 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-rose-400"
+                title="Bảng riêng cho đơn hủy: nhập file, nhận đơn hủy từ điện thoại, đối chiếu khi quét nhận hàng">
+          <span>🚫 BẢNG ĐƠN HỦY</span>
+          <span id="cancelledOrdersCountBadge" class="bg-white text-rose-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0 đơn</span>
+        </button>
+
         <button type="button" onclick="openQuickCreateOrdersModal()" id="btnQuickCreateOrders"
                 class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-teal-600 to-emerald-700 hover:from-teal-700 hover:to-emerald-800 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-emerald-400"
                 title="Dán danh sách mã đơn / mã vận đơn để tạo nhanh hàng loạt đơn mới">
@@ -3077,6 +3084,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             archivedOrders = data.archivedOrders.map(order => Object.assign({}, order));
             if (!saveArchivedOrders().success) throw new Error('Không lưu được kho lưu trữ; chưa phục hồi dữ liệu mới.');
           }
+          if (Array.isArray(data.cancelledOrders)) { cancelledOrders = data.cancelledOrders.map(o => Object.assign({}, o)); saveCancelledOrders(); }
           published = true;
           photoMemoryCache.clear(); for (const [id, photo] of stagedPhotos) photoMemoryCache.set(id, photo);
           orders = stagedOrders;
@@ -7036,7 +7044,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.31';
+    const APP_VERSION_NUMBER = '1.8.32';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -9375,7 +9383,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         window.desktopDiskAPI.backupToCustomFolder({
           version: 1, exportTime: new Date().toISOString(),
           orders: orders.map(o => Object.assign({}, o, { photo: o.photo || (o.photoId && photoMemoryCache.get(o.photoId)) || '' })),
-          archivedOrders, photos: Array.from(photoMemoryCache, ([id, data]) => ({ id, data })),
+          archivedOrders, cancelledOrders, photos: Array.from(photoMemoryCache, ([id, data]) => ({ id, data })),
           catalog: catalogItems, accountantStock, cellEditHistory
         }).then(res => {
           if (res && res.success) {
@@ -13500,7 +13508,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.31',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.32',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14050,6 +14058,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       
       // v1.7.5: Tiếp nhận đơn mới quét từ điện thoại gửi lên
+      if (data.type === 'new_order_scan' && data.cancelled === true) return handleCancelledOrderScan(data);
       if (data.type === 'new_order_scan') {
         const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
         if (!trackCode) return;
@@ -14695,6 +14704,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
           phoneRequestReceipts.delete(key);
         }
+        if (typeof findCancelledOrder === 'function' && !(key && phoneRequestStaged.has(key)) && findCancelledOrder(cleanCode) !== -1 && phoneOrderMatches(cleanCode).length === 0) {
+          // Mã chỉ có trong Bảng đơn hủy: xác nhận nhận hàng tại đó.
+          confirmCancelledReceipt(cleanCode, { requestId, room: clientRoom, captureId: capture.captureId || '' }, false);
+          return { success: true, outcome: 'cancelled' };
+        }
         let staged = key && phoneRequestStaged.get(key);
         if (staged && staged.code !== cleanCode) return { success: false };
         if (!staged) {
@@ -14735,6 +14749,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             processingMs: Date.now() - receivedAt, saveMs: Date.now() - saveStartedAt,
             lagMs: typeof pcRecentLagMs === 'function' ? pcRecentLagMs() : 0 };
           if (key) { phoneRequestReceipts.set(key, staged.receipt); phoneRequestStaged.delete(key); }
+          // Mã có ở cả Bảng chính và Bảng đơn hủy: đánh dấu đã nhận ở cả hai nơi.
+          try { if (typeof findCancelledOrder === 'function' && findCancelledOrder(cleanCode) !== -1) confirmCancelledReceipt(cleanCode, null, true); } catch (e) {}
           sendAckToPhone(...staged.receipt);
           if (photoDataUrl && !photoAttached && capture.captureId) sendAckToPhone(0, cleanCode, 'Ảnh chưa ghép được đúng một kiện; giữ ảnh để kiểm tra',
             staged.receipt[3] === 'ambiguous' ? 'ambiguous' : 'not_found', false, requestId, clientRoom,
@@ -15791,6 +15807,274 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // HỆ THỐNG KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO QUÁ 24H (v1.8.4)
     // Tự động dời các đơn có ngày giờ về kho >= 24h để Bảng chính siêu nhẹ & mượt mà
     // =========================================================================
+    // =========================================================================
+    // v1.8.32: BẢNG ĐƠN HỦY (lưu riêng, không lẫn Bảng chính)
+    // - Nhập file chỉ vào bảng này; điện thoại tạo đơn hủy đẩy thẳng vào đây (mỗi mã 1 đơn).
+    // - Quét nhận hàng trên điện thoại đối chiếu cả Bảng chính lẫn bảng này.
+    // =========================================================================
+    let cancelledOrders = [];
+    const CANCELLED_STORAGE_KEY = 'shopee_cancelled_orders_v1';
+    let cancelledCurrentPage = 1;
+    const cancelledPageSize = 50;
+    let filteredCancelledOrders = [];
+    const cancelledEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const cancelledKey = code => String(code || '').trim().toUpperCase();
+
+    function loadCancelledOrders() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(CANCELLED_STORAGE_KEY) || '[]');
+        if (Array.isArray(parsed)) cancelledOrders = parsed.filter(o => o && typeof o === 'object');
+      } catch (e) { console.warn('Lỗi đọc bảng đơn hủy:', e); }
+      updateCancelledBadge();
+    }
+
+    function saveCancelledOrders() {
+      try {
+        const serialized = JSON.stringify(cancelledOrders);
+        localStorage.setItem(CANCELLED_STORAGE_KEY, serialized);
+        if (localStorage.getItem(CANCELLED_STORAGE_KEY) !== serialized) throw new Error('Không xác nhận được bản lưu');
+        updateCancelledBadge();
+        if (document.getElementById('cancelledOrdersModal') && !document.getElementById('cancelledOrdersModal').classList.contains('hidden')) applyCancelledFilters();
+        return { success: true };
+      } catch (e) {
+        if (typeof showAppToast === 'function') showAppToast('❌ Chưa lưu được bảng đơn hủy.', 'error');
+        return { success: false, error: e.message };
+      }
+    }
+
+    function updateCancelledBadge() {
+      const n = cancelledOrders.length;
+      const a = document.getElementById('cancelledOrdersCountBadge'); if (a) a.textContent = n + ' đơn';
+      const b = document.getElementById('cancelledModalCountBadge'); if (b) b.textContent = n + ' đơn';
+    }
+
+    function findCancelledOrder(rawCode) {
+      const key = cancelledKey(rawCode);
+      if (!key) return -1;
+      const clean = cancelledKey(typeof extractCleanTrackingCode === 'function' ? extractCleanTrackingCode(rawCode) : rawCode);
+      return cancelledOrders.findIndex(o => [o.track, o.orderId, o.returnTrack].some(v => v && (cancelledKey(v) === key || cancelledKey(v) === clean)));
+    }
+
+    function cancelledOrderTotals(o) {
+      const items = Array.isArray(o.items) ? o.items : [];
+      const qty = items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+      const value = items.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+      return { qty, value };
+    }
+
+    function makeCancelledOrder(src) {
+      return Object.assign({
+        id: 'cxl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        orderId: '', track: '', returnTrack: '', platform: '', orderType: 'Đơn hủy', carrier: '',
+        shipDate: '', returnDate: '', deadline: '', recvDate: '', platStatus: '', preorder: '',
+        items: [], received: false, source: 'import', createdAt: getNowDateTimeString()
+      }, src);
+    }
+
+    // ---- Nhập file (chỉ vào bảng đơn hủy) ----
+    function cancelledPickField(row, names) {
+      const norm = v => removeVietnameseTones(String(v || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const keys = Object.keys(row);
+      for (const n of names) { const k = keys.find(key => norm(key) === norm(n)); if (k && String(row[k] ?? '').trim()) return String(row[k]).trim(); }
+      return '';
+    }
+
+    function mapCancelledRows(rows) {
+      const byKey = new Map();
+      for (const row of rows) {
+        const orderId = cancelledPickField(row, ['Order ID', 'Mã đơn hàng', 'ID đơn hàng', 'Mã đơn']);
+        const track = cancelledPickField(row, ['Tracking ID', 'Tracking Number', 'Mã vận đơn', 'Mã Vận Đơn']);
+        const returnTrack = cancelledPickField(row, ['Return Logistics Tracking ID', 'Mã vận đơn trả hàng', 'Mã vận đơn hoàn', 'Mã trả hàng']);
+        const code = orderId || track || returnTrack;
+        if (!code) continue;
+        const platform = (cancelledPickField(row, ['Sàn', 'Platform']) || (typeof autoDetectPlatformFromCode === 'function' ? autoDetectPlatformFromCode(track || orderId) : '')) || '';
+        const item = {
+          product: cancelledPickField(row, ['Product Name', 'Tên sản phẩm', 'Tên sản phẩm trên sàn', 'Tên hàng hóa', 'Item Name', 'Seller SKU']),
+          color: cancelledPickField(row, ['Màu sắc', 'Color']),
+          size: cancelledPickField(row, ['Size', 'Kích cỡ']),
+          qty: Number(String(cancelledPickField(row, ['Quantity', 'Số lượng', 'Qty', 'Sku Quantity of return', 'Số lượng hoàn'])).replace(/[^0-9.]/g, '')) || 1,
+          price: Number(String(cancelledPickField(row, ['Giá', 'Đơn giá', 'Unit Price', 'SKU Unit Original Price', 'Giá gốc'])).replace(/[^0-9.]/g, '')) || 0
+        };
+        const k = cancelledKey(orderId || track || returnTrack);
+        if (!byKey.has(k)) byKey.set(k, makeCancelledOrder({
+          orderId: orderId || code, track: track || '', returnTrack,
+          platform, carrier: cancelledPickField(row, ['Đơn vị vận chuyển', 'Shipping Provider Name', 'Carrier']) || (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(track || code) : ''),
+          shipDate: cancelledPickField(row, ['Shipped Time', 'Ngày gửi hàng', 'Thời gian gửi', 'Ship by date']),
+          returnDate: cancelledPickField(row, ['Cancelled Time', 'Thời gian hủy', 'Thời gian hoàn', 'Ngày hủy', 'Time Requested']),
+          platStatus: cancelledPickField(row, ['Order Status', 'Trạng thái đơn hàng', 'Order Substatus', 'Cancelation/Return Type']),
+          preorder: /pre|đặt trước/i.test(cancelledPickField(row, ['Pre-order', 'Hàng đặt trước'])) ? '⭐ Đặt trước' : '',
+          source: 'import', items: []
+        }));
+        const o = byKey.get(k);
+        if (item.product || item.qty) o.items.push(item);
+      }
+      return Array.from(byKey.values());
+    }
+
+    async function handleCancelledFileUpload(e) {
+      const target = e && e.target;
+      const files = target && target.files ? Array.from(target.files) : [];
+      if (!files.length) return;
+      try {
+        const parsed = [];
+        for (const file of files) {
+          const buffer = await new Promise((res, rej) => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.onerror = () => rej(r.error || new Error('Không đọc được file')); r.readAsArrayBuffer(file); });
+          const rows = readWorkbookRowsFromBuffer(buffer, /\.csv$/i.test(file.name || ''));
+          if (!rows.length) throw new Error('File "' + file.name + '" không có dữ liệu đơn hàng.');
+          parsed.push({ name: file.name || '', rows });
+        }
+        const prepared = preparePlatformImportGroups(parsed);
+        let added = 0, skipped = 0;
+        const snapshot = cancelledOrders.slice();
+        for (const group of prepared.groups) {
+          for (const o of mapCancelledRows(group)) {
+            if ([o.orderId, o.track, o.returnTrack].some(c => c && findCancelledOrder(c) !== -1)) { skipped++; continue; }
+            cancelledOrders.unshift(o); added++;
+          }
+        }
+        if (!saveCancelledOrders().success) { cancelledOrders = snapshot; return; }
+        showAppToast(`🚫 Đã nạp ${added} đơn vào Bảng đơn hủy` + (skipped ? ` (bỏ qua ${skipped} đơn trùng)` : ''), 'success');
+      } catch (err) {
+        alert('❌ Chưa nạp được file đơn hủy: ' + (err.message || err));
+      } finally { if (target) target.value = ''; }
+    }
+
+    // ---- Nhận từ điện thoại ----
+    function handleCancelledOrderScan(data) {
+      const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
+      if (!trackCode) return { success: false };
+      const ack = (msg, outcome, dup) => sendAckToPhone(0, trackCode, msg, outcome, dup, data.requestId || '', data.room || '', { ackStage: 'scan', photoSaved: false, captureId: data.captureId || '' });
+      if (findCancelledOrder(trackCode) !== -1) {
+        ack('ĐƠN HỦY ĐÃ TẠO TRƯỚC ĐÓ', 'duplicate', true);
+        if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
+        showAppToast(`🚫 Đơn hủy ${trackCode} đã tạo rồi`, 'warning');
+        return { success: true };
+      }
+      const platform = (data.platform && data.platform !== 'auto') ? data.platform : autoDetectPlatformFromCode(trackCode);
+      const entry = makeCancelledOrder({
+        orderId: trackCode, track: trackCode, platform,
+        carrier: data.carrier || detectCarrierByTrackingCode(trackCode) || (platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
+        returnDate: getNowDateTimeString(), source: 'phone', items: []
+      });
+      cancelledOrders.unshift(entry);
+      if (!saveCancelledOrders().success) { cancelledOrders.shift(); ack('Chưa lưu được bảng đơn hủy', 'error', false); return { success: false }; }
+      if (typeof playScanSuccessTone === 'function') playScanSuccessTone();
+      showAppToast(`🚫 Đơn hủy mới từ điện thoại: ${trackCode}`, 'success');
+      appendPhoneLiveLog(`🚫 ĐƠN HỦY: tạo đơn [${trackCode}] ➔ [${platform}]`);
+      ack('ĐÃ TẠO ĐƠN HỦY (' + platform + ')', 'success', false);
+      return { success: true };
+    }
+
+    // Quét nhận hàng: trả về true nếu mã thuộc bảng đơn hủy và đã được xử lý/ack.
+    function confirmCancelledReceipt(rawCode, ctx, alsoInMain) {
+      const idx = findCancelledOrder(rawCode);
+      if (idx === -1) return false;
+      const o = cancelledOrders[idx];
+      const code = o.track || o.orderId || rawCode;
+      const rkey = ctx && ctx.requestId ? JSON.stringify([ctx.room || '', ctx.requestId]) : '';
+      if (rkey && confirmCancelledReceipt.receipts.has(rkey)) { sendAckToPhone(...confirmCancelledReceipt.receipts.get(rkey)); return true; }
+      const send = (msg, outcome, dup) => {
+        if (!ctx) return;
+        const args = [idx + 1, code, msg, outcome, dup, ctx.requestId || '', ctx.room || '', { ackStage: 'scan', photoSaved: false, captureId: ctx.captureId || '' }];
+        if (rkey && outcome !== 'error') confirmCancelledReceipt.receipts.set(rkey, args);
+        sendAckToPhone(...args);
+      };
+      if (o.received) {
+        if (!alsoInMain) send('🚫 ĐƠN HỦY — ĐÃ NHẬN TRƯỚC ĐÓ (QUÉT TRÙNG)', 'duplicate', true);
+        return true;
+      }
+      o.received = true; o.recvDate = getNowDateTimeString();
+      if (!saveCancelledOrders().success) { o.received = false; o.recvDate = ''; send('Chưa lưu được bảng đơn hủy', 'error', false); return true; }
+      if (!alsoInMain) { send('🚫 ĐƠN HỦY — ĐÃ NHẬN VỀ KHO', 'success', false); if (typeof playScanSuccessTone === 'function') playScanSuccessTone(); }
+      appendPhoneLiveLog(`🚫 NHẬN ĐƠN HỦY: [${code}] đã về kho`);
+      return true;
+    }
+
+    confirmCancelledReceipt.receipts = new Map();
+
+    // ---- Giao diện ----
+    function openCancelledOrdersModal() {
+      const m = document.getElementById('cancelledOrdersModal'); if (!m) return;
+      m.classList.remove('hidden'); cancelledCurrentPage = 1; applyCancelledFilters();
+    }
+    function closeCancelledOrdersModal() { const m = document.getElementById('cancelledOrdersModal'); if (m) m.classList.add('hidden'); }
+
+    function applyCancelledFilters() {
+      const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+      const search = val('cancelledSearchInput').trim().toLowerCase();
+      const plat = val('cancelledPlatformFilter') || 'all';
+      const st = val('cancelledStatusFilter') || 'all';
+      filteredCancelledOrders = cancelledOrders.filter(o => {
+        if (plat !== 'all' && o.platform !== plat) return false;
+        if (st === 'received' && !o.received) return false;
+        if (st === 'pending' && o.received) return false;
+        if (search) {
+          const hay = [o.orderId, o.track, o.returnTrack, o.carrier, o.platStatus, o.platform, ...(o.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`)].join(' ').toLowerCase();
+          if (!hay.includes(search)) return false;
+        }
+        return true;
+      });
+      cancelledCurrentPage = Math.min(cancelledCurrentPage, Math.max(1, Math.ceil(filteredCancelledOrders.length / cancelledPageSize)));
+      renderCancelledTable();
+    }
+    function resetCancelledFilters() {
+      ['cancelledSearchInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      const p = document.getElementById('cancelledPlatformFilter'); if (p) p.value = 'all';
+      const s = document.getElementById('cancelledStatusFilter'); if (s) s.value = 'all';
+      cancelledCurrentPage = 1; applyCancelledFilters();
+    }
+    function changeCancelledPage(d) {
+      const total = Math.max(1, Math.ceil(filteredCancelledOrders.length / cancelledPageSize));
+      cancelledCurrentPage = Math.min(total, Math.max(1, cancelledCurrentPage + d)); renderCancelledTable();
+    }
+
+    function renderCancelledTable() {
+      const tbody = document.getElementById('cancelledTableBody'); if (!tbody) return;
+      const total = filteredCancelledOrders.length;
+      const pages = Math.max(1, Math.ceil(total / cancelledPageSize));
+      const start = (cancelledCurrentPage - 1) * cancelledPageSize;
+      const slice = filteredCancelledOrders.slice(start, start + cancelledPageSize);
+      tbody.innerHTML = slice.map((o, i) => {
+        const items = o.items || [];
+        const prod = items.length ? items.map(it => cancelledEsc([it.product, it.color, it.size].filter(Boolean).join(' / ') + ' ×' + (it.qty || 1))).join('<br>') : '<span class="text-slate-500">—</span>';
+        const t = cancelledOrderTotals(o);
+        const recv = o.received ? `<span class="text-emerald-400 font-bold">✅ Đã nhận</span><div class="text-[10px] text-slate-400">${cancelledEsc(o.recvDate)}</div>` : '<span class="text-amber-400 font-bold">Chưa nhận</span>';
+        return `<tr class="border-b border-slate-800 hover:bg-slate-800/60">
+          <td class="px-2 py-1.5 text-center">${start + i + 1}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.shipDate)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.returnDate)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.deadline)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.recvDate)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.platform)}</td>
+          <td class="px-2 py-1.5"><span class="px-2 py-0.5 rounded bg-rose-900 text-rose-100 font-bold">${cancelledEsc(o.orderType || 'Đơn hủy')}</span></td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.platStatus)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.preorder)}</td>
+          <td class="px-2 py-1.5 font-mono">${cancelledEsc(o.orderId)}</td>
+          <td class="px-2 py-1.5 font-mono">${cancelledEsc(o.track || o.returnTrack)}</td>
+          <td class="px-2 py-1.5">${cancelledEsc(o.carrier)}</td>
+          <td class="px-2 py-1.5">${prod}</td>
+          <td class="px-2 py-1.5 text-center">${t.qty}</td>
+          <td class="px-2 py-1.5 text-right">${t.value ? formatMoney(t.value) : ''}</td>
+          <td class="px-2 py-1.5">${recv}</td>
+          <td class="px-2 py-1.5 text-center"><button type="button" onclick="deleteCancelledOrder('${cancelledEsc(o.id)}')" class="px-2 py-0.5 rounded bg-rose-700 hover:bg-rose-600 text-white font-bold cursor-pointer">Xóa</button></td>
+        </tr>`;
+      }).join('');
+      const totals = filteredCancelledOrders.reduce((a, o) => { const t = cancelledOrderTotals(o); a.qty += t.qty; a.value += t.value; if (o.received) a.recv++; return a; }, { qty: 0, value: 0, recv: 0 });
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      set('cancelledTotalOrders', total); set('cancelledTotalQty', totals.qty); set('cancelledTotalValue', formatMoney(totals.value)); set('cancelledTotalReceived', totals.recv);
+      set('cancelledPageIndicator', `Trang ${cancelledCurrentPage} / ${pages}`);
+      const empty = document.getElementById('cancelledEmptyState'); if (empty) empty.classList.toggle('hidden', total > 0);
+    }
+
+    async function deleteCancelledOrder(id) {
+      const idx = cancelledOrders.findIndex(o => o.id === id); if (idx === -1) return;
+      if (!(await appConfirm('Xóa đơn hủy ' + (cancelledOrders[idx].track || cancelledOrders[idx].orderId) + ' khỏi bảng?', 'Xóa Đơn Hủy'))) return;
+      const removed = cancelledOrders.splice(idx, 1);
+      if (!saveCancelledOrders().success) cancelledOrders.splice(idx, 0, removed[0]);
+    }
+
+    loadCancelledOrders();
+
     function escapeArchivedHtml(str) {
       if (!str) return '';
       return String(str)
@@ -18498,6 +18782,60 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 <!-- =============================================================== -->
   <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
   <!-- =============================================================== -->
+  <!-- BẢNG ĐƠN HỦY (v1.8.32) -->
+  <div id="cancelledOrdersModal" onclick="closeCancelledOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-rose-500/40 overflow-hidden">
+      <div class="px-5 py-3 bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 border-b border-rose-500/30 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-black text-base text-white flex items-center gap-2">
+          <span>🚫 BẢNG ĐƠN HỦY</span>
+          <span id="cancelledModalCountBadge" class="bg-amber-400 text-slate-950 text-xs px-2.5 py-0.5 rounded-full font-mono font-black">0 đơn</span>
+        </h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg cursor-pointer" title="Nạp file Excel/CSV đơn hủy; dữ liệu chỉ vào bảng này">
+            📥 Nhập file đơn hủy
+            <input id="cancelledFileInput" type="file" multiple accept=".xlsx,.xls,.csv" class="hidden" onchange="handleCancelledFileUpload(event)" />
+          </label>
+          <button type="button" onclick="closeCancelledOrdersModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg cursor-pointer">✕ Đóng</button>
+        </div>
+      </div>
+      <div class="px-4 py-2 border-b border-slate-800 flex flex-wrap items-center gap-2 text-xs">
+        <input id="cancelledSearchInput" oninput="cancelledCurrentPage = 1; applyCancelledFilters()" type="text" placeholder="🔍 Tìm mã đơn, mã vận đơn, sản phẩm, ĐVVC..." class="flex-1 min-w-[220px] bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-100 outline-none" />
+        <select id="cancelledPlatformFilter" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5">
+          <option value="all">Tất cả sàn</option><option value="Shopee">🟠 Shopee</option><option value="TikTok Shop">⚫ TikTok Shop</option>
+        </select>
+        <select id="cancelledStatusFilter" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5">
+          <option value="all">Mọi trạng thái nhận</option><option value="pending">Chưa nhận</option><option value="received">Đã nhận</option>
+        </select>
+        <button type="button" onclick="resetCancelledFilters()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold cursor-pointer">✕ Xóa lọc</button>
+      </div>
+      <div class="overflow-auto flex-1 min-h-[200px]">
+        <table class="w-full text-[11px] text-left whitespace-nowrap">
+          <thead class="bg-slate-950 text-slate-200 uppercase sticky top-0 z-10"><tr>
+            <th class="px-2 py-2">STT</th><th class="px-2 py-2">Ngày gửi</th><th class="px-2 py-2">Ngày hủy</th><th class="px-2 py-2">Hạn xử lý</th><th class="px-2 py-2">Ngày về kho</th>
+            <th class="px-2 py-2">Sàn TMĐT</th><th class="px-2 py-2">Loại đơn/sàn</th><th class="px-2 py-2">Trạng thái sàn</th><th class="px-2 py-2">Hàng đặt trước</th>
+            <th class="px-2 py-2">Mã đơn hàng</th><th class="px-2 py-2">Mã vận đơn</th><th class="px-2 py-2">ĐVVC</th><th class="px-2 py-2">Sản phẩm</th>
+            <th class="px-2 py-2 text-center">Tổng SL</th><th class="px-2 py-2 text-right">Tổng giá trị</th><th class="px-2 py-2">Trạng thái nhận</th><th class="px-2 py-2 text-center">Thao tác</th>
+          </tr></thead>
+          <tbody id="cancelledTableBody"></tbody>
+        </table>
+        <div id="cancelledEmptyState" class="p-8 text-center text-slate-500 italic">Chưa có đơn hủy. Nhập file hoặc dùng nút "Tạo đơn hủy" trên điện thoại.</div>
+      </div>
+      <div class="px-4 py-2 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs font-bold">
+        <div class="flex flex-wrap gap-4">
+          <span>Tổng đơn: <b id="cancelledTotalOrders" class="text-amber-400 font-mono">0</b></span>
+          <span>Tổng SL: <b id="cancelledTotalQty" class="text-amber-400 font-mono">0</b></span>
+          <span>Tổng giá trị: <b id="cancelledTotalValue" class="text-amber-400 font-mono">0</b></span>
+          <span>Đã nhận: <b id="cancelledTotalReceived" class="text-emerald-400 font-mono">0</b></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="changeCancelledPage(-1)" class="px-2 py-1 bg-slate-800 rounded cursor-pointer">◀</button>
+          <span id="cancelledPageIndicator">Trang 1 / 1</span>
+          <button type="button" onclick="changeCancelledPage(1)" class="px-2 py-1 bg-slate-800 rounded cursor-pointer">▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="archivedOrdersModal" onclick="closeArchivedOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
     <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-7xl max-h-[94vh] flex flex-col border border-indigo-500/40 overflow-hidden">
       

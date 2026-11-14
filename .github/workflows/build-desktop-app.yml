@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.31
+          name: QuanLyHangHoan-Windows-Installer-v1.8.32
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.31
-          name: "Quản Lý Hàng Hoàn v1.8.31 — máy quét điện thoại đọc tem nghiêng, mờ, nhạt tốt hơn"
+          tag_name: v1.8.32
+          name: "Quản Lý Hàng Hoàn v1.8.32 — thêm Bảng đơn hủy (nhập file, tạo từ điện thoại, đối chiếu quét nhận hàng)"
           body: |
+            ### Bản sửa 1.8.32
+
+            - Mới: 🚫 BẢNG ĐƠN HỦY riêng (nút trên thanh đầu): nhập file chỉ vào bảng này, có tìm kiếm, lọc, tổng SL/giá trị cuối bảng; không có cột ghi chú người mua, lý do hoàn/hủy, ghi chú của tôi; loại đơn mặc định "Đơn hủy".
+            - Điện thoại: nút "TẠO ĐƠN HỦY" cạnh "TẠO ĐƠN MỚI"; quét là tự vào bảng, quét trùng báo đã tạo, có lịch sử đã tạo.
+            - Quét nhận hàng trên điện thoại đối chiếu cả Bảng chính lẫn Bảng đơn hủy.
+
             ### Bản sửa 1.8.31
 
             - Máy quét điện thoại: thêm lượt đọc sâu cho tem nghiêng bất kỳ góc, in nhạt hoặc hơi mờ (vẫn kiểm tra checksum, cần 2 lần khớp).

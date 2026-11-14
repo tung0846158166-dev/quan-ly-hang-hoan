@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.31</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.32</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -561,7 +561,7 @@
 
     
     <!-- CHẾ ĐỘ QUÉT: QUÉT HOÀN KHO vs TẠO ĐƠN MỚI -->
-    <div class="mode-switcher-container" style="margin-bottom: 12px; background: #0f172a; border: 1.5px solid #334155; border-radius: 14px; padding: 6px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+    <div class="mode-switcher-container" style="margin-bottom: 12px; background: #0f172a; border: 1.5px solid #334155; border-radius: 14px; padding: 6px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
       <button type="button" id="btnModeReturn" onclick="switchMobileScanMode('return')"
               style="padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 900; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; box-shadow: 0 2px 8px rgba(245,158,11,0.4);">
         <span>🔍</span>
@@ -572,6 +572,19 @@
         <span>➕</span>
         <span>TẠO ĐƠN MỚI</span>
       </button>
+      <button type="button" id="btnModeCancel" onclick="switchMobileScanMode('cancel_order')"
+              style="padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 800; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.2s; background: #1e293b; color: #94a3b8;">
+        <span>🚫</span>
+        <span>TẠO ĐƠN HỦY</span>
+      </button>
+    </div>
+
+    <!-- PANEL TẠO ĐƠN HỦY + LỊCH SỬ -->
+    <div id="cancelOrderPanel" style="display: none; margin-bottom: 12px; background: linear-gradient(135deg, #7f1d1d, #0f172a); border: 2px solid #ef4444; border-radius: 14px; padding: 12px 14px; color: #fff;">
+      <div style="font-size:12px; font-weight:900; color:#fca5a5; text-transform:uppercase; margin-bottom:6px;">🚫 Chế độ tạo đơn hủy — quét là tự vào Bảng đơn hủy</div>
+      <div style="font-size:10.5px; color:#fecaca; margin-bottom:8px;">Mỗi mã chỉ tạo 1 đơn; quét lại sẽ báo "đã tạo".</div>
+      <div style="font-size:11px; font-weight:800; color:#fff; margin-bottom:4px;">Lịch sử đã tạo (<span id="cancelHistoryCount">0</span>)</div>
+      <div id="cancelHistoryList" style="max-height:180px; overflow:auto; font-size:11px;"></div>
     </div>
 
     <!-- PANEL TÙY CHỌN TẠO ĐƠN MỚI (Hiển thị khi ở chế độ Tạo Đơn Mới) -->
@@ -1040,6 +1053,24 @@
       renderScanHistory();
     }
 
+    function renderCancelHistoryPanel() {
+      const box = document.getElementById('cancelHistoryList');
+      if (!box) return;
+      const items = scanHistory.filter(e => e && e.cancelled);
+      const cnt = document.getElementById('cancelHistoryCount'); if (cnt) cnt.textContent = items.length;
+      box.innerHTML = '';
+      if (!items.length) { const d = document.createElement('div'); d.style.cssText = 'color:#fca5a5;font-style:italic;'; d.textContent = 'Chưa tạo đơn hủy nào.'; box.appendChild(d); return; }
+      items.slice(0, 50).forEach(e => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.12);';
+        const left = document.createElement('span'); left.style.fontFamily = 'monospace'; left.textContent = e.code;
+        const dup = e.status === 'duplicate', ok = e.synced === true || e.scanConfirmed === true;
+        const right = document.createElement('span');
+        right.textContent = dup ? '🔴 Đã tạo trước đó' : ok ? '🟢 Đã tạo ' + new Date(e.time).toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'}) : '⏳ Chờ PC';
+        row.appendChild(left); row.appendChild(right); box.appendChild(row);
+      });
+    }
+
     function renderScanHistory() {
       const list = document.getElementById('mobileHistoryList');
       if (!list) return;
@@ -1058,15 +1089,16 @@
       const unEl = document.getElementById('histCountUnsynced');
       if (unEl) unEl.textContent = unsyncedCount;
 
-      let filtered = scanHistory;
+      renderCancelHistoryPanel();
+      let filtered = currentMobileMode === 'cancel_order' ? scanHistory.filter(e => e.cancelled) : scanHistory;
       if (currentHistoryFilter === 'success') {
-        filtered = scanHistory.filter(e => !e.photoOnly && e.status === 'success' && e.synced === true);
+        filtered = filtered.filter(e => !e.photoOnly && e.status === 'success' && e.synced === true);
       } else if (currentHistoryFilter === 'duplicate') {
-        filtered = scanHistory.filter(e => e.status === 'duplicate');
+        filtered = filtered.filter(e => e.status === 'duplicate');
       } else if (currentHistoryFilter === 'not_found') {
-        filtered = scanHistory.filter(e => e.status === 'not_found');
+        filtered = filtered.filter(e => e.status === 'not_found');
       } else if (currentHistoryFilter === 'unsynced') {
-        filtered = scanHistory.filter(e => e && e.synced !== true);
+        filtered = filtered.filter(e => e && e.synced !== true);
       }
 
       list.innerHTML = '';
@@ -1318,12 +1350,14 @@
         const latestResult = document.getElementById('lastPcResult');
         if (latestResult) {
           latestResult.classList.remove('hidden');
-          const text = {success:'Đơn đã về kho',duplicate:'Đơn đã về kho — quét trùng',not_found:'Không tồn tại trong danh sách',ambiguous:'Nhiều kiện cùng mã — cần kiểm tra',new_order:'Đã lưu vào hộp đơn mới'}[existing.status] || existing.detail;
+          let text = {success:'Đơn đã về kho',duplicate:'Đơn đã về kho — quét trùng',not_found:'Không tồn tại trong danh sách',ambiguous:'Nhiều kiện cùng mã — cần kiểm tra',new_order:'Đã lưu vào hộp đơn mới'}[existing.status] || existing.detail;
+          if (existing.cancelled) text = existing.status === 'duplicate' ? 'Đơn hủy đã tạo trước đó' : existing.status === 'new_order' ? 'Đã tạo đơn hủy trên máy tính' : text;
           latestResult.textContent = 'PC xác nhận: ' + cleanCode + ' — ' + text;
         }
       }
       if (scanHistory[0] === existing && (!photoReceipt || !scanAlreadyConfirmed)) {
         const titles = { error: 'PC chưa lưu được', ambiguous: 'Có nhiều kiện phù hợp — cần kiểm tra', not_found: 'Không tồn tại trong danh sách', duplicate: 'Đơn đã về kho — quét trùng', pending: 'Đang chờ PC đối chiếu', new_order: 'Máy tính đã lưu đơn mới', success: 'Đơn đã về kho' };
+        if (existing.cancelled) { titles.duplicate = 'Đơn hủy đã tạo trước đó'; titles.new_order = 'Đã tạo đơn hủy'; }
         triggerScanFeedback(['ambiguous', 'error'].includes(existing.status) ? 'not_found' : existing.status === 'new_order' ? 'success' : existing.status,
           cleanCode, titles[existing.status] || 'Máy tính đã lưu ảnh', existing.detail, existing.orderNum);
       }
@@ -1558,16 +1592,27 @@
     }
 
     function switchMobileScanMode(mode) {
-      mode = mode === 'new_order' ? 'new_order' : 'return';
+      mode = mode === 'new_order' ? 'new_order' : mode === 'cancel_order' ? 'cancel_order' : 'return';
       currentMobileMode = mode;
       lastScannedRawCode = ''; lastScannedRawTime = 0;
       if (typeof lastScannedCode !== 'undefined') { lastScannedCode = null; lastScannedTime = 0; }
       const btnRet = document.getElementById('btnModeReturn');
       const btnNew = document.getElementById('btnModeNewOrder');
       const panel = document.getElementById('newOrderOptionsPanel');
+      const btnCancel = document.getElementById('btnModeCancel');
+      const cancelPanel = document.getElementById('cancelOrderPanel');
+      if (btnCancel) { btnCancel.style.background = mode === 'cancel_order' ? 'linear-gradient(135deg, #ef4444, #b91c1c)' : '#1e293b'; btnCancel.style.color = mode === 'cancel_order' ? '#fff' : '#94a3b8'; }
+      if (cancelPanel) cancelPanel.style.display = mode === 'cancel_order' ? 'block' : 'none';
       const camBox = document.querySelector('.camera-box');
 
-      if (mode === 'new_order') {
+      if (mode === 'cancel_order') {
+        if (btnNew) { btnNew.style.background = '#1e293b'; btnNew.style.color = '#94a3b8'; btnNew.style.boxShadow = 'none'; }
+        if (btnRet) { btnRet.style.background = '#1e293b'; btnRet.style.color = '#94a3b8'; btnRet.style.boxShadow = 'none'; }
+        if (panel) panel.style.display = 'none';
+        if (camBox) { camBox.style.borderColor = '#ef4444'; camBox.style.boxShadow = '0 0 15px rgba(239,68,68,0.35)'; }
+        showToast('🚫 Đã bật Chế độ Tạo Đơn Hủy! Quét mã để tạo đơn hủy trên máy tính.');
+        renderScanHistory();
+      } else if (mode === 'new_order') {
         if (btnNew) {
           btnNew.style.background = 'linear-gradient(135deg, #10b981, #059669)';
           btnNew.style.color = '#ffffff';
@@ -1619,8 +1664,9 @@
       return '';
     }
 
-    function handleNewOrderScan(clean, capturedPhoto) {
+    function handleNewOrderScan(clean, capturedPhoto, cancelled = false) {
       const now = Date.now();
+      if (cancelled) capturedPhoto = '';
       const noteInput = document.getElementById('newOrderNoteInput');
       const customNote = noteInput ? noteInput.value.trim() : '';
 
@@ -1634,7 +1680,8 @@
         dupCount: 0,
         photo: capturedPhoto || '',
         synced: false,
-        detail: `✨ Đơn mới quét gửi PC` + (customNote ? ` (${customNote})` : '')
+        cancelled: cancelled === true,
+        detail: cancelled ? '🚫 Đơn hủy quét gửi PC' : `✨ Đơn mới quét gửi PC` + (customNote ? ` (${customNote})` : '')
       });
       saveScanHistory();
       renderScanHistory();
@@ -1645,6 +1692,7 @@
         track: clean,
         orderId: clean,
         platform: 'auto',
+        cancelled: cancelled === true,
         carrier: detectCarrierFromCode(clean),
         photo: capturedPhoto || '',
         note: customNote || 'Đơn mới tạo từ máy quét điện thoại',
@@ -1685,8 +1733,8 @@
       const capturedPhoto = captureCurrentVideoFrame();
 
       // NẾU ĐANG Ở CHẾ ĐỘ: TẠO ĐƠN MỚI ➔ GỬI TRỰC TIẾP LÊN HỘP ĐƠN MỚI TRÊN MÁY TÍNH!
-      if (currentMobileMode === 'new_order') {
-        return handleNewOrderScan(clean, capturedPhoto);
+      if (currentMobileMode === 'new_order' || currentMobileMode === 'cancel_order') {
+        return handleNewOrderScan(clean, capturedPhoto, currentMobileMode === 'cancel_order');
       }
       // Only an outstanding request is retried locally; all outcomes come from PC.
       const outstanding = offlineQueue.find(it => sameMobileScanIntent(it, 'barcode') && !it.photoOnly && !it.reviewRequired && !it.scanConfirmed && extractCleanTrackingCode(it.code) === clean);
@@ -2509,7 +2557,7 @@
     }
 
     // =========================================================================
-    // v1.8.31: ĐỌC TEM KHÓ — nghiêng, mờ, nhạt (chạy ở lượt "sâu", không chạy mọi khung hình)
+    // v1.8.32: ĐỌC TEM KHÓ — nghiêng, mờ, nhạt (chạy ở lượt "sâu", không chạy mọi khung hình)
     // - findBarcodeOrientations: tìm vùng có nhiều vạch song song và hướng vuông góc với vạch (tem xoay bất kỳ góc).
     // - sampleScanLine: lấy một dòng điểm ảnh theo hướng đó (nội suy), rồi giải mã như dòng ngang thường.
     // - stretchLine / sharpenLine: kéo giãn độ tương phản (tem in nhạt) và làm nét (ảnh mờ).
@@ -3416,7 +3464,7 @@
       finally { stillDecodeBusy = false; e.target.value = ''; }
     }
 
-    // v1.8.31: iPhone Safari không có BarcodeDetector → nạp ZXing (WASM) làm bộ đọc. Chỉ bật khi tự kiểm tra chạy được;
+    // v1.8.32: iPhone Safari không có BarcodeDetector → nạp ZXing (WASM) làm bộ đọc. Chỉ bật khi tự kiểm tra chạy được;
     // lỗi/chậm thì gỡ bỏ và vẫn dùng bộ đọc JS + Quagga như trước.
     async function loadZxingPolyfillIfNeeded() {
       if ('BarcodeDetector' in window) return;

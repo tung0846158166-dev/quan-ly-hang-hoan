@@ -2838,6 +2838,67 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
   <script>
     // =========================================================================
+    // v1.8.36: PHẢN CHIẾU DỮ LIỆU PHỤ RA Ổ CỨNG (bản desktop)
+    // Mọi khóa localStorage trong danh sách của main.js (kho lưu trữ, bảng đơn hủy, hộp đơn mới,
+    // danh mục, thông báo...) được ghi ra file trong thư mục dữ liệu mỗi khi thay đổi.
+    // Khi mở app, khóa nào trong localStorage đang trống mà ổ cứng có thì khôi phục từ ổ cứng.
+    // Phải chạy trước mọi đoạn đọc localStorage nên đặt ở đầu script chính.
+    // =========================================================================
+    (function installDiskMirror() {
+      const api = window.desktopDiskAPI;
+      if (!api || typeof api.auxReadAllSync !== 'function' || typeof api.auxSave !== 'function') return;
+      let keys = new Set();
+      const isEmptyValue = v => v == null || ['', '[]', '{}', 'null'].includes(String(v).trim());
+      const timers = new Map();
+      const rawSet = Storage.prototype.setItem, rawRemove = Storage.prototype.removeItem;
+      const flush = key => {
+        timers.delete(key);
+        let value = null;
+        try { value = localStorage.getItem(key); } catch (e) {}
+        api.auxSave(key, value == null ? null : String(value)).then(r => {
+          if (r && r.success === false) console.warn('Chưa ghi được ' + key + ' ra ổ cứng:', r.error);
+        }).catch(e => console.warn('Lỗi ghi ổ cứng', key, e));
+      };
+      const schedule = (key, pendingValue) => {
+        if (!keys.has(key)) return;
+        if (pendingValue !== undefined) window.__auxPending = Object.assign(window.__auxPending || {}, { [key]: pendingValue });
+        clearTimeout(timers.get(key));
+        timers.set(key, setTimeout(() => {
+          // localStorage đầy (hết 5MB) thì giá trị mới chỉ có trong __auxPending: vẫn ghi ra ổ cứng.
+          const pend = window.__auxPending && key in window.__auxPending ? window.__auxPending[key] : undefined;
+          if (pend !== undefined) { delete window.__auxPending[key]; api.auxSave(key, pend === null ? null : String(pend)).catch(() => {}); timers.delete(key); }
+          else flush(key);
+        }, 300));
+      };
+      try {
+        const snapshot = api.auxReadAllSync() || { keys: [], data: {} };
+        keys = new Set(snapshot.keys || []);
+        for (const key of keys) {
+          const diskVal = snapshot.data && snapshot.data[key];
+          if (typeof diskVal !== 'string' || isEmptyValue(diskVal)) continue;
+          let current = null;
+          try { current = localStorage.getItem(key); } catch (e) {}
+          if (isEmptyValue(current)) { try { rawSet.call(localStorage, key, diskVal); window.__auxRestored = (window.__auxRestored || []).concat(key); } catch (e) { console.warn('Không khôi phục được ' + key, e); } }
+        }
+      } catch (e) { console.warn('Không đọc được dữ liệu phụ từ ổ cứng:', e); return; }
+      Storage.prototype.setItem = function (k, v) {
+        if (this === localStorage && keys.has(k)) {
+          try { rawSet.call(this, k, v); } catch (err) { schedule(k, String(v)); throw err; }
+          schedule(k);
+          return;
+        }
+        return rawSet.call(this, k, v);
+      };
+      Storage.prototype.removeItem = function (k) {
+        rawRemove.call(this, k);
+        if (this === localStorage && keys.has(k)) schedule(k, null);
+      };
+      // Gieo dữ liệu hiện có ra ổ cứng lần đầu (sau khi nâng cấp) để có bản an toàn ngay.
+      setTimeout(() => keys.forEach(k => { try { if (localStorage.getItem(k) != null) schedule(k); } catch (e) {} }), 4000);
+      window.__diskMirrorActive = true;
+    })();
+
+    // =========================================================================
     // INDEXEDDB ULTRA-LARGE PHOTO STORAGE (CHỐNG TRÀN BỘ NHỚ LOCALSTORAGE 5MB)
     // =========================================================================
     const PHOTO_DB_NAME = 'ShopeeReturnPhotoDB_v1';
@@ -7044,7 +7105,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.35';
+    const APP_VERSION_NUMBER = '1.8.36';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13514,7 +13575,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.35',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.36',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14067,7 +14128,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       
       // v1.7.5: Tiếp nhận đơn mới quét từ điện thoại gửi lên
-      // v1.8.35: điện thoại đẩy 1 đơn từ Bảng đơn mới ra Bảng chính
+      // v1.8.36: điện thoại đẩy 1 đơn từ Bảng đơn mới ra Bảng chính
       if (data.type === 'inbox_push') {
         const pushCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
         const reply = (msg, outcome) => sendAckToPhone(0, pushCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'push' });
@@ -15830,7 +15891,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Tự động dời các đơn có ngày giờ về kho >= 24h để Bảng chính siêu nhẹ & mượt mà
     // =========================================================================
     // =========================================================================
-    // v1.8.35: BẢNG ĐƠN HỦY (lưu riêng, không lẫn Bảng chính)
+    // v1.8.36: BẢNG ĐƠN HỦY (lưu riêng, không lẫn Bảng chính)
     // - Nhập file chỉ vào bảng này; điện thoại tạo đơn hủy đẩy thẳng vào đây (mỗi mã 1 đơn).
     // - Quét nhận hàng trên điện thoại đối chiếu cả Bảng chính lẫn bảng này.
     // =========================================================================
@@ -15968,8 +16029,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const stored = await savePhotoToDb(photoId, dataUrl);
       photoMemoryCache.set(photoId, dataUrl);
       entry.photoId = photoId;
+      // Bản desktop: ghi ảnh ra file trên ổ cứng như ảnh Bảng chính.
+      let onDisk = true;
+      const api = window.desktopDiskAPI;
+      if (api && typeof api.savePhotoFiles === 'function') {
+        try { const reply = await api.savePhotoFiles([{ id: photoId, data: dataUrl }]); onDisk = Boolean(reply && reply.success); } catch (e) { onDisk = false; }
+      }
       if (!saveCancelledOrders().success) return false;
-      return stored !== false;
+      return stored !== false || onDisk;
     }
 
     function findCancelledByPhotoRequest(capture) {
@@ -16063,8 +16130,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     confirmCancelledReceipt.receipts = new Map();
 
     // ---- Giao diện ----
+    // Ảnh đơn hủy mất khỏi bộ nhớ trình duyệt thì lấy lại từ file trên ổ cứng.
+    async function restoreCancelledPhotosFromDisk() {
+      const api = window.desktopDiskAPI;
+      if (!api || typeof api.readPhotoFiles !== 'function') return false;
+      const missing = cancelledOrders.filter(o => o.photoId && !photoMemoryCache.has(o.photoId)).map(o => o.photoId);
+      if (!missing.length) return false;
+      try {
+        const reply = await api.readPhotoFiles(missing);
+        let n = 0;
+        for (const id of missing) {
+          const data = reply && reply.photos && reply.photos[id];
+          if (data) { photoMemoryCache.set(id, data); if (typeof savePhotoToDb === 'function') savePhotoToDb(id, data); n++; }
+        }
+        if (n && document.getElementById('cancelledOrdersModal') && !document.getElementById('cancelledOrdersModal').classList.contains('hidden')) renderCancelledTable();
+        return n > 0;
+      } catch (e) { return false; }
+    }
+
     function openCancelledOrdersModal() {
       const m = document.getElementById('cancelledOrdersModal'); if (!m) return;
+      restoreCancelledPhotosFromDisk();
       m.classList.remove('hidden'); cancelledCurrentPage = 1; applyCancelledFilters();
     }
     function closeCancelledOrdersModal() { window._cancelledHitId = null; const m = document.getElementById('cancelledOrdersModal'); if (m) m.classList.add('hidden'); }
@@ -16199,7 +16285,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     loadCancelledOrders();
 
-    // ---- v1.8.35: cảnh báo đơn sắp đến hạn / quá hạn mà chưa về ----
+    // ---- v1.8.36: cảnh báo đơn sắp đến hạn / quá hạn mà chưa về ----
     const DEADLINE_NOTIFIED_KEY = 'deadline_notified_v1';
     function collectDeadlineCandidates() {
       const list = [];
@@ -16242,6 +16328,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         localStorage.setItem(DEADLINE_NOTIFIED_KEY, JSON.stringify(notified));
       } catch (e) { console.warn('Lỗi kiểm tra hạn đơn:', e); }
     }
+    setTimeout(restoreCancelledPhotosFromDisk, 3000);
     setTimeout(checkDeadlineNotifications, 5000);
     setTimeout(checkDeadlineNotifications, 25000);
     setInterval(checkDeadlineNotifications, 30 * 60 * 1000);
@@ -18955,7 +19042,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 <!-- =============================================================== -->
   <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
   <!-- =============================================================== -->
-  <!-- BẢNG ĐƠN HỦY (v1.8.35) -->
+  <!-- BẢNG ĐƠN HỦY (v1.8.36) -->
   <div id="cancelledOrdersModal" onclick="closeCancelledOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
     <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-rose-500/40 overflow-hidden">
       <div class="px-5 py-3 bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 border-b border-rose-500/30 flex flex-wrap items-center justify-between gap-3">

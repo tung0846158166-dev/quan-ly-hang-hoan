@@ -110,7 +110,7 @@ function mainHarness(t) {
   const app = new EventEmitter();
   Object.assign(app, { requestSingleInstanceLock: () => true, getPath: () => dir, whenReady: () => new Promise(() => {}), quit() {} });
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8'), {
-    require(name) { return name === 'electron' ? { app, ipcMain: { handle: (k, fn) => handlers.set(k, fn) } } : require(name); },
+    require(name) { return name === 'electron' ? { app, ipcMain: { handle: (k, fn) => handlers.set(k, fn), on: () => {} } } : require(name); },
     __dirname: path.join(__dirname, '..'), process: { argv: [] }, console, Buffer
   });
   return { call: (k, ...a) => handlers.get(k)({}, ...a), dir: path.join(dir, 'QuanLyHangHoan') };

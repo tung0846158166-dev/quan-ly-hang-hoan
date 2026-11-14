@@ -17,6 +17,7 @@ function makeCtx() {
   const ctx = vm.createContext({
     localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
     document: { getElementById: () => null },
+    window: {}, setTimeout: () => 0, savePhotoToDb: async () => true, photoMemoryCache: new Map(),
     console,
     sendAckToPhone: (...a) => acks.push(a),
     extractCleanTrackingCode: c => String(c || '').trim().toUpperCase(),

@@ -11,5 +11,8 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   sendNotification: (title, body) => ipcRenderer.invoke('send-desktop-notification', { title, body }),
   getAutoStart: () => ipcRenderer.invoke('get-autostart-status'),
   setAutoStart: (enabled) => ipcRenderer.invoke('set-autostart-status', enabled),
+  auxReadAllSync: () => ipcRenderer.sendSync('aux-read-all-sync'),
+  auxSave: (key, value) => ipcRenderer.invoke('aux-save', key, value),
+  runAutoBackup: () => ipcRenderer.invoke('run-auto-backup'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version')
 });

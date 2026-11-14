@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { createAuxStore } = require(path.join(__dirname, 'disk_aux'));
 
 let mainWindow = null;
 let tray = null;
@@ -332,6 +333,17 @@ ipcMain.handle('read-photo-files', async (event, ids) => {
   }
 });
 
+// Du lieu phu (kho luu tru, don huy, hop don moi...) luu ra o cung + sao luu tu dong.
+const auxStore = createAuxStore(getDataDir);
+ipcMain.on('aux-read-all-sync', (event) => {
+  try { event.returnValue = auxStore.readAllSync(); } catch (e) { event.returnValue = { keys: [], data: {} }; }
+});
+ipcMain.handle('aux-save', async (event, key, value) => {
+  if (quitDrainComplete) return { success: false, error: 'Ung dung dang thoat' };
+  return auxStore.save(key, value);
+});
+ipcMain.handle('run-auto-backup', async () => auxStore.runBackup());
+
 ipcMain.handle('open-data-folder', async () => {
   try {
     const dataFilePath = getDataFilePath();
@@ -397,6 +409,9 @@ ipcMain.handle('get-app-version', () => {
 app.whenReady().then(() => {
   getDataDir();
   createWindow();
+  // Sao luu tu dong: sau khi mo 30 giay roi moi 2 gio, giu 7 ngay gan nhat.
+  setTimeout(() => auxStore.runBackup(), 30 * 1000);
+  setInterval(() => auxStore.runBackup(), 2 * 3600 * 1000);
   createTray();
 
   // Mac dinh bat tu khoi dong cung may tinh

@@ -821,6 +821,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-orange-600 focus:ring-orange-500" />
           Chỉ hiện khớp
         </label>
+        <button type="button" id="btnClearMainSearch" onclick="clearMainSearch()" title="Xóa từ khóa tìm kiếm" class="ml-2 px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">✕ Xóa</button>
       </div>
 
       <!-- Pipeline Status Tabs (Gộp số đơn, màu sắc rõ nét) -->
@@ -10204,6 +10205,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         renderAll();
         showToast('🗑 Đã xóa ảnh của đơn hàng này.', 'info');
         return true;
+    }
+
+    function clearMainSearch() {
+      const inp = document.getElementById('searchInput');
+      if (inp) inp.value = '';
+      currentPage = 1;
+      renderAll();
+      if (inp) inp.focus();
     }
 
     function escapeAttr(str) {

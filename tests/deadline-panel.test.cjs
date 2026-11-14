@@ -24,3 +24,7 @@ test('UI có tab Hạn Xử Lý và hook render', () => {
   assert.match(src, /notifCatBtn_deadline/);
   assert.match(src, /renderDeadlinePanel\(container, deadlineItems, kw\)/);
 });
+test('ô tìm kiếm chính có nút Xóa', () => {
+  assert.match(src, /id="btnClearMainSearch" onclick="clearMainSearch\(\)"/);
+  assert.match(src, /function clearMainSearch\(\) \{[\s\S]*?value = ''[\s\S]*?renderAll\(\)/);
+});

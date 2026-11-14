@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.36
+          name: QuanLyHangHoan-Windows-Installer-v1.8.37
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.36
-          name: "Quản Lý Hàng Hoàn v1.8.36 — lưu toàn bộ dữ liệu ra ổ cứng + sao lưu tự động mỗi ngày"
+          tag_name: v1.8.37
+          name: "Quản Lý Hàng Hoàn v1.8.37 — tab Hạn Xử Lý: đơn sắp đến hạn / quá hạn bao nhiêu ngày"
           body: |
+            ### Bản sửa 1.8.37
+
+            - Thông báo có thêm tab "⏰ Hạn Xử Lý": liệt kê từng đơn chưa về đã gần hạn hoặc quá hạn, ghi rõ "Sắp đến hạn: còn X giờ" / "Quá hạn N ngày Y giờ", quá hạn lâu nhất lên đầu, có nút Định Vị Đơn (cả bảng chính và bảng đơn hủy).
+          - Mở Thông báo lần đầu sẽ tự vào tab này nếu có đơn cần xử lý; có toast nhắc khi kiểm tra hạn; kiểm tra lại sau khi nạp dữ liệu xong.
+
             ### Bản sửa 1.8.36
 
             - Lưu TOÀN BỘ dữ liệu ra ổ cứng: kho lưu trữ, bảng đơn hủy, hộp đơn mới, danh mục, thông báo... ghi ra file trong thư mục dữ liệu ngay khi có thay đổi (trễ khoảng 0,3 giây); khi mở app mà bộ nhớ trống thì tự khôi phục từ ổ cứng. Ảnh đơn hủy cũng ghi thành file.

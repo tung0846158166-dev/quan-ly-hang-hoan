@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.29
+          name: QuanLyHangHoan-Windows-Installer-v1.8.30
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.29
-          name: "Quản Lý Hàng Hoàn v1.8.29 — giao diện gọn hơn: bộ lọc nâng cao thu gọn, một thanh tổng, tìm kiếm báo rõ đơn ở đâu"
+          tag_name: v1.8.30
+          name: "Quản Lý Hàng Hoàn v1.8.30 — gọn hơn: bấm mã đơn là sao chép, ô nhảy trang nhanh, bảng đơn chiếm hết màn hình"
           body: |
+            ### Bản sửa 1.8.30
+
+            - Bấm 1 lần vào Mã đơn hàng là sao chép luôn (có báo nhỏ ở góc), không mở hộp thoại; nhấp đúp vẫn để chỉnh sửa.
+            - Bỏ dòng tổng thừa ở chân bảng; bảng đơn hàng chiếm hết phần màn hình còn lại nên thấy được nhiều dòng hơn.
+            - Hàng tuần / sàn gọn hơn: bỏ nhãn thừa, bỏ khung "ĐANG QUẢN LÝ", bỏ cụm nút Chế độ (bảng thống kê mở bằng nút ở thanh dưới cùng). Các ô trạng thái bớt màu.
+            - Thêm ô "Đến trang" ở góc trái: nhập số trang rồi Enter (hoặc bấm Đi) để tới thẳng trang đó.
+
             ### Bản sửa 1.8.29
 
             - Trang chính mặc định chỉ hiện danh sách đơn hàng; bảng thống kê Màu & Size chỉ hiện khi bấm nút "Xem Bảng Thống Kê Phân Loại" ở thanh dưới cùng (bấm "Bảng Đơn Hàng" để quay lại).

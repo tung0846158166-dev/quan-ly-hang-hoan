@@ -54,7 +54,7 @@ test('chân bảng không còn các span tổng lặp và dock có K.cần nhậ
 
 test('mở app mặc định chỉ hiện danh sách đơn, bảng thống kê mở bằng nút dock', () => {
   assert.ok(/let currentMainView = 'orders';/.test(html));
-  assert.ok(/window\.switchMainView = switchMainView;\s*\n[^\n]*\n\s*switchMainView\('orders'\);/.test(html));
+  assert.ok(/window\.switchMainView = switchMainView;[\s\S]{0,400}?\n\s*switchMainView\('orders'\);/.test(html));
   assert.ok(/onclick="switchMainView\('summary'\); scrollToSummaryTable\(\);"/.test(html));
   assert.ok(/onclick="switchMainView\('orders'\); scrollToMainTable\(\);"/.test(html));
 });
@@ -63,4 +63,11 @@ test('bảng thống kê theo sản phẩm cộng cả đơn lưu trữ nhưng t
   assert.ok(/archivedForSummary\.forEach\(\(order, i\) => processSummaryOrder\(order, 'a' \+ i, true\)\)/.test(html));
   assert.ok(/if \(!archived && kw && isOrderMatch\(order, kw\)\)/.test(html));
   assert.ok(/id="summaryArchivedNote"/.test(html));
+});
+
+test('bấm mã đơn hàng sao chép luôn, bỏ chân bảng thừa, có ô nhảy trang', () => {
+  assert.ok(/if \(fieldName === 'orderId' && String\(latestVal \|\| ''\)\.trim\(\)\) \{\s*\n\s*copyTextQuick\(/.test(html));
+  assert.ok(!/<tfoot>/.test(html.slice(html.indexOf('id="mainTableScrollContainer"'), html.indexOf('id="categorySummaryWrapper"'))));
+  assert.ok(/id="gotoPageInput"/.test(html) && /function goToTablePage\(/.test(html));
+  assert.ok(!/id="activePlatformBannerBadge"/.test(html) && !/id="btnViewBothTab"/.test(html));
 });

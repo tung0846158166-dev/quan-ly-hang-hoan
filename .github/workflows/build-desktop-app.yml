@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.33
+          name: QuanLyHangHoan-Windows-Installer-v1.8.35
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.33
+          tag_name: v1.8.35
           name: "Quản Lý Hàng Hoàn v1.8.35 — tìm xuyên kho lưu trữ + bảng đơn hủy, cảnh báo đơn sắp đến hạn"
           body: |
+            ### Bản sửa 1.8.35
+
+            - Ô tìm kiếm bảng chính nay cũng tìm trong Kho lưu trữ và Bảng đơn hủy: dưới dòng thông báo đơn khớp hiện thêm đơn khớp ở bảng nào kèm nút "Đi đến vị trí" (tự mở bảng, nhảy đúng trang, tô xanh dòng đơn).
+            - Thông báo: cảnh báo đơn sắp đến hạn (trên 2 ngày) và quá hạn (trên 3 ngày) mà chưa về kho, gồm cả đơn hủy chưa nhận; mỗi đơn mỗi mức chỉ báo 1 lần, nằm trong nhóm "Cảnh báo".
+
+            ### Bản sửa 1.8.34
+
+            - Tạo đơn hủy trên điện thoại gửi kèm ảnh (như quét hoàn kho) để xem mã đơn hàng đối chiếu; Bảng đơn hủy có cột Ảnh đơn hàng, bấm để phóng to.
+            - Tạo đơn mới không gửi ảnh nữa (ảnh nằm ở bước quét hoàn kho).
+
             ### Bản sửa 1.8.33
 
             - Điện thoại: lịch sử tách riêng 3 mục (quét hoàn kho / tạo đơn mới / tạo đơn hủy), mỗi mục chỉ hiện nút lọc phù hợp (Hợp lệ, Quét trùng, Không có, Chờ nạp PC; đơn hủy không có "Không có"). Xóa lịch sử chỉ xóa đúng mục.

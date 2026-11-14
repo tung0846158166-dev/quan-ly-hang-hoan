@@ -96,3 +96,30 @@ test('điện thoại: có nút Tạo đơn hủy, gửi cờ cancelled, lịch 
   assert.ok(/cancelled: cancelled === true,\s*carrier/.test(mobile));
   assert.ok(/function historyEntryKind/.test(mobile));
 });
+
+test('đơn hủy: ảnh gửi kèm được lưu theo yêu cầu, ghép đúng đơn; đơn mới không gửi ảnh', async () => {
+  const ctx = makeCtx();
+  const saved = {};
+  ctx.savePhotoToDb = async (id, d) => { saved[id] = d; return true; };
+  ctx.photoMemoryCache = new Map();
+  const photo = 'data:image/jpeg;base64,AAAA';
+  ctx.photo = photo;
+  vm.runInContext("handleCancelledOrderScan({ code: 'SPX777', requestId: 'r9', captureId: 'c9', room: 'A', cancelled: true })", ctx);
+  const target = vm.runInContext("findCancelledByPhotoRequest({ requestId: 'r9', captureId: 'c9' })", ctx);
+  assert.ok(target, 'tìm được đơn theo requestId');
+  assert.strictEqual(vm.runInContext("findCancelledByPhotoRequest({ requestId: 'zzz' })", ctx), null);
+  ctx.acks.length = 0;
+  const r = await vm.runInContext("attachCancelledPhoto(findCancelledByPhotoRequest({ requestId: 'r9', captureId: 'c9' }), 'SPX777', photo, { requestId: 'r9', captureId: 'c9', room: 'A' })", ctx);
+  assert.strictEqual(r.success, true);
+  assert.strictEqual(ctx.acks[0][7].ackStage, 'photo');
+  assert.strictEqual(ctx.acks[0][7].photoSaved, true);
+  assert.strictEqual(Object.values(saved)[0], photo);
+  assert.ok(vm.runInContext('cancelledOrders[0].photoId', ctx));
+  assert.ok(!JSON.stringify(JSON.parse(ctx.store.shopee_cancelled_orders_v1)).includes('base64'), 'không nhét ảnh vào localStorage');
+});
+
+test('điện thoại: đơn hủy giữ ảnh, đơn mới bỏ ảnh; PC có cột Ảnh và route ảnh theo yêu cầu', () => {
+  assert.ok(/if \(!cancelled\) capturedPhoto = ''/.test(mobile));
+  assert.ok(/Ảnh đơn hàng<\/th>/.test(html.match(/<div id="cancelledOrdersModal"[\s\S]*?<tbody id="cancelledTableBody">/)[0]));
+  assert.ok(/findCancelledByPhotoRequest\(capture\)/.test(html));
+});

@@ -17,7 +17,7 @@ const table = html.slice(tableStart, html.indexOf('];', tableStart) + 2);
 function decoder() {
   const c = vm.createContext({ console, Date, Math, Uint8Array, Float32Array, Array, Map, Number, String });
   vm.runInContext(table + '\n' + ['matchCode128Symbol', 'code128Edges', 'code128ToText', 'decodeCode128Forward',
-    'decodeCode128Line', 'fastDecodeCode128Canvas'].map(fn).join('\n'), c);
+    'decodeCode128Line', 'code128GrayFrame', 'findBarcodeOrientations', 'sampleScanLine', 'stretchLine', 'sharpenLine', 'decodeCode128LineDeep', 'fastDecodeCode128Canvas'].map(fn).join('\n'), c);
   return c;
 }
 // Fixtures are rendered from reportlab's own Code 128 encoder (independent of the phone code's table).
@@ -90,6 +90,16 @@ test('camera frame decode: horizontal, rotated and single-line confirmation', ()
 });
 
 test('live scan loop and still capture use the fast decoder first', () => {
-  assert(/detectedCode = fastDecodeCode128Canvas\(roi, \{ skipVertical: frameNo % 2 === 1 \}\);/.test(html));
+  assert(/detectedCode = fastDecodeCode128Canvas\(roi, \{ skipVertical: frameNo % 2 === 1, deep: frameNo % 4 === 0 \}\);/.test(html));
   assert(/fastDecodeCode128Canvas\(canvas, \{ single: true \}\)/.test(html));
+});
+
+test('deep pass: low-contrast line still decodes, noise gives no false read', () => {
+  const c = decoder();
+  const r = rows[0];
+  const faded = Uint8Array.from(r.row, v => 120 + Math.round(v * 0.12));
+  const got = c.decodeCode128LineDeep(faded);
+  assert(got === null || got === r.text);
+  const rnd = Uint8Array.from({ length: 900 }, (_, i) => (i * 7919) % 256);
+  assert.equal(c.decodeCode128LineDeep(rnd), null);
 });

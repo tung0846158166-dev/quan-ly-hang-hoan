@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.28
+          name: QuanLyHangHoan-Windows-Installer-v1.8.29
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.28
-          name: "Quản Lý Hàng Hoàn v1.8.28 — sửa mã đơn Shopee bị phình số 0, nhập Salework có mã trả hàng"
+          tag_name: v1.8.29
+          name: "Quản Lý Hàng Hoàn v1.8.29 — giao diện gọn hơn: bộ lọc nâng cao thu gọn, một thanh tổng, tìm kiếm báo rõ đơn ở đâu"
           body: |
+            ### Bản sửa 1.8.29
+
+            - Trang chính mặc định chỉ hiện danh sách đơn hàng; bảng thống kê Màu & Size chỉ hiện khi bấm nút "Xem Bảng Thống Kê Phân Loại" ở thanh dưới cùng (bấm "Bảng Đơn Hàng" để quay lại).
+            - Bảng thống kê hàng hoàn chi tiết theo sản phẩm (Màu & Size) giờ tính cả các đơn đã chuyển về Kho Lưu Trữ (có nhãn "+ N đơn đã lưu trữ"); bộ lọc tuần / sàn / loại đơn áp dụng cho cả hai.
+            - Giao diện gọn hơn: các bộ lọc phụ (Loại đơn, Trước/Thường, Mã vận đơn, Ngày, Giờ) gom vào nút "Bộ lọc nâng cao" (thu gọn mặc định, hiện số bộ lọc đang bật).
+            - Bỏ thanh tổng bị lặp ở chân bảng; số đơn, SP, đã về, chưa về, không cần nhận, tiền hiện ở một thanh tổng cuối màn hình.
+            - Ô tìm kiếm: khi không có đơn khớp trong tuần/sàn/loại đang chọn nhưng có ở mục khác, thanh báo ghi rõ đơn nằm ở sàn/tuần nào và có nút "Xem trong tất cả".
+
             ### Bản sửa 1.8.28
 
             - Mã đơn Shopee dạng "số + E + số" (vd 26111238E12345) không còn bị hiểu nhầm là số khoa học và nối thêm hàng nghìn số 0 làm bảng rộng bất thường; các đơn đã bị hỏng được tự khôi phục khi mở app.

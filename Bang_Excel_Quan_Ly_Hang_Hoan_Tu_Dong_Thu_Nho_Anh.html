@@ -7044,7 +7044,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.33';
+    const APP_VERSION_NUMBER = '1.8.35';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -11975,6 +11975,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         previewEl.innerHTML = `✅ Tìm thấy <b>${matchCount} đơn</b> khớp! Đơn đầu tiên (#${firstMatchIdx}): Mã đơn <b>${escapeAttr(firstMatch.orderId)}</b> | MVĐ: <b>${escapeAttr(firstMatch.track)}</b> | Ngày bấm hoàn: <b>${escapeAttr(firstMatch.returnDate)}</b> | Gồm ${firstMatch.items.length} SP: <b>${escapeAttr(spSummary)}</b> | Trạng thái: <b>[${firstMatch.status}]</b>` + (() => { const where = getOrderMatchFieldLabels(firstMatch, kw); return where.length ? ` | Khớp ở: <b>${escapeAttr(where.join(', '))}</b>` : ''; })();
       }
 
+      if (kw) {
+        let otherHtml = '';
+        try { otherHtml = buildOtherTablesSearchHtml(kw); } catch (e) { otherHtml = ''; }
+        if (otherHtml) { previewEl.classList.remove('hidden'); previewEl.innerHTML += otherHtml; }
+      }
+
       // Filter criteria for the 300+ SKU Summary Table
       const rawFProd = (document.getElementById('catSummarySearchProd')?.value ?? document.getElementById('sumFilterProd')?.value ?? '').trim();
       const rawFColor = (document.getElementById('catSummarySearchColor')?.value ?? document.getElementById('sumFilterColor')?.value ?? '').trim();
@@ -13508,7 +13514,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.33',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.35',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13889,6 +13895,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function attachPhotoToOrderByCode(rawCode, photoDataUrl, capture = {}) {
+      // Ảnh của đơn hủy đi theo đúng yêu cầu (requestId) đã tạo đơn hủy.
+      const cancelledTarget = typeof findCancelledByPhotoRequest === 'function' ? findCancelledByPhotoRequest(capture) : null;
+      if (cancelledTarget) return attachCancelledPhoto(cancelledTarget, rawCode, photoDataUrl, capture);
       // Inbox captures are bound to their own request and never fall back to a return row.
       const inboxTargets = capture.requestId && typeof newOrdersInbox !== 'undefined' ? newOrdersInbox.filter(item =>
         extractCleanTrackingCode(item.track || item.code || '') === extractCleanTrackingCode(rawCode) &&
@@ -14058,7 +14067,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       
       // v1.7.5: Tiếp nhận đơn mới quét từ điện thoại gửi lên
-      // v1.8.33: điện thoại đẩy 1 đơn từ Bảng đơn mới ra Bảng chính
+      // v1.8.35: điện thoại đẩy 1 đơn từ Bảng đơn mới ra Bảng chính
       if (data.type === 'inbox_push') {
         const pushCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
         const reply = (msg, outcome) => sendAckToPhone(0, pushCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'push' });
@@ -14347,7 +14356,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (n.type === 'phone_scan') phoneCount++;
         else if (n.type === 'phone_new_order' || n.type === 'new_order_import') newOrderCount++;
         else if (n.type === 'excel_update' || n.type === 'excel_import') excelCount++;
-        else if (n.type === 'duplicate_scan' || n.type === 'unknown_scan') warningCount++;
+        else if (n.type === 'duplicate_scan' || n.type === 'unknown_scan' || n.type === 'deadline_warning') warningCount++;
       });
 
       const elAll = document.getElementById('notifCount_all');
@@ -14366,7 +14375,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentNotifFilter === 'phone' && item.type !== 'phone_scan') return false;
         if (currentNotifFilter === 'new_order' && (item.type !== 'phone_new_order' && item.type !== 'new_order_import')) return false;
         if (currentNotifFilter === 'excel' && (item.type !== 'excel_update' && item.type !== 'excel_import')) return false;
-        if (currentNotifFilter === 'warning' && (item.type !== 'duplicate_scan' && item.type !== 'unknown_scan')) return false;
+        if (currentNotifFilter === 'warning' && (item.type !== 'duplicate_scan' && item.type !== 'unknown_scan' && item.type !== 'deadline_warning')) return false;
 
         // Keyword filter (theo Mã đơn, MVĐ, tiêu đề hoặc nội dung)
         if (kw) {
@@ -14399,6 +14408,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (item.type === 'phone_new_order' || item.type === 'new_order_import') {
           badgeColor = 'bg-amber-100 text-amber-900 border-amber-400';
           icon = '✨';
+        } else if (item.type === 'deadline_warning') {
+          badgeColor = 'bg-orange-100 text-orange-900 border-orange-400';
+          icon = '⏰';
         } else if (item.type === 'excel_update') {
           badgeColor = 'bg-indigo-100 text-indigo-900 border-indigo-300';
           icon = '🔄';
@@ -15818,7 +15830,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Tự động dời các đơn có ngày giờ về kho >= 24h để Bảng chính siêu nhẹ & mượt mà
     // =========================================================================
     // =========================================================================
-    // v1.8.33: BẢNG ĐƠN HỦY (lưu riêng, không lẫn Bảng chính)
+    // v1.8.35: BẢNG ĐƠN HỦY (lưu riêng, không lẫn Bảng chính)
     // - Nhập file chỉ vào bảng này; điện thoại tạo đơn hủy đẩy thẳng vào đây (mỗi mã 1 đơn).
     // - Quét nhận hàng trên điện thoại đối chiếu cả Bảng chính lẫn bảng này.
     // =========================================================================
@@ -15949,12 +15961,58 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } finally { if (target) target.value = ''; }
     }
 
+    // ---- Ảnh đơn hủy (lưu IndexedDB như Bảng chính, chỉ giữ photoId trong danh sách) ----
+    async function setCancelledPhoto(entry, dataUrl) {
+      if (!entry || typeof dataUrl !== 'string' || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl)) return false;
+      const photoId = entry.photoId || 'cxl_ph_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      const stored = await savePhotoToDb(photoId, dataUrl);
+      photoMemoryCache.set(photoId, dataUrl);
+      entry.photoId = photoId;
+      if (!saveCancelledOrders().success) return false;
+      return stored !== false;
+    }
+
+    function findCancelledByPhotoRequest(capture) {
+      if (!capture || !capture.requestId) return null;
+      return cancelledOrders.find(o => (o.photoRequests || []).some(r => r.requestId === capture.requestId && (!r.captureId || !capture.captureId || r.captureId === capture.captureId))) || null;
+    }
+
+    async function attachCancelledPhoto(entry, rawCode, photoDataUrl, capture) {
+      const ok = await setCancelledPhoto(entry, photoDataUrl);
+      sendAckToPhone(0, extractCleanTrackingCode(rawCode), ok ? 'Đã lưu ảnh đơn hủy' : 'Ảnh đơn hủy chưa lưu được; giữ lại',
+        ok ? 'success' : 'error', false, capture.requestId || '', capture.room || '',
+        { ackStage: 'photo', photoSaved: ok, captureId: capture.captureId || '', photoStatus: ok ? 'saved' : 'pending' });
+      return { success: ok };
+    }
+
+    function openCancelledPhoto(id) {
+      const o = cancelledOrders.find(x => x.id === id);
+      const src = o && o.photoId ? photoMemoryCache.get(o.photoId) : '';
+      if (!src) return;
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+      overlay.onclick = () => overlay.remove();
+      const img = document.createElement('img');
+      img.src = src; img.style.cssText = 'max-width:95vw;max-height:95vh;object-fit:contain;border-radius:8px;';
+      overlay.appendChild(img); document.body.appendChild(overlay);
+    }
+
     // ---- Nhận từ điện thoại ----
     function handleCancelledOrderScan(data) {
       const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
       if (!trackCode) return { success: false };
       const ack = (msg, outcome, dup) => sendAckToPhone(0, trackCode, msg, outcome, dup, data.requestId || '', data.room || '', { ackStage: 'scan', photoSaved: false, captureId: data.captureId || '' });
-      if (findCancelledOrder(trackCode) !== -1) {
+      const existingIdx = findCancelledOrder(trackCode);
+      const rememberRequest = entry => {
+        if (!data.requestId) return;
+        entry.photoRequests = entry.photoRequests || [];
+        if (!entry.photoRequests.some(r => r.requestId === data.requestId)) entry.photoRequests.push({ requestId: data.requestId, captureId: data.captureId || '' });
+        entry.photoRequests = entry.photoRequests.slice(-5);
+      };
+      if (existingIdx !== -1) {
+        const dupEntry = cancelledOrders[existingIdx];
+        // Quét lại mà chưa có ảnh thì vẫn nhận ảnh mới để đối chiếu.
+        if (!dupEntry.photoId) { rememberRequest(dupEntry); saveCancelledOrders(); if (data.photo) setCancelledPhoto(dupEntry, data.photo); }
         ack('ĐƠN HỦY ĐÃ TẠO TRƯỚC ĐÓ', 'duplicate', true);
         if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
         showAppToast(`🚫 Đơn hủy ${trackCode} đã tạo rồi`, 'warning');
@@ -15966,8 +16024,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         carrier: data.carrier || detectCarrierByTrackingCode(trackCode) || (platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
         returnDate: getNowDateTimeString(), source: 'phone', items: []
       });
+      rememberRequest(entry);
       cancelledOrders.unshift(entry);
       if (!saveCancelledOrders().success) { cancelledOrders.shift(); ack('Chưa lưu được bảng đơn hủy', 'error', false); return { success: false }; }
+      if (data.photo) setCancelledPhoto(entry, data.photo);
       if (typeof playScanSuccessTone === 'function') playScanSuccessTone();
       showAppToast(`🚫 Đơn hủy mới từ điện thoại: ${trackCode}`, 'success');
       appendPhoneLiveLog(`🚫 ĐƠN HỦY: tạo đơn [${trackCode}] ➔ [${platform}]`);
@@ -16007,7 +16067,61 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const m = document.getElementById('cancelledOrdersModal'); if (!m) return;
       m.classList.remove('hidden'); cancelledCurrentPage = 1; applyCancelledFilters();
     }
-    function closeCancelledOrdersModal() { const m = document.getElementById('cancelledOrdersModal'); if (m) m.classList.add('hidden'); }
+    function closeCancelledOrdersModal() { window._cancelledHitId = null; const m = document.getElementById('cancelledOrdersModal'); if (m) m.classList.add('hidden'); }
+
+    function cancelledMatchesKeyword(o, kwLower) {
+      const hay = [o.orderId, o.track, o.returnTrack, o.carrier, o.platStatus, o.platform, o.orderType, ...(o.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`)].join(' ').toLowerCase();
+      if (hay.includes(kwLower)) return true;
+      return typeof removeVietnameseTones === 'function' && removeVietnameseTones(hay).toLowerCase().includes(removeVietnameseTones(kwLower).toLowerCase());
+    }
+
+    // Tìm kiếm ở Bảng chính cũng báo đơn khớp trong Kho lưu trữ và Bảng đơn hủy.
+    function buildOtherTablesSearchHtml(kw) {
+      const kwTrim = String(kw || '').trim();
+      if (kwTrim.length < 2) return '';
+      let arch = [];
+      try { arch = (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders)) ? archivedOrders.filter(o => isOrderMatch(o, kwTrim)) : []; } catch (e) { arch = []; }
+      const cxl = cancelledOrders.filter(o => cancelledMatchesKeyword(o, kwTrim.toLowerCase()));
+      const line = (icon, name, list, table, idOf) => {
+        const first = list[0];
+        const code = first.orderId || first.track || '';
+        return `<div class="mt-1">${icon} <b>${name}</b>: có <b>${list.length} đơn</b> khớp — đơn đầu <b>${escapeAttr(code)}</b>${first.track && first.track !== code ? ' | MVĐ: <b>' + escapeAttr(first.track) + '</b>' : ''}. <button type="button" onclick="gotoSearchHit('${table}', '${escapeAttr(idOf(first))}')" class="ml-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer">📍 Đi đến vị trí</button></div>`;
+      };
+      let out = '';
+      if (arch.length) out += line('📦', 'Kho lưu trữ', arch, 'archived', o => o.orderId || o.track || '');
+      if (cxl.length) out += line('🚫', 'Bảng đơn hủy', cxl, 'cancelled', o => o.id);
+      return out;
+    }
+
+    function scrollToSearchHit() {
+      setTimeout(() => { const el = document.querySelector('tr[data-search-hit="1"]'); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 80);
+    }
+
+    async function gotoSearchHit(table, id) {
+      if (table === 'archived') {
+        await openArchivedOrdersModal();
+        const target = archivedOrders.find(o => (o.orderId || o.track) === id);
+        const inp = document.getElementById('archivedSearchInput');
+        if (inp && target) inp.value = target.orderId || target.track || '';
+        window._archivedHitId = id;
+        filterArchivedOrders();
+        const idx = filteredArchivedOrders.findIndex(o => (o.orderId || o.track) === id);
+        if (idx >= 0) { archivedCurrentPage = Math.floor(idx / archivedPageSize) + 1; renderArchivedOrdersTable(); }
+        scrollToSearchHit();
+      } else if (table === 'cancelled') {
+        openCancelledOrdersModal();
+        const target = cancelledOrders.find(o => o.id === id);
+        const inp = document.getElementById('cancelledSearchInput');
+        if (inp && target) inp.value = target.track || target.orderId || '';
+        window._cancelledHitId = id;
+        const p = document.getElementById('cancelledPlatformFilter'); if (p) p.value = 'all';
+        const s = document.getElementById('cancelledStatusFilter'); if (s) s.value = 'all';
+        applyCancelledFilters();
+        const idx = filteredCancelledOrders.findIndex(o => o.id === id);
+        if (idx >= 0) { cancelledCurrentPage = Math.floor(idx / cancelledPageSize) + 1; renderCancelledTable(); }
+        scrollToSearchHit();
+      }
+    }
 
     function applyCancelledFilters() {
       const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
@@ -16018,10 +16132,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (plat !== 'all' && o.platform !== plat) return false;
         if (st === 'received' && !o.received) return false;
         if (st === 'pending' && o.received) return false;
-        if (search) {
-          const hay = [o.orderId, o.track, o.returnTrack, o.carrier, o.platStatus, o.platform, ...(o.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`)].join(' ').toLowerCase();
-          if (!hay.includes(search)) return false;
-        }
+        if (search && !cancelledMatchesKeyword(o, search)) return false;
         return true;
       });
       cancelledCurrentPage = Math.min(cancelledCurrentPage, Math.max(1, Math.ceil(filteredCancelledOrders.length / cancelledPageSize)));
@@ -16049,7 +16160,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const prod = items.length ? items.map(it => cancelledEsc([it.product, it.color, it.size].filter(Boolean).join(' / ') + ' ×' + (it.qty || 1))).join('<br>') : '<span class="text-slate-500">—</span>';
         const t = cancelledOrderTotals(o);
         const recv = o.received ? `<span class="text-emerald-400 font-bold">✅ Đã nhận</span><div class="text-[10px] text-slate-400">${cancelledEsc(o.recvDate)}</div>` : '<span class="text-amber-400 font-bold">Chưa nhận</span>';
-        return `<tr class="border-b border-slate-800 hover:bg-slate-800/60">
+        const hit = window._cancelledHitId === o.id;
+        return `<tr ${hit ? 'data-search-hit="1"' : ''} class="border-b border-slate-800 ${hit ? 'bg-emerald-800/70 ring-2 ring-emerald-400' : 'hover:bg-slate-800/60'}">
           <td class="px-2 py-1.5 text-center">${start + i + 1}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.shipDate)}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.returnDate)}</td>
@@ -16066,6 +16178,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <td class="px-2 py-1.5 text-center">${t.qty}</td>
           <td class="px-2 py-1.5 text-right">${t.value ? formatMoney(t.value) : ''}</td>
           <td class="px-2 py-1.5">${recv}</td>
+          <td class="px-2 py-1.5 text-center">${photoMemoryCache.get(o.photoId) ? `<img src="${photoMemoryCache.get(o.photoId)}" alt="Ảnh đơn hủy" title="Bấm để phóng to" onclick="openCancelledPhoto('${cancelledEsc(o.id)}')" class="w-12 h-10 object-cover rounded border border-slate-600 cursor-zoom-in mx-auto" />` : '<span class="text-slate-500">—</span>'}</td>
           <td class="px-2 py-1.5 text-center"><button type="button" onclick="deleteCancelledOrder('${cancelledEsc(o.id)}')" class="px-2 py-0.5 rounded bg-rose-700 hover:bg-rose-600 text-white font-bold cursor-pointer">Xóa</button></td>
         </tr>`;
       }).join('');
@@ -16080,10 +16193,58 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const idx = cancelledOrders.findIndex(o => o.id === id); if (idx === -1) return;
       if (!(await appConfirm('Xóa đơn hủy ' + (cancelledOrders[idx].track || cancelledOrders[idx].orderId) + ' khỏi bảng?', 'Xóa Đơn Hủy'))) return;
       const removed = cancelledOrders.splice(idx, 1);
+      if (removed[0].photoId && typeof deletePhotoFromDb === 'function') deletePhotoFromDb(removed[0].photoId);
       if (!saveCancelledOrders().success) cancelledOrders.splice(idx, 0, removed[0]);
     }
 
     loadCancelledOrders();
+
+    // ---- v1.8.35: cảnh báo đơn sắp đến hạn / quá hạn mà chưa về ----
+    const DEADLINE_NOTIFIED_KEY = 'deadline_notified_v1';
+    function collectDeadlineCandidates() {
+      const list = [];
+      orders.forEach(o => {
+        const s = getDeadlineStatus(o);
+        if (s !== 'upcoming' && s !== 'overdue') return;
+        list.push({ key: 'm:' + (o.orderId || '') + '|' + (o.track || ''), level: s, code: o.track || o.orderId || '' });
+      });
+      cancelledOrders.forEach(o => {
+        if (o.received) return;
+        const dt = typeof parseFullDate === 'function' ? parseFullDate(o.returnDate) : null;
+        if (!dt || isNaN(dt.getTime())) return;
+        const hours = (Date.now() - dt.getTime()) / 3600000;
+        if (hours >= 72) list.push({ key: 'c:' + o.id, level: 'overdue', code: (o.track || o.orderId || '') + ' (hủy)' });
+        else if (hours >= 48) list.push({ key: 'c:' + o.id, level: 'upcoming', code: (o.track || o.orderId || '') + ' (hủy)' });
+      });
+      return list;
+    }
+
+    function checkDeadlineNotifications() {
+      try {
+        let notified = {};
+        try { notified = JSON.parse(localStorage.getItem(DEADLINE_NOTIFIED_KEY) || '{}') || {}; } catch (e) { notified = {}; }
+        const cands = collectDeadlineCandidates();
+        const live = new Set(cands.map(c => c.key));
+        Object.keys(notified).forEach(k => { if (!live.has(k)) delete notified[k]; });
+        for (const level of ['upcoming', 'overdue']) {
+          const fresh = cands.filter(c => c.level === level && (level === 'overdue' ? notified[c.key] !== 'overdue' : !notified[c.key]));
+          if (!fresh.length) continue;
+          const shown = fresh.slice(0, 5).map(c => c.code).join(', ');
+          addAppNotification({
+            type: 'deadline_warning',
+            title: level === 'upcoming' ? `⏰ ${fresh.length} đơn sắp đến hạn mà chưa về` : `🚨 ${fresh.length} đơn QUÁ HẠN mà chưa về`,
+            detail: (level === 'upcoming' ? 'Đã trên 2 ngày kể từ ngày hủy/hoàn, cần xử lý trước hạn 3 ngày. ' : 'Đã quá 3 ngày kể từ ngày hủy/hoàn mà hàng chưa về kho. ') +
+              'Đơn: ' + shown + (fresh.length > 5 ? ` (+${fresh.length - 5} đơn nữa)` : '') + '. Bấm tab "Sắp đến hạn"/"Quá hạn" ở bảng chính để xem đủ.',
+            code: ''
+          });
+          fresh.forEach(c => { notified[c.key] = level; });
+        }
+        localStorage.setItem(DEADLINE_NOTIFIED_KEY, JSON.stringify(notified));
+      } catch (e) { console.warn('Lỗi kiểm tra hạn đơn:', e); }
+    }
+    setTimeout(checkDeadlineNotifications, 5000);
+    setTimeout(checkDeadlineNotifications, 25000);
+    setInterval(checkDeadlineNotifications, 30 * 60 * 1000);
 
     function escapeArchivedHtml(str) {
       if (!str) return '';
@@ -16262,6 +16423,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function closeArchivedOrdersModal() {
+      window._archivedHitId = null;
       const modal = document.getElementById('archivedOrdersModal');
       if (modal) {
         modal.classList.add('hidden');
@@ -16426,8 +16588,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         const priceFormatted = Number(o.price || 0).toLocaleString('vi-VN') + ' đ';
 
+        const archHit = window._archivedHitId === itemId;
         html += `
-          <tr class="hover:bg-slate-800/60 transition ${isChecked ? 'bg-indigo-950/40' : ''}">
+          <tr ${archHit ? 'data-search-hit="1"' : ''} class="transition ${archHit ? 'bg-emerald-800/70 ring-2 ring-emerald-400' : 'hover:bg-slate-800/60'} ${isChecked ? 'bg-indigo-950/40' : ''}">
             <td class="p-2.5 text-center">
               <input type="checkbox" onchange="toggleSelectArchivedItem('${escapeArchivedHtml(itemId)}', this.checked)" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
             </td>
@@ -18792,7 +18955,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 <!-- =============================================================== -->
   <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
   <!-- =============================================================== -->
-  <!-- BẢNG ĐƠN HỦY (v1.8.33) -->
+  <!-- BẢNG ĐƠN HỦY (v1.8.35) -->
   <div id="cancelledOrdersModal" onclick="closeCancelledOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
     <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-rose-500/40 overflow-hidden">
       <div class="px-5 py-3 bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 border-b border-rose-500/30 flex flex-wrap items-center justify-between gap-3">
@@ -18824,7 +18987,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <th class="px-2 py-2">STT</th><th class="px-2 py-2">Ngày gửi</th><th class="px-2 py-2">Ngày hủy</th><th class="px-2 py-2">Hạn xử lý</th><th class="px-2 py-2">Ngày về kho</th>
             <th class="px-2 py-2">Sàn TMĐT</th><th class="px-2 py-2">Loại đơn/sàn</th><th class="px-2 py-2">Trạng thái sàn</th><th class="px-2 py-2">Hàng đặt trước</th>
             <th class="px-2 py-2">Mã đơn hàng</th><th class="px-2 py-2">Mã vận đơn</th><th class="px-2 py-2">ĐVVC</th><th class="px-2 py-2">Sản phẩm</th>
-            <th class="px-2 py-2 text-center">Tổng SL</th><th class="px-2 py-2 text-right">Tổng giá trị</th><th class="px-2 py-2">Trạng thái nhận</th><th class="px-2 py-2 text-center">Thao tác</th>
+            <th class="px-2 py-2 text-center">Tổng SL</th><th class="px-2 py-2 text-right">Tổng giá trị</th><th class="px-2 py-2">Trạng thái nhận</th><th class="px-2 py-2 text-center">Ảnh đơn hàng</th><th class="px-2 py-2 text-center">Thao tác</th>
           </tr></thead>
           <tbody id="cancelledTableBody"></tbody>
         </table>

@@ -1,6 +1,6 @@
 const test = require('node:test'), assert = require('node:assert'), fs = require('fs'), vm = require('vm'), path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
-function grab(name) { const m = src.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n    \\}\\n')); assert.ok(m, name); return m[0]; }
+function grab(name) { const m = src.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\r?\\n    \\}\\r?\\n')); assert.ok(m, name); return m[0]; }
 const code = 'const DEADLINE_DAYS = 3;\n' + ['formatDuration', 'computeDeadlineInfo', 'collectDeadlineItems'].map(grab).join('\n');
 function ctx(orders, cancelled) {
   const c = { orders, cancelledOrders: cancelled, Date, getDeadlineStatus: o => o.st || 'none', parseFullDate: v => new Date(v) };

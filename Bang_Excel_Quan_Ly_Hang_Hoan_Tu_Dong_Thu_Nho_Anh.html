@@ -735,9 +735,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <!-- Phân Loại Sàn (Segmented Tabs gọn gàng) -->
         <div class="flex items-center gap-1.5 flex-wrap" id="platformBigTabs">
-          <span class="text-[10.5px] font-black text-slate-700 uppercase tracking-wide mr-0.5 flex items-center gap-0.5">
-            <span>🏷️ SÀN RIÊNG BIỆT:</span>
-          </span>
           <button type="button" id="platBigBtn_Shopee" onclick="setPlatformFilter('Shopee')"
                   title="Chuyển sang Không Gian Quản Lý Đơn Hoàn Sàn Shopee"
                   class="px-3.5 py-1 rounded-lg font-black text-xs transition flex items-center gap-1.5 shadow-xs cursor-pointer">
@@ -756,33 +753,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <span>🌐 Xem Cả 2 Sàn</span>
             <span id="platCount_all" class="bg-slate-200 text-slate-700 text-[10px] px-1 py-0.2 rounded-full font-mono">0</span>
           </button>
-          <div id="activePlatformBannerBadge" class="flex items-center text-xs font-black px-2.5 py-0.5 rounded-lg"></div>
         </div>
       </div>
 
-      <!-- Cụm Phải: Chế Độ Xem (Chuyển lên đây loại bỏ hẳn hàng đen cũ) + Phân Tích & Ca Nhận -->
+      <!-- Cụm Phải: Phân Tích, Bảng đơn mới, Kho lưu trữ, Tạo đơn nhanh, Ca nhận -->
       <div class="flex items-center gap-1.5 flex-wrap">
-        <!-- Chế độ xem segmented pills -->
-        <div class="inline-flex items-center gap-0.5 bg-slate-200/90 p-0.5 rounded-lg border border-slate-300">
-          <span class="text-[10px] font-black text-slate-600 px-1">CHẾ ĐỘ:</span>
-          <button type="button" id="btnViewOrdersTab" onclick="switchMainView('orders')"
-                  class="px-2 py-0.5 rounded font-extrabold text-xs transition flex items-center gap-1 bg-white text-indigo-950 shadow-2xs cursor-pointer ring-1 ring-indigo-300">
-            <span>📋 Đơn Hàng</span>
-            <span id="viewOrdersCountBadge" class="bg-slate-200 text-slate-900 text-[10px] px-1 rounded-full font-mono">0</span>
-          </button>
-          <button type="button" id="btnViewSummaryTab" onclick="switchMainView('summary')"
-                  class="px-2 py-0.5 rounded font-bold text-xs transition flex items-center gap-1 text-slate-700 hover:bg-white/60 cursor-pointer"
-                  title="Xem Bảng Thống Kê Phân Loại Màu & Size">
-            <span>📊 Thống Kê SKU</span>
-            <span id="viewSummaryCountBadge" class="bg-teal-800 text-teal-100 text-[10px] px-1 rounded-full font-mono">0</span>
-          </button>
-          <button type="button" id="btnViewBothTab" onclick="switchMainView('both')"
-                  class="px-1.5 py-0.5 rounded font-semibold text-xs text-slate-500 hover:text-slate-800 transition cursor-pointer"
-                  title="Hiển thị cả 2 bảng">
-            <span>👁️ Cả hai</span>
-          </button>
-        </div>
-
         <button type="button" onclick="openAnalyticsDashboardModal()"
                 class="px-2 py-1 rounded-md font-extrabold text-[11px] bg-indigo-700 hover:bg-indigo-800 text-white shadow-2xs transition flex items-center gap-1 cursor-pointer"
                 title="Bảng phân tích chuyên sâu: Top mẫu áo bị hoàn nhiều nhất, lý do hoàn và đối soát chi phí">
@@ -849,43 +824,43 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="tabCountAll" class="bg-white/20 text-white text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('waiting')" id="tabBtn_waiting"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
                 title="Chờ hàng về kho (Loại trừ đơn Đã nhận và Không cần nhận)">
           <span>⏳ Chưa nhận</span>
-          <span id="tabCountWaiting" class="bg-amber-200 text-amber-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountWaiting" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('returned')" id="tabBtn_returned"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-emerald-50 text-emerald-900 border border-emerald-300 hover:bg-emerald-100 cursor-pointer"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
                 title="Đã nhận kiện về kho">
           <span>🟢 Đã nhận</span>
-          <span id="tabCountReturned" class="bg-emerald-200 text-emerald-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountReturned" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('unneeded')" id="tabBtn_unneeded"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 cursor-pointer"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
                 title="Đơn hủy trước khi gửi (Không cần nhận về kho)">
           <span>⚪ K.cần nhận</span>
-          <span id="tabCountUnneeded" class="bg-slate-200 text-slate-700 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountUnneeded" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('upcoming')" id="tabBtn_upcoming"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-orange-50 text-orange-950 border border-orange-300 hover:bg-orange-100 cursor-pointer"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
                 title="Cảnh báo vàng: Từ lúc hủy 2 ngày (>= 48 giờ) chưa nhận được hàng">
           <span>⚠️ Báo Vàng (2 ngày)</span>
-          <span id="tabCountUpcomingDeadline" class="bg-orange-200 text-orange-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountUpcomingDeadline" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('overdue')" id="tabBtn_overdue"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-rose-50 text-rose-900 border border-rose-300 hover:bg-rose-100 cursor-pointer"
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
                 title="Cảnh báo đỏ: Sau 3 ngày (>= 72 giờ) từ lúc hủy vẫn chưa nhận được hàng">
           <span>🚨 Báo Đỏ (3 ngày)</span>
-          <span id="tabCountOverdue" class="bg-rose-200 text-rose-900 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountOverdue" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('lost')" id="tabBtn_lost"
-                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 bg-slate-100 text-slate-800 border border-slate-300 hover:bg-slate-200 cursor-pointer">
+                class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer">
           <span>🔴 Bị mất</span>
-          <span id="tabCountLost" class="bg-slate-200 text-slate-800 text-[10px] px-1.5 rounded-full font-mono">0</span>
+          <span id="tabCountLost" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" id="btnExportReturnedHeader" onclick="exportReturnedOrdersToExcel()"
                 title="Xuất danh sách đơn hàng đã về kho và bảng SKU nhập lại kho (.xlsx)"
-                class="px-2 py-1 rounded-md font-extrabold text-[11px] transition flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs cursor-pointer ml-1">
+                class="px-2 py-1 rounded-md font-bold text-[11px] transition flex items-center gap-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-600 cursor-pointer ml-1">
           <span>📥 Xuất Đơn Đã Về</span>
         </button>
 
@@ -913,6 +888,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="Lazada">Lazada</option>
           <option value="Khác">Khác</option>
         </select>
+        <div class="inline-flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-md px-1.5 py-0.5" title="Nhập số trang rồi nhấn Enter để đến thẳng trang đó">
+          <span class="font-bold text-slate-600">Đến trang</span>
+          <input id="gotoPageInput" type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="1"
+                 onkeydown="if (event.key === 'Enter') goToTablePage(this.value)"
+                 class="w-11 text-center font-bold text-slate-800 bg-white border border-slate-300 rounded px-0.5 py-0 outline-none focus:border-blue-500" />
+          <span id="gotoPageTotal" class="text-slate-500 font-semibold">/ 1</span>
+          <button type="button" onclick="goToTablePage(document.getElementById('gotoPageInput').value)" class="px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold cursor-pointer">Đi</button>
+        </div>
         <button type="button" id="btnAdvancedFilters" onclick="toggleAdvancedFilters()"
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold text-[11px] cursor-pointer transition"
                 title="Loại đơn, Trước/Thường, Mã vận đơn, Ngày & Giờ">
@@ -1073,22 +1056,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </tr>
         </thead>
         <tbody id="orderTableBody"></tbody>
-        <tfoot>
-          <tr class="bg-slate-100 font-bold text-xs border-t-2 border-slate-800">
-            <td class="text-center font-black text-sm py-2 bg-slate-900 text-amber-400 select-none">Σ</td>
-            <td class="text-center font-black text-[11px] py-2 bg-slate-900 text-amber-300 select-none" title="Tổng số đơn hàng đang hiển thị"><span id="footOrderCount">0</span></td>
-            <td colspan="13" class="py-2.5 px-3 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-t-2 border-slate-700">
-              <div class="flex items-center gap-2 text-xs">
-                <span class="font-black uppercase tracking-wider text-slate-900">📊 TỔNG CỘNG (đang lọc)</span>
-                <span class="text-[11px] text-slate-500 hidden xl:inline">Số đơn · SP · tiền · đã về / chưa về: xem thanh tổng ở cuối màn hình</span>
-              </div>
-            </td>
-            <td id="footTotalQty" class="text-center font-black text-sm py-2 px-1 text-indigo-950 bg-indigo-100/90 border border-indigo-300 font-mono" title="Tổng số lượng sản phẩm">0</td>
-            <td id="footTotalPrice" class="text-right font-black text-sm py-2 px-2 text-rose-950 bg-rose-100/90 border border-rose-300 font-mono whitespace-nowrap" title="Tổng giá trị đơn hàng">0 đ</td>
-            <td id="footReturnedSummary" class="text-center font-black text-xs py-2 px-1 text-emerald-900 bg-emerald-100/90 border border-emerald-300 whitespace-nowrap">🟢 Đã về: 0</td>
-            <td colspan="5" class="bg-slate-100/80"></td>
-          </tr>
-        </tfoot>
       </table>
     </div>
 
@@ -7054,6 +7021,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     window.switchMainView = switchMainView;
+    window.fitMainTableHeight = (typeof fitMainTableHeight === 'function') ? fitMainTableHeight : function () {};
     // Khi mở app: chỉ hiện danh sách đơn hàng, ẩn bảng thống kê Màu & Size
     switchMainView('orders');
     window.setImportWeekFilter = setImportWeekFilter;
@@ -7068,7 +7036,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.29';
+    const APP_VERSION_NUMBER = '1.8.30';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -7091,6 +7059,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       pageSize = parseInt(newVal, 10) || 0;
       currentPage = 1;
       renderAll(false);
+    }
+
+    function goToTablePage(value) {
+      const input = document.getElementById('gotoPageInput');
+      const n = parseInt(String(value || '').replace(/\D/g, ''), 10);
+      if (!n) { if (input) input.value = ''; return; }
+      const maxPage = Math.max(1, totalFilteredPages || 1);
+      currentPage = Math.min(Math.max(n, 1), maxPage);
+      if (input) input.value = '';
+      renderAll(false);
+      const scrollBox = document.getElementById('mainTableScrollContainer');
+      if (scrollBox) scrollBox.scrollTop = 0;
+      if (n > maxPage && typeof showAppToast === 'function') showAppToast(`Chỉ có ${maxPage} trang, đã chuyển tới trang cuối`, 'info', 1800);
     }
 
     function changeTablePage(delta) {
@@ -7553,8 +7534,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentFilterTab = tab;
       currentPage = 1;
       document.querySelectorAll('#pipelineTabs button:not(#btnExportReturnedHeader)').forEach(b => {
-        b.className = 'px-2.5 py-1 rounded-md font-bold transition flex items-center gap-1 border ' +
-          'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
+        b.className = 'px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer';
       });
       const activeBtn = document.getElementById('tabBtn_' + tab);
       if (activeBtn) {
@@ -10270,6 +10250,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       enterCellInlineEdit(key);
     }
 
+    // Sao chép nhanh vào clipboard + báo nhỏ ở góc màn hình (không mở hộp thoại)
+    function copyTextQuick(text, label) {
+      const done = () => { if (typeof showAppToast === 'function') showAppToast(`📋 Đã sao chép ${label || 'nội dung'}: ${text}`, 'success', 1600); };
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+          done();
+        } catch (e) {}
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
+      else fallback();
+    }
+
     function handleCellClick(e, cellKey, labelName, textVal, orderIdx, fieldName, targetWrapper) {
       if (e.target && e.target.classList && e.target.classList.contains('cell-edit-input')) return;
       if (cellLocks && cellLocks[cellKey]) {
@@ -10281,6 +10276,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let latestVal = textVal;
         if (orders[orderIdx] && orders[orderIdx][fieldName] !== undefined) {
           latestVal = orders[orderIdx][fieldName];
+        }
+        // Mã đơn hàng: bấm 1 lần là sao chép luôn (nhấp đúp vẫn để chỉnh sửa)
+        if (fieldName === 'orderId' && String(latestVal || '').trim()) {
+          copyTextQuick(String(latestVal).trim(), 'mã đơn');
+          singleClickTimer = null;
+          return;
         }
         showCellDetailPopover(targetWrapper, labelName, latestVal, cellKey, orderIdx, fieldName);
         singleClickTimer = null;
@@ -10677,7 +10678,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
              onclick="handleCellClick(event,'${cellKey}','${escapeJs(labelName)}','${escapeJs(safeVal)}',${orderIdxNum},'${fieldName}',this)"
              ondblclick="handleCellDblClick(event,'${cellKey}',this)"
              oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')"
-             title="Bấm 1 lần: Xem đầy đủ | Nhấp đúp (2 lần): Chỉnh sửa | Chuột phải: Khóa ô">
+             title="${fieldName === 'orderId' ? 'Bấm 1 lần: Sao chép mã đơn' : 'Bấm 1 lần: Xem đầy đủ'} | Nhấp đúp (2 lần): Chỉnh sửa | Chuột phải: Khóa ô">
           <span class="cell-view-text ${extraClass} block truncate w-full pointer-events-none">
             ${escapeAttr(safeVal.trim()) || `<span class="text-slate-400 italic font-normal">${placeholder || '-'}</span>`}
           </span>
@@ -10853,6 +10854,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       const pageIndEl = document.getElementById('pageIndicatorText');
       if (pageIndEl) pageIndEl.textContent = `Trang ${currentPage}/${totalFilteredPages}`;
+      const gotoTotalEl = document.getElementById('gotoPageTotal');
+      if (gotoTotalEl) gotoTotalEl.textContent = `/ ${totalFilteredPages}`;
+      const gotoInputEl = document.getElementById('gotoPageInput');
+      if (gotoInputEl) gotoInputEl.placeholder = String(currentPage);
       const prevBtn = document.getElementById('btnPrevPage');
       if (prevBtn) prevBtn.disabled = (currentPage <= 1);
       const nextBtn = document.getElementById('btnNextPage');
@@ -11589,12 +11594,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showAppToast(`Đã cập nhật hạn xử lý Đơn #${orderIdx + 1}${newVal ? `: ${newVal}` : ' (đã xóa)'}`, 'success');
     }
 
+    // Bảng đơn chiếm hết phần màn hình còn lại (không chừa khoảng trắng dưới bảng)
+    function fitMainTableHeight() {
+      const c = document.getElementById('mainTableScrollContainer');
+      if (!c || c.classList.contains('hidden')) return;
+      const dock = document.getElementById('stickyBottomDock');
+      const dockH = dock ? dock.offsetHeight : 0;
+      const absTop = c.getBoundingClientRect().top + (window.pageYOffset || 0);
+      const h = Math.max(260, Math.floor(window.innerHeight - absTop - dockH - 6));
+      c.style.maxHeight = h + 'px';
+      c.style.minHeight = '0px';
+    }
+    window.addEventListener('resize', () => requestAnimationFrame(fitMainTableHeight));
+
     // ===== Bộ lọc nâng cao thu gọn (v1.8.29) =====
     function toggleAdvancedFilters(forceOpen) {
       const panel = document.getElementById('advancedFilterPanel');
       if (!panel) return;
       const open = typeof forceOpen === 'boolean' ? forceOpen : panel.classList.contains('hidden');
       panel.classList.toggle('hidden', !open);
+      requestAnimationFrame(fitMainTableHeight);
       const arrow = document.getElementById('advancedFilterArrow');
       if (arrow) arrow.textContent = open ? '▴' : '▾';
     }
@@ -11922,6 +11941,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       renderWeeklyImportTabs();
       if (typeof updateAdvancedFilterBadge === 'function') updateAdvancedFilterBadge();
+      requestAnimationFrame(fitMainTableHeight);
 
       const previewEl = document.getElementById('searchPreviewBar');
       if (!previewEl) return;
@@ -13480,7 +13500,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.29',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.30',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

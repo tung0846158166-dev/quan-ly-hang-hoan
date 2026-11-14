@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.37';
+    const APP_VERSION_NUMBER = '1.8.38';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.37',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.38',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -15987,6 +15987,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return '';
     }
 
+    // "Xanh Nâu,L - Premium Cao Cấp" -> màu "Xanh Nâu", size "L"
+    function cancelledSplitVariant(v) {
+      const s = String(v || '').trim();
+      if (!s) return { color: '', size: '' };
+      const i = s.indexOf(',');
+      if (i === -1) return { color: s, size: '' };
+      return { color: s.slice(0, i).trim(), size: s.slice(i + 1).split(/\s+-\s+/)[0].trim() };
+    }
+
     function mapCancelledRows(rows) {
       const byKey = new Map();
       for (const row of rows) {
@@ -15998,8 +16007,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const platform = (cancelledPickField(row, ['Sàn', 'Platform']) || (typeof autoDetectPlatformFromCode === 'function' ? autoDetectPlatformFromCode(track || orderId) : '')) || '';
         const item = {
           product: cancelledPickField(row, ['Product Name', 'Tên sản phẩm', 'Tên sản phẩm trên sàn', 'Tên hàng hóa', 'Item Name', 'Seller SKU']),
-          color: cancelledPickField(row, ['Màu sắc', 'Color']),
-          size: cancelledPickField(row, ['Size', 'Kích cỡ']),
+          color: cancelledPickField(row, ['Màu sắc', 'Color']) || cancelledSplitVariant(cancelledPickField(row, ['Tên phân loại hàng', 'Phân loại hàng', 'Variation Name', 'Variation'])).color,
+          size: cancelledPickField(row, ['Size', 'Kích cỡ']) || cancelledSplitVariant(cancelledPickField(row, ['Tên phân loại hàng', 'Phân loại hàng', 'Variation Name', 'Variation'])).size,
           qty: Number(String(cancelledPickField(row, ['Quantity', 'Số lượng', 'Qty', 'Sku Quantity of return', 'Số lượng hoàn'])).replace(/[^0-9.]/g, '')) || 1,
           price: Number(String(cancelledPickField(row, ['Giá', 'Đơn giá', 'Unit Price', 'SKU Unit Original Price', 'Giá gốc'])).replace(/[^0-9.]/g, '')) || 0
         };
@@ -16114,7 +16123,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const entry = makeCancelledOrder({
         orderId: trackCode, track: trackCode, platform,
         carrier: data.carrier || detectCarrierByTrackingCode(trackCode) || (platform === 'Shopee' ? 'SPX Express' : 'J&T Express'),
-        returnDate: getNowDateTimeString(), source: 'phone', items: []
+        returnDate: getNowDateTimeString(), source: 'phone', items: [],
+        received: true, recvDate: getNowDateTimeString()
       });
       rememberRequest(entry);
       cancelledOrders.unshift(entry);
@@ -16270,22 +16280,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const items = o.items || [];
         const prod = items.length ? items.map(it => cancelledEsc([it.product, it.color, it.size].filter(Boolean).join(' / ') + ' ×' + (it.qty || 1))).join('<br>') : '<span class="text-slate-500">—</span>';
         const t = cancelledOrderTotals(o);
-        const recv = o.received ? `<span class="text-emerald-400 font-bold">✅ Đã nhận</span><div class="text-[10px] text-slate-400">${cancelledEsc(o.recvDate)}</div>` : '<span class="text-amber-400 font-bold">Chưa nhận</span>';
+        const eid = cancelledEsc(o.id);
+        const recv = `<select onchange="setCancelledReceived('${eid}', this.value === 'received')" class="bg-slate-800 border ${o.received ? 'border-emerald-500 text-emerald-300' : 'border-amber-500 text-amber-300'} rounded px-1 py-0.5 font-bold cursor-pointer"><option value="pending" ${o.received ? '' : 'selected'}>Chưa nhận</option><option value="received" ${o.received ? 'selected' : ''}>✅ Đã nhận</option></select>`;
+        const colorCell = items.length ? items.map(it => cancelledEsc(it.color || '—')).join('<br>') : '<span class="text-slate-500">—</span>';
+        const sizeCell = items.length ? items.map(it => cancelledEsc(it.size || '—')).join('<br>') : '<span class="text-slate-500">—</span>';
+        const prodOnly = items.length ? items.map(it => cancelledEsc((it.product || '—') + ' ×' + (it.qty || 1))).join('<br>') : '<span class="text-slate-500">—</span>';
         const hit = window._cancelledHitId === o.id;
         return `<tr ${hit ? 'data-search-hit="1"' : ''} class="border-b border-slate-800 ${hit ? 'bg-emerald-800/70 ring-2 ring-emerald-400' : 'hover:bg-slate-800/60'}">
+          <td class="px-2 py-1.5 text-center"><input type="checkbox" class="cancelledRowCheck w-4 h-4 cursor-pointer" data-id="${eid}" ${selectedCancelledIds.has(o.id) ? 'checked' : ''} onchange="toggleCancelledSelect('${eid}', this.checked)" /></td>
           <td class="px-2 py-1.5 text-center">${start + i + 1}</td>
-          <td class="px-2 py-1.5">${cancelledEsc(o.shipDate)}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.returnDate)}</td>
-          <td class="px-2 py-1.5">${cancelledEsc(o.deadline)}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.recvDate)}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.platform)}</td>
           <td class="px-2 py-1.5"><span class="px-2 py-0.5 rounded bg-rose-900 text-rose-100 font-bold">${cancelledEsc(o.orderType || 'Đơn hủy')}</span></td>
-          <td class="px-2 py-1.5">${cancelledEsc(o.platStatus)}</td>
-          <td class="px-2 py-1.5">${cancelledEsc(o.preorder)}</td>
           <td class="px-2 py-1.5 font-mono">${cancelledEsc(o.orderId)}</td>
           <td class="px-2 py-1.5 font-mono">${cancelledEsc(o.track || o.returnTrack)}</td>
           <td class="px-2 py-1.5">${cancelledEsc(o.carrier)}</td>
-          <td class="px-2 py-1.5">${prod}</td>
+          <td class="px-2 py-1.5">${prodOnly}</td>
+          <td class="px-2 py-1.5">${colorCell}</td>
+          <td class="px-2 py-1.5">${sizeCell}</td>
           <td class="px-2 py-1.5 text-center">${t.qty}</td>
           <td class="px-2 py-1.5 text-right">${t.value ? formatMoney(t.value) : ''}</td>
           <td class="px-2 py-1.5">${recv}</td>
@@ -16298,6 +16311,94 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       set('cancelledTotalOrders', total); set('cancelledTotalQty', totals.qty); set('cancelledTotalValue', formatMoney(totals.value)); set('cancelledTotalReceived', totals.recv);
       set('cancelledPageIndicator', `Trang ${cancelledCurrentPage} / ${pages}`);
       const empty = document.getElementById('cancelledEmptyState'); if (empty) empty.classList.toggle('hidden', total > 0);
+      updateCancelledBulkBar();
+    }
+
+    // ---- v1.8.38: chọn nhiều, đổi trạng thái nhận bằng tay, tạo đơn tay ----
+    const selectedCancelledIds = new Set();
+    function updateCancelledBulkBar() {
+      const bar = document.getElementById('cancelledBulkBar');
+      const live = new Set(cancelledOrders.map(o => o.id));
+      Array.from(selectedCancelledIds).forEach(id => { if (!live.has(id)) selectedCancelledIds.delete(id); });
+      if (bar) bar.classList.toggle('hidden', selectedCancelledIds.size === 0);
+      const c = document.getElementById('cancelledSelectedCount'); if (c) c.textContent = `Đã chọn ${selectedCancelledIds.size} đơn`;
+      const all = document.getElementById('cancelledSelectAll');
+      if (all) all.checked = filteredCancelledOrders.length > 0 && filteredCancelledOrders.every(o => selectedCancelledIds.has(o.id));
+    }
+    function toggleCancelledSelect(id, on) { if (on) selectedCancelledIds.add(id); else selectedCancelledIds.delete(id); updateCancelledBulkBar(); }
+    function toggleCancelledSelectAll(on) {
+      filteredCancelledOrders.forEach(o => { if (on) selectedCancelledIds.add(o.id); else selectedCancelledIds.delete(o.id); });
+      renderCancelledTable();
+    }
+    function clearCancelledSelection() { selectedCancelledIds.clear(); renderCancelledTable(); }
+
+    // Đã nhận -> ghi thời gian về kho; chưa nhận -> xóa thời gian về kho.
+    function applyCancelledReceived(o, received) {
+      o.received = !!received;
+      o.recvDate = received ? getNowDateTimeString() : '';
+    }
+    function setCancelledReceived(id, received) {
+      const o = cancelledOrders.find(x => x.id === id); if (!o) return;
+      const before = { received: o.received, recvDate: o.recvDate };
+      applyCancelledReceived(o, received);
+      if (!saveCancelledOrders().success) { o.received = before.received; o.recvDate = before.recvDate; }
+      renderCancelledTable();
+    }
+    function bulkSetCancelledReceived(received) {
+      const list = cancelledOrders.filter(o => selectedCancelledIds.has(o.id));
+      if (!list.length) return;
+      const before = list.map(o => ({ o, received: o.received, recvDate: o.recvDate }));
+      list.forEach(o => applyCancelledReceived(o, received));
+      if (!saveCancelledOrders().success) before.forEach(b => { b.o.received = b.received; b.o.recvDate = b.recvDate; });
+      else showAppToast(`${received ? '✅ Đã đánh dấu nhận' : '↩ Đã chuyển về chưa nhận'} ${list.length} đơn hủy`, 'success');
+      renderCancelledTable();
+    }
+    async function bulkDeleteCancelled() {
+      const ids = new Set(selectedCancelledIds);
+      const list = cancelledOrders.filter(o => ids.has(o.id));
+      if (!list.length) return;
+      if (!(await appConfirm(`Xóa ${list.length} đơn hủy đã chọn khỏi bảng?`, 'Xóa Đơn Hủy'))) return;
+      const snapshot = cancelledOrders.slice();
+      cancelledOrders = cancelledOrders.filter(o => !ids.has(o.id));
+      if (!saveCancelledOrders().success) { cancelledOrders = snapshot; return; }
+      list.forEach(o => { if (o.photoId && typeof deletePhotoFromDb === 'function') deletePhotoFromDb(o.photoId); });
+      selectedCancelledIds.clear();
+      applyCancelledFilters();
+    }
+
+    function openCancelledCreateForm() {
+      const m = document.getElementById('cancelledCreateModal'); if (!m) return;
+      ['ccCode', 'ccProduct', 'ccColor', 'ccSize'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      const q = document.getElementById('ccQty'); if (q) q.value = '1';
+      const p = document.getElementById('ccPlatform'); if (p) p.value = 'auto';
+      const r = document.getElementById('ccReceived'); if (r) r.checked = false;
+      m.classList.remove('hidden');
+      setTimeout(() => { const el = document.getElementById('ccCode'); if (el) el.focus(); }, 50);
+    }
+    function closeCancelledCreateForm() { const m = document.getElementById('cancelledCreateModal'); if (m) m.classList.add('hidden'); }
+    function submitCancelledCreateForm() {
+      const v = id => String((document.getElementById(id) || {}).value || '').trim();
+      const raw = v('ccCode');
+      const code = (typeof extractCleanTrackingCode === 'function' && extractCleanTrackingCode(raw)) || raw;
+      if (!code) { showAppToast('Nhập mã vận đơn hoặc mã đơn hàng', 'warning'); return false; }
+      if (findCancelledOrder(code) !== -1) { showAppToast(`🚫 Đơn hủy ${code} đã có trong bảng`, 'warning'); return false; }
+      const pv = v('ccPlatform');
+      const platform = pv && pv !== 'auto' ? pv : (typeof autoDetectPlatformFromCode === 'function' ? autoDetectPlatformFromCode(code) : '');
+      const received = !!(document.getElementById('ccReceived') || {}).checked;
+      const product = v('ccProduct');
+      const items = (product || v('ccColor') || v('ccSize')) ? [{ product, color: v('ccColor'), size: v('ccSize'), qty: Number(v('ccQty')) || 1, price: 0 }] : [];
+      const entry = makeCancelledOrder({
+        orderId: code, track: code, platform,
+        carrier: (typeof detectCarrierByTrackingCode === 'function' && detectCarrierByTrackingCode(code)) || '',
+        returnDate: getNowDateTimeString(), source: 'manual', items,
+        received, recvDate: received ? getNowDateTimeString() : ''
+      });
+      cancelledOrders.unshift(entry);
+      if (!saveCancelledOrders().success) { cancelledOrders.shift(); return false; }
+      closeCancelledCreateForm();
+      showAppToast(`🚫 Đã tạo đơn hủy ${code}`, 'success');
+      applyCancelledFilters();
+      return true;
     }
 
     async function deleteCancelledOrder(id) {
@@ -19142,6 +19243,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="cancelledModalCountBadge" class="bg-amber-400 text-slate-950 text-xs px-2.5 py-0.5 rounded-full font-mono font-black">0 đơn</span>
         </h2>
         <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="openCancelledCreateForm()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg cursor-pointer" title="Tạo tay 1 đơn hủy">➕ Tạo đơn hủy</button>
           <label class="px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold rounded-lg cursor-pointer" title="Nạp file Excel/CSV đơn hủy; dữ liệu chỉ vào bảng này">
             📥 Nhập file đơn hủy
             <input id="cancelledFileInput" type="file" multiple accept=".xlsx,.xls,.csv" class="hidden" onchange="handleCancelledFileUpload(event)" />
@@ -19159,12 +19261,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </select>
         <button type="button" onclick="resetCancelledFilters()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold cursor-pointer">✕ Xóa lọc</button>
       </div>
+      <div id="cancelledBulkBar" class="hidden px-4 py-2 bg-indigo-950 border-b border-indigo-500/40 flex flex-wrap items-center gap-2 text-xs">
+        <b id="cancelledSelectedCount" class="text-amber-300">Đã chọn 0 đơn</b>
+        <button type="button" onclick="bulkSetCancelledReceived(true)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded font-bold cursor-pointer">✅ Đánh dấu đã nhận</button>
+        <button type="button" onclick="bulkSetCancelledReceived(false)" class="px-2.5 py-1 bg-amber-600 hover:bg-amber-500 rounded font-bold cursor-pointer">↩ Đánh dấu chưa nhận</button>
+        <button type="button" onclick="bulkDeleteCancelled()" class="px-2.5 py-1 bg-rose-700 hover:bg-rose-600 rounded font-bold cursor-pointer">🗑 Xóa đã chọn</button>
+        <button type="button" onclick="clearCancelledSelection()" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded font-bold cursor-pointer">Bỏ chọn</button>
+      </div>
       <div class="overflow-auto flex-1 min-h-[200px]">
         <table class="w-full text-[11px] text-left whitespace-nowrap">
           <thead class="bg-slate-950 text-slate-200 uppercase sticky top-0 z-10"><tr>
-            <th class="px-2 py-2">STT</th><th class="px-2 py-2">Ngày gửi</th><th class="px-2 py-2">Ngày hủy</th><th class="px-2 py-2">Hạn xử lý</th><th class="px-2 py-2">Ngày về kho</th>
-            <th class="px-2 py-2">Sàn TMĐT</th><th class="px-2 py-2">Loại đơn/sàn</th><th class="px-2 py-2">Trạng thái sàn</th><th class="px-2 py-2">Hàng đặt trước</th>
-            <th class="px-2 py-2">Mã đơn hàng</th><th class="px-2 py-2">Mã vận đơn</th><th class="px-2 py-2">ĐVVC</th><th class="px-2 py-2">Sản phẩm</th>
+            <th class="px-2 py-2 text-center"><input type="checkbox" id="cancelledSelectAll" class="w-4 h-4 cursor-pointer" title="Chọn / bỏ chọn tất cả đơn đang hiện" onchange="toggleCancelledSelectAll(this.checked)" /></th>
+            <th class="px-2 py-2">STT</th><th class="px-2 py-2">Ngày hủy</th><th class="px-2 py-2">Ngày về kho</th>
+            <th class="px-2 py-2">Sàn TMĐT</th><th class="px-2 py-2">Loại đơn/sàn</th>
+            <th class="px-2 py-2">Mã đơn hàng</th><th class="px-2 py-2">Mã vận đơn</th><th class="px-2 py-2">ĐVVC</th><th class="px-2 py-2">Sản phẩm</th><th class="px-2 py-2">Màu</th><th class="px-2 py-2">Size</th>
             <th class="px-2 py-2 text-center">Tổng SL</th><th class="px-2 py-2 text-right">Tổng giá trị</th><th class="px-2 py-2">Trạng thái nhận</th><th class="px-2 py-2 text-center">Ảnh đơn hàng</th><th class="px-2 py-2 text-center">Thao tác</th>
           </tr></thead>
           <tbody id="cancelledTableBody"></tbody>
@@ -19183,6 +19293,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="cancelledPageIndicator">Trang 1 / 1</span>
           <button type="button" onclick="changeCancelledPage(1)" class="px-2 py-1 bg-slate-800 rounded cursor-pointer">▶</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancelledCreateModal" onclick="closeCancelledCreateForm()" class="fixed inset-0 bg-slate-950/80 z-[60] hidden flex items-center justify-center p-4">
+    <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-xl shadow-2xl w-full max-w-md border border-emerald-500/40 p-4 text-xs">
+      <h3 class="font-black text-sm mb-3">➕ Tạo đơn hủy</h3>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="col-span-2">Mã vận đơn / mã đơn hàng *<input id="ccCode" type="text" onkeydown="if(event.key==='Enter') submitCancelledCreateForm()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 font-mono" /></label>
+        <label>Sàn<select id="ccPlatform" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5"><option value="auto">Tự nhận diện</option><option value="Shopee">Shopee</option><option value="TikTok Shop">TikTok Shop</option></select></label>
+        <label>Số lượng<input id="ccQty" type="number" min="1" value="1" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5" /></label>
+        <label class="col-span-2">Sản phẩm<input id="ccProduct" type="text" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5" /></label>
+        <label>Màu<input id="ccColor" type="text" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5" /></label>
+        <label>Size<input id="ccSize" type="text" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5" /></label>
+        <label class="col-span-2 flex items-center gap-2 cursor-pointer"><input id="ccReceived" type="checkbox" class="w-4 h-4" /> Đã nhận về kho (ghi thời gian về kho ngay)</label>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button type="button" onclick="closeCancelledCreateForm()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded font-bold cursor-pointer">Hủy</button>
+        <button type="button" onclick="submitCancelledCreateForm()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded font-bold cursor-pointer">Tạo đơn</button>
       </div>
     </div>
   </div>

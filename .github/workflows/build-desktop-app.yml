@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.37
+          name: QuanLyHangHoan-Windows-Installer-v1.8.38
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.37
-          name: "Quản Lý Hàng Hoàn v1.8.37 — tab Hạn Xử Lý: đơn sắp đến hạn / quá hạn bao nhiêu ngày"
+          tag_name: v1.8.38
+          name: "Quản Lý Hàng Hoàn v1.8.38 — bảng đơn hủy: tạo đơn, chọn nhiều, màu/size, đổi trạng thái nhận"
           body: |
+            ### Bản sửa 1.8.38
+
+            - Bảng đơn hủy: thêm nút "Tạo đơn hủy", ô tích chọn từng đơn / chọn tất cả với thao tác hàng loạt (đánh dấu đã nhận, chưa nhận, xóa), thêm cột Màu và Size, bỏ cột Ngày gửi, Hạn xử lý, Trạng thái sàn, Hàng đặt trước.
+            - Trạng thái nhận đổi được bằng tay: chuyển sang Đã nhận thì ghi ngày về kho, chuyển sang Chưa nhận thì xóa ngày về kho.
+            - Đơn hủy quét từ điện thoại mặc định là Đã nhận và có ngày về kho.
+            - Nhập file đơn hủy tách Màu / Size từ cột "Tên phân loại hàng".
+            - Điện thoại: loại mã cần quét mặc định là Tự động.
+
             ### Bản sửa 1.8.37
 
             - Thông báo có thêm tab "⏰ Hạn Xử Lý": liệt kê từng đơn chưa về đã gần hạn hoặc quá hạn, ghi rõ "Sắp đến hạn: còn X giờ" / "Quá hạn N ngày Y giờ", quá hạn lâu nhất lên đầu, có nút Định Vị Đơn (cả bảng chính và bảng đơn hủy).

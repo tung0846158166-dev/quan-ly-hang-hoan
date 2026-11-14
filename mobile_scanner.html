@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.37</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.38</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -604,9 +604,9 @@
     <div class="decode-controls">
       <div class="decode-label">Loại mã cần quét</div>
       <div class="decode-buttons" role="group" aria-label="Loại mã cần quét">
-        <button type="button" id="decodeBarcodeBtn" aria-pressed="true" onclick="setScannerDecodeMode('barcode')">Mã vạch</button>
+        <button type="button" id="decodeBarcodeBtn" aria-pressed="false" onclick="setScannerDecodeMode('barcode')">Mã vạch</button>
         <button type="button" id="decodeQrBtn" aria-pressed="false" onclick="setScannerDecodeMode('qr')">QR</button>
-        <button type="button" id="decodeAutoBtn" aria-pressed="false" onclick="setScannerDecodeMode('auto')">Tự động</button>
+        <button type="button" id="decodeAutoBtn" aria-pressed="true" onclick="setScannerDecodeMode('auto')">Tự động</button>
       </div>
       <div id="decoderModeHint" class="hint-text" role="status">Chỉ đọc mã vạch; hỗ trợ hướng ngang và dọc.</div>
     </div>
@@ -2214,7 +2214,7 @@
     let quaggaDecodeBusy = false;
     let stillDecodeBusy = false;
     const cameraConstraintTasks = new WeakMap();
-    let scannerDecodeMode = 'barcode';
+    let scannerDecodeMode = 'auto';
     let scannerDecodeRevision = 0;
     try {
       const saved = localStorage.getItem('mobile_scanner_decode_mode_v1');

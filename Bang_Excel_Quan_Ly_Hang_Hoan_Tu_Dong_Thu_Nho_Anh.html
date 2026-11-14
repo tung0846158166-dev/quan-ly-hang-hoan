@@ -821,6 +821,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <input id="chkFilterOnly" type="checkbox" onchange="currentPage = 1; renderAll()" class="w-3.5 h-3.5 mr-1 rounded text-orange-600 focus:ring-orange-500" />
           Chỉ hiện khớp
         </label>
+        <button type="button" id="btnClearMainSearch" onclick="clearMainSearch()" title="Xóa từ khóa tìm kiếm" class="ml-2 px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">✕ Xóa</button>
       </div>
 
       <!-- Pipeline Status Tabs (Gộp số đơn, màu sắc rõ nét) -->
@@ -1253,6 +1254,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           </button>
           <button type="button" onclick="setNotifFilterCategory('excel')" id="notifCatBtn_excel" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
             🔄 Cập Nhật Excel (<span id="notifCount_excel">0</span>)
+          </button>
+          <button type="button" onclick="setNotifFilterCategory('deadline')" id="notifCatBtn_deadline" class="px-2.5 py-1 rounded text-xs font-bold bg-orange-100 text-orange-900 border border-orange-400 hover:bg-orange-200 cursor-pointer transition" title="Đơn sắp đến hạn / quá hạn mà chưa về, tính trực tiếp theo thời điểm hiện tại">
+            ⏰ Hạn Xử Lý (<span id="notifCount_deadline">0</span>)
           </button>
           <button type="button" onclick="setNotifFilterCategory('warning')" id="notifCatBtn_warning" class="px-2.5 py-1 rounded text-xs font-bold bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">
             ⚠️ Trùng & Cảnh Báo (<span id="notifCount_warning">0</span>)
@@ -7105,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.36';
+    const APP_VERSION_NUMBER = '1.8.37';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -10201,6 +10205,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         renderAll();
         showToast('🗑 Đã xóa ảnh của đơn hàng này.', 'info');
         return true;
+    }
+
+    function clearMainSearch() {
+      const inp = document.getElementById('searchInput');
+      if (inp) inp.value = '';
+      currentPage = 1;
+      renderAll();
+      if (inp) inp.focus();
     }
 
     function escapeAttr(str) {
@@ -13575,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.36',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.37',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14364,6 +14376,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function openNotificationModal() {
+      try { if (!window._notifOpenedOnce && collectDeadlineItems().length) setNotifFilterCategory('deadline'); } catch (e) {}
+      window._notifOpenedOnce = true;
       unreadNotifCount = 0;
       updateUnreadNotifUI();
       const modal = document.getElementById('notificationModal');
@@ -14388,7 +14402,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function setNotifFilterCategory(cat) {
       currentNotifFilter = cat;
-      ['all', 'phone', 'new_order', 'excel', 'warning'].forEach(c => {
+      ['all', 'phone', 'new_order', 'excel', 'deadline', 'warning'].forEach(c => {
         const btn = document.getElementById('notifCatBtn_' + c);
         if (btn) {
           if (c === cat) {
@@ -14407,6 +14421,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const kw = (document.getElementById('notifSearchInput')?.value || '').trim().toLowerCase();
       const normKw = removeVietnameseTones(kw);
+
+      let deadlineItems = [];
+      try { deadlineItems = collectDeadlineItems(); } catch (e) { deadlineItems = []; }
+      const elDl = document.getElementById('notifCount_deadline');
+      if (elDl) elDl.textContent = deadlineItems.length;
+      if (currentNotifFilter === 'deadline') {
+        renderDeadlinePanel(container, deadlineItems, kw);
+        const cEl = document.getElementById('notifFilteredCountText');
+        if (cEl) cEl.textContent = `Hiển thị ${deadlineItems.length} đơn cần theo dõi hạn`;
+        return;
+      }
 
       let phoneCount = 0;
       let newOrderCount = 0;
@@ -16285,6 +16310,70 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     loadCancelledOrders();
 
+    // ---- v1.8.37: bảng Hạn Xử Lý tính trực tiếp (không phụ thuộc thông báo đã lưu) ----
+    const DEADLINE_DAYS = 3;
+    function formatDuration(ms) {
+      const totalH = Math.floor(Math.abs(ms) / 3600000);
+      const d = Math.floor(totalH / 24), h = totalH % 24;
+      return ((d > 0 ? d + ' ngày ' : '') + (h > 0 || d === 0 ? h + ' giờ' : '')).trim();
+    }
+    function computeDeadlineInfo(returnDateStr, deadlineStr) {
+      let due = null, basis = '';
+      const dl = deadlineStr ? parseFullDate(deadlineStr) : null;
+      if (dl && !isNaN(dl.getTime())) { due = dl.getTime(); basis = 'hạn sàn'; }
+      else {
+        const rd = returnDateStr ? parseFullDate(returnDateStr) : null;
+        if (rd && !isNaN(rd.getTime())) { due = rd.getTime() + DEADLINE_DAYS * 86400000; basis = DEADLINE_DAYS + ' ngày từ ngày hủy/hoàn'; }
+      }
+      if (due == null) return null;
+      const left = due - Date.now();
+      let text;
+      if (left > 0) text = 'Sắp đến hạn: còn ' + formatDuration(left);
+      else if (-left < 3600000) text = 'Đã đến hạn';
+      else text = 'Quá hạn ' + formatDuration(left);
+      return { due, left, text, basis };
+    }
+    function collectDeadlineItems() {
+      const items = [];
+      orders.forEach((o, idx) => {
+        const s = getDeadlineStatus(o);
+        if (s !== 'upcoming' && s !== 'overdue') return;
+        const info = computeDeadlineInfo(o.returnDate, o.deadline);
+        if (!info) return;
+        items.push({ kind: 'main', idx, level: info.left < 0 ? 'overdue' : 'upcoming', info, code: o.track || o.orderId || '', orderId: o.orderId || '', platform: o.platform || '', from: o.returnDate || '' });
+      });
+      cancelledOrders.forEach(o => {
+        if (o.received) return;
+        const info = computeDeadlineInfo(o.returnDate, o.deadline);
+        if (!info || info.left > 24 * 3600000) return;
+        items.push({ kind: 'cancelled', id: o.id, level: info.left < 0 ? 'overdue' : 'upcoming', info, code: o.track || o.orderId || '', orderId: o.orderId || '', platform: o.platform || '', from: o.returnDate || '' });
+      });
+      items.sort((a, b) => a.info.left - b.info.left);
+      return items;
+    }
+    function locateDeadlineItem(kind, ref) {
+      closeNotificationModal();
+      if (kind === 'cancelled') { gotoSearchHit('cancelled', ref); return; }
+      setTimeout(() => { revealNotificationOrderFilters(); highlightAndFlashOrderRow(Number(ref), { source: 'notification' }); }, 100);
+    }
+    function renderDeadlinePanel(container, items, kw) {
+      let noDate = 0, pendingTotal = 0;
+      try { orders.forEach(o => { if (!isOrderReceived(o) && !isOrderUnneeded(o) && o.status !== 'Bị mất') { pendingTotal++; if (!o.returnDate && !o.deadline) noDate++; } }); } catch (e) {}
+      const over = items.filter(i => i.level === 'overdue').length, soon = items.length - over;
+      const list = kw ? items.filter(i => (i.code + ' ' + i.orderId + ' ' + i.platform).toLowerCase().includes(kw)) : items;
+      const summary = `<div class="mb-3 p-3 rounded-lg bg-orange-50 border border-orange-300 text-xs text-orange-950 leading-relaxed"><b>Quy tắc:</b> hạn xử lý = ${DEADLINE_DAYS} ngày kể từ ngày hủy/hoàn (hoặc hạn sàn nếu đơn có ghi sẵn); báo "sắp đến hạn" khi đơn chưa về đã quá 2 ngày.<br><b>Hiện có:</b> 🚨 ${over} đơn quá hạn, ⏰ ${soon} đơn sắp đến hạn${noDate ? ` — ${noDate}/${pendingTotal} đơn chưa về ở bảng chính chưa có ngày hủy/hoàn nên chưa tính được hạn` : ''}.</div>`;
+      if (!list.length) {
+        container.innerHTML = summary + `<div class="py-10 text-center text-slate-400 italic"><span class="text-3xl block mb-2">✅</span>Không có đơn nào sắp đến hạn hoặc quá hạn${kw ? ' khớp từ khóa' : ''}.</div>`;
+        return;
+      }
+      container.innerHTML = summary + list.map(i => {
+        const isOver = i.level === 'overdue';
+        const badge = isOver ? 'bg-rose-100 text-rose-900 border-rose-400' : 'bg-orange-100 text-orange-900 border-orange-400';
+        const target = i.kind === 'cancelled' ? escapeAttr(i.id) : String(i.idx);
+        return `<div class="p-3 mb-2 rounded-lg border ${isOver ? 'border-rose-300 bg-rose-50/60' : 'border-orange-300 bg-orange-50/60'} flex items-center justify-between gap-3"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><span class="px-2 py-0.5 text-[11px] font-extrabold rounded-md border ${badge}">${isOver ? '🚨' : '⏰'} ${escapeAttr(i.info.text)}</span><span class="px-1.5 bg-slate-100 text-slate-800 rounded font-mono text-[11px] font-bold border border-slate-300">${escapeAttr(i.code)}</span>${i.kind === 'cancelled' ? '<span class="px-1.5 bg-rose-900 text-white rounded text-[10px] font-bold">Đơn hủy</span>' : ''}</div><div class="text-[11px] text-slate-600 mt-1">${escapeAttr(i.platform)}${i.orderId && i.orderId !== i.code ? ' | Mã đơn: ' + escapeAttr(i.orderId) : ''}${i.from ? ' | Ngày hủy/hoàn: ' + escapeAttr(i.from) : ''} | Tính hạn theo: ${escapeAttr(i.info.basis)}</div></div><button type="button" onclick="locateDeadlineItem('${i.kind}', '${target}')" class="shrink-0 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold cursor-pointer">🎯 Định Vị Đơn</button></div>`;
+      }).join('');
+    }
+
     // ---- v1.8.36: cảnh báo đơn sắp đến hạn / quá hạn mà chưa về ----
     const DEADLINE_NOTIFIED_KEY = 'deadline_notified_v1';
     function collectDeadlineCandidates() {
@@ -16316,6 +16405,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const fresh = cands.filter(c => c.level === level && (level === 'overdue' ? notified[c.key] !== 'overdue' : !notified[c.key]));
           if (!fresh.length) continue;
           const shown = fresh.slice(0, 5).map(c => c.code).join(', ');
+          try { showAppToast(level === 'upcoming' ? `⏰ ${fresh.length} đơn sắp đến hạn mà chưa về — mở Thông báo ➔ Hạn Xử Lý` : `🚨 ${fresh.length} đơn QUÁ HẠN mà chưa về — mở Thông báo ➔ Hạn Xử Lý`, 'warning', 6000); } catch (e) {}
           addAppNotification({
             type: 'deadline_warning',
             title: level === 'upcoming' ? `⏰ ${fresh.length} đơn sắp đến hạn mà chưa về` : `🚨 ${fresh.length} đơn QUÁ HẠN mà chưa về`,
@@ -16331,6 +16421,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     setTimeout(restoreCancelledPhotosFromDisk, 3000);
     setTimeout(checkDeadlineNotifications, 5000);
     setTimeout(checkDeadlineNotifications, 25000);
+    setTimeout(checkDeadlineNotifications, 90000);
     setInterval(checkDeadlineNotifications, 30 * 60 * 1000);
 
     function escapeArchivedHtml(str) {

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.32
+          name: QuanLyHangHoan-Windows-Installer-v1.8.33
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.32
-          name: "Quản Lý Hàng Hoàn v1.8.32 — thêm Bảng đơn hủy (nhập file, tạo từ điện thoại, đối chiếu quét nhận hàng)"
+          tag_name: v1.8.33
+          name: "Quản Lý Hàng Hoàn v1.8.33 — lịch sử điện thoại tách 3 mục, đẩy đơn mới ra bảng chính, nút dừng camera"
           body: |
+            ### Bản sửa 1.8.33
+
+            - Điện thoại: lịch sử tách riêng 3 mục (quét hoàn kho / tạo đơn mới / tạo đơn hủy), mỗi mục chỉ hiện nút lọc phù hợp (Hợp lệ, Quét trùng, Không có, Chờ nạp PC; đơn hủy không có "Không có"). Xóa lịch sử chỉ xóa đúng mục.
+            - Tạo đơn mới: quét trùng báo "đã có trong Bảng đơn mới"; thêm nút ⬆️ Đẩy ra bảng chính cạnh nút xóa.
+            - Camera: nút ⏸ Dừng / ▶ Tiếp tục để tắt tạm camera, tránh nóng máy.
+
             ### Bản sửa 1.8.32
 
             - Mới: 🚫 BẢNG ĐƠN HỦY riêng (nút trên thanh đầu): nhập file chỉ vào bảng này, có tìm kiếm, lọc, tổng SL/giá trị cuối bảng; không có cột ghi chú người mua, lý do hoàn/hủy, ghi chú của tôi; loại đơn mặc định "Đơn hủy".

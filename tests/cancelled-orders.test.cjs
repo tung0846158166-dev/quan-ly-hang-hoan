@@ -94,5 +94,5 @@ test('điện thoại: có nút Tạo đơn hủy, gửi cờ cancelled, lịch 
   assert.ok(/switchMobileScanMode\('cancel_order'\)/.test(mobile));
   assert.ok(/handleNewOrderScan\(clean, capturedPhoto, currentMobileMode === 'cancel_order'\)/.test(mobile));
   assert.ok(/cancelled: cancelled === true,\s*carrier/.test(mobile));
-  assert.ok(/id="cancelHistoryList"/.test(mobile) && /function renderCancelHistoryPanel/.test(mobile));
+  assert.ok(/function historyEntryKind/.test(mobile));
 });

@@ -6695,7 +6695,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const savedW = localStorage.getItem(SAVED_ACTIVE_WEEK_KEY);
       if (savedW) currentImportWeekFilter = savedW;
     } catch (e) {}
-    let currentMainView = 'both'; // 'orders' | 'summary' | 'both'
+    let currentMainView = 'orders'; // 'orders' | 'summary' | 'both' (mặc định chỉ hiện danh sách đơn; bảng thống kê mở bằng nút ở thanh dưới cùng)
     let customWeekTabs = [];
 
     function getWeekInfo(dateInput) {
@@ -7053,6 +7053,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     window.switchMainView = switchMainView;
+    // Khi mở app: chỉ hiện danh sách đơn hàng, ẩn bảng thống kê Màu & Size
+    switchMainView('orders');
     window.setImportWeekFilter = setImportWeekFilter;
     window.renderWeeklyImportTabs = renderWeeklyImportTabs;
     window.scrollToSummaryTable = scrollToSummaryTable;

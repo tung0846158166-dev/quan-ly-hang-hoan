@@ -93,6 +93,7 @@ jobs:
           body: |
             ### Bản sửa 1.8.29
 
+            - Trang chính mặc định chỉ hiện danh sách đơn hàng; bảng thống kê Màu & Size chỉ hiện khi bấm nút "Xem Bảng Thống Kê Phân Loại" ở thanh dưới cùng (bấm "Bảng Đơn Hàng" để quay lại).
             - Giao diện gọn hơn: các bộ lọc phụ (Loại đơn, Trước/Thường, Mã vận đơn, Ngày, Giờ) gom vào nút "Bộ lọc nâng cao" (thu gọn mặc định, hiện số bộ lọc đang bật).
             - Bỏ thanh tổng bị lặp ở chân bảng; số đơn, SP, đã về, chưa về, không cần nhận, tiền hiện ở một thanh tổng cuối màn hình.
             - Ô tìm kiếm: khi không có đơn khớp trong tuần/sàn/loại đang chọn nhưng có ở mục khác, thanh báo ghi rõ đơn nằm ở sàn/tuần nào và có nút "Xem trong tất cả".

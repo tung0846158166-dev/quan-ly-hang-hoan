@@ -89,7 +89,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v1.8.33
-          name: "Quản Lý Hàng Hoàn v1.8.33 — lịch sử điện thoại tách 3 mục, đẩy đơn mới ra bảng chính, nút dừng camera"
+          name: "Quản Lý Hàng Hoàn v1.8.35 — tìm xuyên kho lưu trữ + bảng đơn hủy, cảnh báo đơn sắp đến hạn"
           body: |
             ### Bản sửa 1.8.33
 

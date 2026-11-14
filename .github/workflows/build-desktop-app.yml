@@ -94,7 +94,7 @@ jobs:
             ### Bản sửa 1.8.37
 
             - Thông báo có thêm tab "⏰ Hạn Xử Lý": liệt kê từng đơn chưa về đã gần hạn hoặc quá hạn, ghi rõ "Sắp đến hạn: còn X giờ" / "Quá hạn N ngày Y giờ", quá hạn lâu nhất lên đầu, có nút Định Vị Đơn (cả bảng chính và bảng đơn hủy).
-          - Mở Thông báo lần đầu sẽ tự vào tab này nếu có đơn cần xử lý; có toast nhắc khi kiểm tra hạn; kiểm tra lại sau khi nạp dữ liệu xong.
+            - Mở Thông báo lần đầu sẽ tự vào tab này nếu có đơn cần xử lý; có toast nhắc khi kiểm tra hạn; kiểm tra lại sau khi nạp dữ liệu xong.
 
             ### Bản sửa 1.8.36
 

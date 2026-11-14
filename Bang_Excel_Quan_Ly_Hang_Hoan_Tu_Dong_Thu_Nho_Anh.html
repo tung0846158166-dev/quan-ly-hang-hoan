@@ -903,8 +903,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     <!-- Row 4: Thanh Bộ Lọc Thuộc Tính, Lọc Ngày Giờ & Phân Trang (Siêu Tinh Gọn, Không Vỡ Dòng) -->
     <div class="px-3 py-1 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-1.5 text-[11px] no-print">
-      <!-- Cụm Dropdown Lọc Thuộc Tính -->
-      <div class="flex items-center gap-1 flex-wrap">
+      <!-- Cụm điều khiển gọn: nút Bộ lọc nâng cao + sắp xếp -->
+      <div class="flex items-center gap-1.5 flex-wrap">
         <!-- Hidden Platform Select (Đã có Segmented Buttons ở Row 2) -->
         <select id="platformFilterSelect" onchange="setPlatformFilter(this.value)" class="hidden">
           <option value="all">Tất cả sàn</option>
@@ -913,7 +913,60 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="Lazada">Lazada</option>
           <option value="Khác">Khác</option>
         </select>
+        <button type="button" id="btnAdvancedFilters" onclick="toggleAdvancedFilters()"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 font-bold text-[11px] cursor-pointer transition"
+                title="Loại đơn, Trước/Thường, Mã vận đơn, Ngày & Giờ">
+          <span>⚙️ Bộ lọc nâng cao</span>
+          <span id="advancedFilterBadge" class="hidden px-1.5 rounded-full bg-amber-500 text-white text-[10px] font-extrabold">0</span>
+          <span id="advancedFilterArrow" class="text-[10px] opacity-70">▾</span>
+        </button>
+        <!-- Sắp xếp ngày & hạn xử lý -->
+        <div class="inline-flex items-center bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
+          <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
+                  title="Sắp xếp đơn hàng"
+                  class="text-[10.5px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer">
+            <option value="default">📅 Xếp ngày: Mặc định (STT)</option>
+            <option value="deadline_desc">🚨 Hạn: Báo Đỏ ➔ Vàng ➔ Trong hạn</option>
+            <option value="deadline_asc">⏳ Hạn: Trong hạn ➔ Báo Đỏ</option>
+            <option value="recvDate_desc">📥 Ngày về kho (Mới ➔ Cũ)</option>
+            <option value="recvDate_asc">📥 Ngày về kho (Cũ ➔ Mới)</option>
+            <option value="returnDate_desc">↩️ Ngày hoàn (Mới ➔ Cũ)</option>
+            <option value="returnDate_asc">↩️ Ngày hoàn (Cũ ➔ Mới)</option>
+            <option value="shipDate_desc">🚚 Ngày gửi đi (Mới ➔ Cũ)</option>
+            <option value="shipDate_asc">🚚 Ngày gửi đi (Cũ ➔ Mới)</option>
+          </select>
+          <label class="ml-1 pl-1 border-l border-slate-200 inline-flex items-center text-[10px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap"
+                 title="Chỉ hiển thị các đơn đã có ngày">
+            <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3 h-3 mr-0.5 rounded text-blue-600" />
+            <span>Có ngày</span>
+          </label>
+        </div>
+      </div>
 
+      <!-- Phân Trang Siêu Mượt Nằm Gọn Bên Phải -->
+      <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
+        <span id="paginationSummaryText" class="text-[10px] font-semibold text-slate-600 hidden xl:inline px-1">0 đơn</span>
+        <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-200 rounded px-1 py-0.2 outline-none cursor-pointer">
+          <option value="30">⚡ 30/trang</option>
+          <option value="50" selected>⚡ 50/trang</option>
+          <option value="100">100/trang</option>
+          <option value="200">200/trang</option>
+          <option value="0">Tất cả</option>
+        </select>
+        <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
+          ◀
+        </button>
+        <span id="pageIndicatorText" class="px-1.5 py-0.2 rounded bg-slate-800 text-white font-bold text-[10px] whitespace-nowrap">
+          1 / 1
+        </span>
+        <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
+          ▶
+        </button>
+      </div>
+    </div>
+
+    <!-- Bảng Bộ Lọc Nâng Cao (mặc định thu gọn; tự hiện số bộ lọc đang bật trên nút) -->
+    <div id="advancedFilterPanel" class="hidden px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-2 text-[11px] no-print">
         <!-- Lọc Loại đơn -->
         <select id="orderTypeFilterSelect" onchange="setOrderTypeFilter(this.value)"
                 title="Lọc theo Loại đơn (Giao không thành công | Trả hàng/Hoàn tiền | Đơn hủy | THẤT THU)"
@@ -943,32 +996,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="has_track">✅ Có mã vận đơn</option>
           <option value="no_track">❌ Không có MVĐ</option>
         </select>
-      </div>
-
-      <!-- Cụm Sắp Xếp & Lọc Ngày Giờ Đa Năng (Compact) -->
-      <div class="flex items-center gap-1 flex-wrap">
-        <!-- Sắp xếp ngày & hạn xử lý -->
-        <div class="inline-flex items-center bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
-          <select id="dateSortSelect" onchange="setDateSortFromDropdown(this.value)"
-                  title="Sắp xếp đơn hàng"
-                  class="text-[10.5px] font-bold text-slate-800 bg-transparent outline-none cursor-pointer">
-            <option value="default">📅 Xếp ngày: Mặc định (STT)</option>
-            <option value="deadline_desc">🚨 Hạn: Báo Đỏ ➔ Vàng ➔ Trong hạn</option>
-            <option value="deadline_asc">⏳ Hạn: Trong hạn ➔ Báo Đỏ</option>
-            <option value="recvDate_desc">📥 Ngày về kho (Mới ➔ Cũ)</option>
-            <option value="recvDate_asc">📥 Ngày về kho (Cũ ➔ Mới)</option>
-            <option value="returnDate_desc">↩️ Ngày hoàn (Mới ➔ Cũ)</option>
-            <option value="returnDate_asc">↩️ Ngày hoàn (Cũ ➔ Mới)</option>
-            <option value="shipDate_desc">🚚 Ngày gửi đi (Mới ➔ Cũ)</option>
-            <option value="shipDate_asc">🚚 Ngày gửi đi (Cũ ➔ Mới)</option>
-          </select>
-          <label class="ml-1 pl-1 border-l border-slate-200 inline-flex items-center text-[10px] font-semibold text-slate-600 cursor-pointer select-none whitespace-nowrap"
-                 title="Chỉ hiển thị các đơn đã có ngày">
-            <input id="chkOnlyWithDate" type="checkbox" onchange="renderAll()" class="w-3 h-3 mr-0.5 rounded text-blue-600" />
-            <span>Có ngày</span>
-          </label>
-        </div>
-
         <!-- Bộ Lọc Ngày & Giờ Thu Gọn -->
         <div class="inline-flex items-center bg-slate-50 border border-slate-300 rounded-md p-0.5 gap-0.5 shadow-2xs">
           <select id="dateFilterTypeSelect" onchange="setDateFilterType(this.value)"
@@ -1003,28 +1030,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             ✕
           </button>
         </div>
-      </div>
-
-      <!-- Phân Trang Siêu Mượt Nằm Gọn Bên Phải -->
-      <div id="tablePaginationBar" class="inline-flex items-center gap-1 bg-slate-50 border border-slate-300 rounded-md px-1 py-0.5">
-        <span id="paginationSummaryText" class="text-[10px] font-semibold text-slate-600 hidden xl:inline px-1">0 đơn</span>
-        <select id="pageSizeSelect" onchange="changePageSize(this.value)" class="text-[10px] font-bold text-emerald-800 bg-white border border-emerald-200 rounded px-1 py-0.2 outline-none cursor-pointer">
-          <option value="30">⚡ 30/trang</option>
-          <option value="50" selected>⚡ 50/trang</option>
-          <option value="100">100/trang</option>
-          <option value="200">200/trang</option>
-          <option value="0">Tất cả</option>
-        </select>
-        <button type="button" id="btnPrevPage" onclick="changeTablePage(-1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
-          ◀
-        </button>
-        <span id="pageIndicatorText" class="px-1.5 py-0.2 rounded bg-slate-800 text-white font-bold text-[10px] whitespace-nowrap">
-          1 / 1
-        </span>
-        <button type="button" id="btnNextPage" onclick="changeTablePage(1)" class="px-1.5 py-0.2 rounded bg-white hover:bg-slate-200 font-bold text-slate-700 disabled:opacity-35 disabled:pointer-events-none cursor-pointer transition text-xs">
-          ▶
-        </button>
-      </div>
     </div>
 
     <!-- Main Spreadsheet Table (Một đơn một dòng tổng - Siêu mượt, không bao giờ đơ) -->
@@ -1073,34 +1078,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="text-center font-black text-sm py-2 bg-slate-900 text-amber-400 select-none">Σ</td>
             <td class="text-center font-black text-[11px] py-2 bg-slate-900 text-amber-300 select-none" title="Tổng số đơn hàng đang hiển thị"><span id="footOrderCount">0</span></td>
             <td colspan="13" class="py-2.5 px-3 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-t-2 border-slate-700">
-              <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
-                <div class="flex items-center flex-wrap gap-2">
-                  <span class="font-black uppercase tracking-wider text-slate-900 flex items-center gap-1">
-                    <span>📊</span>
-                    <span>TỔNG CỘNG:</span>
-                  </span>
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-800 text-white font-black text-xs shadow-xs font-mono">
-                    <span id="footDisplayOrders">0</span>&nbsp;đơn
-                  </span>
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-indigo-700 text-white font-black text-xs shadow-xs font-mono">
-                    SL:&nbsp;<span id="footDisplayQty">0</span>&nbsp;SP
-                  </span>
-                  <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-rose-700 text-white font-black text-xs shadow-xs font-mono">
-                    Tiền:&nbsp;<span id="footDisplayPrice">0 đ</span>
-                  </span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-extrabold text-[11px] border border-emerald-300 font-mono">
-                    🟢 Đã về:&nbsp;<span id="footDisplayReturned">0</span>
-                  </span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold text-[11px] border border-amber-300 font-mono">
-                    🟠 Chưa về:&nbsp;<span id="footDisplayUnreturned">0</span>
-                  </span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded bg-slate-200 text-slate-800 font-bold text-[11px] border border-slate-300 font-mono">
-                    ⚪ K.cần nhận:&nbsp;<span id="footDisplayUnneeded">0</span>
-                  </span>
-                </div>
-                <span class="text-[11px] text-slate-500 italic hidden xl:inline">
-                  (Chi tiết cột Tổng SL &amp; Tổng Tiền ở bên phải ➔)
-                </span>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="font-black uppercase tracking-wider text-slate-900">📊 TỔNG CỘNG (đang lọc)</span>
+                <span class="text-[11px] text-slate-500 hidden xl:inline">Số đơn · SP · tiền · đã về / chưa về: xem thanh tổng ở cuối màn hình</span>
               </div>
             </td>
             <td id="footTotalQty" class="text-center font-black text-sm py-2 px-1 text-indigo-950 bg-indigo-100/90 border border-indigo-300 font-mono" title="Tổng số lượng sản phẩm">0</td>
@@ -1222,12 +1202,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <div id="stickyBottomDock" class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-md text-white px-4 py-2 border-t-2 border-teal-500 shadow-2xl flex flex-wrap items-center justify-between gap-2.5 text-xs no-print transition-transform duration-300">
       <div class="flex flex-wrap items-center gap-2">
         <span class="font-extrabold text-teal-400 flex items-center gap-1 uppercase tracking-wide">
-          <span>📊 TỔNG KẾT TỨC THÌ:</span>
+          <span>📊 TỔNG (đang lọc):</span>
         </span>
         <span id="dockOrdersBadge" class="bg-slate-800 border border-slate-700 px-2 py-0.5 rounded font-mono font-bold text-white">0 đơn</span>
         <span id="dockQtyBadge" class="bg-indigo-900 border border-indigo-600 px-2 py-0.5 rounded font-mono font-bold text-indigo-100">0 SP</span>
         <span id="dockReturnedBadge" class="bg-emerald-950 border border-emerald-600 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">🟢 Đã về: 0</span>
         <span id="dockUnreturnedBadge" class="bg-amber-950 border border-amber-600 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">🟠 Chưa về: 0</span>
+        <span id="dockUnneededBadge" class="bg-slate-800 border border-slate-600 text-slate-300 px-2 py-0.5 rounded font-mono font-bold">⚪ K.cần nhận: 0</span>
         <span id="dockPriceBadge" class="bg-rose-950 border border-rose-600 text-rose-300 px-2 py-0.5 rounded font-mono font-bold">0 đ</span>
       </div>
       <div class="flex items-center gap-2">
@@ -7084,7 +7065,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.28';
+    const APP_VERSION_NUMBER = '1.8.29';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -11605,6 +11586,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       showAppToast(`Đã cập nhật hạn xử lý Đơn #${orderIdx + 1}${newVal ? `: ${newVal}` : ' (đã xóa)'}`, 'success');
     }
 
+    // ===== Bộ lọc nâng cao thu gọn (v1.8.29) =====
+    function toggleAdvancedFilters(forceOpen) {
+      const panel = document.getElementById('advancedFilterPanel');
+      if (!panel) return;
+      const open = typeof forceOpen === 'boolean' ? forceOpen : panel.classList.contains('hidden');
+      panel.classList.toggle('hidden', !open);
+      const arrow = document.getElementById('advancedFilterArrow');
+      if (arrow) arrow.textContent = open ? '▴' : '▾';
+    }
+
+    function countActiveAdvancedFilters() {
+      const val = (id) => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+      let n = 0;
+      if (typeof currentOrderTypeFilter !== 'undefined' && currentOrderTypeFilter !== 'all') n++;
+      if (typeof currentPreOrderFilter !== 'undefined' && currentPreOrderFilter !== 'all') n++;
+      if (typeof currentTrackingFilter !== 'undefined' && currentTrackingFilter !== 'all') n++;
+      if (val('filterDateFrom') || val('filterDateTo')) n++;
+      if (val('filterTimeFrom') || val('filterTimeTo')) n++;
+      const quick = val('recvDateFilterSelect');
+      if (quick && quick !== 'all') n++;
+      const onlyDate = document.getElementById('chkOnlyWithDate');
+      if (onlyDate && onlyDate.checked) n++;
+      return n;
+    }
+
+    function updateAdvancedFilterBadge() {
+      const badge = document.getElementById('advancedFilterBadge');
+      if (!badge) return;
+      const n = countActiveAdvancedFilters();
+      badge.textContent = String(n);
+      badge.classList.toggle('hidden', n === 0);
+    }
+
+    // Bỏ lọc tuần / sàn / loại đơn để thấy đơn đang tìm (dùng từ banner tìm kiếm)
+    function clearScopeFiltersForSearch() {
+      if (typeof setImportWeekFilter === 'function') setImportWeekFilter('all');
+      if (typeof setPlatformFilter === 'function') setPlatformFilter('all');
+      if (typeof setOrderTypeFilter === 'function') setOrderTypeFilter('all');
+      if (typeof setPreOrderFilter === 'function') setPreOrderFilter('all');
+      if (typeof setTrackingFilter === 'function') setTrackingFilter('all');
+      const sel = ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect'];
+      sel.forEach(id => { const el = document.getElementById(id); if (el) el.value = 'all'; });
+    }
+
     function recalcTotalsAndSummary(skipDomRebuildIfTyping = false) {
       updatePlatformSwitcherUI();
       const kw = document.getElementById('searchInput').value.trim();
@@ -11850,27 +11875,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
 
       // Cập nhật dòng TỔNG CỘNG ở chân bảng dữ liệu
-      const elFootDisplayOrders = document.getElementById('footDisplayOrders');
-      if (elFootDisplayOrders) elFootDisplayOrders.textContent = activeCount;
       const elFootOrderCount = document.getElementById('footOrderCount');
       if (elFootOrderCount) elFootOrderCount.textContent = activeCount;
 
-      const elFootDisplayQty = document.getElementById('footDisplayQty');
-      if (elFootDisplayQty) elFootDisplayQty.textContent = activeQty;
       const elFootTotalQty = document.getElementById('footTotalQty');
       if (elFootTotalQty) elFootTotalQty.textContent = activeQty;
 
-      const elFootDisplayPrice = document.getElementById('footDisplayPrice');
-      if (elFootDisplayPrice) elFootDisplayPrice.textContent = formatMoney(activePrice);
       const elFootTotalPrice = document.getElementById('footTotalPrice');
       if (elFootTotalPrice) elFootTotalPrice.textContent = formatMoney(activePrice);
 
-      const elFootDisplayReturned = document.getElementById('footDisplayReturned');
-      if (elFootDisplayReturned) elFootDisplayReturned.textContent = activeRetQty;
-      const elFootDisplayUnreturned = document.getElementById('footDisplayUnreturned');
-      if (elFootDisplayUnreturned) elFootDisplayUnreturned.textContent = activeUnretQty;
-      const elFootDisplayUnneeded = document.getElementById('footDisplayUnneeded');
-      if (elFootDisplayUnneeded) elFootDisplayUnneeded.textContent = activeUnneededQty;
       const elFootReturnedSummary = document.getElementById('footReturnedSummary');
       if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${activeRetQty}`;
 
@@ -11883,6 +11896,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (dockRet) dockRet.textContent = `🟢 Đã về: ${activeRetQty}`;
       const dockUnret = document.getElementById('dockUnreturnedBadge');
       if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${activeUnretQty}`;
+      const dockUnneeded = document.getElementById('dockUnneededBadge');
+      if (dockUnneeded) dockUnneeded.textContent = `⚪ K.cần nhận: ${activeUnneededQty}`;
       const dockP = document.getElementById('dockPriceBadge');
       if (dockP) dockP.textContent = formatMoney(activePrice);
 
@@ -11890,6 +11905,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (viewOrdBadge) viewOrdBadge.textContent = `${activeCount} đơn`;
 
       renderWeeklyImportTabs();
+      if (typeof updateAdvancedFilterBadge === 'function') updateAdvancedFilterBadge();
 
       const previewEl = document.getElementById('searchPreviewBar');
       if (!previewEl) return;
@@ -11898,7 +11914,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         previewEl.innerHTML = '';
       } else if (matchCount === 0) {
         previewEl.classList.remove('hidden');
-        previewEl.innerHTML = `⚠️ Không tìm thấy đơn hàng nào khớp với từ khóa: <b>"${escapeAttr(kw)}"</b>`;
+        let elsewhere = [];
+        try { elsewhere = orders.filter(o => isOrderMatch(o, kw)); } catch (e) { elsewhere = []; }
+        if (elsewhere.length > 0) {
+          const o1 = elsewhere[0];
+          let weekLabel = '';
+          try { weekLabel = getWeekInfo(o1.importedAt || Date.now()).label; } catch (e) { weekLabel = ''; }
+          const plat = (typeof getOrderPlatform === 'function') ? getOrderPlatform(o1) : '';
+          previewEl.innerHTML = `⚠️ Không có đơn khớp <b>"${escapeAttr(kw)}"</b> trong bộ lọc hiện tại (tuần / sàn / loại đơn đang chọn). Nhưng có <b>${elsewhere.length} đơn</b> khớp ở mục khác — đơn đầu: <b>${escapeAttr(o1.orderId || o1.track || '')}</b>${plat ? ' | ' + escapeAttr(plat) : ''}${weekLabel ? ' | ' + escapeAttr(weekLabel) : ''}. <button type="button" onclick="clearScopeFiltersForSearch()" class="ml-1 px-2 py-0.5 rounded bg-amber-600 text-white font-bold cursor-pointer">Xem trong tất cả</button>`;
+        } else {
+          previewEl.innerHTML = `⚠️ Không tìm thấy đơn hàng nào khớp với từ khóa: <b>"${escapeAttr(kw)}"</b>`;
+        }
       } else {
         previewEl.classList.remove('hidden');
         const spSummary = (firstMatch.items || []).map(it => `${it.product || ''} ${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join('; ');
@@ -13438,7 +13464,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.28',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.29',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

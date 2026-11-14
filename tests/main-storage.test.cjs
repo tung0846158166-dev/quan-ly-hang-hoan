@@ -16,7 +16,7 @@ function harness(t, overrides = {}) {
     quit() { this.quitCalls++; this.emit('before-quit', { preventDefault() {} }); } });
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../main.js'), 'utf8'), {
     require(name) {
-      if (name === 'electron') return { app, ipcMain: { handle: (key, fn) => handlers.set(key, fn) } };
+      if (name === 'electron') return { app, ipcMain: { handle: (key, fn) => handlers.set(key, fn), on: () => {} } };
       if (name === 'fs') return { ...fs, promises: { ...fs.promises, ...overrides } };
       return require(name);
     }, __dirname: path.join(__dirname, '..'), process: { argv: [] }, console, Buffer

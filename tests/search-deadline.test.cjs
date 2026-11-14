@@ -17,6 +17,7 @@ function makeCtx(extra = {}) {
   const ctx = vm.createContext(Object.assign({
     localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
     document: { getElementById: () => null },
+    window: {}, setTimeout: () => 0, savePhotoToDb: async () => true, photoMemoryCache: new Map(),
     console, Date, JSON, getNowDateTimeString: () => '15/11/2026 08:00', showAppToast() {}, formatMoney: n => String(n),
     escapeAttr: s => String(s == null ? '' : s).replace(/'/g, '&#39;').replace(/"/g, '&quot;'),
     removeVietnameseTones: s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd'),

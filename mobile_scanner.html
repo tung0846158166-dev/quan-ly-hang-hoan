@@ -546,7 +546,7 @@
   <div class="app-header">
     <div>
       <div class="header-title">📱 MÁY QUÉT ĐƠN HÀNG HOÀN</div>
-      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.33</div>
+      <div class="header-sub">Quét Mã Vạch 1D &amp; QR Code Siêu Tốc • v1.8.34</div>
     </div>
     <div id="connBadge" class="conn-pill conn-waiting">Đang kết nối...</div>
   </div>
@@ -1684,7 +1684,7 @@
 
     function handleNewOrderScan(clean, capturedPhoto, cancelled = false) {
       const now = Date.now();
-      if (cancelled) capturedPhoto = '';
+      if (!cancelled) capturedPhoto = ''; // Tạo đơn mới không cần ảnh (ảnh nằm ở bước quét hoàn kho); đơn hủy vẫn gửi ảnh để đối chiếu mã đơn hàng
       const noteInput = document.getElementById('newOrderNoteInput');
       const customNote = noteInput ? noteInput.value.trim() : '';
 
@@ -2576,7 +2576,7 @@
     }
 
     // =========================================================================
-    // v1.8.33: ĐỌC TEM KHÓ — nghiêng, mờ, nhạt (chạy ở lượt "sâu", không chạy mọi khung hình)
+    // v1.8.34: ĐỌC TEM KHÓ — nghiêng, mờ, nhạt (chạy ở lượt "sâu", không chạy mọi khung hình)
     // - findBarcodeOrientations: tìm vùng có nhiều vạch song song và hướng vuông góc với vạch (tem xoay bất kỳ góc).
     // - sampleScanLine: lấy một dòng điểm ảnh theo hướng đó (nội suy), rồi giải mã như dòng ngang thường.
     // - stretchLine / sharpenLine: kéo giãn độ tương phản (tem in nhạt) và làm nét (ảnh mờ).
@@ -3501,7 +3501,7 @@
       finally { stillDecodeBusy = false; e.target.value = ''; }
     }
 
-    // v1.8.33: iPhone Safari không có BarcodeDetector → nạp ZXing (WASM) làm bộ đọc. Chỉ bật khi tự kiểm tra chạy được;
+    // v1.8.34: iPhone Safari không có BarcodeDetector → nạp ZXing (WASM) làm bộ đọc. Chỉ bật khi tự kiểm tra chạy được;
     // lỗi/chậm thì gỡ bỏ và vẫn dùng bộ đọc JS + Quagga như trước.
     async function loadZxingPolyfillIfNeeded() {
       if ('BarcodeDetector' in window) return;

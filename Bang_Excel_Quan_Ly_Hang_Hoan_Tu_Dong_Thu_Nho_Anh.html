@@ -1101,6 +1101,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="summaryPlatformTitleBadge" class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-white text-teal-900 shadow-2xs">
             🌐 CẢ 2 SÀN
           </span>
+          <span id="summaryArchivedNote" class="hidden px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-300 text-amber-950 shadow-2xs" title="Bảng này đã cộng cả các đơn nằm trong Kho Lưu Trữ"></span>
         </div>
         <div class="flex items-center gap-1 text-[11px] no-print">
           <span class="text-teal-100 font-semibold mr-1">Xem tồn kho theo sàn:</span>
@@ -11650,7 +11651,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const productMap = new Map();
 
-      orders.forEach((order, idx) => {
+      // Bảng thống kê theo sản phẩm tính cả đơn đã chuyển về Kho Lưu Trữ (không đưa vào kết quả tìm kiếm / bảng đơn chính)
+      let archivedForSummary = [];
+      try { archivedForSummary = Array.isArray(archivedOrders) ? archivedOrders : []; } catch (e) { archivedForSummary = []; }
+      let archivedUsedCount = 0;
+
+      const processSummaryOrder = (order, idx, archived) => {
         // Khi đang lọc theo sàn (Shopee / TikTok...) hoặc Loại đơn, các thẻ thống kê & bảng kế toán tính theo bộ lọc đang chọn!
         if (currentImportWeekFilter !== 'all' && getOrderImportWeek(order) !== currentImportWeekFilter) return;
         if (currentPlatformFilter !== 'all' && getOrderPlatform(order) !== currentPlatformFilter) {
@@ -11678,6 +11684,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
 
 
+        if (archived) archivedUsedCount++;
         const p = Number(order.price) || 0;
         totalPrice += p;
 
@@ -11685,7 +11692,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           lostVal += p;
         }
 
-        if (kw && isOrderMatch(order, kw)) {
+        if (!archived && kw && isOrderMatch(order, kw)) {
           matchCount++;
           if (!firstMatch) {
             firstMatch = order;
@@ -11765,7 +11772,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
           }
         });
-      });
+      };
+      orders.forEach((order, idx) => processSummaryOrder(order, idx, false));
+      archivedForSummary.forEach((order, i) => processSummaryOrder(order, 'a' + i, true));
+      const elArchNote = document.getElementById('summaryArchivedNote');
+      if (elArchNote) {
+        elArchNote.textContent = archivedUsedCount > 0 ? `+ ${archivedUsedCount} đơn đã lưu trữ` : '';
+        elArchNote.classList.toggle('hidden', archivedUsedCount === 0);
+      }
 
       document.getElementById('kpiTotalQty').textContent = `${totalQty} SP`;
       document.getElementById('kpiReturnedQty').textContent = `${returnedQty} SP`;

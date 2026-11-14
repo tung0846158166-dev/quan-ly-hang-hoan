@@ -58,3 +58,9 @@ test('mở app mặc định chỉ hiện danh sách đơn, bảng thống kê m
   assert.ok(/onclick="switchMainView\('summary'\); scrollToSummaryTable\(\);"/.test(html));
   assert.ok(/onclick="switchMainView\('orders'\); scrollToMainTable\(\);"/.test(html));
 });
+
+test('bảng thống kê theo sản phẩm cộng cả đơn lưu trữ nhưng tìm kiếm chỉ đếm đơn chính', () => {
+  assert.ok(/archivedForSummary\.forEach\(\(order, i\) => processSummaryOrder\(order, 'a' \+ i, true\)\)/.test(html));
+  assert.ok(/if \(!archived && kw && isOrderMatch\(order, kw\)\)/.test(html));
+  assert.ok(/id="summaryArchivedNote"/.test(html));
+});

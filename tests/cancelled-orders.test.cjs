@@ -50,6 +50,10 @@ test('điện thoại tạo đơn hủy: vào bảng, quét trùng chỉ nhận 
 test('quét nhận hàng đối chiếu bảng đơn hủy: lần đầu nhận, lần sau báo trùng, cùng requestId gửi lại đúng ack cũ', () => {
   const ctx = makeCtx();
   vm.runInContext("handleCancelledOrderScan({ code: 'TT999', requestId: 'c1', room: 'A', cancelled: true })", ctx);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].received', ctx), true, 'đơn hủy quét từ điện thoại mặc định đã nhận');
+  assert.ok(vm.runInContext('cancelledOrders[0].recvDate', ctx), 'có thời gian về kho');
+  vm.runInContext("setCancelledReceived(cancelledOrders[0].id, false)", ctx);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].recvDate', ctx), '', 'chuyển chưa nhận thì xóa ngày về kho');
   ctx.acks.length = 0;
   assert.strictEqual(vm.runInContext("confirmCancelledReceipt('tt999', { requestId: 'q1', room: 'A' }, false)", ctx), true);
   assert.strictEqual(ctx.acks[0][3], 'success');
@@ -123,4 +127,41 @@ test('điện thoại: đơn hủy giữ ảnh, đơn mới bỏ ảnh; PC có c
   assert.ok(/if \(!cancelled\) capturedPhoto = ''/.test(mobile));
   assert.ok(/Ảnh đơn hàng<\/th>/.test(html.match(/<div id="cancelledOrdersModal"[\s\S]*?<tbody id="cancelledTableBody">/)[0]));
   assert.ok(/findCancelledByPhotoRequest\(capture\)/.test(html));
+});
+
+test('v1.8.38: tạo tay, đổi nhận/chưa nhận (xóa/ghi ngày về), chọn nhiều thao tác hàng loạt', () => {
+  const ctx = makeCtx();
+  ctx.filteredCancelledOrders = [];
+  ctx.renderCancelledTable = () => {}; ctx.applyCancelledFilters = () => {};
+  ctx.appConfirm = async () => true;
+  ctx.vals = { ccCode: 'spx777', ccProduct: 'Áo', ccColor: 'Đen', ccSize: 'M', ccQty: '2', ccPlatform: 'auto' };
+  ctx.document.getElementById = id => ({ value: ctx.vals[id] || '', checked: false, classList: { toggle() {}, add() {}, remove() {}, contains: () => true }, textContent: '' });
+  assert.strictEqual(vm.runInContext('submitCancelledCreateForm()', ctx), true);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].source', ctx), 'manual');
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].received', ctx), false);
+  assert.strictEqual(vm.runInContext("cancelledOrders[0].items[0].size", ctx), 'M');
+  // trùng mã không tạo thêm
+  assert.strictEqual(vm.runInContext('submitCancelledCreateForm()', ctx), false);
+  assert.strictEqual(vm.runInContext('cancelledOrders.length', ctx), 1);
+  vm.runInContext("setCancelledReceived(cancelledOrders[0].id, true)", ctx);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].recvDate', ctx), '15/11/2026 08:00');
+  vm.runInContext("setCancelledReceived(cancelledOrders[0].id, false)", ctx);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].recvDate', ctx), '');
+  vm.runInContext("selectedCancelledIds.add(cancelledOrders[0].id); bulkSetCancelledReceived(true)", ctx);
+  assert.strictEqual(vm.runInContext('cancelledOrders[0].received', ctx), true);
+});
+
+test('v1.8.38: tách màu/size từ "Tên phân loại hàng" khi nhập file', () => {
+  const ctx = makeCtx();
+  ctx.rows = [{ 'Mã đơn hàng': 'X1', 'Tên sản phẩm': 'Áo', 'Tên phân loại hàng': 'Xanh Nâu,L - Premium Cao Cấp', 'Số lượng': '1' }];
+  const it = vm.runInContext('mapCancelledRows(rows)[0].items[0]', ctx);
+  assert.strictEqual(it.color, 'Xanh Nâu');
+  assert.strictEqual(it.size, 'L');
+});
+
+test('v1.8.38: bảng đơn hủy bỏ 4 cột, có checkbox, màu, size, nút tạo; điện thoại mặc định Tự động', () => {
+  const m = html.match(/<div id="cancelledOrdersModal"[\s\S]*?<tbody id="cancelledTableBody">/)[0];
+  assert.ok(!/Ngày gửi|Hạn xử lý|Trạng thái sàn|Hàng đặt trước/.test(m));
+  assert.ok(/cancelledSelectAll/.test(m) && />Màu</.test(m) && />Size</.test(m) && /openCancelledCreateForm/.test(m));
+  assert.match(mobile, /let scannerDecodeMode = 'auto';/);
 });

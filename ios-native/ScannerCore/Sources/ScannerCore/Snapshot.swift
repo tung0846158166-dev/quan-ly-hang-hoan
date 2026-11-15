@@ -13,9 +13,18 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var rd: String     // ngày hủy/hoàn (chuỗi từ PC)
     public var due: Int       // hạn xử lý, ms epoch; 0 = chưa tính được
     public var st: String
+    public var ty: String = ""      // loại đơn (Giao không thành công / Trả hàng/Hoàn tiền / Đơn hủy / THẤT THU)
+    public var pre: Bool = false    // hàng đặt trước
+    public var pd: Bool = true      // còn chờ nhận hoàn (bản PC cũ không gửi trường này nên mặc định là chờ)
+    public var rv: Bool = false     // đã nhận hoàn kho
+    public var wl: Bool = false     // đang theo dõi
+    public var wr: String = ""      // lý do/ghi chú theo dõi
+    public var nt: String = ""      // ghi chú đơn
 
     public var id: String { k + "|" + c }
-    public var isCancelled: Bool { k == "c" }
+    /// Thuộc nhóm đơn hủy: nằm trong bảng đơn hủy, hoặc ở bảng chính nhưng loại đơn là "Đơn hủy".
+    public var isCancelled: Bool { k == "c" || ty == "Đơn hủy" }
+    public var isArchived: Bool { k == "a" }
 }
 
 public struct SnapshotPayload: Codable, Equatable {
@@ -33,6 +42,16 @@ private extension KeyedDecodingContainer {
         if let b = try? decode(Bool.self, forKey: key) { return b ? "true" : "false" }
         return ""
     }
+    func flexBool(_ key: Key, default def: Bool) -> Bool {
+        if let b = try? decode(Bool.self, forKey: key) { return b }
+        if let i = try? decode(Int.self, forKey: key) { return i != 0 }
+        if let s = try? decode(String.self, forKey: key) {
+            let t = s.lowercased()
+            if ["1", "true", "yes"].contains(t) { return true }
+            if ["0", "false", "no", ""].contains(t) { return false }
+        }
+        return def
+    }
     func flexInt(_ key: Key, default def: Int = 0) -> Int {
         if let i = try? decode(Int.self, forKey: key) { return i }
         if let d = try? decode(Double.self, forKey: key), d.isFinite, abs(d) < 9e18 { return Int(d) }
@@ -41,7 +60,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt }
 private enum PayloadKeys: String, CodingKey { case time, count, rows }
 
 extension OrderRow {
@@ -49,7 +68,9 @@ extension OrderRow {
         let c = try decoder.container(keyedBy: RowKeys.self)
         self.init(k: c.flexString(.k), c: c.flexString(.c), o: c.flexString(.o), p: c.flexString(.p), n: c.flexString(.n),
                   co: c.flexString(.co), sz: c.flexString(.sz), q: c.flexInt(.q, default: 1), rd: c.flexString(.rd),
-                  due: c.flexInt(.due), st: c.flexString(.st))
+                  due: c.flexInt(.due), st: c.flexString(.st),
+                  ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
+                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt))
     }
 }
 

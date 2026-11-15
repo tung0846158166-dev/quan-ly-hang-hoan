@@ -5,6 +5,9 @@ struct SettingsView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
     @State private var roomText = ""
+    @AppStorage("soundOn") private var soundOn = true
+    @AppStorage("hapticOn") private var hapticOn = true
+    @AppStorage("sendPhoto") private var sendPhoto = true
 
     var body: some View {
         NavigationStack {
@@ -27,8 +30,13 @@ struct SettingsView: View {
                     LabeledContent("Thông báo quá hạn", value: store.notificationsAllowed ? "Đã bật" : "Chưa bật")
                     if !store.notificationsAllowed { Button("Bật thông báo đơn sắp đến hạn") { store.requestNotificationPermission() } }
                 }
+                Section("Tùy chọn quét") {
+                    Toggle("Âm thanh khi có kết quả", isOn: $soundOn)
+                    Toggle("Rung khi quét", isOn: $hapticOn)
+                    Toggle("Gửi kèm ảnh khi quét hoàn kho", isOn: $sendPhoto)
+                }
                 Section("Giới thiệu") {
-                    LabeledContent("Phiên bản", value: "0.3.0 (app gốc)")
+                    LabeledContent("Phiên bản", value: (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") + " (app gốc)")
                 }
             }
             .navigationTitle("Cài đặt")

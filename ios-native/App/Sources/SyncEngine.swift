@@ -49,6 +49,22 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Tuỳ chọn bật/tắt trong Cài đặt (mặc định bật).
+    static func pref(_ key: String) -> Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+
+    /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
+    func resend(_ requestId: String) {
+        guard let it = items.first(where: { $0.requestId == requestId }) else { return }
+        transmit(requestId)
+        if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired { transmitPhoto(requestId) }
+        banner = Banner(code: it.code, text: "ĐÃ GỬI LẠI, CHỜ PC", color: .orange)
+    }
+
+    /// Các mã đã quét hoàn kho thành công trên điện thoại (dùng để đánh dấu trong danh sách đơn).
+    var scannedReturnCodes: Set<String> {
+        Set(items.filter { $0.kind == .returnScan && $0.scanConfirmed && ($0.status == .success || $0.status == .duplicate) }.map { $0.code.uppercased() })
+    }
+
     var mqttConnected: Bool { !brokerUp.isEmpty }
     var channelUp: Bool { sseConnected || mqttConnected }
     var pendingCount: Int { items.filter { !$0.isSettled }.count }
@@ -224,10 +240,17 @@ final class SyncEngine: ObservableObject {
         let d = describe(it)
         banner = Banner(code: it.code, text: d.0, color: d.1)
         let gen = UINotificationFeedbackGenerator()
+        let haptic = Self.pref("hapticOn"), sound = Self.pref("soundOn")
         switch it.status {
-        case .success: gen.notificationOccurred(.success); AudioServicesPlaySystemSound(1057)
-        case .duplicate: gen.notificationOccurred(.warning); AudioServicesPlaySystemSound(1053)
-        default: gen.notificationOccurred(.error); AudioServicesPlaySystemSound(1053)
+        case .success:
+            if haptic { gen.notificationOccurred(.success) }
+            if sound { AudioServicesPlaySystemSound(1057) }
+        case .duplicate:
+            if haptic { gen.notificationOccurred(.warning) }
+            if sound { AudioServicesPlaySystemSound(1053) }
+        default:
+            if haptic { gen.notificationOccurred(.error) }
+            if sound { AudioServicesPlaySystemSound(1053) }
         }
     }
 
@@ -257,7 +280,7 @@ final class SyncEngine: ObservableObject {
         seq += 1
         let rid = "\(sessionId)-\(seq)-\(nowMs() % 100000)"
         var photoData = photo
-        if kind != .newOrder && photoData == nil && useSnapshot { photoData = snapshotProvider?() }
+        if kind != .newOrder && photoData == nil && useSnapshot && Self.pref("sendPhoto") { photoData = snapshotProvider?() }
         if kind == .newOrder { photoData = nil }  // đơn mới không cần ảnh; ảnh nằm ở bước quét hoàn kho
         var file: String? = nil
         if let d = photoData {
@@ -269,7 +292,7 @@ final class SyncEngine: ObservableObject {
         trimHistory()
         persist()
         banner = Banner(code: code, text: "ĐANG CHỜ PC XÁC NHẬN", color: .orange, sub: localHint(code: code, kind: kind))
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         transmit(rid)
         if file != nil { transmitPhoto(rid) }
         return true

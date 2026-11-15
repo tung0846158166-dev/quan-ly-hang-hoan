@@ -31,6 +31,7 @@ final class SyncEngine: ObservableObject {
     private var mqttTasks: [Task<Void, Never>] = []
     private var mqttGeneration = 0
     private var seenMsgs: [String: Date] = [:]
+    private var snapshotRetries = 0
     private var sseTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
     private var seq = 0
@@ -393,6 +394,12 @@ final class SyncEngine: ObservableObject {
 
     private func tick() async {
         tickCount += 1
+        // Danh sách đơn ghép dở và đã 10 giây không có mảnh mới: xin PC gửi lại (tối đa 4 lần mỗi đợt).
+        if snapshot.incomplete, let t = snapshotLastChunkAt, Date().timeIntervalSince(t) > 10, snapshotRetries < 4 {
+            snapshotRetries += 1
+            snapshotLastChunkAt = Date()
+            requestSnapshot()
+        } else if !snapshot.incomplete { snapshotRetries = 0 }
         let n = nowMs()
         var needPoll = false
         for it in items where !it.isSettled {

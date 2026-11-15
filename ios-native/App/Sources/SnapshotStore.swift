@@ -23,6 +23,8 @@ final class SnapshotStore: ObservableObject {
     var overdueCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
     var soonCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
+    /// Đang ghép dở (thiếu mảnh, chưa lỗi).
+    var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
 
     func ingest(_ chunk: SnapshotChunk) {
         let p = assembler.add(chunk)

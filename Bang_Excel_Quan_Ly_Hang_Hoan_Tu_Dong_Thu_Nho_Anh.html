@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.1';
+    const APP_VERSION_NUMBER = '1.9.2';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.1',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.2',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13833,16 +13833,35 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
         const snapshotId = 'snap_' + Date.now();
         const topic = getNtfyTopic();
-        for (let i = 0; i < total; i++) {
-          const msg = JSON.stringify({ type: 'snapshot_chunk', room, snapshotId, idx: i, total, chunk: b64.slice(i * CHUNK, (i + 1) * CHUNK), count: rows.length, time: Date.now() + i });
-          // MQTT trước (nhanh, không giới hạn 4KB); ntfy lỗi (bị chặn mạng) cũng không làm dừng việc gửi.
-          const mqttTopic = 'agy_shopee_return_scanner_2026/' + room;
-          if (mqttClient && mqttClient.connected) { try { mqttClient.publish(mqttTopic, msg); } catch (e) {} }
-          (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(mqttTopic, msg); } catch (e) {} } });
-          try { await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Snapshot', { method: 'POST', body: msg }); } catch (e) {}
-          if (i + 1 < total) await new Promise(r => setTimeout(r, 120));
+        const mqttTopic = 'agy_shopee_return_scanner_2026/' + room;
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const msgs = [];
+        for (let i = 0; i < total; i++) msgs.push(JSON.stringify({ type: 'snapshot_chunk', room, snapshotId, idx: i, total, chunk: b64.slice(i * CHUNK, (i + 1) * CHUNK), count: rows.length, time: Date.now() + i }));
+        const publishMqtt = m => {
+          if (mqttClient && mqttClient.connected) { try { mqttClient.publish(mqttTopic, m); } catch (e) {} }
+          (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(mqttTopic, m); } catch (e) {} } });
+        };
+        // MQTT trước và nhanh (không chờ ntfy); gửi 2 lượt để bù mảnh bị rớt trên broker công cộng, điện thoại tự bỏ mảnh trùng.
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < total; i++) { publishMqtt(msgs[i]); await sleep(40); }
+          if (pass === 0) await sleep(600);
         }
         lastPhoneSnapshotAt = Date.now();
+        // ntfy chạy nền, không chặn: mạng chặn/chậm ntfy.sh (treo hoặc lỗi) cũng không làm chậm phần gửi MQTT.
+        (async () => {
+          let fails = 0;
+          for (const m of msgs) {
+            if (fails >= 2) break;
+            const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timer = ctl ? setTimeout(() => ctl.abort(), 5000) : null;
+            try {
+              const resp = await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Snapshot', { method: 'POST', body: m, signal: ctl ? ctl.signal : undefined });
+              if (!resp.ok) fails++;
+            } catch (e) { fails++; }
+            if (timer) clearTimeout(timer);
+            await sleep(120);
+          }
+        })();
         return true;
       } catch (e) {
         console.warn('Snapshot sang điện thoại lỗi:', e);

@@ -9,6 +9,7 @@ final class SnapshotStore: ObservableObject {
     @Published var updatedAt: Date?
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
+    @Published var stats: [String: Int] = [:]
 
     private let assembler = SnapshotAssembler()
     private var index: [String: OrderRow] = [:]
@@ -34,6 +35,7 @@ final class SnapshotStore: ObservableObject {
 
     private func set(_ p: SnapshotPayload, save: Bool) {
         rows = p.rows
+        stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = [:]
         // Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.

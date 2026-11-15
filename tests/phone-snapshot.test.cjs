@@ -54,3 +54,18 @@ test('v1.9.1: snapshot gửi cả qua MQTT, lỗi ntfy không dừng, và bỏ q
   const filters = src.match(/\['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'\]\.includes\(data\.type\)/g) || [];
   assert.strictEqual(filters.length, 2, 'cả hai bộ nhận MQTT (chính và phụ) đều phải lọc');
 });
+
+test('v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc của PC', () => {
+  const full = src.match(/function buildPhoneSnapshotStats[\s\S]*?\r?\n    \}\r?\n/)[0];
+  const c = {
+    orders: [{ status: 'Hàng đã trả', isWatchlist: true, preOrder: 'Hàng đặt trước' }, { status: 'Chưa nhận', orderType: 'Đơn hủy' }, { status: 'Chưa nhận' }],
+    archivedOrders: [{ status: 'Hàng đã trả' }, { status: 'Chưa nhận', isWatchlist: true }],
+    cancelledOrders: [{ received: true }, { received: false }, { received: true }],
+    isOrderReceived: o => o.status === 'Hàng đã trả', isOrderPending: o => o.status !== 'Hàng đã trả',
+    getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền'
+  };
+  vm.createContext(c); vm.runInContext(full, c);
+  const st = JSON.parse(JSON.stringify(vm.runInContext('buildPhoneSnapshotStats(7)', c)));
+  assert.deepStrictEqual(st, { m_total: 3, m_recv: 1, m_pend: 2, m_watch: 1, m_pre: 1, m_cancelType: 1, a_total: 2, a_recv: 1, c_total: 3, c_recv: 2, sent: 7, dropped: 1 });
+  assert.match(src, /stats: buildPhoneSnapshotStats\(rows\.length\)/);
+});

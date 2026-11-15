@@ -9,6 +9,24 @@ struct SettingsView: View {
     @AppStorage("hapticOn") private var hapticOn = true
     @AppStorage("sendPhoto") private var sendPhoto = true
 
+    /// (nhãn, số PC, số điện thoại): điện thoại đếm lại từ danh sách đã nhận để so với số PC tự tính.
+    private var reconcile: [(String, Int, Int)] {
+        let r = store.rows, s = store.stats
+        func n(_ f: (OrderRow) -> Bool) -> Int { r.filter(f).count }
+        return [
+            ("Bảng chính", s["m_total"] ?? 0, n { $0.k == "m" }),
+            ("Đã nhận (bảng chính)", s["m_recv"] ?? 0, n { $0.k == "m" && $0.rv }),
+            ("Đang chờ (bảng chính)", s["m_pend"] ?? 0, n { $0.k == "m" && $0.pd }),
+            ("Đang theo dõi", s["m_watch"] ?? 0, n { $0.k == "m" && $0.wl }),
+            ("Hàng đặt trước", s["m_pre"] ?? 0, n { $0.k == "m" && $0.pre }),
+            ("Loại đơn là Đơn hủy", s["m_cancelType"] ?? 0, n { $0.k == "m" && $0.ty == "Đơn hủy" }),
+            ("Kho lưu trữ", s["a_total"] ?? 0, n { $0.k == "a" }),
+            ("Lưu trữ đã nhận", s["a_recv"] ?? 0, n { $0.k == "a" && $0.rv }),
+            ("Bảng đơn hủy", s["c_total"] ?? 0, n { $0.k == "c" }),
+            ("Đơn hủy đã nhận", s["c_recv"] ?? 0, n { $0.k == "c" && $0.rv })
+        ]
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -31,6 +49,21 @@ struct SettingsView: View {
                     Button("Cập nhật dữ liệu đơn từ PC") { engine.requestSnapshot() }
                     LabeledContent("Thông báo quá hạn", value: store.notificationsAllowed ? "Đã bật" : "Chưa bật")
                     if !store.notificationsAllowed { Button("Bật thông báo đơn sắp đến hạn") { store.requestNotificationPermission() } }
+                }
+                Section("Đối chiếu số đơn với máy tính") {
+                    if store.stats.isEmpty {
+                        Text("Máy tính chưa gửi bảng đối chiếu (cần bản máy tính 1.9.4 trở lên).").font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        ForEach(reconcile, id: \.0) { item in
+                            LabeledContent(item.0) {
+                                Text("PC \(item.1) · ĐT \(item.2)" + (item.1 == item.2 ? "  ✓" : "  ⚠️"))
+                                    .foregroundColor(item.1 == item.2 ? .green : .orange)
+                            }
+                        }
+                        if let d = store.stats["dropped"], d > 0 {
+                            Text("\(d) đơn không có mã vận đơn và mã đơn hàng nên không gửi sang được.").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 Section("Tùy chọn quét") {
                     Toggle("Âm thanh khi có kết quả", isOn: $soundOn)

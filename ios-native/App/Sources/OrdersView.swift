@@ -30,8 +30,8 @@ struct OrdersView: View {
         case .pending: return r.pd
         case .overdue: return r.pd && Deadline.level(due: r.due, now: now) == .overdue
         case .soon: return r.pd && Deadline.level(due: r.due, now: now) == .soon
-        case .watch: return r.wl
-        case .received: return r.rv
+        case .watch: return r.wl && r.k == "m"   // giống bảng Theo Dõi trên PC: chỉ tính bảng chính
+        case .received: return r.rv && r.k != "c"   // đã nhận ở bảng chính và kho lưu trữ; đơn hủy đã nhận nằm ở mục Đơn hủy
         case .cancelled: return r.isCancelled
         case .pre: return r.pre
         case .archived: return r.isArchived

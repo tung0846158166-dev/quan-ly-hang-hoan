@@ -31,6 +31,8 @@ public struct SnapshotPayload: Codable, Equatable {
     public var time: Int
     public var count: Int
     public var rows: [OrderRow]
+    /// Bảng đối chiếu số đơn do PC tính trên dữ liệu gốc (PC cũ không gửi thì rỗng).
+    public var stats: [String: Int] = [:]
 }
 
 /// Giải mã "dễ tính": PC có thể gửi số thay cho chuỗi (mã đơn, ngày), null hoặc số lẻ; app vẫn đọc được thay vì bỏ cả danh sách.
@@ -61,7 +63,7 @@ private extension KeyedDecodingContainer {
 }
 
 private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt }
-private enum PayloadKeys: String, CodingKey { case time, count, rows }
+private enum PayloadKeys: String, CodingKey { case time, count, rows, stats }
 
 extension OrderRow {
     public init(from decoder: Decoder) throws {
@@ -78,7 +80,8 @@ extension SnapshotPayload {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: PayloadKeys.self)
         let rows = try c.decode([OrderRow].self, forKey: .rows)
-        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows)
+        let stats = (try? c.decode([String: Int].self, forKey: .stats)) ?? [:]
+        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows, stats: stats)
     }
 }
 

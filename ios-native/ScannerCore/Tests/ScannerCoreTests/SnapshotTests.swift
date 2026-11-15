@@ -129,3 +129,14 @@ final class WatchlistFieldTests: XCTestCase {
         XCTAssertFalse(p.rows[1].wl); XCTAssertEqual(p.rows[1].wr, "")
     }
 }
+
+final class StatsFieldTests: XCTestCase {
+    func testStatsDecodeAndDefaultEmpty() throws {
+        let with = #"{"time":1,"rows":[],"stats":{"m_total":10,"dropped":2}}"#
+        let without = #"{"time":1,"rows":[]}"#
+        let a = try JSONDecoder().decode(SnapshotPayload.self, from: Data(with.utf8))
+        let b = try JSONDecoder().decode(SnapshotPayload.self, from: Data(without.utf8))
+        XCTAssertEqual(a.stats["m_total"], 10); XCTAssertEqual(a.stats["dropped"], 2)
+        XCTAssertTrue(b.stats.isEmpty)
+    }
+}

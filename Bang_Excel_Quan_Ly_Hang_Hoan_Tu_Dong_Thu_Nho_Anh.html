@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.3';
+    const APP_VERSION_NUMBER = '1.9.4';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.3',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.4',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13831,6 +13831,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return rows.filter(r => r.c).slice(0, PHONE_SNAPSHOT_MAX_ROWS);
     }
 
+    // v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc của PC; iPhone so với số nó nhận được để biết lệch ở đâu.
+    function buildPhoneSnapshotStats(sentCount) {
+      const arr = v => Array.isArray(v) ? v : [];
+      const ord = arr(orders), can = arr(cancelledOrders);
+      let arch = [];
+      try { arch = typeof archivedOrders !== 'undefined' ? arr(archivedOrders) : []; } catch (e) {}
+      const cnt = (list, fn) => list.reduce((n, o) => n + (o && fn(o) ? 1 : 0), 0);
+      const st = {
+        m_total: ord.length, m_recv: cnt(ord, isOrderReceived), m_pend: cnt(ord, isOrderPending), m_watch: cnt(ord, o => o.isWatchlist),
+        m_pre: cnt(ord, o => o.preOrder === 'Hàng đặt trước'), m_cancelType: cnt(ord, o => getOrderType(o) === 'Đơn hủy'),
+        a_total: arch.length, a_recv: cnt(arch, isOrderReceived),
+        c_total: can.length, c_recv: cnt(can, o => o.received)
+      };
+      st.sent = sentCount;
+      st.dropped = st.m_total + st.a_total + st.c_total - sentCount;
+      return st;
+    }
+
     async function deflateRawBase64(str) {
       const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'));
       const buf = new Uint8Array(await new Response(stream).arrayBuffer());
@@ -13846,7 +13864,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try {
         const room = phoneRoomId || 'SHP-2026';
         const rows = buildPhoneSnapshotRows();
-        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, rows }));
+        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, stats: buildPhoneSnapshotStats(rows.length), rows }));
         const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
         const snapshotId = 'snap_' + Date.now();
         const topic = getNtfyTopic();

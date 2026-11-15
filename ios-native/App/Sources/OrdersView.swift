@@ -14,6 +14,10 @@ struct OrdersView: View {
     @State private var selected: OrderRow?
     @State private var platform = ""
     @State private var showScanner = false
+    // Kết quả lọc được tính sẵn (không tính lại mỗi lần giao diện vẽ lại) để vuốt danh sách mượt.
+    @State private var shown: [OrderRow] = []
+    @State private var counts: [OrderFilter: Int] = [:]
+    @State private var scanned: Set<String> = []
 
     private func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
         if q.isEmpty { return true }
@@ -56,20 +60,26 @@ struct OrdersView: View {
 
     private var platforms: [String] { Array(Set(store.rows.map { $0.p }.filter { !$0.isEmpty })).sorted() }
 
+    private func refresh() {
+        let d = compute()
+        shown = d.shown
+        counts = d.counts
+        scanned = engine.scannedReturnCodes
+    }
+
     var body: some View {
-        let data = compute()
-        return NavigationStack {
+        NavigationStack {
             VStack(spacing: 6) {
-                summary(shown: data.shown.count)
+                summary(shown: shown.count)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
-                            Button("\(f.rawValue) (\(data.counts[f] ?? 0))") { filter = f }
+                            Button("\(f.rawValue) (\(counts[f] ?? 0))") { filter = f }
                                 .buttonStyle(.borderedProminent).tint(filter == f ? .indigo : .gray).font(.footnote.bold())
                         }
                     }.padding(.horizontal)
                 }
-                List(data.shown) { r in
+                List(shown) { r in
                     Button { selected = r } label: { row(r) }.buttonStyle(.plain)
                 }
                 .listStyle(.plain)
@@ -80,11 +90,18 @@ struct OrdersView: View {
                             Text("Chưa nhận dữ liệu đơn từ máy tính").font(.headline)
                             Text("Mở app trên PC và kéo xuống để cập nhật.").font(.footnote).foregroundStyle(.secondary)
                         }
-                    } else if data.shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
+                    } else if shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
                 }
             }
             .searchable(text: $query, prompt: "Tìm mã, sản phẩm, màu, size, ghi chú")
             .navigationTitle("Đơn hàng")
+            .onAppear { refresh() }
+            .onChange(of: query) { _ in refresh() }
+            .onChange(of: filter) { _ in refresh() }
+            .onChange(of: platform) { _ in refresh() }
+            .onChange(of: store.updatedAt) { _ in refresh() }
+            .onChange(of: store.rows.count) { _ in refresh() }
+            .onChange(of: engine.items.count) { _ in refresh() }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button { showScanner = true } label: { Image(systemName: "qrcode.viewfinder") }
@@ -103,7 +120,8 @@ struct OrdersView: View {
                     query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                     filter = .all
                     // Quét ra đúng một đơn thì mở luôn chi tiết.
-                    let again = compute().shown
+                    refresh()
+                    let again = shown
                     if again.count == 1 { selected = again[0] }
                 }
             }
@@ -122,7 +140,6 @@ struct OrdersView: View {
 
     /// Danh sách chỉ hiện mã đơn hàng và/hoặc mã vận đơn; chạm vào mới xem đủ thông tin.
     private func row(_ r: OrderRow) -> some View {
-        let scanned = engine.scannedReturnCodes
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let level = r.pd ? r.alertLevel(now: now) : .unknown
         let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()

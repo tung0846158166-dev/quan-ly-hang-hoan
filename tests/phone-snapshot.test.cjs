@@ -77,3 +77,9 @@ test('v1.9.5: mỗi dòng gửi iPhone kèm mức cảnh báo Báo Đỏ/Báo V�
   assert.match(src, /if \(x\.lv !== undefined\) row\.lv = x\.lv;/);
   assert.match(src, /rv: !!o\.received, lv: 0 \}/);
 });
+
+test('v1.9.6: PC nhận ghi chú đơn từ iPhone, đánh dấu theo dõi và báo lại', () => {
+  assert.match(src, /data\.type === 'order_note'/);
+  assert.match(src, /order\.isWatchlist = true;\s*const cur = String\(order\.watchlistReason/);
+  assert.match(src, /ackStage: 'note'/);
+});

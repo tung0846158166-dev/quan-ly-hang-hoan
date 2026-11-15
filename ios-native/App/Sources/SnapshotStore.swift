@@ -52,6 +52,16 @@ final class SnapshotStore: ObservableObject {
 
     func lookup(_ code: String) -> OrderRow? { index[code.uppercased()] }
 
+    /// Cập nhật ngay trên điện thoại sau khi tạo ghi chú (PC sẽ gửi bản chính thức ở lần đồng bộ sau).
+    func applyLocalNote(rowId: String, note: String) {
+        guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
+        rows[i].wl = true
+        if !rows[i].wr.contains(note) { rows[i].wr = rows[i].wr.isEmpty ? note : rows[i].wr + " | " + note }
+        let r = rows[i]
+        index[r.c.uppercased()] = r
+        if !r.o.isEmpty { index[r.o.uppercased()] = r }
+    }
+
     // MARK: bảng thông báo trên điện thoại
     private func dismissKey(_ r: OrderRow) -> String { "\(r.id)|\(r.due)" }
 

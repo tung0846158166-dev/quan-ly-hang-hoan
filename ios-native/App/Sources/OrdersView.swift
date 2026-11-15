@@ -194,6 +194,9 @@ struct ScanSearchSheet: View {
 struct DetailView: View {
     let row: OrderRow
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var engine: SyncEngine
+    @State private var noteText = ""
+    @State private var sentNote = false
 
     private var source: String {
         if row.isArchived { return "Kho lưu trữ" }
@@ -208,6 +211,15 @@ struct DetailView: View {
                     if !row.o.isEmpty { LabeledContent("Mã đơn hàng", value: row.o) }
                     Button("Sao chép mã vận đơn") { UIPasteboard.general.string = row.c }
                     if !row.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = row.o } }
+                }
+                Section("Tạo ghi chú (đơn sẽ được đánh dấu theo dõi trên máy tính)") {
+                    TextField("Nhập ghi chú cho đơn này", text: $noteText, axis: .vertical).lineLimit(1...4)
+                    Button(sentNote ? "✓ Đã gửi sang máy tính" : "Lưu ghi chú & đẩy lên bảng theo dõi") {
+                        engine.sendOrderNote(row, note: noteText)
+                        noteText = ""; sentNote = true
+                    }
+                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if row.k != "m" { Text("Chỉ đơn ở bảng chính mới đánh dấu theo dõi được trên máy tính.").font(.caption).foregroundStyle(.secondary) }
                 }
                 if row.wl || !row.wr.isEmpty || !row.nt.isEmpty {
                     Section("Theo dõi & ghi chú") {

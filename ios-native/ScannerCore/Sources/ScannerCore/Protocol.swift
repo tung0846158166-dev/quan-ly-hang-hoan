@@ -90,6 +90,12 @@ public enum SyncProtocol {
         json(["type": "snapshot_request", "room": room, "time": now])
     }
 
+    /// Ghi chú đơn từ điện thoại: PC đánh dấu theo dõi đơn đó và lưu ghi chú làm lý do theo dõi.
+    public static func orderNote(code: String, orderId: String, note: String, room: String, requestId: String) -> String {
+        json(["type": "order_note", "code": code, "orderId": orderId, "note": note, "requestId": requestId, "room": room,
+              "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
     public static func inboxPush(code: String, room: String, requestId: String) -> String {
         json(["type": "inbox_push", "code": code, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
     }

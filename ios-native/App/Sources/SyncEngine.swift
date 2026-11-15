@@ -175,6 +175,7 @@ final class SyncEngine: ObservableObject {
         let hello = SyncProtocol.json(["type": "phone_connected", "room": room, "time": nowMs()])
         broadcast(hello, title: "Shopee Connect", room: room)
         resendAllPending()
+        resendPendingNotes()
         if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 { requestSnapshot() }
     }
 
@@ -207,6 +208,15 @@ final class SyncEngine: ObservableObject {
             snapshotLastChunkAt = Date()
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
+        case .ack(let ack) where ack.ackStage == "note":
+            pcLastSeen = Date()
+            if isDuplicate("n|\(ack.requestId)|\(ack.outcome)") { return }
+            if ack.outcome == "success" || ack.outcome == "duplicate" || ack.outcome == "not_found" {
+                pendingNotes[ack.requestId] = nil
+                UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+            }
+            let ok = ack.outcome == "success" || ack.outcome == "duplicate"
+            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "PC đã lưu ghi chú và đánh dấu theo dõi" : "PC không thấy đơn này ở bảng chính"), color: ok ? .green : .red)
         case .ack(let ack) where ack.ackStage == "push":
             pcLastSeen = Date()
             if isDuplicate("p|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(ack.extra ?? "")") { return }
@@ -313,6 +323,26 @@ final class SyncEngine: ObservableObject {
             return "Đơn đang chờ hoàn: \(r.n) \(v)\(due)"
         }
         return "Không thấy trong danh sách chờ hoàn (đã nhận hoặc chưa có đơn)"
+    }
+
+    // MARK: ghi chú đơn (gửi sang PC, giữ trong hàng đợi đến khi PC xác nhận)
+    private var pendingNotes: [String: String] = UserDefaults.standard.dictionary(forKey: "pendingNotes") as? [String: String] ?? [:]
+    var pendingNoteCount: Int { pendingNotes.count }
+
+    func sendOrderNote(_ row: OrderRow, note: String) {
+        let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        let rid = "note-\(nowMs())"
+        let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, room: room, requestId: rid)
+        pendingNotes[rid] = body
+        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        broadcast(body, title: "Shopee Note", room: room)
+        snapshot.applyLocalNote(rowId: row.id, note: t)
+        banner = Banner(code: row.c, text: "ĐÃ GỬI GHI CHÚ, CHỜ PC", color: .orange)
+    }
+
+    private func resendPendingNotes() {
+        for b in pendingNotes.values { broadcast(b, title: "Shopee Note", room: room) }
     }
 
     func requestSnapshot() {

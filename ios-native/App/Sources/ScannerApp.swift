@@ -8,7 +8,8 @@ struct ScannerApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(engine)
-                .task { engine.start() }
+                .environmentObject(engine.snapshot)
+                .task { engine.start(); engine.snapshot.refreshAuthorization() }
         }
     }
 }
@@ -20,6 +21,9 @@ struct ContentView: View {
         TabView {
             ScanView()
                 .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
+            OrdersView()
+                .tabItem { Label("Đơn", systemImage: "shippingbox") }
+                .badge(engine.snapshot.overdueCount)
             HistoryView()
                 .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                 .badge(engine.pendingCount)

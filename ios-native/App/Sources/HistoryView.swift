@@ -36,6 +36,7 @@ struct HistoryView: View {
                     Text("Đơn hủy").tag(ScanKind.cancelOrder)
                 }
                 .pickerStyle(.segmented).padding(.horizontal)
+                statsLine
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(filters, id: \.self) { f in
@@ -56,6 +57,9 @@ struct HistoryView: View {
             .searchable(text: $query, prompt: "Tìm mã")
             .navigationTitle("Lịch sử")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    ShareLink(item: engine.csv(kind: kind), subject: Text("Lịch sử quét")) { Image(systemName: "square.and.arrow.up") }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Xóa hết") { confirmClear = true }.disabled(shown.isEmpty)
                 }
@@ -65,6 +69,12 @@ struct HistoryView: View {
             }
             .onChange(of: kind) { _ in filter = nil }
         }
+    }
+
+    private var statsLine: some View {
+        let s = engine.todayStats(kind: kind)
+        return Text("Hôm nay: \(s.total) mã · \(s.valid) hợp lệ · \(s.dup) trùng · \(s.missing) không có · \(s.pending) chờ PC")
+            .font(.caption.bold()).foregroundStyle(.secondary).padding(.horizontal)
     }
 
     private func row(_ it: ScanItem) -> some View {
@@ -78,6 +88,10 @@ struct HistoryView: View {
                 Text(it.detail).font(.caption2).foregroundStyle(.secondary)
                 Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .abbreviated, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
+                if it.kind == .newOrder && it.scanConfirmed {
+                    if it.pushed { Text("✅ Đã đẩy ra bảng chính").font(.caption2.bold()).foregroundColor(.green) }
+                    else { Button("⬆️ Đẩy ra bảng chính") { engine.pushToMain(it) }.font(.caption.bold()).buttonStyle(.bordered) }
+                }
             }
         }
     }

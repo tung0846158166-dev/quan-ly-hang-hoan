@@ -22,6 +22,7 @@ public enum PcMessage: Equatable {
     case heartbeat
     case ack(PcAck)
     case manifest([String])
+    case snapshotChunk(SnapshotChunk)
     case other
 }
 
@@ -85,6 +86,14 @@ public enum SyncProtocol {
         return out
     }
 
+    public static func snapshotRequest(room: String, now: Int) -> String {
+        json(["type": "snapshot_request", "room": room, "time": now])
+    }
+
+    public static func inboxPush(code: String, room: String, requestId: String) -> String {
+        json(["type": "inbox_push", "code": code, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
     /// `sseData` là dòng "data:" của ntfy: {"event":"message","message":"<json>"}
     public static func parseIncoming(sseData: String, room: String) -> PcMessage? {
         guard let outer = (try? JSONSerialization.jsonObject(with: Data(sseData.utf8))) as? [String: Any],
@@ -101,6 +110,10 @@ public enum SyncProtocol {
         case "manifest_sync":
             let codes = (d["knownCodes"] as? [Any])?.compactMap { $0 as? String } ?? []
             return .manifest(codes.map { TrackingCode.clean($0) })
+        case "snapshot_chunk":
+            guard let sid = d["snapshotId"] as? String, let idx = d["idx"] as? Int, let total = d["total"] as? Int,
+                  let chunk = d["chunk"] as? String else { return .other }
+            return .snapshotChunk(SnapshotChunk(snapshotId: sid, idx: idx, total: total, chunk: chunk))
         case "pc_ack":
             guard let rid = d["requestId"] as? String, let code = d["code"] as? String,
                   let outcome = d["outcome"] as? String else { return .other }

@@ -67,6 +67,7 @@ struct ScanView: View {
         VStack(spacing: 2) {
             Text(b.text).font(.headline.bold())
             Text(b.code).font(.system(.title3, design: .monospaced).bold())
+            if !b.sub.isEmpty { Text(b.sub).font(.footnote).multilineTextAlignment(.center) }
         }
         .frame(maxWidth: .infinity).padding(10)
         .background(b.color.opacity(0.9)).foregroundColor(.white).cornerRadius(12)

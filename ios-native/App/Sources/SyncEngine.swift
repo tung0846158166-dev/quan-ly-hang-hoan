@@ -7,6 +7,7 @@ struct Banner: Equatable {
     var code: String
     var text: String
     var color: Color
+    var sub: String = ""
 }
 
 @MainActor
@@ -20,6 +21,7 @@ final class SyncEngine: ObservableObject {
     @Published var note = ""
 
     var snapshotProvider: (() -> Data?)?
+    let snapshot = SnapshotStore()
 
     private let client = NtfyClient()
     private var sseTask: Task<Void, Never>?
@@ -98,11 +100,20 @@ final class SyncEngine: ObservableObject {
             let r = room
             Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Connect", body: hello) }
             resendAllPending()
+            if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 { requestSnapshot() }
         }
         guard let msg = SyncProtocol.parseIncoming(sseData: data, room: room) else { return }
         switch msg {
         case .hello, .heartbeat:
             pcLastSeen = Date()
+        case .snapshotChunk(let ch):
+            pcLastSeen = Date()
+            snapshot.ingest(ch)
+        case .ack(let ack) where ack.ackStage == "push":
+            pcLastSeen = Date()
+            let ok = ack.outcome == "success" || ack.outcome == "duplicate"
+            if ok { for i in items.indices where items[i].kind == .newOrder && items[i].code == ack.code { items[i].pushed = true } ; persist() }
+            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "Đã đẩy ra bảng chính" : "Chưa đẩy được"), color: ok ? .green : .red)
         case .ack(let ack):
             pcLastSeen = Date()
             guard let i = items.firstIndex(where: { $0.requestId == ack.requestId }) else { return }
@@ -174,11 +185,54 @@ final class SyncEngine: ObservableObject {
         items.insert(item, at: 0)
         trimHistory()
         persist()
-        banner = Banner(code: code, text: "ĐANG CHỜ PC XÁC NHẬN", color: .orange)
+        banner = Banner(code: code, text: "ĐANG CHỜ PC XÁC NHẬN", color: .orange, sub: localHint(code: code, kind: kind))
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         transmit(rid)
         if file != nil { transmitPhoto(rid) }
         return true
+    }
+
+    /// Gợi ý tức thì từ danh sách PC gửi sang (PC vẫn là bên quyết định kết quả).
+    private func localHint(code: String, kind: ScanKind) -> String {
+        guard kind == .returnScan, snapshot.hasData else { return "" }
+        if let r = snapshot.lookup(code) {
+            let v = [r.co, r.sz].filter { !$0.isEmpty }.joined(separator: "/")
+            let due = r.due > 0 ? " · " + Deadline.text(due: r.due, now: nowMs()) : ""
+            return "Đơn đang chờ hoàn: \(r.n) \(v)\(due)"
+        }
+        return "Không thấy trong danh sách chờ hoàn (đã nhận hoặc chưa có đơn)"
+    }
+
+    func requestSnapshot() {
+        let r = room
+        let body = SyncProtocol.snapshotRequest(room: r, now: nowMs())
+        Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Snapshot Request", body: body) }
+    }
+
+    func pushToMain(_ item: ScanItem) {
+        let r = room
+        let body = SyncProtocol.inboxPush(code: item.code, room: r, requestId: "push-\(nowMs())")
+        banner = Banner(code: item.code, text: "ĐANG ĐẨY RA BẢNG CHÍNH", color: .orange)
+        Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Push", body: body) }
+    }
+
+    // MARK: thống kê & xuất
+    func todayStats(kind: ScanKind) -> (total: Int, valid: Int, dup: Int, missing: Int, pending: Int) {
+        let start = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
+        let list = items.filter { $0.kind == kind && $0.time >= start }
+        return (list.count, list.filter { $0.status == .success }.count, list.filter { $0.status == .duplicate }.count,
+                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, list.filter { !$0.scanConfirmed }.count)
+    }
+
+    func csv(kind: ScanKind) -> String {
+        let f = DateFormatter(); f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        var out = "Mã,Thời gian,Trạng thái,Chi tiết\n"
+        for it in items where it.kind == kind {
+            let t = f.string(from: Date(timeIntervalSince1970: Double(it.time) / 1000))
+            let detail = it.detail.replacingOccurrences(of: "\"", with: "'")
+            out += "\(it.code),\(t),\(it.status.rawValue),\"\(detail)\"\n"
+        }
+        return out
     }
 
     // MARK: gửi

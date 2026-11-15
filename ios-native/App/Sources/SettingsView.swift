@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var store: SnapshotStore
     @State private var roomText = ""
 
     var body: some View {
@@ -18,8 +19,14 @@ struct SettingsView: View {
                     LabeledContent("PC", value: engine.pcLastSeen.map { "Phản hồi \($0.formatted(date: .omitted, time: .standard))" } ?? "Chưa thấy phản hồi")
                     LabeledContent("Đơn đang chờ PC", value: "\(engine.pendingCount)")
                 }
+                Section("Dữ liệu đơn & thông báo") {
+                    LabeledContent("Danh sách từ PC", value: store.updatedAt.map { "\(store.rows.count) đơn, lúc \($0.formatted(date: .omitted, time: .shortened))" } ?? "Chưa nhận")
+                    Button("Cập nhật dữ liệu đơn từ PC") { engine.requestSnapshot() }
+                    LabeledContent("Thông báo quá hạn", value: store.notificationsAllowed ? "Đã bật" : "Chưa bật")
+                    if !store.notificationsAllowed { Button("Bật thông báo đơn sắp đến hạn") { store.requestNotificationPermission() } }
+                }
                 Section("Giới thiệu") {
-                    LabeledContent("Phiên bản", value: "0.2.0 (app gốc)")
+                    LabeledContent("Phiên bản", value: "0.3.0 (app gốc)")
                 }
             }
             .navigationTitle("Cài đặt")

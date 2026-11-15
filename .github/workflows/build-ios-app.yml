@@ -1,8 +1,6 @@
 name: Build iPhone App (IPA chưa ký)
 
 on:
-  push:
-    branches: [feat/ios-app]
   workflow_dispatch:
     inputs:
       version:

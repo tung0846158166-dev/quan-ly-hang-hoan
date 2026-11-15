@@ -23,7 +23,16 @@ public enum PcMessage: Equatable {
     case ack(PcAck)
     case manifest([String])
     case snapshotChunk(SnapshotChunk)
+    case watchSync(time: Int, items: [WatchItem])
     case other
+}
+
+/// Một đơn đang theo dõi trên PC kèm ghi chú/lý do theo dõi (PC gửi mỗi khi danh sách theo dõi hoặc ghi chú đổi).
+public struct WatchItem: Equatable {
+    public var c: String
+    public var o: String
+    public var r: String
+    public init(c: String, o: String, r: String) { self.c = c; self.o = o; self.r = r }
 }
 
 public enum SyncProtocol {
@@ -91,8 +100,8 @@ public enum SyncProtocol {
     }
 
     /// Ghi chú đơn từ điện thoại: PC đánh dấu theo dõi đơn đó và lưu ghi chú làm lý do theo dõi.
-    public static func orderNote(code: String, orderId: String, note: String, room: String, requestId: String) -> String {
-        json(["type": "order_note", "code": code, "orderId": orderId, "note": note, "requestId": requestId, "room": room,
+    public static func orderNote(code: String, orderId: String, note: String, watch: Bool = true, room: String, requestId: String) -> String {
+        json(["type": "order_note", "code": code, "orderId": orderId, "note": note, "watch": watch, "requestId": requestId, "room": room,
               "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
@@ -116,6 +125,10 @@ public enum SyncProtocol {
         case "manifest_sync":
             let codes = (d["knownCodes"] as? [Any])?.compactMap { $0 as? String } ?? []
             return .manifest(codes.map { TrackingCode.clean($0) })
+        case "watch_sync":
+            let list = (d["items"] as? [[String: Any]]) ?? []
+            let items = list.map { WatchItem(c: ($0["c"] as? String) ?? "", o: ($0["o"] as? String) ?? "", r: ($0["r"] as? String) ?? "") }
+            return .watchSync(time: (d["time"] as? NSNumber)?.intValue ?? 0, items: items)
         case "snapshot_chunk":
             guard let sid = d["snapshotId"] as? String, let idx = d["idx"] as? Int, let total = d["total"] as? Int,
                   let chunk = d["chunk"] as? String else { return .other }

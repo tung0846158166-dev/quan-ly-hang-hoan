@@ -51,7 +51,7 @@ test('v1.9.1: snapshot gửi cả qua MQTT, lỗi ntfy không dừng, và bỏ q
   assert.match(fn, /AbortController/, 'ntfy có hạn chờ, không treo vòng gửi');
   assert.match(fn, /pass < 2/, 'MQTT gửi 2 lượt để bù mảnh rớt');
   assert.ok(fn.indexOf('(async () => {') > fn.indexOf('pass < 2'), 'ntfy chạy nền sau khi MQTT gửi xong');
-  const filters = src.match(/\['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'\]\.includes\(data\.type\)/g) || [];
+  const filters = src.match(/\['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat', 'watch_sync'\]\.includes\(data\.type\)/g) || [];
   assert.strictEqual(filters.length, 2, 'cả hai bộ nhận MQTT (chính và phụ) đều phải lọc');
 });
 
@@ -80,6 +80,16 @@ test('v1.9.5: mỗi dòng gửi iPhone kèm mức cảnh báo Báo Đỏ/Báo V�
 
 test('v1.9.6: PC nhận ghi chú đơn từ iPhone, đánh dấu theo dõi và báo lại', () => {
   assert.match(src, /data\.type === 'order_note'/);
-  assert.match(src, /order\.isWatchlist = true;\s*const cur = String\(order\.watchlistReason/);
+  assert.match(src, /order\.isWatchlist = watchOn;\s*order\.watchlistReason = watchOn \? noteText : ''/);
   assert.match(src, /ackStage: 'note'/);
+});
+
+test('v1.9.7: PC gửi danh sách theo dõi + ghi chú sang iPhone mỗi khi đổi (đồng bộ 2 chiều)', () => {
+  assert.match(src, /markUnsavedToFile\(\);\s*try \{ schedulePhoneWatchSync\(\); \}/);
+  const fn = src.match(/function sendPhoneWatchSync[\s\S]*?\r?\n    \}\r?\n/)[0];
+  assert.match(fn, /type: 'watch_sync'/);
+  assert.match(fn, /sig === phoneWatchSig/);
+  const ctx = { orders: [{ isWatchlist: true, track: ' T1 ', orderId: 'O1', watchlistReason: 'x' }, { isWatchlist: false, track: 'T2' }] };
+  vm.createContext(ctx); vm.runInContext(src.match(/function buildPhoneWatchList[\s\S]*?\r?\n    \}\r?\n/)[0], ctx);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(vm.runInContext('buildPhoneWatchList()', ctx))), [{ c: 'T1', o: 'O1', r: 'x' }]);
 });

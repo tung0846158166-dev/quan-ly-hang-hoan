@@ -212,59 +212,61 @@ struct DetailView: View {
     let row: OrderRow
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var store: SnapshotStore
     @State private var noteText = ""
+    @State private var watchOn = false
     @State private var sentNote = false
 
+    /// Bản mới nhất của đơn (đổi ngay khi máy tính sửa theo dõi/ghi chú).
+    private var live: OrderRow { store.rows.first(where: { $0.id == row.id }) ?? row }
+
     private var source: String {
-        if row.isArchived { return "Kho lưu trữ" }
-        return row.k == "c" ? "Bảng đơn hủy" : "Bảng chính"
+        if live.isArchived { return "Kho lưu trữ" }
+        return live.k == "c" ? "Bảng đơn hủy" : "Bảng chính"
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Mã") {
-                    LabeledContent("Mã vận đơn", value: row.c)
-                    if !row.o.isEmpty { LabeledContent("Mã đơn hàng", value: row.o) }
-                    Button("Sao chép mã vận đơn") { UIPasteboard.general.string = row.c }
-                    if !row.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = row.o } }
+                    LabeledContent("Mã vận đơn", value: live.c)
+                    if !live.o.isEmpty { LabeledContent("Mã đơn hàng", value: live.o) }
+                    Button("Sao chép mã vận đơn") { UIPasteboard.general.string = live.c }
+                    if !live.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = live.o } }
                 }
-                Section("Tạo ghi chú (đơn sẽ được đánh dấu theo dõi trên máy tính)") {
-                    TextField("Nhập ghi chú cho đơn này", text: $noteText, axis: .vertical).lineLimit(1...4)
-                    Button(sentNote ? "✓ Đã gửi sang máy tính" : "Lưu ghi chú & đẩy lên bảng theo dõi") {
-                        engine.sendOrderNote(row, note: noteText)
-                        noteText = ""; sentNote = true
+                Section("Theo dõi & ghi chú (đồng bộ 2 chiều với máy tính)") {
+                    Toggle("Đang theo dõi", isOn: $watchOn)
+                    TextField("Ghi chú / lý do theo dõi", text: $noteText, axis: .vertical).lineLimit(1...5)
+                    Button(sentNote ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu & đồng bộ sang máy tính") {
+                        engine.sendOrderNote(live, note: noteText, watch: watchOn)
+                        sentNote = true
                     }
-                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    if row.k != "m" { Text("Chỉ đơn ở bảng chính mới đánh dấu theo dõi được trên máy tính.").font(.caption).foregroundStyle(.secondary) }
-                }
-                if row.wl || !row.wr.isEmpty || !row.nt.isEmpty {
-                    Section("Theo dõi & ghi chú") {
-                        if row.wl { LabeledContent("Đang theo dõi", value: "⭐ Có") }
-                        if !row.wr.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Lý do theo dõi").font(.caption).foregroundStyle(.secondary); Text(row.wr) } }
-                        if !row.nt.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Ghi chú").font(.caption).foregroundStyle(.secondary); Text(row.nt) } }
-                    }
+                    if live.k != "m" { Text("Chỉ đơn ở bảng chính mới đồng bộ theo dõi/ghi chú với máy tính.").font(.caption).foregroundStyle(.secondary) }
+                    if !live.nt.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Ghi chú đơn trên máy tính").font(.caption).foregroundStyle(.secondary); Text(live.nt) } }
                 }
                 Section("Đơn") {
                     LabeledContent("Nằm ở", value: source)
-                    LabeledContent("Sàn", value: row.p.isEmpty ? "—" : row.p)
-                    if !row.ty.isEmpty { LabeledContent("Loại đơn", value: row.ty) }
-                    if row.pre { LabeledContent("Hàng đặt trước", value: "Có") }
-                    LabeledContent("Sản phẩm", value: row.n.isEmpty ? "—" : row.n)
-                    LabeledContent("Màu", value: row.co.isEmpty ? "—" : row.co)
-                    LabeledContent("Size", value: row.sz.isEmpty ? "—" : row.sz)
-                    LabeledContent("Số lượng", value: "\(row.q)")
-                    LabeledContent("Trạng thái", value: row.st.isEmpty ? "—" : row.st)
-                    LabeledContent("Đã nhận hoàn kho", value: row.rv ? "Rồi" : "Chưa")
+                    LabeledContent("Sàn", value: live.p.isEmpty ? "—" : live.p)
+                    if !live.ty.isEmpty { LabeledContent("Loại đơn", value: live.ty) }
+                    if live.pre { LabeledContent("Hàng đặt trước", value: "Có") }
+                    LabeledContent("Sản phẩm", value: live.n.isEmpty ? "—" : live.n)
+                    LabeledContent("Màu", value: live.co.isEmpty ? "—" : live.co)
+                    LabeledContent("Size", value: live.sz.isEmpty ? "—" : live.sz)
+                    LabeledContent("Số lượng", value: "\(live.q)")
+                    LabeledContent("Trạng thái", value: live.st.isEmpty ? "—" : live.st)
+                    LabeledContent("Đã nhận hoàn kho", value: live.rv ? "Rồi" : "Chưa")
                 }
-                if row.pd {
+                if live.pd {
                     Section("Hạn xử lý") {
-                        LabeledContent("Ngày hủy/hoàn", value: row.rd.isEmpty ? "—" : row.rd)
-                        LabeledContent("Hạn", value: row.due > 0 ? Date(timeIntervalSince1970: Double(row.due) / 1000).formatted(date: .abbreviated, time: .shortened) : "Chưa có")
-                        LabeledContent("Còn lại", value: Deadline.text(due: row.due, now: Int(Date().timeIntervalSince1970 * 1000)))
+                        LabeledContent("Ngày hủy/hoàn", value: live.rd.isEmpty ? "—" : live.rd)
+                        LabeledContent("Hạn", value: live.due > 0 ? Date(timeIntervalSince1970: Double(live.due) / 1000).formatted(date: .abbreviated, time: .shortened) : "Chưa có")
+                        LabeledContent("Còn lại", value: Deadline.text(due: live.due, now: Int(Date().timeIntervalSince1970 * 1000)))
                     }
                 }
             }
+            .onAppear { noteText = live.wr; watchOn = live.wl }
+            .onChange(of: live.wr) { v in noteText = v; sentNote = false }
+            .onChange(of: live.wl) { v in watchOn = v }
             .navigationTitle("Chi tiết đơn")
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
         }

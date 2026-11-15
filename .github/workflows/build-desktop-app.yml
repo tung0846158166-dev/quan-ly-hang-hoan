@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.7
+          name: QuanLyHangHoan-Windows-Installer-v1.9.8
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.7
-          name: "Quản Lý Hàng Hoàn v1.9.7 — theo dõi & ghi chú đồng bộ 2 chiều với iPhone"
+          tag_name: v1.9.8
+          name: "Quản Lý Hàng Hoàn v1.9.8 — sửa/xóa đơn đồng bộ 2 chiều với iPhone"
           body: |
+            ### Bản sửa 1.9.8
+
+            - iPhone sửa đơn (sản phẩm, màu, size, số lượng, trạng thái, loại đơn) hoặc xóa đơn thì máy tính làm theo (đơn bị khóa thì từ chối, đơn xóa được lưu bản sao trong bộ nhớ). Sửa/xóa đơn trên máy tính thì danh sách trên iPhone tự cập nhật sau vài giây.
+
             ### Bản sửa 1.9.7
 
             - Theo dõi và ghi chú đồng bộ 2 chiều với iPhone: sửa lý do theo dõi/bỏ theo dõi trên máy tính thì iPhone tự cập nhật; sửa trên iPhone (thay hẳn nội dung cũ, có công tắc theo dõi) thì máy tính cập nhật.

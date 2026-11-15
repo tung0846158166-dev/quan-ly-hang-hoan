@@ -105,6 +105,17 @@ public enum SyncProtocol {
               "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
+    /// iPhone sửa đơn ở bảng chính: `fields` gồm n (sản phẩm), co (màu), sz, q, st (trạng thái), ty (loại đơn).
+    public static func orderEdit(code: String, orderId: String, fields: [String: Any], room: String, requestId: String) -> String {
+        json(["type": "order_edit", "code": code, "orderId": orderId, "fields": fields, "requestId": requestId, "room": room,
+              "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
+    public static func orderDelete(code: String, orderId: String, room: String, requestId: String) -> String {
+        json(["type": "order_delete", "code": code, "orderId": orderId, "requestId": requestId, "room": room,
+              "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
     public static func inboxPush(code: String, room: String, requestId: String) -> String {
         json(["type": "inbox_push", "code": code, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
     }

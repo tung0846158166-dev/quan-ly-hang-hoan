@@ -99,9 +99,18 @@ public final class SnapshotAssembler {
             lastError = nil
             return p
         } catch {
-            lastError = "\(error)"
+            lastError = Self.describeFailure(error, base64: b64, total: total)
             return nil
         }
+    }
+
+    /// Mô tả lỗi kèm kích thước và đầu dữ liệu để biết hỏng ở bước nào (base64, giải nén hay JSON).
+    static func describeFailure(_ error: Error, base64: String, total: Int) -> String {
+        var s = "\(error) (\(total) mảnh, base64 \(base64.count) ký tự"
+        if let data = Data(base64Encoded: base64), let raw = try? (data as NSData).decompressed(using: .zlib) as Data {
+            s += ", giải nén \(raw.count) byte, đầu: " + String(decoding: raw.prefix(80), as: UTF8.self)
+        }
+        return s + ")"
     }
 
     public static func decode(base64: String) throws -> SnapshotPayload {

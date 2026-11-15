@@ -307,6 +307,7 @@ final class SyncEngine: ObservableObject {
     private func localHint(code: String, kind: ScanKind) -> String {
         guard kind == .returnScan, snapshot.hasData else { return "" }
         if let r = snapshot.lookup(code) {
+            if r.rv { return "Đơn này đã nhận hoàn kho trước đó: \(r.n)" }
             let v = [r.co, r.sz].filter { !$0.isEmpty }.joined(separator: "/")
             let due = r.due > 0 ? " · " + Deadline.text(due: r.due, now: nowMs()) : ""
             return "Đơn đang chờ hoàn: \(r.n) \(v)\(due)"

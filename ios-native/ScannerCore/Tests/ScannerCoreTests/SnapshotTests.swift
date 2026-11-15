@@ -96,3 +96,36 @@ final class LenientSnapshotTests: XCTestCase {
         XCTAssertNotNil(a.lastError, "dữ liệu rác phải báo lỗi giải mã, không im lặng")
     }
 }
+
+final class OrderRowV2Tests: XCTestCase {
+    func testNewFieldsDecodeAndOldPcDefaultsToPending() throws {
+        let json = """
+        {"time":1,"count":2,"rows":[
+          {"k":"a","c":"A1","o":"O1","ty":"Đơn hủy","pre":1,"pd":0,"rv":1,"due":0},
+          {"k":"m","c":"B2"}
+        ]}
+        """
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        let a = p.rows[0], b = p.rows[1]
+        XCTAssertTrue(a.isArchived); XCTAssertTrue(a.isCancelled); XCTAssertTrue(a.pre); XCTAssertFalse(a.pd); XCTAssertTrue(a.rv)
+        XCTAssertTrue(b.pd, "PC bản cũ không có pd thì coi là đơn đang chờ")
+        XCTAssertFalse(b.rv); XCTAssertFalse(b.pre); XCTAssertFalse(b.isCancelled)
+    }
+
+    func testEncodeThenDecodeKeepsFlags() throws {
+        var r = OrderRow(k: "c", c: "X", o: "", p: "", n: "", co: "", sz: "", q: 1, rd: "", due: 0, st: "")
+        r.pd = false; r.rv = true; r.pre = true; r.ty = "THẤT THU"
+        let data = try JSONEncoder().encode(SnapshotPayload(time: 1, count: 1, rows: [r]))
+        let back = try JSONDecoder().decode(SnapshotPayload.self, from: data)
+        XCTAssertEqual(back.rows.first, r)
+    }
+}
+
+final class WatchlistFieldTests: XCTestCase {
+    func testWatchlistFieldsDecode() throws {
+        let json = #"{"time":1,"rows":[{"k":"m","c":"W1","wl":1,"wr":"Khiếu nại đã gửi","nt":"Gọi shop"},{"k":"m","c":"W2"}]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertTrue(p.rows[0].wl); XCTAssertEqual(p.rows[0].wr, "Khiếu nại đã gửi"); XCTAssertEqual(p.rows[0].nt, "Gọi shop")
+        XCTAssertFalse(p.rows[1].wl); XCTAssertEqual(p.rows[1].wr, "")
+    }
+}

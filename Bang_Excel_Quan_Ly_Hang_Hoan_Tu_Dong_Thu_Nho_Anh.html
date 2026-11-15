@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.2';
+    const APP_VERSION_NUMBER = '1.9.3';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.2',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.3',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13781,36 +13781,53 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // ---- v1.9.0/1.9.1: gửi danh sách đơn đang chờ hoàn sang app iPhone (nén deflate-raw, chia mảnh qua MQTT và ntfy) ----
-    const PHONE_SNAPSHOT_MAX_ROWS = 1500;
+    const PHONE_SNAPSHOT_MAX_ROWS = 30000;
     let lastPhoneSnapshotAt = 0;
     let phoneSnapshotBusy = false;
+    // v1.9.3: gửi TOÀN BỘ đơn (chưa nhận, đã nhận, đơn hủy, đặt trước, kho lưu trữ, đang theo dõi) kèm cờ phân loại.
+    //   k: m = bảng chính, c = bảng đơn hủy, a = kho lưu trữ | ty: loại đơn | pre: đặt trước | pd: 0 nếu không còn chờ nhận
+    //   rv: đã nhận | wl: đang theo dõi | wr: lý do theo dõi | nt: ghi chú
     function buildPhoneSnapshotRows() {
       const rows = [];
-      const pack = (kind, o, platform, due, rd, status) => {
+      const pack = (kind, o, platform, due, rd, status, x) => {
         const items = Array.isArray(o.items) && o.items.length ? o.items : [{ product: o.product, color: o.color, size: o.size, qty: o.qty }];
-        rows.push({
+        const row = {
           k: kind,
           c: String(o.track || o.returnTrack || o.orderId || '').trim(),
           o: String(o.orderId || '').trim(),
           p: platform || '',
-          n: items.map(x => String(x.product || '').slice(0, 70)).filter(Boolean).join(' | ').slice(0, 160),
-          co: items.map(x => x.color || '').join(' | ').slice(0, 60),
-          sz: items.map(x => x.size || '').join(' | ').slice(0, 40),
-          q: items.reduce((s, x) => s + (Number(x.qty) || 1), 0),
+          n: items.map(i => String(i.product || '').slice(0, 70)).filter(Boolean).join(' | ').slice(0, 160),
+          co: items.map(i => i.color || '').join(' | ').slice(0, 60),
+          sz: items.map(i => i.size || '').join(' | ').slice(0, 40),
+          q: items.reduce((sum, i) => sum + (Number(i.qty) || 1), 0),
           rd: rd || '', due: due || 0, st: status || ''
-        });
+        };
+        if (x.ty) row.ty = x.ty;
+        if (x.pre) row.pre = 1;
+        if (!x.pd) row.pd = 0;
+        if (x.rv) row.rv = 1;
+        if (o.isWatchlist) { row.wl = 1; if (o.watchlistReason) row.wr = String(o.watchlistReason).slice(0, 200); }
+        const nt = [o.note, o.buyerNote, o.myNote].map(v => String(v || '').trim()).filter(Boolean).join(' | ').slice(0, 200);
+        if (nt) row.nt = nt;
+        rows.push(row);
       };
-      (orders || []).forEach(o => {
-        if (!o || isOrderReceived(o) || isOrderUnneeded(o) || o.status === 'Bị mất') return;
-        const info = computeDeadlineInfo(o.returnDate, o.deadline);
-        pack('m', o, getOrderPlatform(o), info ? info.due : 0, o.returnDate, o.status);
-      });
+      const packOrder = (kind, o) => {
+        if (!o) return;
+        const pending = isOrderPending(o);
+        const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
+        pack(kind, o, getOrderPlatform(o), info ? info.due : 0, o.returnDate, o.status,
+          { ty: getOrderType(o), pre: o.preOrder === 'Hàng đặt trước', pd: pending, rv: isOrderReceived(o) });
+      };
+      (orders || []).forEach(o => packOrder('m', o));
+      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => packOrder('a', o)); } catch (e) {}
       (cancelledOrders || []).forEach(o => {
-        if (!o || o.received) return;
-        const info = computeDeadlineInfo(o.returnDate, o.deadline);
-        pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy');
+        if (!o) return;
+        const pending = !o.received;
+        const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
+        pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy', { ty: 'Đơn hủy', pre: false, pd: pending, rv: !!o.received });
       });
-      rows.sort((a, b) => (a.due || 9e15) - (b.due || 9e15));
+      // Đơn đang chờ lên trước (hạn gần nhất trước), rồi tới các đơn còn lại.
+      rows.sort((a, b) => ((b.pd === 0 ? 0 : 1) - (a.pd === 0 ? 0 : 1)) || ((a.due || 9e15) - (b.due || 9e15)));
       return rows.filter(r => r.c).slice(0, PHONE_SNAPSHOT_MAX_ROWS);
     }
 

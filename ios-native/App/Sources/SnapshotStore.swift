@@ -20,8 +20,8 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    var overdueCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
-    var soonCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
+    var overdueCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
+    var soonCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
     var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
@@ -36,9 +36,11 @@ final class SnapshotStore: ObservableObject {
         rows = p.rows
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = [:]
+        // Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.
         for r in p.rows {
-            index[r.c.uppercased()] = r
-            if !r.o.isEmpty { index[r.o.uppercased()] = r }
+            let kc = r.c.uppercased()
+            if index[kc] == nil { index[kc] = r }
+            if !r.o.isEmpty { let ko = r.o.uppercased(); if index[ko] == nil { index[ko] = r } }
         }
         if save, let data = try? JSONEncoder().encode(p) { try? data.write(to: fileURL, options: .atomic) }
         scheduleNotifications()
@@ -64,7 +66,7 @@ final class SnapshotStore: ObservableObject {
     }
 
     func scheduleNotifications() {
-        let planned = NotificationPlanner.plan(rows: rows, now: Date())
+        let planned = NotificationPlanner.plan(rows: rows.filter { $0.pd }, now: Date())
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { s in
             guard s.authorizationStatus == .authorized || s.authorizationStatus == .provisional else { return }

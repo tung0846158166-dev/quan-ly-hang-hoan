@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.0';
+    const APP_VERSION_NUMBER = '1.9.1';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.0',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.1',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13780,7 +13780,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (err) {}
     }
 
-    // ---- v1.9.0: gửi danh sách đơn đang chờ hoàn sang app iPhone (nén deflate-raw, chia mảnh qua ntfy) ----
+    // ---- v1.9.0/1.9.1: gửi danh sách đơn đang chờ hoàn sang app iPhone (nén deflate-raw, chia mảnh qua MQTT và ntfy) ----
     const PHONE_SNAPSHOT_MAX_ROWS = 1500;
     let lastPhoneSnapshotAt = 0;
     let phoneSnapshotBusy = false;
@@ -13835,7 +13835,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const topic = getNtfyTopic();
         for (let i = 0; i < total; i++) {
           const msg = JSON.stringify({ type: 'snapshot_chunk', room, snapshotId, idx: i, total, chunk: b64.slice(i * CHUNK, (i + 1) * CHUNK), count: rows.length, time: Date.now() + i });
-          await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Snapshot', { method: 'POST', body: msg });
+          // MQTT trước (nhanh, không giới hạn 4KB); ntfy lỗi (bị chặn mạng) cũng không làm dừng việc gửi.
+          const mqttTopic = 'agy_shopee_return_scanner_2026/' + room;
+          if (mqttClient && mqttClient.connected) { try { mqttClient.publish(mqttTopic, msg); } catch (e) {} }
+          (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(mqttTopic, msg); } catch (e) {} } });
+          try { await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Snapshot', { method: 'POST', body: msg }); } catch (e) {}
           if (i + 1 < total) await new Promise(r => setTimeout(r, 120));
         }
         lastPhoneSnapshotAt = Date.now();
@@ -13963,7 +13967,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           mqttClient.on('message', (t, msgBuf) => {
             try {
               const data = JSON.parse(msgBuf.toString());
-              if (!data || data.type === 'pc_ack') return;
+              if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'].includes(data.type)) return;
               data.__via = 'emqx';
               processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
             } catch (e) {}
@@ -13977,7 +13981,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               extra.on('message', (t, msgBuf) => {
                 try {
                   const data = JSON.parse(msgBuf.toString());
-                  if (!data || data.type === 'pc_ack') return;
+                  if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'].includes(data.type)) return;
                   data.__via = url.indexOf('hivemq') >= 0 ? 'hivemq' : 'mosquitto';
                   processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
                 } catch (e) {}

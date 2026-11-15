@@ -11,6 +11,7 @@ struct HistoryView: View {
     @State private var filter: HistoryFilter?
     @State private var confirmClear = false
     @State private var query = ""
+    @State private var detail: ScanItem?
 
     private var filters: [HistoryFilter] { kind == .cancelOrder ? [.valid, .duplicate, .pending] : HistoryFilter.allCases }
 
@@ -48,7 +49,7 @@ struct HistoryView: View {
                     }.padding(.horizontal)
                 }
                 List {
-                    ForEach(shown) { row($0) }
+                    ForEach(shown) { it in row(it).contentShape(Rectangle()).onTapGesture { detail = it } }
                         .onDelete { idx in idx.map { shown[$0] }.forEach(engine.delete) }
                 }
                 .listStyle(.plain)
@@ -68,6 +69,7 @@ struct HistoryView: View {
                 Button("Xóa", role: .destructive) { engine.clear(kind: kind) }
             }
             .onChange(of: kind) { _ in filter = nil }
+            .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         }
     }
 
@@ -84,7 +86,7 @@ struct HistoryView: View {
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(it.code).font(.system(.body, design: .monospaced).bold())
-                Text(label(it)).font(.caption.bold()).foregroundColor(color(it))
+                Text(scanLabel(it)).font(.caption.bold()).foregroundColor(scanColor(it))
                 Text(it.detail).font(.caption2).foregroundStyle(.secondary)
                 Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .abbreviated, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
@@ -93,26 +95,6 @@ struct HistoryView: View {
                     else { Button("⬆️ Đẩy ra bảng chính") { engine.pushToMain(it) }.font(.caption.bold()).buttonStyle(.bordered) }
                 }
             }
-        }
-    }
-
-    private func label(_ it: ScanItem) -> String {
-        if !it.scanConfirmed { return it.status == .error ? "Lỗi, đang thử lại" : "Chờ nạp PC" }
-        switch it.status {
-        case .success: return it.kind == .returnScan ? "Hợp lệ" : "Đã tạo"
-        case .duplicate: return "Quét trùng"
-        case .notFound: return "Không có"
-        case .ambiguous: return "Trùng nhiều đơn"
-        default: return "Chờ nạp PC"
-        }
-    }
-
-    private func color(_ it: ScanItem) -> Color {
-        if !it.scanConfirmed { return .orange }
-        switch it.status {
-        case .success: return .green
-        case .duplicate: return .orange
-        default: return .red
         }
     }
 }

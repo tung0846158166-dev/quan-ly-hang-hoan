@@ -7,27 +7,18 @@ struct ScanView: View {
     @State private var manual = ""
     @State private var zoom: CGFloat = 1
 
+    @State private var detail: ScanItem?
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CameraPreview(session: camera.session).ignoresSafeArea()
-
-            if camera.denied {
-                VStack(spacing: 8) {
-                    Image(systemName: "camera.fill").font(.largeTitle)
-                    Text("Chưa cho phép camera").font(.headline)
-                    Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.").font(.footnote).multilineTextAlignment(.center)
-                }
-                .padding().background(.ultraThinMaterial).cornerRadius(12).frame(maxHeight: .infinity)
-            }
-
-            VStack(spacing: 8) {
-                statusBar
-                Spacer()
-                if let b = engine.banner { bannerView(b) }
-                controls
-            }
-            .padding(.horizontal, 12).padding(.bottom, 8)
+        VStack(spacing: 8) {
+            statusBar
+            cameraFrame
+            if let b = engine.banner { bannerView(b) }
+            controls
+            recentList
         }
+        .padding(.horizontal, 12).padding(.top, 4)
+        .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
             camera.onCode = { engine.handleCameraCode($0) }
             engine.snapshotProvider = { camera.snapshotJPEG() }
@@ -40,6 +31,56 @@ struct ScanView: View {
         }
     }
 
+    /// Khung camera nhỏ như bản web (chỉ nhận mã trong khung).
+    private var cameraFrame: some View {
+        ZStack {
+            CameraPreview(controller: camera)
+            if camera.denied {
+                VStack(spacing: 6) {
+                    Image(systemName: "camera.fill").font(.title)
+                    Text("Chưa cho phép camera").font(.headline)
+                    Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.").font(.footnote).multilineTextAlignment(.center)
+                }
+                .padding().background(.ultraThinMaterial).cornerRadius(12)
+            } else {
+                ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
+            }
+        }
+        .frame(height: 230)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.indigo, lineWidth: 2))
+    }
+
+    /// Vài lần quét gần nhất của chế độ đang chọn; chạm vào để xem chi tiết và ảnh.
+    private var recentList: some View {
+        let list = Array(engine.items.filter { $0.kind == engine.mode }.prefix(8))
+        return ScrollView {
+            LazyVStack(spacing: 6) {
+                if list.isEmpty {
+                    Text("Chưa quét mã nào ở chế độ này").font(.footnote).foregroundStyle(.secondary).padding(.top, 12)
+                }
+                ForEach(list) { it in
+                    HStack(spacing: 8) {
+                        Circle().fill(scanColor(it)).frame(width: 10, height: 10)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(it.code).font(.system(.subheadline, design: .monospaced).bold())
+                            Text(scanLabel(it)).font(.caption2.bold()).foregroundColor(scanColor(it))
+                        }
+                        Spacer()
+                        Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .omitted, time: .standard))
+                            .font(.caption2).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    .padding(8).background(Color(.secondarySystemBackground)).cornerRadius(8)
+                    .contentShape(Rectangle())
+                    .onTapGesture { detail = it }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
     private var statusBar: some View {
         VStack(spacing: 6) {
             Picker("Chế độ", selection: $engine.mode) {
@@ -49,7 +90,7 @@ struct ScanView: View {
             }
             .pickerStyle(.segmented)
             HStack {
-                pill(engine.sseConnected ? "Đã nối kênh" : "Mất kết nối", engine.sseConnected ? .green : .red)
+                pill(engine.channelUp ? "Đã nối kênh" : "Mất kết nối", engine.channelUp ? .green : .red)
                 pill(engine.pcOnline ? "PC đang online" : "Chờ PC phản hồi", engine.pcOnline ? .green : .orange)
                 if engine.pendingCount > 0 { pill("Chờ \(engine.pendingCount)", .orange) }
                 Spacer()
@@ -107,5 +148,25 @@ struct ScanView: View {
         guard !v.isEmpty else { return }
         engine.submitManual(v)
         manual = ""
+    }
+}
+
+/// Bốn góc ngắm quét.
+struct ScanGuide: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let l: CGFloat = 26
+        let corners: [(CGPoint, CGFloat, CGFloat)] = [
+            (CGPoint(x: r.minX, y: r.minY), 1, 1),
+            (CGPoint(x: r.maxX, y: r.minY), -1, 1),
+            (CGPoint(x: r.minX, y: r.maxY), 1, -1),
+            (CGPoint(x: r.maxX, y: r.maxY), -1, -1)
+        ]
+        for (pt, dx, dy) in corners {
+            p.move(to: CGPoint(x: pt.x + dx * l, y: pt.y))
+            p.addLine(to: pt)
+            p.addLine(to: CGPoint(x: pt.x, y: pt.y + dy * l))
+        }
+        return p
     }
 }

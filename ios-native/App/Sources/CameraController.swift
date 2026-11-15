@@ -15,6 +15,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     private var latestBuffer: CVPixelBuffer?
     private var configured = false
     private var device: AVCaptureDevice?
+    private var metaOutput: AVCaptureMetadataOutput?
     private let ciContext = CIContext()
 
     func start() {
@@ -57,6 +58,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         let meta = AVCaptureMetadataOutput()
         if session.canAddOutput(meta) {
             session.addOutput(meta)
+            metaOutput = meta
             meta.setMetadataObjectsDelegate(self, queue: .main)
             let wanted: [AVMetadataObject.ObjectType] = [.code128, .code39, .code93, .ean13, .ean8, .upce, .qr, .itf14, .interleaved2of5, .dataMatrix, .pdf417]
             meta.metadataObjectTypes = wanted.filter { meta.availableMetadataObjectTypes.contains($0) }
@@ -79,6 +81,14 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             dev.unlockForConfiguration()
         } catch {}
         configured = true
+    }
+
+    /// Chỉ nhận mã nằm trong khung đang nhìn thấy (khung nhỏ hơn toàn màn hình). Nếu tính ra giá trị lạ thì giữ nguyên toàn khung hình.
+    func updateScanRegion(_ layer: AVCaptureVideoPreviewLayer) {
+        guard let meta = metaOutput, layer.bounds.width > 20, layer.bounds.height > 20 else { return }
+        let r = layer.metadataOutputRectConverted(fromLayerRect: layer.bounds)
+        guard r.width > 0.1, r.height > 0.1, r.minX >= -0.01, r.minY >= -0.01, r.maxX <= 1.01, r.maxY <= 1.01 else { return }
+        queue.async { meta.rectOfInterest = r }
     }
 
     func setTorch(_ on: Bool) {
@@ -135,14 +145,24 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
 final class PreviewUIView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    var onLayout: ((AVCaptureVideoPreviewLayer) -> Void)?
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        onLayout?(previewLayer)
+        // Phiên camera có thể chạy sau lần bố cục đầu; tính lại một lần nữa.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            if let self = self { self.onLayout?(self.previewLayer) }
+        }
+    }
 }
 
 struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let controller: CameraController
     func makeUIView(context: Context) -> PreviewUIView {
         let v = PreviewUIView()
-        v.previewLayer.session = session
+        v.previewLayer.session = controller.session
         v.previewLayer.videoGravity = .resizeAspectFill
+        v.onLayout = { [weak controller] layer in controller?.updateScanRegion(layer) }
         return v
     }
     func updateUIView(_ uiView: PreviewUIView, context: Context) {}

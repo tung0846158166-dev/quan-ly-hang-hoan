@@ -11,10 +11,12 @@ struct OrdersView: View {
     @State private var query = ""
     @State private var filter: OrderFilter = .all
     @State private var selected: OrderRow?
+    @State private var platform = ""
 
     private var shown: [OrderRow] {
         let now = Int(Date().timeIntervalSince1970 * 1000)
         return store.rows.filter { r in
+            if !platform.isEmpty && r.p != platform { return false }
             switch filter {
             case .all: break
             case .overdue: if Deadline.level(due: r.due, now: now) != .overdue { return false }
@@ -26,6 +28,8 @@ struct OrdersView: View {
             return [r.c, r.o, r.n, r.co, r.sz].contains { $0.localizedCaseInsensitiveContains(query) }
         }
     }
+
+    private var platforms: [String] { Array(Set(store.rows.map { $0.p }.filter { !$0.isEmpty })).sorted() }
 
     var body: some View {
         NavigationStack {
@@ -55,7 +59,17 @@ struct OrdersView: View {
             }
             .searchable(text: $query, prompt: "Tìm mã, sản phẩm, màu, size")
             .navigationTitle("Đơn chờ hoàn")
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { engine.requestSnapshot() } label: { Image(systemName: "arrow.clockwise") } } }
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button("Tất cả sàn") { platform = "" }
+                        ForEach(platforms, id: \.self) { p in Button(p) { platform = p } }
+                    } label: {
+                        Image(systemName: platform.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    }
+                    Button { engine.requestSnapshot() } label: { Image(systemName: "arrow.clockwise") }
+                }
+            }
             .sheet(item: $selected) { DetailView(row: $0) }
         }
     }
@@ -71,11 +85,13 @@ struct OrdersView: View {
     }
 
     private func row(_ r: OrderRow) -> some View {
+        let scanned = engine.scannedReturnCodes
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let level = Deadline.level(due: r.due, now: now)
         return VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(r.c).font(.system(.body, design: .monospaced).bold())
+                if scanned.contains(r.c.uppercased()) { Text("✅ Đã quét").font(.caption2.bold()).foregroundColor(.green) }
                 if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 5).background(Color.red.opacity(0.2)).cornerRadius(4) }
             }
             Text(r.n).font(.footnote).lineLimit(2)

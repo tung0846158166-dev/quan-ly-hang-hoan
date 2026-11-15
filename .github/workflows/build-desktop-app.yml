@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.8.38
+          name: QuanLyHangHoan-Windows-Installer-v1.9.0
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.8.38
-          name: "Quản Lý Hàng Hoàn v1.8.38 — bảng đơn hủy: tạo đơn, chọn nhiều, màu/size, đổi trạng thái nhận"
+          tag_name: v1.9.0
+          name: "Quản Lý Hàng Hoàn v1.9.0 — gửi danh sách đơn chờ hoàn sang app iPhone"
           body: |
+            ### Bản sửa 1.9.0
+
+            - Gửi danh sách đơn chờ hoàn (kèm màu, size, hạn xử lý) sang app iPhone gốc: tự gửi khi điện thoại kết nối, khi điện thoại yêu cầu cập nhật và mỗi 10 phút. App iPhone dùng dữ liệu này để tra cứu, cảnh báo đơn sắp quá hạn và gợi ý ngay khi quét.
+
             ### Bản sửa 1.8.38
 
             - Bảng đơn hủy: thêm nút "Tạo đơn hủy", ô tích chọn từng đơn / chọn tất cả với thao tác hàng loạt (đánh dấu đã nhận, chưa nhận, xóa), thêm cột Màu và Size, bỏ cột Ngày gửi, Hạn xử lý, Trạng thái sàn, Hàng đặt trước.

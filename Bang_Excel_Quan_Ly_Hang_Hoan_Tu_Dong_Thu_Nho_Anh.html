@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.8.38';
+    const APP_VERSION_NUMBER = '1.9.0';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13587,7 +13587,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.8.38',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.0',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13779,6 +13779,74 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       } catch (err) {}
     }
+
+    // ---- v1.9.0: gửi danh sách đơn đang chờ hoàn sang app iPhone (nén deflate-raw, chia mảnh qua ntfy) ----
+    const PHONE_SNAPSHOT_MAX_ROWS = 1500;
+    let lastPhoneSnapshotAt = 0;
+    let phoneSnapshotBusy = false;
+    function buildPhoneSnapshotRows() {
+      const rows = [];
+      const pack = (kind, o, platform, due, rd, status) => {
+        const items = Array.isArray(o.items) && o.items.length ? o.items : [{ product: o.product, color: o.color, size: o.size, qty: o.qty }];
+        rows.push({
+          k: kind,
+          c: String(o.track || o.returnTrack || o.orderId || '').trim(),
+          o: String(o.orderId || '').trim(),
+          p: platform || '',
+          n: items.map(x => String(x.product || '').slice(0, 70)).filter(Boolean).join(' | ').slice(0, 160),
+          co: items.map(x => x.color || '').join(' | ').slice(0, 60),
+          sz: items.map(x => x.size || '').join(' | ').slice(0, 40),
+          q: items.reduce((s, x) => s + (Number(x.qty) || 1), 0),
+          rd: rd || '', due: due || 0, st: status || ''
+        });
+      };
+      (orders || []).forEach(o => {
+        if (!o || isOrderReceived(o) || isOrderUnneeded(o) || o.status === 'Bị mất') return;
+        const info = computeDeadlineInfo(o.returnDate, o.deadline);
+        pack('m', o, getOrderPlatform(o), info ? info.due : 0, o.returnDate, o.status);
+      });
+      (cancelledOrders || []).forEach(o => {
+        if (!o || o.received) return;
+        const info = computeDeadlineInfo(o.returnDate, o.deadline);
+        pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy');
+      });
+      rows.sort((a, b) => (a.due || 9e15) - (b.due || 9e15));
+      return rows.filter(r => r.c).slice(0, PHONE_SNAPSHOT_MAX_ROWS);
+    }
+
+    async function deflateRawBase64(str) {
+      const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+      const buf = new Uint8Array(await new Response(stream).arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      return btoa(bin);
+    }
+
+    async function broadcastOrdersSnapshot(force) {
+      if (phoneSnapshotBusy) return false;
+      if (!force && Date.now() - lastPhoneSnapshotAt < 20000) return false;
+      phoneSnapshotBusy = true;
+      try {
+        const room = phoneRoomId || 'SHP-2026';
+        const rows = buildPhoneSnapshotRows();
+        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, rows }));
+        const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
+        const snapshotId = 'snap_' + Date.now();
+        const topic = getNtfyTopic();
+        for (let i = 0; i < total; i++) {
+          const msg = JSON.stringify({ type: 'snapshot_chunk', room, snapshotId, idx: i, total, chunk: b64.slice(i * CHUNK, (i + 1) * CHUNK), count: rows.length, time: Date.now() + i });
+          await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Snapshot', { method: 'POST', body: msg });
+          if (i + 1 < total) await new Promise(r => setTimeout(r, 120));
+        }
+        lastPhoneSnapshotAt = Date.now();
+        return true;
+      } catch (e) {
+        console.warn('Snapshot sang điện thoại lỗi:', e);
+        return false;
+      } finally { phoneSnapshotBusy = false; }
+    }
+    // Định kỳ 10 phút gửi lại nếu điện thoại còn hoạt động trong 30 phút gần đây.
+    setInterval(() => { if (Date.now() - (window.__lastPhoneActivity || 0) < 30 * 60 * 1000) broadcastOrdersSnapshot(false); }, 10 * 60 * 1000);
 
     // v1.6.5: Cloud Message Deduplication (Ngăn chặn re-process tin nhắn cũ từ 12h trước)
     const PROCESSED_CLOUD_MSG_KEY = 'shopee_processed_cloud_msg_ids_v2';
@@ -14092,6 +14160,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     async function processIncomingPhonePayload(data) {
       if (data && data.type === 'latency_pong') return { success: false };
       if (!data || !data.room || data.room !== phoneRoomId) return { success: false, outcome: 'wrong_room' };
+      if (typeof window !== 'undefined') window.__lastPhoneActivity = Date.now();
+      if (data.type === 'snapshot_request') { broadcastOrdersSnapshot(true); return { success: true }; }
       if (data.type === 'latency_ping') {
         // Speed probe from the phone: answer once per channel the ping arrived on, on every channel, so the
         // phone can time each channel's round trip.
@@ -14217,6 +14287,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         appendPhoneLiveLog('📱 Điện thoại vừa kết nối thành công vào bảng!');
         sendAckToPhone(0, '', 'ĐÃ KẾT NỐI VỚI MÁY TÍNH', 'success', false, '', data.room || '');
         setTimeout(() => broadcastManifestToPhone(), 120);
+        setTimeout(() => broadcastOrdersSnapshot(false), 900);
       } else if (data.type === 'barcode' && data.code) {
         return handleIncomingPhoneBarcode(String(data.code).trim(), data.requestId || '', data.photo || '', data.room || '', data);
       } else if (data.type === 'smart_label') {

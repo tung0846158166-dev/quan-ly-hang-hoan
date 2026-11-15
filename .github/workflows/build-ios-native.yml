@@ -1,0 +1,69 @@
+name: Build iPhone App gốc SwiftUI (IPA chưa ký)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Số phiên bản app iPhone gốc (vd 0.2.0)"
+        required: true
+        default: "0.2.0"
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event.inputs.version || '0.0.0-test' }}
+
+jobs:
+  build-native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm thử lõi (ScannerCore)
+        working-directory: ios-native/ScannerCore
+        run: swift test 2>&1 | tail -60
+
+      - name: Cài XcodeGen
+        run: brew install xcodegen
+
+      - name: Biểu tượng và dự án Xcode
+        working-directory: ios-native/App
+        run: |
+          sips -z 1024 1024 ../../app_icon.png --out Sources/Assets.xcassets/AppIcon.appiconset/icon.png
+          sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"${VERSION}\"/" project.yml
+          sed -i '' "s/CURRENT_PROJECT_VERSION: \"[^\"]*\"/CURRENT_PROJECT_VERSION: \"${{ github.run_number }}\"/" project.yml
+          xcodegen generate
+
+      - name: Build (không ký)
+        working-directory: ios-native/App
+        run: |
+          xcodebuild -project QuetHangHoan.xcodeproj -scheme QuetHangHoan -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/build/App.xcarchive" archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tail -80
+
+      - name: Đóng gói IPA
+        working-directory: ios-native/App/build
+        run: |
+          mkdir -p Payload
+          cp -R App.xcarchive/Products/Applications/*.app Payload/
+          zip -qry "QuetHangHoan-Native-v${VERSION}.ipa" Payload
+          ls -lh *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuetHangHoan-Native-v${{ env.VERSION }}
+          path: ios-native/App/build/*.ipa
+
+      - name: Phát hành
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-native-v${{ env.VERSION }}
+          name: "App iPhone gốc Quét Hàng Hoàn v${{ env.VERSION }} (IPA chưa ký)"
+          make_latest: "false"
+          files: ios-native/App/build/*.ipa
+          body: |
+            App iPhone gốc (SwiftUI), `.ipa` **chưa ký**. Cài bằng **Sideloadly** hoặc **AltStore** với Apple ID.
+            Apple ID miễn phí: app chạy 7 ngày rồi phải cài lại.
+            Lần đầu mở: Cài đặt > Cài đặt chung > Quản lý VPN & thiết bị > tin cậy tài khoản của bạn, rồi cho phép camera và nhập mã phòng.

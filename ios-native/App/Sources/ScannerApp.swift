@@ -2,14 +2,17 @@ import SwiftUI
 
 @main
 struct ScannerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var engine = SyncEngine()
+    @StateObject private var router = NotificationRouter.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(engine)
                 .environmentObject(engine.snapshot)
-                .task { engine.start(); engine.snapshot.refreshAuthorization() }
+                .environmentObject(router)
+                .task { router.store = engine.snapshot; engine.start(); engine.snapshot.refreshAuthorization() }
         }
     }
 }
@@ -17,19 +20,27 @@ struct ScannerApp: App {
 struct ContentView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
+    @EnvironmentObject var router: NotificationRouter
 
     var body: some View {
-        TabView {
+        TabView(selection: $router.tab) {
             ScanView()
                 .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
+                .tag(0)
             OrdersView()
                 .tabItem { Label("Đơn", systemImage: "shippingbox") }
-                .badge(store.overdueCount)
+                .tag(1)
+            NotificationsView()
+                .tabItem { Label("Thông báo", systemImage: "bell") }
+                .badge(store.alertCount)
+                .tag(2)
             HistoryView()
                 .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                 .badge(engine.pendingCount)
+                .tag(3)
             SettingsView()
                 .tabItem { Label("Cài đặt", systemImage: "gearshape") }
+                .tag(4)
         }
     }
 }

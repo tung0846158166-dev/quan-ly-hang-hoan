@@ -88,19 +88,21 @@ struct OrdersView: View {
         let scanned = engine.scannedReturnCodes
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let level = Deadline.level(due: r.due, now: now)
-        return VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(r.c).font(.system(.body, design: .monospaced).bold())
-                if scanned.contains(r.c.uppercased()) { Text("✅ Đã quét").font(.caption2.bold()).foregroundColor(.green) }
-                if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 5).background(Color.red.opacity(0.2)).cornerRadius(4) }
+        // Danh sách chỉ hiện mã đơn hàng và/hoặc mã vận đơn; chạm vào mới xem đủ thông tin.
+        let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()
+        return HStack(spacing: 8) {
+            Circle().fill(color(level)).frame(width: 8, height: 8)
+            VStack(alignment: .leading, spacing: 2) {
+                if !r.o.isEmpty {
+                    Text(hasBoth ? "Mã đơn: \(r.o)" : r.o).font(.system(.subheadline, design: .monospaced).bold())
+                }
+                if hasBoth || r.o.isEmpty {
+                    Text(hasBoth ? "Vận đơn: \(r.c)" : r.c).font(.system(.subheadline, design: .monospaced)).foregroundColor(hasBoth ? .secondary : .primary)
+                }
             }
-            Text(r.n).font(.footnote).lineLimit(2)
-            HStack {
-                if !r.co.isEmpty || !r.sz.isEmpty { Text([r.co, r.sz].filter { !$0.isEmpty }.joined(separator: " / ")).font(.caption) }
-                Text("×\(r.q)").font(.caption)
-                Spacer()
-                Text(Deadline.text(due: r.due, now: now)).font(.caption.bold()).foregroundColor(color(level))
-            }
+            Spacer()
+            if scanned.contains(r.c.uppercased()) { Text("✅ Đã quét").font(.caption2.bold()).foregroundColor(.green) }
+            if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 5).background(Color.red.opacity(0.2)).cornerRadius(4) }
         }
     }
 

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.1
+          name: QuanLyHangHoan-Windows-Installer-v1.9.2
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.1
-          name: "Quản Lý Hàng Hoàn v1.9.1 — danh sách đơn sang iPhone qua cả MQTT"
+          tag_name: v1.9.2
+          name: "Quản Lý Hàng Hoàn v1.9.2 — gửi danh sách đơn sang iPhone nhanh và không bị treo"
           body: |
+            ### Bản sửa 1.9.2
+
+            - Gửi danh sách đơn sang iPhone: MQTT gửi trước, nhanh và gửi 2 lượt để bù mảnh bị rớt; ntfy chạy nền có hạn chờ nên mạng chặn/chậm ntfy.sh không còn làm treo việc gửi (trước đây mỗi mảnh phải chờ ntfy nên điện thoại chỉ nhận được vài mảnh).
+
             ### Bản sửa 1.9.1
 
             - Danh sách đơn gửi sang app iPhone giờ đi qua cả MQTT (không chỉ ntfy.sh), để iPhone ở mạng chặn ntfy.sh vẫn nhận được. Một lỗi ntfy không còn làm dừng việc gửi. Máy tính bỏ qua các bản tin do chính nó gửi vọng lại trên MQTT.

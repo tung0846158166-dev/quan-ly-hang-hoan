@@ -46,7 +46,7 @@ struct ScanView: View {
                 ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
             }
         }
-        .frame(height: 230)
+        .frame(height: 345)
         .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.indigo, lineWidth: 2))

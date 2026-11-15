@@ -8,6 +8,7 @@ final class SnapshotStore: ObservableObject {
     @Published var rows: [OrderRow] = []
     @Published var updatedAt: Date?
     @Published var notificationsAllowed = false
+    @Published var assembleInfo = ""
 
     private let assembler = SnapshotAssembler()
     private var index: [String: OrderRow] = [:]
@@ -22,9 +23,13 @@ final class SnapshotStore: ObservableObject {
     var overdueCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
     var soonCount: Int { rows.filter { Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
+    /// Đang ghép dở (thiếu mảnh, chưa lỗi).
+    var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
 
     func ingest(_ chunk: SnapshotChunk) {
-        if let p = assembler.add(chunk) { set(p, save: true) }
+        let p = assembler.add(chunk)
+        assembleInfo = assembler.lastError.map { "Lỗi giải mã: \($0)" } ?? "Đã ghép \(assembler.partsReceived)/\(assembler.partsTotal) mảnh"
+        if let p = p { set(p, save: true) }
     }
 
     private func set(_ p: SnapshotPayload, save: Bool) {

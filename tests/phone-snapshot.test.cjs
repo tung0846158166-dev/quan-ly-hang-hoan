@@ -32,9 +32,12 @@ test('PC có xử lý snapshot_request và gửi theo mảnh deflate-raw', () =>
 });
 test('v1.9.1: snapshot gửi cả qua MQTT, lỗi ntfy không dừng, và bỏ qua bản tin PC tự gửi vọng lại', () => {
   const fn = src.match(/async function broadcastOrdersSnapshot[\s\S]*?\r?\n    \}\r?\n/)[0];
-  assert.match(fn, /mqttClient\.publish\(mqttTopic, msg\)/);
+  assert.match(fn, /mqttClient\.publish\(mqttTopic, m\)/);
   assert.match(fn, /extraMqttClients/);
-  assert.match(fn, /try \{ await fetch\('https:\/\/ntfy\.sh\/' \+ topic \+ '\?title=Shopee%20Snapshot'/);
+  assert.match(fn, /fetch\('https:\/\/ntfy\.sh\/' \+ topic \+ '\?title=Shopee%20Snapshot'/);
+  assert.match(fn, /AbortController/, 'ntfy có hạn chờ, không treo vòng gửi');
+  assert.match(fn, /pass < 2/, 'MQTT gửi 2 lượt để bù mảnh rớt');
+  assert.ok(fn.indexOf('(async () => {') > fn.indexOf('pass < 2'), 'ntfy chạy nền sau khi MQTT gửi xong');
   const filters = src.match(/\['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'\]\.includes\(data\.type\)/g) || [];
   assert.strictEqual(filters.length, 2, 'cả hai bộ nhận MQTT (chính và phụ) đều phải lọc');
 });

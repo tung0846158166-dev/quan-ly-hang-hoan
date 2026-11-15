@@ -20,11 +20,17 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var wl: Bool = false     // đang theo dõi
     public var wr: String = ""      // lý do/ghi chú theo dõi
     public var nt: String = ""      // ghi chú đơn
+    public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=72h), 1 = Báo Vàng (>=48h), 0 = an toàn; -1 = PC cũ không gửi
 
     public var id: String { k + "|" + c }
     /// Thuộc nhóm đơn hủy: nằm trong bảng đơn hủy, hoặc ở bảng chính nhưng loại đơn là "Đơn hủy".
     public var isCancelled: Bool { k == "c" || ty == "Đơn hủy" }
     public var isArchived: Bool { k == "a" }
+    /// Mức cảnh báo giống cột Hạn Cần Xử Lý trên PC (quá hạn = Báo Đỏ, sắp đến hạn = Báo Vàng); PC cũ thì tính theo `due`.
+    public func alertLevel(now: Int) -> DeadlineLevel {
+        if lv >= 0 { return lv >= 2 ? .overdue : (lv == 1 ? .soon : .normal) }
+        return Deadline.level(due: due, now: now)
+    }
 }
 
 public struct SnapshotPayload: Codable, Equatable {
@@ -62,7 +68,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv }
 private enum PayloadKeys: String, CodingKey { case time, count, rows, stats }
 
 extension OrderRow {
@@ -72,7 +78,7 @@ extension OrderRow {
                   co: c.flexString(.co), sz: c.flexString(.sz), q: c.flexInt(.q, default: 1), rd: c.flexString(.rd),
                   due: c.flexInt(.due), st: c.flexString(.st),
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
-                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt))
+                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), lv: c.flexInt(.lv, default: -1))
     }
 }
 

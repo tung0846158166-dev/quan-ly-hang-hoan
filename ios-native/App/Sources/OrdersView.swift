@@ -14,6 +14,10 @@ struct OrdersView: View {
     @State private var selected: OrderRow?
     @State private var platform = ""
     @State private var showScanner = false
+    // Kết quả lọc được tính sẵn (không tính lại mỗi lần giao diện vẽ lại) để vuốt danh sách mượt.
+    @State private var shown: [OrderRow] = []
+    @State private var counts: [OrderFilter: Int] = [:]
+    @State private var scanned: Set<String> = []
 
     private func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
         if q.isEmpty { return true }
@@ -27,9 +31,9 @@ struct OrdersView: View {
     private func belongs(_ r: OrderRow, _ f: OrderFilter, now: Int) -> Bool {
         switch f {
         case .all: return true
-        case .pending: return r.pd
-        case .overdue: return r.pd && Deadline.level(due: r.due, now: now) == .overdue
-        case .soon: return r.pd && Deadline.level(due: r.due, now: now) == .soon
+        case .pending: return r.pd && r.k == "m"
+        case .overdue: return r.pd && r.alertLevel(now: now) == .overdue
+        case .soon: return r.pd && r.alertLevel(now: now) == .soon
         case .watch: return r.wl && r.k == "m"   // giống bảng Theo Dõi trên PC: chỉ tính bảng chính
         case .received: return r.rv && r.k != "c"   // đã nhận ở bảng chính và kho lưu trữ; đơn hủy đã nhận nằm ở mục Đơn hủy
         case .cancelled: return r.isCancelled
@@ -56,20 +60,26 @@ struct OrdersView: View {
 
     private var platforms: [String] { Array(Set(store.rows.map { $0.p }.filter { !$0.isEmpty })).sorted() }
 
+    private func refresh() {
+        let d = compute()
+        shown = d.shown
+        counts = d.counts
+        scanned = engine.scannedReturnCodes
+    }
+
     var body: some View {
-        let data = compute()
-        return NavigationStack {
+        NavigationStack {
             VStack(spacing: 6) {
-                summary(shown: data.shown.count)
+                summary(shown: shown.count)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
-                            Button("\(f.rawValue) (\(data.counts[f] ?? 0))") { filter = f }
+                            Button("\(f.rawValue) (\(counts[f] ?? 0))") { filter = f }
                                 .buttonStyle(.borderedProminent).tint(filter == f ? .indigo : .gray).font(.footnote.bold())
                         }
                     }.padding(.horizontal)
                 }
-                List(data.shown) { r in
+                List(shown) { r in
                     Button { selected = r } label: { row(r) }.buttonStyle(.plain)
                 }
                 .listStyle(.plain)
@@ -80,11 +90,18 @@ struct OrdersView: View {
                             Text("Chưa nhận dữ liệu đơn từ máy tính").font(.headline)
                             Text("Mở app trên PC và kéo xuống để cập nhật.").font(.footnote).foregroundStyle(.secondary)
                         }
-                    } else if data.shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
+                    } else if shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
                 }
             }
             .searchable(text: $query, prompt: "Tìm mã, sản phẩm, màu, size, ghi chú")
             .navigationTitle("Đơn hàng")
+            .onAppear { refresh() }
+            .onChange(of: query) { _ in refresh() }
+            .onChange(of: filter) { _ in refresh() }
+            .onChange(of: platform) { _ in refresh() }
+            .onChange(of: store.updatedAt) { _ in refresh() }
+            .onChange(of: store.rows.count) { _ in refresh() }
+            .onChange(of: engine.items.count) { _ in refresh() }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button { showScanner = true } label: { Image(systemName: "qrcode.viewfinder") }
@@ -103,7 +120,8 @@ struct OrdersView: View {
                     query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                     filter = .all
                     // Quét ra đúng một đơn thì mở luôn chi tiết.
-                    let again = compute().shown
+                    refresh()
+                    let again = shown
                     if again.count == 1 { selected = again[0] }
                 }
             }
@@ -122,9 +140,8 @@ struct OrdersView: View {
 
     /// Danh sách chỉ hiện mã đơn hàng và/hoặc mã vận đơn; chạm vào mới xem đủ thông tin.
     private func row(_ r: OrderRow) -> some View {
-        let scanned = engine.scannedReturnCodes
         let now = Int(Date().timeIntervalSince1970 * 1000)
-        let level = r.pd ? Deadline.level(due: r.due, now: now) : .unknown
+        let level = r.pd ? r.alertLevel(now: now) : .unknown
         let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()
         return HStack(spacing: 8) {
             Circle().fill(r.pd ? color(level) : Color.gray.opacity(0.4)).frame(width: 8, height: 8)
@@ -194,6 +211,9 @@ struct ScanSearchSheet: View {
 struct DetailView: View {
     let row: OrderRow
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var engine: SyncEngine
+    @State private var noteText = ""
+    @State private var sentNote = false
 
     private var source: String {
         if row.isArchived { return "Kho lưu trữ" }
@@ -208,6 +228,15 @@ struct DetailView: View {
                     if !row.o.isEmpty { LabeledContent("Mã đơn hàng", value: row.o) }
                     Button("Sao chép mã vận đơn") { UIPasteboard.general.string = row.c }
                     if !row.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = row.o } }
+                }
+                Section("Tạo ghi chú (đơn sẽ được đánh dấu theo dõi trên máy tính)") {
+                    TextField("Nhập ghi chú cho đơn này", text: $noteText, axis: .vertical).lineLimit(1...4)
+                    Button(sentNote ? "✓ Đã gửi sang máy tính" : "Lưu ghi chú & đẩy lên bảng theo dõi") {
+                        engine.sendOrderNote(row, note: noteText)
+                        noteText = ""; sentNote = true
+                    }
+                    .disabled(noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if row.k != "m" { Text("Chỉ đơn ở bảng chính mới đánh dấu theo dõi được trên máy tính.").font(.caption).foregroundStyle(.secondary) }
                 }
                 if row.wl || !row.wr.isEmpty || !row.nt.isEmpty {
                     Section("Theo dõi & ghi chú") {

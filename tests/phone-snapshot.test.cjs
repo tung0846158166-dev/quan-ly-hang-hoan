@@ -62,10 +62,24 @@ test('v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc c�
     archivedOrders: [{ status: 'Hàng đã trả' }, { status: 'Chưa nhận', isWatchlist: true }],
     cancelledOrders: [{ received: true }, { received: false }, { received: true }],
     isOrderReceived: o => o.status === 'Hàng đã trả', isOrderPending: o => o.status !== 'Hàng đã trả',
-    getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền'
+    getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền',
+    getOrderReturnElapsedInfo: o => ({ level: o.lvl || 'safe' })
   };
+  c.orders[1].lvl = 'danger'; c.orders[2].lvl = 'warning';
   vm.createContext(c); vm.runInContext(full, c);
   const st = JSON.parse(JSON.stringify(vm.runInContext('buildPhoneSnapshotStats(7)', c)));
-  assert.deepStrictEqual(st, { m_total: 3, m_recv: 1, m_pend: 2, m_watch: 1, m_pre: 1, m_cancelType: 1, a_total: 2, a_recv: 1, c_total: 3, c_recv: 2, sent: 7, dropped: 1 });
+  assert.deepStrictEqual(st, { m_total: 3, m_recv: 1, m_pend: 2, m_watch: 1, m_pre: 1, m_cancelType: 1, m_danger: 1, m_warn: 1, a_total: 2, a_recv: 1, c_total: 3, c_recv: 2, sent: 7, dropped: 1 });
   assert.match(src, /stats: buildPhoneSnapshotStats\(rows\.length\)/);
+});
+
+test('v1.9.5: mỗi dòng gửi iPhone kèm mức cảnh báo Báo Đỏ/Báo Vàng như cột Hạn Cần Xử Lý', () => {
+  assert.match(src, /getOrderReturnElapsedInfo\(o\)\.level; return l === 'danger' \? 2 : \(l === 'warning' \? 1 : 0\)/);
+  assert.match(src, /if \(x\.lv !== undefined\) row\.lv = x\.lv;/);
+  assert.match(src, /rv: !!o\.received, lv: 0 \}/);
+});
+
+test('v1.9.6: PC nhận ghi chú đơn từ iPhone, đánh dấu theo dõi và báo lại', () => {
+  assert.match(src, /data\.type === 'order_note'/);
+  assert.match(src, /order\.isWatchlist = true;\s*const cur = String\(order\.watchlistReason/);
+  assert.match(src, /ackStage: 'note'/);
 });

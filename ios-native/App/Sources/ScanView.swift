@@ -10,6 +10,7 @@ struct ScanView: View {
     @State private var detail: ScanItem?
 
     var body: some View {
+        ScrollView {
         VStack(spacing: 8) {
             statusBar
             cameraFrame
@@ -18,6 +19,8 @@ struct ScanView: View {
             recentList
         }
         .padding(.horizontal, 12).padding(.top, 4)
+        }
+        .scrollDismissesKeyboard(.interactively)
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
             camera.onCode = { engine.handleCameraCode($0) }
@@ -55,8 +58,8 @@ struct ScanView: View {
     /// Vài lần quét gần nhất của chế độ đang chọn; chạm vào để xem chi tiết và ảnh.
     private var recentList: some View {
         let list = Array(engine.items.filter { $0.kind == engine.mode }.prefix(8))
-        return ScrollView {
-            LazyVStack(spacing: 6) {
+        return VStack(spacing: 0) {
+            VStack(spacing: 6) {
                 if list.isEmpty {
                     Text("Chưa quét mã nào ở chế độ này").font(.footnote).foregroundStyle(.secondary).padding(.top, 12)
                 }
@@ -78,7 +81,6 @@ struct ScanView: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity)
     }
 
     private var statusBar: some View {

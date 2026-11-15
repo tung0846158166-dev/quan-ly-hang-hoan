@@ -23,8 +23,8 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    var overdueCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
-    var soonCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
+    var overdueCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .overdue }.count }
+    var soonCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
     var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
@@ -52,6 +52,16 @@ final class SnapshotStore: ObservableObject {
 
     func lookup(_ code: String) -> OrderRow? { index[code.uppercased()] }
 
+    /// Cập nhật ngay trên điện thoại sau khi tạo ghi chú (PC sẽ gửi bản chính thức ở lần đồng bộ sau).
+    func applyLocalNote(rowId: String, note: String) {
+        guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
+        rows[i].wl = true
+        if !rows[i].wr.contains(note) { rows[i].wr = rows[i].wr.isEmpty ? note : rows[i].wr + " | " + note }
+        let r = rows[i]
+        index[r.c.uppercased()] = r
+        if !r.o.isEmpty { index[r.o.uppercased()] = r }
+    }
+
     // MARK: bảng thông báo trên điện thoại
     private func dismissKey(_ r: OrderRow) -> String { "\(r.id)|\(r.due)" }
 
@@ -59,8 +69,8 @@ final class SnapshotStore: ObservableObject {
     func alerts() -> (overdue: [OrderRow], soon: [OrderRow]) {
         let now = nowMs()
         var overdue: [OrderRow] = [], soon: [OrderRow] = []
-        for r in rows where r.pd && r.due > 0 && !dismissed.contains(dismissKey(r)) {
-            switch Deadline.level(due: r.due, now: now) {
+        for r in rows where r.pd && !dismissed.contains(dismissKey(r)) {
+            switch r.alertLevel(now: now) {
             case .overdue: overdue.append(r)
             case .soon: soon.append(r)
             default: break

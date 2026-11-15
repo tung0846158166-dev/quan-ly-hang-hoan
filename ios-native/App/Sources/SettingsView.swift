@@ -27,6 +27,7 @@ struct SettingsView: View {
                 Section("Dữ liệu đơn & thông báo") {
                     LabeledContent("Danh sách từ PC", value: store.updatedAt.map { "\(store.rows.count) đơn, lúc \($0.formatted(date: .omitted, time: .shortened))" } ?? "Chưa nhận")
                     LabeledContent("Mảnh dữ liệu đã nhận", value: engine.snapshotLastChunkAt.map { "\(engine.snapshotChunksSeen) mảnh, lúc \($0.formatted(date: .omitted, time: .standard))" } ?? "Chưa nhận mảnh nào")
+                    if !store.assembleInfo.isEmpty { LabeledContent("Ghép danh sách", value: store.assembleInfo) }
                     Button("Cập nhật dữ liệu đơn từ PC") { engine.requestSnapshot() }
                     LabeledContent("Thông báo quá hạn", value: store.notificationsAllowed ? "Đã bật" : "Chưa bật")
                     if !store.notificationsAllowed { Button("Bật thông báo đơn sắp đến hạn") { store.requestNotificationPermission() } }

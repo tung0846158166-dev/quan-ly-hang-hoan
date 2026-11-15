@@ -24,6 +24,43 @@ public struct SnapshotPayload: Codable, Equatable {
     public var rows: [OrderRow]
 }
 
+/// Giải mã "dễ tính": PC có thể gửi số thay cho chuỗi (mã đơn, ngày), null hoặc số lẻ; app vẫn đọc được thay vì bỏ cả danh sách.
+private extension KeyedDecodingContainer {
+    func flexString(_ key: Key) -> String {
+        if let s = try? decode(String.self, forKey: key) { return s }
+        if let i = try? decode(Int.self, forKey: key) { return String(i) }
+        if let d = try? decode(Double.self, forKey: key), d.isFinite { return d == d.rounded() && abs(d) < 9e15 ? String(Int(d)) : String(d) }
+        if let b = try? decode(Bool.self, forKey: key) { return b ? "true" : "false" }
+        return ""
+    }
+    func flexInt(_ key: Key, default def: Int = 0) -> Int {
+        if let i = try? decode(Int.self, forKey: key) { return i }
+        if let d = try? decode(Double.self, forKey: key), d.isFinite, abs(d) < 9e18 { return Int(d) }
+        if let s = try? decode(String.self, forKey: key), let i = Int(s.trimmingCharacters(in: .whitespaces)) { return i }
+        return def
+    }
+}
+
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st }
+private enum PayloadKeys: String, CodingKey { case time, count, rows }
+
+extension OrderRow {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: RowKeys.self)
+        self.init(k: c.flexString(.k), c: c.flexString(.c), o: c.flexString(.o), p: c.flexString(.p), n: c.flexString(.n),
+                  co: c.flexString(.co), sz: c.flexString(.sz), q: c.flexInt(.q, default: 1), rd: c.flexString(.rd),
+                  due: c.flexInt(.due), st: c.flexString(.st))
+    }
+}
+
+extension SnapshotPayload {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: PayloadKeys.self)
+        let rows = try c.decode([OrderRow].self, forKey: .rows)
+        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows)
+    }
+}
+
 public struct SnapshotChunk: Equatable {
     public var snapshotId: String
     public var idx: Int
@@ -38,6 +75,10 @@ public final class SnapshotAssembler {
     private var currentId = ""
     private var parts: [Int: String] = [:]
     private var total = 0
+    /// Để chẩn đoán: số mảnh đã nhận / tổng của lần gửi gần nhất, và lỗi ghép/giải mã nếu có.
+    public private(set) var partsReceived = 0
+    public private(set) var partsTotal = 0
+    public private(set) var lastError: String?
 
     public init() {}
 
@@ -49,10 +90,18 @@ public final class SnapshotAssembler {
             currentId = c.snapshotId; parts = [:]; total = c.total
         }
         parts[c.idx] = c.chunk
+        partsReceived = parts.count; partsTotal = total
         guard parts.count == total else { return nil }
         let b64 = (0..<total).compactMap { parts[$0] }.joined()
         parts = [:]
-        return try? Self.decode(base64: b64)
+        do {
+            let p = try Self.decode(base64: b64)
+            lastError = nil
+            return p
+        } catch {
+            lastError = "\(error)"
+            return nil
+        }
     }
 
     public static func decode(base64: String) throws -> SnapshotPayload {

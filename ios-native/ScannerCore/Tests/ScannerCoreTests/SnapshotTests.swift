@@ -58,3 +58,41 @@ final class SnapshotTests: XCTestCase {
         XCTAssertLessThanOrEqual(plan.count, 57)
     }
 }
+
+final class LenientSnapshotTests: XCTestCase {
+    /// PC thật có thể gửi số thay chuỗi, null, hoặc số lẻ; danh sách vẫn phải đọc được.
+    func testDecodesLooseTypesFromPc() throws {
+        let json = """
+        {"time":1700000000000,"count":2,"rows":[
+          {"k":"m","c":"SPX123","o":123456789,"p":"Shopee","n":"Áo","co":"Đen","sz":38,"q":2.0,"rd":45000,"due":null,"st":"Chưa nhận"},
+          {"k":"c","c":"GHN9","o":"","p":"","n":"","co":"","sz":"","q":"3","rd":"2026-11-10","due":1700000500000.0,"st":"Đơn hủy"}
+        ]}
+        """
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows.count, 2)
+        XCTAssertEqual(p.rows[0].o, "123456789")
+        XCTAssertEqual(p.rows[0].sz, "38")
+        XCTAssertEqual(p.rows[0].q, 2)
+        XCTAssertEqual(p.rows[0].rd, "45000")
+        XCTAssertEqual(p.rows[0].due, 0)
+        XCTAssertEqual(p.rows[1].q, 3)
+        XCTAssertEqual(p.rows[1].due, 1700000500000)
+    }
+
+    func testMissingFieldsDefaultInsteadOfFailing() throws {
+        let json = #"{"time":5,"rows":[{"c":"ABC123"}]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows.first?.c, "ABC123")
+        XCTAssertEqual(p.rows.first?.q, 1)
+        XCTAssertEqual(p.count, 1)
+    }
+
+    func testAssemblerReportsProgressAndError() {
+        let a = SnapshotAssembler()
+        XCTAssertNil(a.add(SnapshotChunk(snapshotId: "s1", idx: 0, total: 2, chunk: "AAAA")))
+        XCTAssertEqual(a.partsReceived, 1)
+        XCTAssertEqual(a.partsTotal, 2)
+        XCTAssertNil(a.add(SnapshotChunk(snapshotId: "s1", idx: 1, total: 2, chunk: "BBBB")))
+        XCTAssertNotNil(a.lastError, "dữ liệu rác phải báo lỗi giải mã, không im lặng")
+    }
+}

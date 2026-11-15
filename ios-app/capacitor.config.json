@@ -1,0 +1,9 @@
+{
+  "appId": "com.quanlyhanghoan.scanner",
+  "appName": "Quét Hàng Hoàn",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0f172a"
+  }
+}

@@ -808,10 +808,12 @@
       const rawSearch = String(window.location.search || '');
       const m = rawSearch.match(/[?&]room=([^&#]+)/i);
       if (m) return decodeURIComponent(m[1]).trim().toUpperCase();
+      try { const saved = localStorage.getItem('scanner-last-room'); if (saved) return saved; } catch (e) {}
       return 'SHP-2026';
     }
 
     let room = extractRoomCode();
+    try { localStorage.setItem('scanner-last-room', room); } catch (e) {}
     document.getElementById('roomCodeInput').value = room;
 
     const GLOBAL_TOPIC = 'agy_shopee_return_scanner_2026/GLOBAL_SYNC';
@@ -1991,6 +1993,7 @@
 
     function changeRoomCode(newRoom) {
       room = String(newRoom || 'SHP-2026').trim().toUpperCase();
+      try { localStorage.setItem('scanner-last-room', room); } catch (e) {}
       for (const scan of pendingScans.values()) { clearTimeout(scan.timer); clearTimeout(scan.retryTimer); clearTimeout(scan.finalReceiptTimer); }
       pendingScans.clear();
       lastScannedRawCode = '';

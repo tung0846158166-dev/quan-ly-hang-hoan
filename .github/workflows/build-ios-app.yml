@@ -1,0 +1,80 @@
+name: Build iPhone App (IPA chưa ký)
+
+on:
+  push:
+    branches: [feat/ios-app]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Số phiên bản app iPhone (vd 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event.inputs.version || '0.0.0-test' }}
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Chuẩn bị trang web cho app
+        working-directory: ios-app
+        run: |
+          mkdir -p www
+          cp ../mobile_scanner.html www/index.html
+          npm install --no-audit --no-fund
+
+      - name: Tạo dự án iOS
+        working-directory: ios-app
+        run: |
+          npx cap add ios
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Cần camera để quét mã vạch hàng hoàn'" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.VERSION }}" "$PLIST" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" "$PLIST" || true
+          ICON=ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+          if [ -f "$ICON" ]; then sips -z 1024 1024 ../app_icon.png --out "$ICON"; fi
+          npx cap sync ios
+
+      - name: Build (không ký)
+        working-directory: ios-app/ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -sdk iphoneos -archivePath "$PWD/build/App.xcarchive" archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" | tail -40
+
+      - name: Đóng gói IPA
+        working-directory: ios-app/ios/App/build
+        run: |
+          mkdir -p Payload
+          cp -R App.xcarchive/Products/Applications/App.app Payload/
+          zip -qry "QuetHangHoan-iPhone-v${{ env.VERSION }}.ipa" Payload
+          ls -lh *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuetHangHoan-iPhone-v${{ env.VERSION }}
+          path: ios-app/ios/App/build/*.ipa
+
+      - name: Phát hành
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-v${{ env.VERSION }}
+          name: "App iPhone Quét Hàng Hoàn v${{ env.VERSION }} (IPA chưa ký)"
+          make_latest: "false"
+          files: ios-app/ios/App/build/*.ipa
+          body: |
+            File `.ipa` **chưa ký**. Cài lên iPhone bằng **Sideloadly** hoặc **AltStore** với Apple ID của bạn.
+            Apple ID miễn phí: app chạy 7 ngày rồi phải cài lại để gia hạn.
+            Lần đầu mở: Cài đặt > Cài đặt chung > Quản lý VPN & thiết bị > tin cậy tài khoản của bạn.
+            Mở app, nhập mã phòng một lần (app sẽ nhớ).

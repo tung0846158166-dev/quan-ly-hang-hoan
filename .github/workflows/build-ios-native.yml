@@ -1,6 +1,8 @@
 name: Build iPhone App gốc SwiftUI (IPA chưa ký)
 
 on:
+  push:
+    branches: [feat/ios-native-stage2]
   workflow_dispatch:
     inputs:
       version:

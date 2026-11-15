@@ -16,6 +16,7 @@ struct ScannerApp: App {
 
 struct ContentView: View {
     @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var store: SnapshotStore
 
     var body: some View {
         TabView {
@@ -23,7 +24,7 @@ struct ContentView: View {
                 .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
             OrdersView()
                 .tabItem { Label("Đơn", systemImage: "shippingbox") }
-                .badge(engine.snapshot.overdueCount)
+                .badge(store.overdueCount)
             HistoryView()
                 .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                 .badge(engine.pendingCount)

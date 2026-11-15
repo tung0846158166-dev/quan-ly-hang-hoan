@@ -10,6 +10,8 @@ final class SnapshotStore: ObservableObject {
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
     @Published var stats: [String: Int] = [:]
+    /// Thông báo đã ẩn trên điện thoại (khóa = id đơn + hạn; không đồng bộ với máy tính).
+    @Published var dismissed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissedAlerts") ?? [])
 
     private let assembler = SnapshotAssembler()
     private var index: [String: OrderRow] = [:]
@@ -50,6 +52,44 @@ final class SnapshotStore: ObservableObject {
 
     func lookup(_ code: String) -> OrderRow? { index[code.uppercased()] }
 
+    // MARK: bảng thông báo trên điện thoại
+    private func dismissKey(_ r: OrderRow) -> String { "\(r.id)|\(r.due)" }
+
+    /// Đơn đang chờ đã quá hạn / sắp đến hạn trong 24 giờ, bỏ các đơn đã ẩn.
+    func alerts() -> (overdue: [OrderRow], soon: [OrderRow]) {
+        let now = nowMs()
+        var overdue: [OrderRow] = [], soon: [OrderRow] = []
+        for r in rows where r.pd && r.due > 0 && !dismissed.contains(dismissKey(r)) {
+            switch Deadline.level(due: r.due, now: now) {
+            case .overdue: overdue.append(r)
+            case .soon: soon.append(r)
+            default: break
+            }
+        }
+        overdue.sort { $0.due < $1.due }   // quá hạn lâu nhất lên đầu
+        soon.sort { $0.due < $1.due }
+        return (overdue, soon)
+    }
+
+    var alertCount: Int { let a = alerts(); return a.overdue.count + a.soon.count }
+
+    func dismissAlerts(_ list: [OrderRow]) {
+        for r in list { dismissed.insert(dismissKey(r)) }
+        UserDefaults.standard.set(Array(dismissed), forKey: "dismissedAlerts")
+    }
+
+    func restoreDismissed() {
+        dismissed = []
+        UserDefaults.standard.removeObject(forKey: "dismissedAlerts")
+    }
+
+    /// Id đơn nằm trong id thông báo ("warn-<id>" hoặc "due-<id>"); bản tóm tắt hằng ngày không có.
+    static func rowId(fromNoticeId id: String) -> String? {
+        if id.hasPrefix("warn-") { return String(id.dropFirst(5)) }
+        if id.hasPrefix("due-") { return String(id.dropFirst(4)) }
+        return nil
+    }
+
     // MARK: thông báo cục bộ
     func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { ok, _ in
@@ -78,6 +118,7 @@ final class SnapshotStore: ObservableObject {
                 content.title = n.title
                 content.body = n.body
                 content.sound = .default
+                if let rid = Self.rowId(fromNoticeId: n.id) { content.userInfo = ["rowId": rid] }
                 let secs = max(5, n.fire.timeIntervalSinceNow)
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secs, repeats: false)
                 center.add(UNNotificationRequest(identifier: n.id, content: content, trigger: trigger))

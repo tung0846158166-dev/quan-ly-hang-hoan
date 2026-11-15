@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.6';
+    const APP_VERSION_NUMBER = '1.9.7';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -9416,6 +9416,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function saveOrders(immediate = false, importCommit = false) {
       if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return Promise.resolve({ success: false, deferred: true });
       markUnsavedToFile();
+      try { schedulePhoneWatchSync(); } catch (e) {}
       if (immediate) {
         return flushPersistOrdersToDiskAndStorage(importCommit);
       }
@@ -13587,7 +13588,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.6',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.7',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13860,6 +13861,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return btoa(bin);
     }
 
+    // v1.9.7: đồng bộ 2 chiều theo dõi + ghi chú. Mỗi lần danh sách theo dõi/lý do theo dõi đổi, PC gửi bản mới sang iPhone.
+    let phoneWatchSig = null, phoneWatchTimer = null;
+    function buildPhoneWatchList() {
+      return (Array.isArray(orders) ? orders : []).filter(o => o && o.isWatchlist).map(o => ({
+        c: String(o.track || o.returnTrack || o.orderId || '').trim(), o: String(o.orderId || '').trim(), r: String(o.watchlistReason || '').slice(0, 300)
+      }));
+    }
+    function schedulePhoneWatchSync() {
+      if (phoneWatchTimer) clearTimeout(phoneWatchTimer);
+      phoneWatchTimer = setTimeout(() => { try { sendPhoneWatchSync(false); } catch (e) {} }, 1500);
+    }
+    function sendPhoneWatchSync(force) {
+      const list = buildPhoneWatchList();
+      const sig = JSON.stringify(list);
+      if (!force && sig === phoneWatchSig) return;
+      phoneWatchSig = sig;
+      const room = phoneRoomId || 'SHP-2026';
+      const msg = JSON.stringify({ type: 'watch_sync', room, time: Date.now(), items: list });
+      const mqttTopic = 'agy_shopee_return_scanner_2026/' + room;
+      if (mqttClient && mqttClient.connected) { try { mqttClient.publish(mqttTopic, msg); } catch (e) {} }
+      (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(mqttTopic, msg); } catch (e) {} } });
+      if (msg.length < 3500) {
+        try {
+          const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          if (ctl) setTimeout(() => ctl.abort(), 5000);
+          fetch('https://ntfy.sh/' + getNtfyTopic() + '?title=Shopee%20Watch', { method: 'POST', body: msg, signal: ctl ? ctl.signal : undefined }).catch(() => {});
+        } catch (e) {}
+      }
+    }
+
     async function broadcastOrdersSnapshot(force) {
       if (phoneSnapshotBusy) return false;
       if (!force && Date.now() - lastPhoneSnapshotAt < 20000) return false;
@@ -14024,7 +14055,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           mqttClient.on('message', (t, msgBuf) => {
             try {
               const data = JSON.parse(msgBuf.toString());
-              if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'].includes(data.type)) return;
+              if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat', 'watch_sync'].includes(data.type)) return;
               data.__via = 'emqx';
               processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
             } catch (e) {}
@@ -14038,7 +14069,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               extra.on('message', (t, msgBuf) => {
                 try {
                   const data = JSON.parse(msgBuf.toString());
-                  if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'].includes(data.type)) return;
+                  if (!data || ['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat', 'watch_sync'].includes(data.type)) return;
                   data.__via = url.indexOf('hivemq') >= 0 ? 'hivemq' : 'mosquitto';
                   processIncomingPhonePayload(data).catch(error => console.warn('MQTT payload error:', error));
                 } catch (e) {}
@@ -14276,19 +14307,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (data.type === 'order_note') {
         const noteCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
         const noteText = String(data.note || '').trim().slice(0, 300);
+        const watchOn = data.watch !== false;
         const nreply = (msg, outcome) => sendAckToPhone(0, noteCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'note' });
         let hits = phoneOrderMatches(noteCode);
         if (!hits.length && data.orderId) hits = phoneOrderMatches(data.orderId);
-        if (!hits.length || !noteText) { nreply('Không thấy đơn ' + noteCode + ' ở bảng chính để ghi chú', 'not_found'); return { success: false }; }
+        if (!hits.length) { nreply('Không thấy đơn ' + noteCode + ' ở bảng chính để ghi chú', 'not_found'); return { success: false }; }
         hits.forEach(({ order }) => {
-          order.isWatchlist = true;
-          const cur = String(order.watchlistReason || '').trim();
-          if (!cur.includes(noteText)) order.watchlistReason = cur ? cur + ' | ' + noteText : noteText;
+          order.isWatchlist = watchOn;
+          order.watchlistReason = watchOn ? noteText : '';
         });
         saveOrders();
         try { updateWatchlistBadge(); } catch (e) {}
         try { renderAll(false); } catch (e) {}
-        nreply('PC đã lưu ghi chú và đưa đơn ' + noteCode + ' vào bảng theo dõi', 'success');
+        nreply(watchOn ? 'PC đã lưu ghi chú và đưa đơn ' + noteCode + ' vào bảng theo dõi' : 'PC đã bỏ theo dõi đơn ' + noteCode, 'success');
         return { success: true };
       }
       if (data.type === 'inbox_push') {

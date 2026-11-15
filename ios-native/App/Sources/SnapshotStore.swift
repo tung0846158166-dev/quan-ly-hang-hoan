@@ -52,14 +52,36 @@ final class SnapshotStore: ObservableObject {
 
     func lookup(_ code: String) -> OrderRow? { index[code.uppercased()] }
 
-    /// Cập nhật ngay trên điện thoại sau khi tạo ghi chú (PC sẽ gửi bản chính thức ở lần đồng bộ sau).
-    func applyLocalNote(rowId: String, note: String) {
+    /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi một đơn đổi theo dõi/ghi chú.
+    private func commit() {
+        let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
+        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
+    }
+
+    /// Sửa ghi chú / theo dõi ngay trên điện thoại (PC nhận cùng nội dung và gửi lại danh sách theo dõi chính thức).
+    func applyLocalNote(rowId: String, note: String, watch: Bool) {
         guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
-        rows[i].wl = true
-        if !rows[i].wr.contains(note) { rows[i].wr = rows[i].wr.isEmpty ? note : rows[i].wr + " | " + note }
-        let r = rows[i]
-        index[r.c.uppercased()] = r
-        if !r.o.isEmpty { index[r.o.uppercased()] = r }
+        rows[i].wl = watch
+        rows[i].wr = watch ? note : ""
+        commit()
+    }
+
+    /// PC báo danh sách đơn đang theo dõi + ghi chú đã đổi: cập nhật các đơn ở bảng chính cho khớp.
+    func applyWatchSync(_ items: [WatchItem]) {
+        var byKey: [String: String] = [:]
+        for it in items {
+            if !it.c.isEmpty { byKey[it.c.uppercased()] = it.r }
+            if !it.o.isEmpty && byKey[it.o.uppercased()] == nil { byKey[it.o.uppercased()] = it.r }
+        }
+        var changed = false
+        for i in rows.indices where rows[i].k == "m" {
+            var reason: String? = byKey[rows[i].c.uppercased()]
+            if reason == nil && !rows[i].o.isEmpty { reason = byKey[rows[i].o.uppercased()] }
+            let wl = reason != nil
+            let wr = reason ?? ""
+            if rows[i].wl != wl || rows[i].wr != wr { rows[i].wl = wl; rows[i].wr = wr; changed = true }
+        }
+        if changed { commit() }
     }
 
     // MARK: bảng thông báo trên điện thoại

@@ -39,6 +39,10 @@ public struct SnapshotPayload: Codable, Equatable {
     public var rows: [OrderRow]
     /// Bảng đối chiếu số đơn do PC tính trên dữ liệu gốc (PC cũ không gửi thì rỗng).
     public var stats: [String: Int] = [:]
+
+    public init(time: Int, count: Int, rows: [OrderRow], stats: [String: Int] = [:]) {
+        self.time = time; self.count = count; self.rows = rows; self.stats = stats
+    }
 }
 
 /// Giải mã "dễ tính": PC có thể gửi số thay cho chuỗi (mã đơn, ngày), null hoặc số lẻ; app vẫn đọc được thay vì bỏ cả danh sách.

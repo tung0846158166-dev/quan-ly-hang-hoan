@@ -208,6 +208,10 @@ final class SyncEngine: ObservableObject {
             snapshotLastChunkAt = Date()
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
+        case .watchSync(let t, let items):
+            pcLastSeen = Date()
+            if isDuplicate("w|\(t)") { return }
+            snapshot.applyWatchSync(items)
         case .ack(let ack) where ack.ackStage == "note":
             pcLastSeen = Date()
             if isDuplicate("n|\(ack.requestId)|\(ack.outcome)") { return }
@@ -329,15 +333,14 @@ final class SyncEngine: ObservableObject {
     private var pendingNotes: [String: String] = UserDefaults.standard.dictionary(forKey: "pendingNotes") as? [String: String] ?? [:]
     var pendingNoteCount: Int { pendingNotes.count }
 
-    func sendOrderNote(_ row: OrderRow, note: String) {
+    func sendOrderNote(_ row: OrderRow, note: String, watch: Bool = true) {
         let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
         let rid = "note-\(nowMs())"
-        let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, room: room, requestId: rid)
+        let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, watch: watch, room: room, requestId: rid)
         pendingNotes[rid] = body
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Note", room: room)
-        snapshot.applyLocalNote(rowId: row.id, note: t)
+        snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
         banner = Banner(code: row.c, text: "ĐÃ GỬI GHI CHÚ, CHỜ PC", color: .orange)
     }
 

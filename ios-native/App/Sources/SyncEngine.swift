@@ -15,6 +15,7 @@ final class SyncEngine: ObservableObject {
     @Published var items: [ScanItem] = []
     @Published var room: String
     @Published var sseConnected = false
+    @Published var brokerUp: Set<String> = []
     @Published var pcLastSeen: Date?
     @Published var banner: Banner?
     @Published var mode: ScanKind = .returnScan
@@ -24,6 +25,10 @@ final class SyncEngine: ObservableObject {
     let snapshot = SnapshotStore()
 
     private let client = NtfyClient()
+    private var mqttClients: [MQTTClient] = []
+    private var mqttTasks: [Task<Void, Never>] = []
+    private var mqttGeneration = 0
+    private var seenMsgs: [String: Date] = [:]
     private var sseTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
     private var seq = 0
@@ -44,6 +49,8 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    var mqttConnected: Bool { !brokerUp.isEmpty }
+    var channelUp: Bool { sseConnected || mqttConnected }
     var pendingCount: Int { items.filter { !$0.isSettled }.count }
     var pcOnline: Bool { pcLastSeen.map { Date().timeIntervalSince($0) < 120 } ?? false }
 
@@ -53,6 +60,7 @@ final class SyncEngine: ObservableObject {
     func start() {
         guard sseTask == nil else { return }
         startSSE()
+        startMQTT()
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -69,6 +77,7 @@ final class SyncEngine: ObservableObject {
         pcLastSeen = nil
         sseTask?.cancel(); sseTask = nil
         startSSE()
+        startMQTT()
     }
 
     private func startSSE() {
@@ -92,30 +101,104 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    // MARK: kênh MQTT dự phòng (dùng khi ntfy.sh bị chặn)
+    private func startMQTT() {
+        mqttTasks.forEach { $0.cancel() }
+        mqttTasks = []
+        mqttClients = []
+        brokerUp = []
+        mqttGeneration += 1
+        let gen = mqttGeneration
+        let topic = SyncProtocol.mqttTopic(room: room)
+        for b in SyncProtocol.mqttBrokers {
+            let c = MQTTClient(name: b.name, url: b.url)
+            mqttClients.append(c)
+            let name = b.name
+            mqttTasks.append(Task {
+                await c.run(topic: topic,
+                    onMessage: { [weak self] raw in
+                        Task { @MainActor [weak self] in
+                            guard let self = self, self.mqttGeneration == gen else { return }
+                            self.handleMQTT(raw)
+                        }
+                    },
+                    onState: { [weak self] up in
+                        Task { @MainActor [weak self] in
+                            guard let self = self, self.mqttGeneration == gen else { return }
+                            self.brokerChanged(name, up: up)
+                        }
+                    })
+            })
+        }
+    }
+
+    private func brokerChanged(_ name: String, up: Bool) {
+        let was = mqttConnected
+        if up { brokerUp.insert(name) } else { brokerUp.remove(name) }
+        if !was && mqttConnected && !sseConnected { channelOpened() }
+    }
+
+    private func handleMQTT(_ raw: String) {
+        guard let msg = SyncProtocol.parseMessage(raw, room: room) else { return }
+        dispatch(msg)
+    }
+
+    /// Gửi một bản tin qua mọi kênh đang có. ntfy chỉ dùng khi nó đang nối, hoặc khi MQTT chưa nối được.
+    private func broadcast(_ body: String, title: String, room r: String) {
+        for c in mqttClients { c.publish(topic: SyncProtocol.mqttTopic(room: r), body: body) }
+        if sseConnected || !mqttConnected {
+            Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: title, body: body) }
+        }
+    }
+
+    /// Kênh vừa nối: báo cho PC biết, gửi lại hàng đợi, xin danh sách đơn nếu cũ.
+    private func channelOpened() {
+        let hello = SyncProtocol.json(["type": "phone_connected", "room": room, "time": nowMs()])
+        broadcast(hello, title: "Shopee Connect", room: room)
+        resendAllPending()
+        if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 { requestSnapshot() }
+    }
+
+    /// Cùng một phản hồi có thể tới từ nhiều kênh; chỉ xử lý một lần trong 30 giây.
+    private func isDuplicate(_ key: String) -> Bool {
+        let now = Date()
+        if seenMsgs.count > 400 { seenMsgs = seenMsgs.filter { now.timeIntervalSince($0.value) < 30 } }
+        if let t = seenMsgs[key], now.timeIntervalSince(t) < 30 { return true }
+        seenMsgs[key] = now
+        return false
+    }
+
     // MARK: nhận phản hồi
     private func handleIncoming(_ data: String, opened: Bool) {
         if opened && !sseConnected {
             sseConnected = true
-            let hello = SyncProtocol.json(["type": "phone_connected", "room": room, "time": nowMs()])
-            let r = room
-            Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Connect", body: hello) }
-            resendAllPending()
-            if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 { requestSnapshot() }
+            channelOpened()
         }
         guard let msg = SyncProtocol.parseIncoming(sseData: data, room: room) else { return }
+        dispatch(msg)
+    }
+
+    private func dispatch(_ msg: PcMessage) {
         switch msg {
         case .hello, .heartbeat:
             pcLastSeen = Date()
         case .snapshotChunk(let ch):
             pcLastSeen = Date()
+            if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
         case .ack(let ack) where ack.ackStage == "push":
             pcLastSeen = Date()
+            if isDuplicate("p|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(ack.extra ?? "")") { return }
             let ok = ack.outcome == "success" || ack.outcome == "duplicate"
             if ok { for i in items.indices where items[i].kind == .newOrder && items[i].code == ack.code { items[i].pushed = true } ; persist() }
             banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "Đã đẩy ra bảng chính" : "Chưa đẩy được"), color: ok ? .green : .red)
         case .ack(let ack):
             pcLastSeen = Date()
+            let saved = ack.photoSaved == true ? "1" : "0"
+            let stage = ack.ackStage ?? ""
+            let cap = ack.captureId ?? ""
+            let extra = ack.extra ?? ""
+            if isDuplicate("a|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(stage)|\(cap)|\(saved)|\(extra)") { return }
             guard let i = items.firstIndex(where: { $0.requestId == ack.requestId }) else { return }
             if items[i].apply(ack) {
                 persist()
@@ -206,14 +289,14 @@ final class SyncEngine: ObservableObject {
     func requestSnapshot() {
         let r = room
         let body = SyncProtocol.snapshotRequest(room: r, now: nowMs())
-        Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Snapshot Request", body: body) }
+        broadcast(body, title: "Shopee Snapshot Request", room: r)
     }
 
     func pushToMain(_ item: ScanItem) {
         let r = room
         let body = SyncProtocol.inboxPush(code: item.code, room: r, requestId: "push-\(nowMs())")
         banner = Banner(code: item.code, text: "ĐANG ĐẨY RA BẢNG CHÍNH", color: .orange)
-        Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Push", body: body) }
+        broadcast(body, title: "Shopee Push", room: r)
     }
 
     // MARK: thống kê & xuất
@@ -245,7 +328,7 @@ final class SyncEngine: ObservableObject {
         let body = SyncProtocol.json(SyncProtocol.scanPayload(kind: it.kind, code: it.code, requestId: it.requestId,
             captureId: it.captureId, captureTime: it.time, time: it.time, room: r, note: note))
         persist()
-        Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Scan", body: body) }
+        broadcast(body, title: "Shopee Scan", room: r)
     }
 
     private func transmitPhoto(_ id: String) {
@@ -259,10 +342,20 @@ final class SyncEngine: ObservableObject {
         let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
         let chunks = SyncProtocol.photoChunks(dataURL: dataURL, code: it.code, kind: it.kind, requestId: it.requestId,
             captureId: it.captureId, captureTime: it.time, room: r, now: nowMs(), photoId: "ph_\(nowMs())_\(it.attempts)")
+        // Ảnh chỉ đi qua MỘT broker MQTT (không nhân ba); ntfy chỉ dùng khi nó đang nối hoặc MQTT chưa nối được.
+        let mq = mqttClients.last(where: { $0.isConnected })
+        let useNtfy = sseConnected || mq == nil
+        let mqTopic = SyncProtocol.mqttTopic(room: r)
         Task {
             for c in chunks {
-                try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Photo Chunk", body: SyncProtocol.json(c))
-                try? await Task.sleep(nanoseconds: 45_000_000)
+                let body = SyncProtocol.json(c)
+                mq?.publish(topic: mqTopic, body: body)
+                if useNtfy {
+                    try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Photo Chunk", body: body)
+                    try? await Task.sleep(nanoseconds: 45_000_000)
+                } else {
+                    try? await Task.sleep(nanoseconds: 4_000_000)
+                }
             }
         }
     }
@@ -287,7 +380,7 @@ final class SyncEngine: ObservableObject {
             }
         }
         // Hỏi lại ntfy để bắt phản hồi bị lỡ khi mất kết nối.
-        if needPoll && tickCount % 3 == 0 {
+        if needPoll && tickCount % 3 == 0 && (sseConnected || !mqttConnected) {
             let r = room
             if let lines = try? await client.poll(topic: SyncProtocol.topic(room: r), since: "10m") {
                 for l in lines { handleIncoming(l, opened: false) }

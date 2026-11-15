@@ -1,4 +1,5 @@
 import SwiftUI
+import ScannerCore
 
 struct SettingsView: View {
     @EnvironmentObject var engine: SyncEngine
@@ -16,6 +17,7 @@ struct SettingsView: View {
                 }
                 Section("Trạng thái") {
                     LabeledContent("Kênh ntfy", value: engine.sseConnected ? "Đã nối" : "Mất kết nối")
+                    LabeledContent("Kênh MQTT dự phòng", value: engine.brokerUp.isEmpty ? "Mất kết nối" : "Đã nối (\(engine.brokerUp.count)/\(SyncProtocol.mqttBrokers.count))")
                     LabeledContent("PC", value: engine.pcLastSeen.map { "Phản hồi \($0.formatted(date: .omitted, time: .standard))" } ?? "Chưa thấy phản hồi")
                     LabeledContent("Đơn đang chờ PC", value: "\(engine.pendingCount)")
                 }

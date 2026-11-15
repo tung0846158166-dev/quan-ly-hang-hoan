@@ -30,3 +30,11 @@ test('PC có xử lý snapshot_request và gửi theo mảnh deflate-raw', () =>
   assert.match(src, /type: 'snapshot_chunk'/);
   const z = zlib.deflateRawSync(Buffer.from('{"rows":[]}')); assert.strictEqual(zlib.inflateRawSync(z).toString(), '{"rows":[]}');
 });
+test('v1.9.1: snapshot gửi cả qua MQTT, lỗi ntfy không dừng, và bỏ qua bản tin PC tự gửi vọng lại', () => {
+  const fn = src.match(/async function broadcastOrdersSnapshot[\s\S]*?\r?\n    \}\r?\n/)[0];
+  assert.match(fn, /mqttClient\.publish\(mqttTopic, msg\)/);
+  assert.match(fn, /extraMqttClients/);
+  assert.match(fn, /try \{ await fetch\('https:\/\/ntfy\.sh\/' \+ topic \+ '\?title=Shopee%20Snapshot'/);
+  const filters = src.match(/\['pc_ack', 'snapshot_chunk', 'manifest_sync', 'pc_hello', 'pc_heartbeat'\]\.includes\(data\.type\)/g) || [];
+  assert.strictEqual(filters.length, 2, 'cả hai bộ nhận MQTT (chính và phụ) đều phải lọc');
+});

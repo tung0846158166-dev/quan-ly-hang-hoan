@@ -49,7 +49,7 @@ struct ScanView: View {
             }
             .pickerStyle(.segmented)
             HStack {
-                pill(engine.sseConnected ? "Đã nối kênh" : "Mất kết nối", engine.sseConnected ? .green : .red)
+                pill(engine.channelUp ? "Đã nối kênh" : "Mất kết nối", engine.channelUp ? .green : .red)
                 pill(engine.pcOnline ? "PC đang online" : "Chờ PC phản hồi", engine.pcOnline ? .green : .orange)
                 if engine.pendingCount > 0 { pill("Chờ \(engine.pendingCount)", .orange) }
                 Spacer()

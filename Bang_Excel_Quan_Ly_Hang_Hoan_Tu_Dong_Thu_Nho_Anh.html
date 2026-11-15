@@ -7109,7 +7109,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.7';
+    const APP_VERSION_NUMBER = '1.9.8';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -9416,7 +9416,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function saveOrders(immediate = false, importCommit = false) {
       if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return Promise.resolve({ success: false, deferred: true });
       markUnsavedToFile();
-      try { schedulePhoneWatchSync(); } catch (e) {}
+      try { schedulePhoneWatchSync(); schedulePhoneSnapshotSync(); } catch (e) {}
       if (immediate) {
         return flushPersistOrdersToDiskAndStorage(importCommit);
       }
@@ -13588,7 +13588,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.7',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.8',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -13862,7 +13862,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // v1.9.7: đồng bộ 2 chiều theo dõi + ghi chú. Mỗi lần danh sách theo dõi/lý do theo dõi đổi, PC gửi bản mới sang iPhone.
-    let phoneWatchSig = null, phoneWatchTimer = null;
+    let phoneWatchSig = null, phoneWatchTimer = null, phoneSnapTimer = null;
+    // v1.9.8: sửa/xóa đơn trên PC → gửi lại danh sách đầy đủ sang iPhone (chỉ khi iPhone mới hoạt động gần đây).
+    function schedulePhoneSnapshotSync(attempt = 0) {
+      if (phoneSnapTimer) clearTimeout(phoneSnapTimer);
+      phoneSnapTimer = setTimeout(async () => {
+        try {
+          if (Date.now() - (window.__lastPhoneActivity || 0) > 30 * 60 * 1000) return;
+          const ok = await broadcastOrdersSnapshot(false);
+          if (!ok && attempt < 4) schedulePhoneSnapshotSync(attempt + 1);
+        } catch (e) {}
+      }, 8000);
+    }
     function buildPhoneWatchList() {
       return (Array.isArray(orders) ? orders : []).filter(o => o && o.isWatchlist).map(o => ({
         c: String(o.track || o.returnTrack || o.orderId || '').trim(), o: String(o.orderId || '').trim(), r: String(o.watchlistReason || '').slice(0, 300)
@@ -14320,6 +14331,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         try { updateWatchlistBadge(); } catch (e) {}
         try { renderAll(false); } catch (e) {}
         nreply(watchOn ? 'PC đã lưu ghi chú và đưa đơn ' + noteCode + ' vào bảng theo dõi' : 'PC đã bỏ theo dõi đơn ' + noteCode, 'success');
+        return { success: true };
+      }
+      // v1.9.8: iPhone sửa / xóa đơn ở bảng chính
+      if (data.type === 'order_edit' || data.type === 'order_delete') {
+        const isDel = data.type === 'order_delete';
+        const eCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
+        const ereply = (msg, outcome) => sendAckToPhone(0, eCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: isDel ? 'delete' : 'edit' });
+        let eh = phoneOrderMatches(eCode);
+        if (!eh.length && data.orderId) eh = phoneOrderMatches(data.orderId);
+        if (!eh.length) { ereply('Không thấy đơn ' + eCode + ' ở bảng chính (có thể đã bị xóa)', 'not_found'); return { success: false }; }
+        if (eh.length > 1) { ereply('Mã ' + eCode + ' trùng ' + eh.length + ' đơn, hãy xử lý trên máy tính', 'ambiguous'); return { success: false }; }
+        const { order: eo, index: eIdx } = eh[0];
+        if (isLocked || hasLockedCellsInOrder(eIdx)) { ereply('Đơn ' + eCode + ' đang khóa trên máy tính', 'locked'); return { success: false }; }
+        if (isDel) {
+          try {
+            const key = 'phone_deleted_orders_backup';
+            const bk = JSON.parse(localStorage.getItem(key) || '[]');
+            bk.push({ at: Date.now(), order: eo });
+            localStorage.setItem(key, JSON.stringify(bk.slice(-200)));
+          } catch (e) {}
+          addAuditLog('🗑 XÓA ĐƠN TỪ ĐT', 'iPhone xóa đơn (Mã đơn: ' + (eo.orderId || 'Trống') + ', MVĐ: ' + (eo.track || 'Trống') + ')');
+          orders.splice(eIdx, 1);
+          shiftCellLocksAfterOrderDelete(eIdx);
+          shiftCellEditHistoryAfterOrderDelete(eIdx);
+          saveOrders();
+          try { renderAll(false); } catch (e) {}
+          ereply('PC đã xóa đơn ' + eCode, 'success');
+          return { success: true };
+        }
+        const f = data.fields || {};
+        const its = Array.isArray(eo.items) && eo.items.length ? eo.items : null;
+        const wantsGoods = ['n', 'co', 'sz', 'q'].some(k => k in f);
+        if (wantsGoods && its && its.length > 1) { ereply('Đơn nhiều sản phẩm, hãy sửa sản phẩm trên máy tính', 'invalid'); return { success: false }; }
+        const tg = its ? its[0] : eo;
+        if (typeof f.n === 'string') tg.product = f.n.slice(0, 200);
+        if (typeof f.co === 'string') tg.color = f.co.slice(0, 60);
+        if (typeof f.sz === 'string') tg.size = f.sz.slice(0, 40);
+        if (f.q !== undefined && Number.isFinite(Number(f.q))) tg.qty = Math.max(1, Math.round(Number(f.q)));
+        if (typeof f.st === 'string' && ['Chưa nhận', 'Hàng đã trả', 'Không cần nhận', 'Bị mất', 'Hư hỏng'].includes(f.st)) eo.status = f.st;
+        if (typeof f.ty === 'string' && ORDER_TYPE_OPTIONS.includes(f.ty)) eo.orderType = f.ty;
+        addAuditLog('📱 SỬA ĐƠN TỪ ĐT', 'iPhone sửa đơn (Mã đơn: ' + (eo.orderId || 'Trống') + ', MVĐ: ' + (eo.track || 'Trống') + ')');
+        saveOrders();
+        try { renderAll(false); } catch (e) {}
+        ereply('PC đã cập nhật đơn ' + eCode, 'success');
         return { success: true };
       }
       if (data.type === 'inbox_push') {

@@ -212,15 +212,16 @@ final class SyncEngine: ObservableObject {
             pcLastSeen = Date()
             if isDuplicate("w|\(t)") { return }
             snapshot.applyWatchSync(items)
-        case .ack(let ack) where ack.ackStage == "note":
+        case .ack(let ack) where ["note", "edit", "delete"].contains(ack.ackStage ?? ""):
             pcLastSeen = Date()
             if isDuplicate("n|\(ack.requestId)|\(ack.outcome)") { return }
-            if ack.outcome == "success" || ack.outcome == "duplicate" || ack.outcome == "not_found" {
-                pendingNotes[ack.requestId] = nil
-                UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
-            }
+            // PC đã trả lời (thành công hay từ chối) thì thôi gửi lại.
+            pendingNotes[ack.requestId] = nil
+            UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
             let ok = ack.outcome == "success" || ack.outcome == "duplicate"
-            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "PC đã lưu ghi chú và đánh dấu theo dõi" : "PC không thấy đơn này ở bảng chính"), color: ok ? .green : .red)
+            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "PC đã cập nhật" : "PC không thực hiện được"), color: ok ? .green : .red)
+            if !ok { requestSnapshot() }   // lấy lại bản đúng từ PC nếu PC từ chối
+
         case .ack(let ack) where ack.ackStage == "push":
             pcLastSeen = Date()
             if isDuplicate("p|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(ack.extra ?? "")") { return }
@@ -342,6 +343,26 @@ final class SyncEngine: ObservableObject {
         broadcast(body, title: "Shopee Note", room: room)
         snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
         banner = Banner(code: row.c, text: "ĐÃ GỬI GHI CHÚ, CHỜ PC", color: .orange)
+    }
+
+    func sendOrderEdit(_ row: OrderRow, fields: [String: Any]) {
+        let rid = "edit-\(nowMs())"
+        let body = SyncProtocol.orderEdit(code: row.c, orderId: row.o, fields: fields, room: room, requestId: rid)
+        pendingNotes[rid] = body
+        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        broadcast(body, title: "Shopee Edit", room: room)
+        snapshot.applyLocalEdit(rowId: row.id, fields: fields)
+        banner = Banner(code: row.c, text: "ĐÃ GỬI SỬA ĐƠN, CHỜ PC", color: .orange)
+    }
+
+    func sendOrderDelete(_ row: OrderRow) {
+        let rid = "del-\(nowMs())"
+        let body = SyncProtocol.orderDelete(code: row.c, orderId: row.o, room: room, requestId: rid)
+        pendingNotes[rid] = body
+        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        broadcast(body, title: "Shopee Delete", room: room)
+        snapshot.removeLocal(rowId: row.id)
+        banner = Banner(code: row.c, text: "ĐÃ GỬI XÓA ĐƠN, CHỜ PC", color: .orange)
     }
 
     private func resendPendingNotes() {

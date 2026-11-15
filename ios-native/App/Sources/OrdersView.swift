@@ -216,6 +216,24 @@ struct DetailView: View {
     @State private var noteText = ""
     @State private var watchOn = false
     @State private var sentNote = false
+    @State private var editN = ""
+    @State private var editCo = ""
+    @State private var editSz = ""
+    @State private var editQ = 1
+    @State private var editSt = ""
+    @State private var editTy = ""
+    @State private var sentEdit = false
+    @State private var askDelete = false
+    @State private var confirmDelete = false
+
+    private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất", "Hư hỏng"]
+    private static let types = ["Giao không thành công", "Trả hàng/Hoàn tiền", "Đơn hủy", "THẤT THU"]
+    private var statusChoices: [String] { Self.statuses.contains(editSt) || editSt.isEmpty ? Self.statuses : Self.statuses + [editSt] }
+    private var typeChoices: [String] { Self.types.contains(editTy) || editTy.isEmpty ? Self.types : Self.types + [editTy] }
+
+    private func fillEdit() {
+        editN = live.n; editCo = live.co; editSz = live.sz; editQ = live.q; editSt = live.st; editTy = live.ty
+    }
 
     /// Bản mới nhất của đơn (đổi ngay khi máy tính sửa theo dõi/ghi chú).
     private var live: OrderRow { store.rows.first(where: { $0.id == row.id }) ?? row }
@@ -244,6 +262,21 @@ struct DetailView: View {
                     if live.k != "m" { Text("Chỉ đơn ở bảng chính mới đồng bộ theo dõi/ghi chú với máy tính.").font(.caption).foregroundStyle(.secondary) }
                     if !live.nt.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Ghi chú đơn trên máy tính").font(.caption).foregroundStyle(.secondary); Text(live.nt) } }
                 }
+                if live.k == "m" {
+                    Section("Sửa thông tin đơn (đồng bộ 2 chiều với máy tính)") {
+                        TextField("Sản phẩm", text: $editN, axis: .vertical).lineLimit(1...3)
+                        TextField("Màu", text: $editCo)
+                        TextField("Size", text: $editSz)
+                        Stepper("Số lượng: \(editQ)", value: $editQ, in: 1...999)
+                        Picker("Trạng thái", selection: $editSt) { ForEach(statusChoices, id: \.self) { Text($0).tag($0) } }
+                        Picker("Loại đơn", selection: $editTy) { ForEach(typeChoices, id: \.self) { Text($0).tag($0) } }
+                        Button(sentEdit ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu thay đổi sang máy tính") {
+                            engine.sendOrderEdit(live, fields: ["n": editN, "co": editCo, "sz": editSz, "q": editQ, "st": editSt, "ty": editTy])
+                            sentEdit = true
+                        }
+                        Button("Xóa đơn này", role: .destructive) { askDelete = true }
+                    }
+                }
                 Section("Đơn") {
                     LabeledContent("Nằm ở", value: source)
                     LabeledContent("Sàn", value: live.p.isEmpty ? "—" : live.p)
@@ -264,7 +297,15 @@ struct DetailView: View {
                     }
                 }
             }
-            .onAppear { noteText = live.wr; watchOn = live.wl }
+            .onAppear { noteText = live.wr; watchOn = live.wl; fillEdit() }
+            .onChange(of: live) { _ in fillEdit(); sentEdit = false }
+            .confirmationDialog("Xóa đơn này?", isPresented: $askDelete, titleVisibility: .visible) {
+                Button("Tiếp tục xóa", role: .destructive) { confirmDelete = true }
+            } message: { Text("Đơn sẽ bị xóa khỏi bảng chính trên cả máy tính và điện thoại.") }
+            .alert("Chắc chắn xóa đơn \(live.o.isEmpty ? live.c : live.o)?", isPresented: $confirmDelete) {
+                Button("Hủy", role: .cancel) {}
+                Button("Xóa", role: .destructive) { engine.sendOrderDelete(live); dismiss() }
+            } message: { Text("Không thể hoàn tác trên điện thoại.") }
             .onChange(of: live.wr) { v in noteText = v; sentNote = false }
             .onChange(of: live.wl) { v in watchOn = v }
             .navigationTitle("Chi tiết đơn")

@@ -66,6 +66,28 @@ final class SnapshotStore: ObservableObject {
         commit()
     }
 
+    /// Sửa đơn ngay trên điện thoại (n, co, sz, q, st, ty); PC làm theo rồi gửi lại danh sách chính thức.
+    func applyLocalEdit(rowId: String, fields: [String: Any]) {
+        guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
+        if let v = fields["n"] as? String { rows[i].n = v }
+        if let v = fields["co"] as? String { rows[i].co = v }
+        if let v = fields["sz"] as? String { rows[i].sz = v }
+        if let v = fields["q"] as? Int { rows[i].q = max(1, v) }
+        if let v = fields["ty"] as? String, !v.isEmpty { rows[i].ty = v }
+        if let v = fields["st"] as? String {
+            rows[i].st = v
+            let received = v == "Hàng đã trả" || v == "Đã nhận"
+            rows[i].rv = received
+            rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất" || v == "Hư hỏng")
+        }
+        commit()
+    }
+
+    func removeLocal(rowId: String) {
+        rows.removeAll { $0.id == rowId }
+        commit()
+    }
+
     /// PC báo danh sách đơn đang theo dõi + ghi chú đã đổi: cập nhật các đơn ở bảng chính cho khớp.
     func applyWatchSync(_ items: [WatchItem]) {
         var byKey: [String: String] = [:]

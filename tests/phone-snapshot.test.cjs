@@ -85,11 +85,20 @@ test('v1.9.6: PC nhận ghi chú đơn từ iPhone, đánh dấu theo dõi và b
 });
 
 test('v1.9.7: PC gửi danh sách theo dõi + ghi chú sang iPhone mỗi khi đổi (đồng bộ 2 chiều)', () => {
-  assert.match(src, /markUnsavedToFile\(\);\s*try \{ schedulePhoneWatchSync\(\); \}/);
+  assert.match(src, /markUnsavedToFile\(\);\s*try \{ schedulePhoneWatchSync\(\);/);
   const fn = src.match(/function sendPhoneWatchSync[\s\S]*?\r?\n    \}\r?\n/)[0];
   assert.match(fn, /type: 'watch_sync'/);
   assert.match(fn, /sig === phoneWatchSig/);
   const ctx = { orders: [{ isWatchlist: true, track: ' T1 ', orderId: 'O1', watchlistReason: 'x' }, { isWatchlist: false, track: 'T2' }] };
   vm.createContext(ctx); vm.runInContext(src.match(/function buildPhoneWatchList[\s\S]*?\r?\n    \}\r?\n/)[0], ctx);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(vm.runInContext('buildPhoneWatchList()', ctx))), [{ c: 'T1', o: 'O1', r: 'x' }]);
+});
+
+test('v1.9.8: PC nhận sửa/xóa đơn từ iPhone và tự gửi lại danh sách khi PC sửa/xóa', () => {
+  assert.match(src, /data\.type === 'order_edit' \|\| data\.type === 'order_delete'/);
+  assert.match(src, /ackStage: isDel \? 'delete' : 'edit'/);
+  assert.match(src, /phone_deleted_orders_backup/);
+  assert.match(src, /isLocked \|\| hasLockedCellsInOrder\(eIdx\)/);
+  assert.match(src, /schedulePhoneWatchSync\(\); schedulePhoneSnapshotSync\(\);/);
+  assert.match(src, /function schedulePhoneSnapshotSync[\s\S]*?broadcastOrdersSnapshot\(false\)/);
 });

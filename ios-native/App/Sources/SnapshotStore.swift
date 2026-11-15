@@ -23,8 +23,8 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    var overdueCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .overdue }.count }
-    var soonCount: Int { rows.filter { $0.pd && Deadline.level(due: $0.due, now: nowMs()) == .soon }.count }
+    var overdueCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .overdue }.count }
+    var soonCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
     var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
@@ -59,8 +59,8 @@ final class SnapshotStore: ObservableObject {
     func alerts() -> (overdue: [OrderRow], soon: [OrderRow]) {
         let now = nowMs()
         var overdue: [OrderRow] = [], soon: [OrderRow] = []
-        for r in rows where r.pd && r.due > 0 && !dismissed.contains(dismissKey(r)) {
-            switch Deadline.level(due: r.due, now: now) {
+        for r in rows where r.pd && !dismissed.contains(dismissKey(r)) {
+            switch r.alertLevel(now: now) {
             case .overdue: overdue.append(r)
             case .soon: soon.append(r)
             default: break

@@ -13,6 +13,7 @@ struct SettingsView: View {
     private var reconcile: [(String, Int, Int)] {
         let r = store.rows, s = store.stats
         func n(_ f: (OrderRow) -> Bool) -> Int { r.filter(f).count }
+        let now = Int(Date().timeIntervalSince1970 * 1000)
         return [
             ("Bảng chính", s["m_total"] ?? 0, n { $0.k == "m" }),
             ("Đã nhận (bảng chính)", s["m_recv"] ?? 0, n { $0.k == "m" && $0.rv }),
@@ -23,7 +24,9 @@ struct SettingsView: View {
             ("Kho lưu trữ", s["a_total"] ?? 0, n { $0.k == "a" }),
             ("Lưu trữ đã nhận", s["a_recv"] ?? 0, n { $0.k == "a" && $0.rv }),
             ("Bảng đơn hủy", s["c_total"] ?? 0, n { $0.k == "c" }),
-            ("Đơn hủy đã nhận", s["c_recv"] ?? 0, n { $0.k == "c" && $0.rv })
+            ("Đơn hủy đã nhận", s["c_recv"] ?? 0, n { $0.k == "c" && $0.rv }),
+            ("Báo Đỏ (quá hạn)", s["m_danger"] ?? 0, n { $0.k == "m" && $0.pd && $0.alertLevel(now: now) == .overdue }),
+            ("Báo Vàng (sắp đến hạn)", s["m_warn"] ?? 0, n { $0.k == "m" && $0.pd && $0.alertLevel(now: now) == .soon })
         ]
     }
 

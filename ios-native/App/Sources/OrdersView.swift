@@ -27,9 +27,9 @@ struct OrdersView: View {
     private func belongs(_ r: OrderRow, _ f: OrderFilter, now: Int) -> Bool {
         switch f {
         case .all: return true
-        case .pending: return r.pd
-        case .overdue: return r.pd && Deadline.level(due: r.due, now: now) == .overdue
-        case .soon: return r.pd && Deadline.level(due: r.due, now: now) == .soon
+        case .pending: return r.pd && r.k == "m"
+        case .overdue: return r.pd && r.alertLevel(now: now) == .overdue
+        case .soon: return r.pd && r.alertLevel(now: now) == .soon
         case .watch: return r.wl && r.k == "m"   // giống bảng Theo Dõi trên PC: chỉ tính bảng chính
         case .received: return r.rv && r.k != "c"   // đã nhận ở bảng chính và kho lưu trữ; đơn hủy đã nhận nằm ở mục Đơn hủy
         case .cancelled: return r.isCancelled
@@ -124,7 +124,7 @@ struct OrdersView: View {
     private func row(_ r: OrderRow) -> some View {
         let scanned = engine.scannedReturnCodes
         let now = Int(Date().timeIntervalSince1970 * 1000)
-        let level = r.pd ? Deadline.level(due: r.due, now: now) : .unknown
+        let level = r.pd ? r.alertLevel(now: now) : .unknown
         let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()
         return HStack(spacing: 8) {
             Circle().fill(r.pd ? color(level) : Color.gray.opacity(0.4)).frame(width: 8, height: 8)

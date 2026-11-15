@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.4
+          name: QuanLyHangHoan-Windows-Installer-v1.9.5
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.4
-          name: "Quản Lý Hàng Hoàn v1.9.4 — bảng đối chiếu số đơn với iPhone"
+          tag_name: v1.9.5
+          name: "Quản Lý Hàng Hoàn v1.9.5 — iPhone đếm Báo Đỏ/Báo Vàng giống máy tính"
           body: |
+            ### Bản sửa 1.9.5
+
+            - Gửi kèm mức cảnh báo Báo Đỏ (từ 72 giờ) / Báo Vàng (từ 48 giờ) tính đúng như cột Hạn Cần Xử Lý để iPhone đếm "Quá hạn" và "Sắp đến hạn" khớp với máy tính.
+
             ### Bản sửa 1.9.4
 
             - Gửi kèm bảng đối chiếu số đơn (bảng chính, đã nhận, đang chờ, theo dõi, đặt trước, đơn hủy, kho lưu trữ, số đơn bị bỏ do thiếu mã) để iPhone so với số nó nhận và chỉ ra chỗ lệch.

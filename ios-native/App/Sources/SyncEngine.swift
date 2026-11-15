@@ -16,6 +16,8 @@ final class SyncEngine: ObservableObject {
     @Published var room: String
     @Published var sseConnected = false
     @Published var brokerUp: Set<String> = []
+    @Published var snapshotChunksSeen = 0
+    @Published var snapshotLastChunkAt: Date?
     @Published var pcLastSeen: Date?
     @Published var banner: Banner?
     @Published var mode: ScanKind = .returnScan
@@ -200,6 +202,8 @@ final class SyncEngine: ObservableObject {
             pcLastSeen = Date()
         case .snapshotChunk(let ch):
             pcLastSeen = Date()
+            snapshotChunksSeen += 1
+            snapshotLastChunkAt = Date()
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
         case .ack(let ack) where ack.ackStage == "push":

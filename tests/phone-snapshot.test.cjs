@@ -124,3 +124,17 @@ test('v1.9.10: tạo đơn mới / đơn hủy / đẩy ra bảng chính từ đ
   assert.match(src, /dupSelected = selectedItems\.filter\(isInboxItemDuplicate\)/);
   assert.match(src, /dupAll = newOrdersInbox\.filter\(isInboxItemDuplicate\)/);
 });
+
+test('v1.9.19: Báo Đỏ/Báo Vàng trong bảng đối chiếu chỉ đếm đơn còn chờ (đơn Hư hỏng cũ không làm lệch với điện thoại)', () => {
+  const full = src.match(/function buildPhoneSnapshotStats[\s\S]*?\r?\n    \}\r?\n/)[0];
+  const c = {
+    orders: [{ status: 'Hư hỏng', lvl: 'danger' }, { status: 'Chưa nhận', lvl: 'danger' }, { status: 'Hư hỏng', lvl: 'warning' }],
+    archivedOrders: [], cancelledOrders: [],
+    isOrderReceived: () => false, isOrderPending: o => o.status !== 'Hư hỏng',
+    getOrderType: () => 'Trả hàng/Hoàn tiền', getOrderReturnElapsedInfo: o => ({ level: o.lvl })
+  };
+  vm.createContext(c); vm.runInContext(full, c);
+  const st = vm.runInContext('buildPhoneSnapshotStats(3)', c);
+  assert.strictEqual(st.m_danger, 1);
+  assert.strictEqual(st.m_warn, 0);
+});

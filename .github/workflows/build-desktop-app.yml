@@ -93,6 +93,8 @@ jobs:
           body: |
             ### Bản sửa 1.9.19
 
+            - Bố cục ứng dụng: thanh bên trái (bảng dữ liệu, thao tác, ô tổng quan), thanh trên nền trắng gọn, tiêu đề bảng một màu, hàng thấp hơn để thấy nhiều đơn hơn.
+            - Sửa đếm: ô tổng quan và thống kê dùng cùng mức Báo Đỏ/Báo Vàng với tab lọc và điện thoại; bảng đối chiếu gửi điện thoại không đếm đơn Hư hỏng vào Báo Đỏ/Vàng.
             - Giao diện mới: thanh tiêu đề dải màu, bảng dạng danh sách (hàng kẻ nhẹ, tô xen kẽ, tiêu đề cố định, rê chuột sáng hàng), nút và ô nhập bo tròn, cửa sổ bo góc có hiệu ứng, thanh cuộn mảnh. Chức năng giữ nguyên.
 
             - Bảng thống kê: chọn xem cả 2 sàn, riêng Shopee hoặc riêng TikTok Shop (cả trên máy tính và iPhone).

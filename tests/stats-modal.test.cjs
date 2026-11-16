@@ -48,3 +48,12 @@ test('thống kê có chọn sàn: cả 2 sàn / Shopee / TikTok Shop', () => {
   assert.ok(extract('renderStatsModal').includes('statsByPlatform'));
   for (const n of ['collectReturnStatsItems', 'collectCancelStatsItems']) assert.ok(extract(n).includes('platform'), n);
 });
+
+test('v1.9.19: thanh bên trái giữ nguyên id các nút, ô tổng quan dùng cùng mức Báo Đỏ/Vàng với tab lọc', () => {
+  const sb = extract('buildAppSidebar');
+  for (const id of ['btnOpenArchivedOrders', 'btnOpenCancelledOrders', 'btnNewOrdersHeader', 'btnOpenStats', 'btnAddOrder', 'btnPhoneScanner', 'kpiStrip']) assert.ok(sb.includes("'" + id + "'"), id);
+  assert.ok(!sb.includes('innerHTML = \'\''), 'không xóa nút');
+  const k = extract('renderKpiStrip');
+  assert.ok(k.includes('getOrderReturnElapsedInfo') && !k.includes('getDeadlineStatus'));
+  assert.ok(extract('collectReturnStatsItems').includes('getOrderReturnElapsedInfo'));
+});

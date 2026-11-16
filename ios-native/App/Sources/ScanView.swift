@@ -88,14 +88,31 @@ struct ScanView: View {
     private var statusBar: some View {
         VStack(spacing: 6) {
             ModePicker(mode: $engine.mode)
-            HStack {
-                pill(engine.channelUp ? "Đã nối kênh" : "Mất kết nối", engine.channelUp ? .green : .red)
-                pill(engine.pcOnline ? "PC đang online" : "Chờ PC phản hồi", engine.pcOnline ? .green : .orange)
-                if engine.pendingCount > 0 { pill("Chờ \(engine.pendingCount)", .orange) }
+            HStack(spacing: 14) {
+                statusIcon("antenna.radiowaves.left.and.right", ok: engine.channelUp)
+                statusIcon("desktopcomputer", ok: engine.pcOnline)
+                if engine.pendingCount > 0 {
+                    Label("\(engine.pendingCount)", systemImage: "tray.and.arrow.up.fill")
+                        .font(.caption.bold()).foregroundColor(.orange)
+                }
                 Spacer()
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel((engine.channelUp ? "Đã nối kênh" : "Mất kết nối") + ", " + (engine.pcOnline ? "máy tính online" : "chưa thấy máy tính"))
         }
         .card(padding: 10)
+    }
+
+    /// Biểu tượng nhỏ: xanh khi kết nối; mất kết nối thì xám và có gạch chéo đỏ.
+    private func statusIcon(_ name: String, ok: Bool) -> some View {
+        ZStack {
+            Image(systemName: name).font(.system(size: 15, weight: .semibold))
+                .foregroundColor(ok ? .green : .secondary)
+            if !ok {
+                Rectangle().fill(Color.red).frame(width: 22, height: 2.5).rotationEffect(.degrees(-40))
+            }
+        }
+        .frame(width: 24, height: 20)
     }
 
     private func pill(_ t: String, _ c: Color) -> some View {

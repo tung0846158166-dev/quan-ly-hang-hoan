@@ -7216,7 +7216,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.13';
+    const APP_VERSION_NUMBER = '1.9.14';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13696,7 +13696,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.13',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.14',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14208,6 +14208,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // Mã điện thoại đã quét nhưng lúc đó chưa có đơn trên máy tính: nhớ lại, khi đơn xuất hiện (nạp file sàn, thêm đơn) thì tự đánh dấu đã nhận.
     const UNMATCHED_SCANS_KEY = 'shopee_unmatched_phone_scans_v1';
     const UNMATCHED_SCANS_MAX_AGE_MS = 30 * 24 * 3600 * 1000;
+    const UNMATCHED_LATE_AFTER_MS = 2 * 60 * 1000;
+    const UNMATCHED_LATE_PROMOTE_DELAY_MS = 15 * 1000;   // chờ ảnh đi kèm tới kịp
     let unmatchedPhoneScans = (function () {
       try { const v = JSON.parse(localStorage.getItem(UNMATCHED_SCANS_KEY) || '[]'); return Array.isArray(v) ? v.filter(e => e && e.code && e.t) : []; } catch (e) { return []; }
     })();
@@ -14219,14 +14221,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const now = Date.now();
       let t = Number(at);
       if (!(t > 1e12 && t <= now + 60000)) t = now;
-      unmatchedPhoneScans.push({ code: c, t, seen: seen || now });
+      // late: lượt quét nằm trong hàng chờ của điện thoại (quét lúc máy tính tắt/mất kết nối) rồi mới được gửi sang.
+      // Máy tính đã đối chiếu mà vẫn không có đơn thì đưa vào Hộp Đơn Mới ngay, không chờ thêm.
+      const late = (seen || now) - t > UNMATCHED_LATE_AFTER_MS;
+      unmatchedPhoneScans.push({ code: c, t, seen: seen || now, late });
       persistUnmatchedScans();
+      if (late && typeof setTimeout === 'function') setTimeout(() => { try { promoteUnmatchedScans(); } catch (e) {} }, UNMATCHED_LATE_PROMOTE_DELAY_MS);
     }
     // Ảnh điện thoại chụp cùng lượt quét: giữ lại (IndexedDB) để đối chiếu với hàng thật khi đơn xuất hiện.
     function attachPhotoToUnmatched(code, dataUrl, at) {
       if (typeof dataUrl !== 'string' || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl)) return false;
       const c = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
       if (!c) return false;
+      // Mã đã được đưa vào Hộp Đơn Mới rồi mà ảnh tới sau: gắn ảnh vào dòng đó.
+      try {
+        const inboxItem = Array.isArray(newOrdersInbox) && newOrdersInbox.find(it => it && it.fromUnmatchedScan && extractCleanTrackingCode(it.track || '') === c);
+        if (inboxItem) { if (!inboxItem.photo) { inboxItem.photo = dataUrl; saveNewOrdersInbox(); } return true; }
+      } catch (x) {}
       rememberUnmatchedScan(c, at);
       const e = unmatchedPhoneScans.find(x => x.code === c);
       if (!e) return false;
@@ -14305,7 +14316,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
 
-    // Mã quét trước mà sau một lúc (đã có cơ hội nạp file sàn) vẫn chưa có đơn: tự đưa vào Hộp Đơn Mới để không bỏ sót hàng đã về.
+    // Mã quét mà máy tính chưa có đơn: lượt quét từ hàng chờ (gửi muộn) vào Hộp Đơn Mới ngay; lượt quét trực tiếp chờ 10 phút để kịp nạp file sàn.
     const UNMATCHED_PROMOTE_AFTER_MS = 10 * 60 * 1000;
     function promoteUnmatchedScans() {
       if (!unmatchedPhoneScans.length) return 0;
@@ -14316,7 +14327,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const keep = [];
       if (!Array.isArray(newOrdersInbox)) return 0;
       for (const e of unmatchedPhoneScans) {
-        if (now - (e.seen || e.t) < UNMATCHED_PROMOTE_AFTER_MS) { keep.push(e); continue; }
+        if (now - (e.seen || e.t) < (e.late ? UNMATCHED_LATE_PROMOTE_DELAY_MS : UNMATCHED_PROMOTE_AFTER_MS)) { keep.push(e); continue; }
         if (phoneOrderMatches(e.code).length > 0) { keep.push(e); continue; }   // trùng nhiều đơn: để người dùng kiểm tra
         changed = true;
         if (locateExistingAnywhere(e.code, '')) { dropScanPhoto(e); continue; }   // đã có ở kho lưu trữ / đơn hủy: không tạo

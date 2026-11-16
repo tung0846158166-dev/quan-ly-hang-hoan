@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.13
+          name: QuanLyHangHoan-Windows-Installer-v1.9.14
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.13
-          name: "Quản Lý Hàng Hoàn v1.9.13 — mã đã quét mà chưa có đơn tự vào Hộp Đơn Mới"
+          tag_name: v1.9.14
+          name: "Quản Lý Hàng Hoàn v1.9.14 — quét lúc máy tính tắt: không có đơn thì vào Hộp Đơn Mới ngay"
           body: |
+            ### Bản sửa 1.9.14
+
+            - Lượt quét nằm trong hàng chờ điện thoại (quét lúc máy tính tắt hoặc mất kết nối): khi máy tính bật lại, đối chiếu mà vẫn không có đơn thì đưa vào Hộp Đơn Mới ngay (kèm giờ quét và ảnh). Lượt quét trực tiếp lúc cả hai máy đang bật mà chưa có đơn vẫn chờ 10 phút để kịp nạp file sàn.
+
             ### Bản sửa 1.9.13
 
             - Mã điện thoại đã quét mà sau 10 phút vẫn chưa có đơn (file sàn thiếu): máy tính tự đưa vào Hộp Đơn Mới kèm giờ quét, để không bỏ sót hàng đã về. Đẩy ra Bảng chính sẽ ghi sẵn "Hàng đã trả". Nếu sau đó file sàn có đơn thì tự đánh dấu đã nhận và gỡ khỏi hộp; mã có ở Kho lưu trữ/Bảng đơn hủy thì không tạo.

@@ -122,3 +122,24 @@ test('v1.9.13: giờ quét vô lý (tương lai/0) thì dùng giờ hiện tại
   t.api.remember('BAD2', 0);
   assert.ok(t.api.list().every(e => e.t <= Date.now() + 1000));
 });
+
+test('v1.9.14: lượt quét gửi muộn (hàng chờ) vào hộp ngay, quét trực tiếp thì chờ 10 phút', () => {
+  const t = make([]);
+  const old = Date.now() - 3 * 3600 * 1000;
+  t.api.remember('Q1', old, Date.now() - 20 * 1000);          // quét 3 giờ trước, máy tính nhận 20 giây trước
+  t.api.remember('LIVE1', Date.now() - 5000, Date.now() - 20 * 1000);  // quét trực tiếp
+  assert.strictEqual(t.api.list().find(e => e.code === 'Q1').late, true);
+  assert.strictEqual(t.api.list().find(e => e.code === 'LIVE1').late, false);
+  assert.strictEqual(t.api.promote(), 1);
+  assert.strictEqual(t.api.inbox().map(i => i.track).join(','), 'Q1');
+  assert.strictEqual(t.api.list().map(e => e.code).join(','), 'LIVE1');
+});
+test('v1.9.14: ảnh tới sau khi mã đã vào hộp thì gắn vào dòng trong hộp', () => {
+  const t = make([]);
+  t.api.remember('Q2', Date.now() - 3 * 3600 * 1000, Date.now() - 20 * 1000);
+  t.api.promote();
+  assert.strictEqual(t.api.inbox()[0].photo, '');
+  assert.strictEqual(t.api.attach('Q2', 'data:image/jpeg;base64,AAAA'), true);
+  assert.strictEqual(t.api.inbox()[0].photo, 'data:image/jpeg;base64,AAAA');
+  assert.strictEqual(t.api.list().length, 0);
+});

@@ -111,12 +111,25 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     }
 
     // MARK: delegates
+    /// Loại mã không có số kiểm tra / sửa lỗi, rất hay bị đọc nhầm từ chữ và hoa văn: phải thấy cùng một giá trị nhiều lần liên tiếp mới nhận.
+    private let weakTypes: Set<AVMetadataObject.ObjectType> = [.code39, .interleaved2of5, .itf14]
+    private var weakCandidate: (code: String, hits: Int, last: Date)?
+
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         for obj in metadataObjects {
-            if let m = obj as? AVMetadataMachineReadableCodeObject, let s = m.stringValue, !s.isEmpty {
-                onCode?(s)
-                return
+            guard let m = obj as? AVMetadataMachineReadableCodeObject, let s = m.stringValue, !s.isEmpty else { continue }
+            if weakTypes.contains(m.type) {
+                let now = Date()
+                if let c = weakCandidate, c.code == s, now.timeIntervalSince(c.last) < 1.0 {
+                    weakCandidate = (s, c.hits + 1, now)
+                } else {
+                    weakCandidate = (s, 1, now)
+                }
+                guard (weakCandidate?.hits ?? 0) >= 4 else { continue }
+                weakCandidate = nil
             }
+            onCode?(s)
+            return
         }
     }
 

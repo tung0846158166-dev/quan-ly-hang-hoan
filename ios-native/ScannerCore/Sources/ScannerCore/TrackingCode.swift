@@ -62,6 +62,16 @@ public enum TrackingCode {
         return cleaned.uppercased()
     }
 
+    /// Mã quét từ camera có đáng tin để gửi đi không. Chặn kết quả "linh tinh" do camera đọc nhầm hoa văn/chữ thành mã vạch
+    /// (chuỗi quá ngắn, có khoảng trắng, chữ có dấu, không có chữ số). Nhập tay không đi qua bộ lọc này.
+    public static func isPlausibleScan(_ raw: String) -> Bool {
+        let c = clean(raw)
+        guard c.count >= 8, c.count <= 40 else { return false }
+        guard c.unicodeScalars.allSatisfy({ $0.isASCII }) else { return false }
+        guard c.rangeOfCharacter(from: .decimalDigits) != nil else { return false }
+        return matches("^[A-Z0-9][A-Z0-9._\\-]*$", c)
+    }
+
     /// Port của detectCarrierFromCode.
     public static func carrier(for code: String) -> String {
         let c = code.trimmingCharacters(in: .whitespaces).uppercased()

@@ -23,7 +23,7 @@ struct HistoryView: View {
             case .valid: return it.status == .success
             case .duplicate: return it.status == .duplicate
             case .missing: return it.status == .notFound || it.status == .ambiguous
-            case .pending: return !it.scanConfirmed
+            case .pending: return !it.isSettled   // gồm cả lượt quét đã xác nhận nhưng ảnh chưa gửi xong (cùng cách đếm với chip "Chờ")
             }
         }
     }
@@ -88,6 +88,11 @@ struct HistoryView: View {
                 Text(it.code).font(.system(.body, design: .monospaced).bold())
                 Text(scanLabel(it)).font(.caption.bold()).foregroundColor(scanColor(it))
                 Text(it.detail).font(.caption2).foregroundStyle(.secondary)
+                if it.scanConfirmed && it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired {
+                    Text("Đang chờ: ảnh chưa gửi xong (đã thử \(it.photoAttempts) lần)").font(.caption2.bold()).foregroundColor(.orange)
+                } else if !it.scanConfirmed {
+                    Text("Đang chờ: máy tính chưa xác nhận (đã gửi \(it.attempts) lần)").font(.caption2.bold()).foregroundColor(.orange)
+                }
                 Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .abbreviated, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
                 if it.kind == .newOrder && it.scanConfirmed {

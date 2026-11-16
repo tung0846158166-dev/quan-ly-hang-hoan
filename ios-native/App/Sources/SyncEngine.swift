@@ -60,7 +60,9 @@ final class SyncEngine: ObservableObject {
 
     /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
     func resend(_ requestId: String) {
-        guard let it = items.first(where: { $0.requestId == requestId }) else { return }
+        guard let i = items.firstIndex(where: { $0.requestId == requestId }) else { return }
+        let it = items[i]
+        if it.photoFile != nil && !it.photoConfirmed { items[i].photoAttempts = 0 }   // cho phép tự thử gửi ảnh lại
         transmit(requestId)
         if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired { transmitPhoto(requestId) }
         banner = Banner(code: it.code, text: "ĐÃ GỬI LẠI, CHỜ PC", color: .orange)
@@ -414,7 +416,7 @@ final class SyncEngine: ObservableObject {
         let start = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
         let list = items.filter { $0.kind == kind && $0.time >= start }
         return (list.count, list.filter { $0.status == .success }.count, list.filter { $0.status == .duplicate }.count,
-                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, list.filter { !$0.scanConfirmed }.count)
+                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, list.filter { !$0.isSettled }.count)
     }
 
     func csv(kind: ScanKind) -> String {

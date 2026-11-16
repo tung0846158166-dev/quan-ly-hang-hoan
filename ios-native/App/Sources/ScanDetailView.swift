@@ -56,7 +56,7 @@ struct ScanDetailView: View {
                     }
                     Section {
                         Button("Sao chép mã") { UIPasteboard.general.string = it.code }
-                        if !it.scanConfirmed || it.status == .error {
+                        if !it.isSettled || it.status == .error {
                             Button("Gửi lại cho máy tính") { engine.resend(it.requestId) }
                         }
                         if it.kind == .newOrder && it.scanConfirmed && !it.pushed {

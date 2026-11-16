@@ -16932,7 +16932,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (row3) row3.classList.add('ui-row-1line');
       const weeks = document.getElementById('weeklyImportTabsContainer');
       const row2 = weeks ? weeks.closest('div.no-print') : null;
-      if (row2) row2.classList.add('ui-row-1line');
+      if (row2) {
+        row2.classList.add('ui-row-1line');
+        // phân trang lên hàng tuần/sàn (còn trống bên phải) để luôn nhìn thấy, không bị đẩy ra ngoài màn hình
+        if (pager) { pager.style.marginLeft = 'auto'; row2.appendChild(pager); }
+      }
       document.body.classList.add('has-drawer');
     }
     if (typeof document !== 'undefined' && document.addEventListener) {

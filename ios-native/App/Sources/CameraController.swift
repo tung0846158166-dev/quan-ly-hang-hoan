@@ -17,6 +17,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     private var device: AVCaptureDevice?
     private var metaOutput: AVCaptureMetadataOutput?
     private let ciContext = CIContext()
+    private var lastRegion = CGRect.zero
+    private let metaQueue = DispatchQueue(label: "camera.meta", qos: .userInteractive)
 
     func start() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -59,7 +61,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         if session.canAddOutput(meta) {
             session.addOutput(meta)
             metaOutput = meta
-            meta.setMetadataObjectsDelegate(self, queue: .main)
+            meta.setMetadataObjectsDelegate(self, queue: metaQueue)   // không dùng luồng giao diện: giao diện bận cũng không làm trễ việc dò mã
             let wanted: [AVMetadataObject.ObjectType] = [.code128, .code39, .code93, .ean13, .ean8, .upce, .qr, .itf14, .interleaved2of5, .dataMatrix, .pdf417]
             meta.metadataObjectTypes = wanted.filter { meta.availableMetadataObjectTypes.contains($0) }
         }
@@ -88,6 +90,11 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         guard let meta = metaOutput, layer.bounds.width > 20, layer.bounds.height > 20 else { return }
         let r = layer.metadataOutputRectConverted(fromLayerRect: layer.bounds)
         guard r.width > 0.1, r.height > 0.1, r.minX >= -0.01, r.minY >= -0.01, r.maxX <= 1.01, r.maxY <= 1.01 else { return }
+        // Đặt lại vùng quét làm bộ dò mã khởi động lại và có thể mất vài giây mới nhận được mã: chỉ đặt khi vùng thật sự đổi
+        // (bố cục chạy lại mỗi lần đổi chế độ quét, trước đây cũng đặt lại vùng mỗi lần).
+        let l = lastRegion
+        if abs(l.minX - r.minX) < 0.004, abs(l.minY - r.minY) < 0.004, abs(l.width - r.width) < 0.004, abs(l.height - r.height) < 0.004 { return }
+        lastRegion = r
         queue.async { meta.rectOfInterest = r }
     }
 
@@ -128,7 +135,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                 guard (weakCandidate?.hits ?? 0) >= 4 else { continue }
                 weakCandidate = nil
             }
-            onCode?(s)
+            DispatchQueue.main.async { [weak self] in self?.onCode?(s) }
             return
         }
     }

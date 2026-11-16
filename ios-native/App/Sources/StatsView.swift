@@ -10,12 +10,19 @@ struct StatsView: View {
     @State private var returnsRecv = StatsResult()
     @State private var cancelsRecv = StatsResult()
     @State private var loading = true
+    @State private var platform = "all"
 
     var body: some View {
         List {
             Section {
                 Picker("Thống kê theo", selection: $period) {
                     ForEach(StatsPeriod.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Sàn", selection: $platform) {
+                    Text("Cả 2 sàn").tag("all")
+                    Text("Shopee").tag("Shopee")
+                    Text("TikTok Shop").tag("TikTok Shop")
                 }
                 .pickerStyle(.segmented)
                 Text("Tính theo ngày hoàn/hủy do khách bấm. Đơn hoàn gồm bảng chính và kho lưu trữ; đơn hủy lấy từ bảng đơn hủy.")
@@ -38,11 +45,12 @@ struct StatsView: View {
         }
         .navigationTitle("Thống kê đơn")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: "\(period.rawValue)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.revision)|\(store.rows.count)") { await reload() }
+        .task(id: "\(period.rawValue)|\(platform)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.revision)|\(store.rows.count)") { await reload() }
     }
 
     private func reload() async {
-        let rows = store.rows, p = period
+        let p = period, pf = platform
+        let rows = pf == "all" ? store.rows : store.rows.filter { $0.p == pf || (pf == "TikTok Shop" && $0.p == "TikTok") }
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let (r, c, rr, cr) = await Task.detached(priority: .userInitiated) { () -> (StatsResult, StatsResult, StatsResult, StatsResult) in
             let ret = OrderStats.compute(rows: rows.filter { OrderStats.isReturn($0) }, period: p, now: now)

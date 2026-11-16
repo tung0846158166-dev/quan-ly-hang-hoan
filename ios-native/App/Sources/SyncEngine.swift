@@ -218,8 +218,12 @@ final class SyncEngine: ObservableObject {
             sseConnected = true
             channelOpened()
         }
-        guard let msg = SyncProtocol.parseIncoming(sseData: data, room: room) else { return }
-        dispatch(msg)
+        // Giải mã JSON (mỗi mảnh danh sách đơn khá lớn) ở luồng nền, chỉ phần xử lý kết quả mới về luồng giao diện.
+        let r = room
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let msg = SyncProtocol.parseIncoming(sseData: data, room: r) else { return }
+            await self?.dispatch(msg)
+        }
     }
 
     private func dispatch(_ msg: PcMessage) {
@@ -306,7 +310,8 @@ final class SyncEngine: ObservableObject {
         // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
         guard TrackingCode.isPlausibleScan(raw) else { return }
         // Camera vẫn nhìn thấy cùng nhãn sau khi đã quét: không tạo thêm lượt "quét trùng" trong vài giây đầu.
-        let c = TrackingCode.clean(raw), now = Date()
+        // Khóa theo cả chế độ quét: đổi sang chế độ khác (Tạo đơn mới, Đơn hủy…) thì quét lại cùng nhãn phải nhận ngay.
+        let c = "\(mode.rawValue)|" + TrackingCode.clean(raw), now = Date()
         if c == lastCameraCode && now.timeIntervalSince(lastCameraTime) < 6 { lastCameraTime = now; return }
         lastCameraCode = c; lastCameraTime = now
         _ = submit(raw: raw, kind: mode, photo: nil, useSnapshot: true)
@@ -321,8 +326,9 @@ final class SyncEngine: ObservableObject {
         let code = TrackingCode.clean(raw)
         guard code.count >= 6 else { return false }
         let now = Date()
-        if code == lastRawCode && now.timeIntervalSince(lastRawTime) < 1.2 { return false }
-        lastRawCode = code; lastRawTime = now
+        let rawKey = "\(kind.rawValue)|" + code
+        if rawKey == lastRawCode && now.timeIntervalSince(lastRawTime) < 1.2 { return false }
+        lastRawCode = rawKey; lastRawTime = now
 
         if let existing = items.first(where: { $0.code == code && $0.kind == kind && !$0.scanConfirmed }) {
             banner = Banner(code: code, text: "ĐANG THỬ LẠI, CHỜ PC", color: .orange)

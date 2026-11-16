@@ -241,7 +241,9 @@ final class SnapshotStore: ObservableObject {
     }
 
     func scheduleNotifications() {
-        let planned = NotificationPlanner.plan(rows: rows.filter { $0.pd }, now: Date())
+        let pending = rows.filter { $0.pd }
+        work.async {
+        let planned = NotificationPlanner.plan(rows: pending, now: Date())
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { s in
             guard s.authorizationStatus == .authorized || s.authorizationStatus == .provisional else { return }
@@ -256,6 +258,7 @@ final class SnapshotStore: ObservableObject {
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secs, repeats: false)
                 center.add(UNNotificationRequest(identifier: n.id, content: content, trigger: trigger))
             }
+        }
         }
     }
 

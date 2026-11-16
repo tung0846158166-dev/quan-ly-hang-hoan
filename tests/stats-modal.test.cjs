@@ -42,3 +42,9 @@ test('đơn hoàn lấy cả kho lưu trữ, đơn hủy lấy bảng đơn hủ
   assert.ok(extract('collectCancelStatsItems').includes('cancelledOrders'));
   assert.ok(html.includes('id="statsModal"') && html.includes('openStatsModal()'));
 });
+
+test('thống kê có chọn sàn: cả 2 sàn / Shopee / TikTok Shop', () => {
+  assert.ok(html.includes('id="statsPlatformSelect"') && html.includes('setStatsPlatform(this.value)'));
+  assert.ok(extract('renderStatsModal').includes('statsByPlatform'));
+  for (const n of ['collectReturnStatsItems', 'collectCancelStatsItems']) assert.ok(extract(n).includes('platform'), n);
+});

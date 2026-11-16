@@ -16779,6 +16779,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     // ---- Thống kê đơn hoàn / đơn hủy theo ngày, tuần, tháng (tính theo ngày hoàn/hủy khách bấm) ----
     let statsPeriod = 'day';
+    let statsPlatform = 'all';
+    function setStatsPlatform(v) { statsPlatform = v; renderStatsModal(); }
+    const statsByPlatform = list => statsPlatform === 'all' ? list : list.filter(it => it.platform === statsPlatform);
     function statsBucketKey(d, period) {
       const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
       if (period === 'month') return new Date(y, m, 1).getTime();
@@ -16823,7 +16826,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const received = !!isOrderReceived(o), pending = !!isOrderPending(o);
         let level = '';
         if (pending) { const s = getDeadlineStatus(o); level = s === 'overdue' ? 'overdue' : (s === 'upcoming' ? 'soon' : ''); }
-        out.push({ rd: o.returnDate, received, pending, level });
+        out.push({ rd: o.returnDate, received, pending, level, platform: getOrderPlatform(o) });
       };
       (Array.isArray(orders) ? orders : []).forEach(add);
       try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
@@ -16834,12 +16837,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const received = !!o.received, pending = !received;
         let level = '';
         if (pending) { const info = computeDeadlineInfo(o.returnDate, o.deadline); if (info) level = info.left < 0 ? 'overdue' : (info.left <= 24 * 3600000 ? 'soon' : ''); }
-        return { rd: o.returnDate, received, pending, level };
+        return { rd: o.returnDate, received, pending, level, platform: o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '') };
       });
     }
     // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo ngày nhận.
     function collectReceivedStatsItems(kind) {
-      const take = o => ({ rd: o.recvDate, received: true, pending: false, level: '' });
+      const take = o => ({ rd: o.recvDate, received: true, pending: false, level: '', platform: kind === 'cancel' ? (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '')) : getOrderPlatform(o) });
       if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(take);
       const out = [];
       const add = o => { if (o && getOrderType(o) !== 'Đơn hủy' && isOrderReceived(o)) out.push(take(o)); };
@@ -16854,10 +16857,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const b = document.getElementById('statsPeriodBtn_' + p);
         if (b) b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ' + (p === statsPeriod ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700');
       });
-      const ret = computeStats(collectReturnStatsItems(), statsPeriod);
-      const can = computeStats(collectCancelStatsItems(), statsPeriod);
-      const retRecv = computeStats(collectReceivedStatsItems('return'), statsPeriod);
-      const canRecv = computeStats(collectReceivedStatsItems('cancel'), statsPeriod);
+      const ret = computeStats(statsByPlatform(collectReturnStatsItems()), statsPeriod);
+      const can = computeStats(statsByPlatform(collectCancelStatsItems()), statsPeriod);
+      const retRecv = computeStats(statsByPlatform(collectReceivedStatsItems('return')), statsPeriod);
+      const canRecv = computeStats(statsByPlatform(collectReceivedStatsItems('cancel')), statsPeriod);
       const limit = statsPeriod === 'day' ? 31 : 24;
       const recvCard = (title, s, color) => {
         const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td><td class="px-2 py-1.5 text-center font-mono text-emerald-300 font-bold">${b.total}</td></tr>`).join('');
@@ -19961,6 +19964,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="px-5 py-3 bg-gradient-to-r from-sky-950 via-slate-900 to-slate-900 border-b border-sky-500/30 flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-black text-base text-white">📊 THỐNG KÊ ĐƠN HOÀN / ĐƠN HỦY</h2>
         <div class="flex flex-wrap items-center gap-2">
+          <select id="statsPlatformSelect" onchange="setStatsPlatform(this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-100">
+            <option value="all">Cả 2 sàn</option><option value="Shopee">🟠 Shopee</option><option value="TikTok Shop">⚫ TikTok Shop</option>
+          </select>
           <button type="button" id="statsPeriodBtn_day" onclick="setStatsPeriod('day')">Theo ngày</button>
           <button type="button" id="statsPeriodBtn_week" onclick="setStatsPeriod('week')">Theo tuần</button>
           <button type="button" id="statsPeriodBtn_month" onclick="setStatsPeriod('month')">Theo tháng</button>

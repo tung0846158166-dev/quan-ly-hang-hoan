@@ -53,6 +53,7 @@ test('v1.9.19: thanh bên trái giữ nguyên id các nút, ô tổng quan dùng
   const sb = extract('buildAppSidebar');
   for (const id of ['btnOpenArchivedOrders', 'btnOpenCancelledOrders', 'btnNewOrdersHeader', 'btnOpenStats', 'btnAddOrder', 'btnPhoneScanner', 'kpiStrip']) assert.ok(sb.includes("'" + id + "'"), id);
   assert.ok(!sb.includes('innerHTML = \'\''), 'không xóa nút');
+  assert.ok(html.includes('function setAppDrawer') && sb.includes("key === 'Escape'") && sb.includes('appDrawerBackdrop'), 'menu ☰ đóng khi bấm ra ngoài / Esc');
   const k = extract('renderKpiStrip');
   assert.ok(k.includes('getOrderReturnElapsedInfo') && !k.includes('getDeadlineStatus'));
   assert.ok(extract('collectReturnStatsItems').includes('getOrderReturnElapsedInfo'));

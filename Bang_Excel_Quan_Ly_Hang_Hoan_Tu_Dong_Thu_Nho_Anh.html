@@ -352,41 +352,51 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .ui-kpi small { display: block; font-size: 10.5px; font-weight: 700; color: #64748b; letter-spacing: .02em; }
     .ui-kpi b { display: block; font-size: 24px; font-weight: 800; line-height: 1.15; }
     @media print { body { background: #fff !important; } button { box-shadow: none !important; } }
-    /* ===== Bố cục ứng dụng (v1.9.19): thanh bên trái + thanh trên gọn, nhường chỗ cho danh sách đơn ===== */
-    body.has-sidebar { padding: 8px 10px 52px 232px !important; }
-    #appSidebar { position: fixed; top: 0; left: 0; bottom: 46px; width: 220px; z-index: 45; background: #0f172a; color: #e2e8f0;
-      display: flex; flex-direction: column; padding: 14px 10px; overflow-y: auto; box-shadow: 4px 0 18px rgba(2, 6, 23, .18); }
+    /* ===== Bố cục ứng dụng (v1.9.19): menu ☰ trượt đè lên bảng, phần trên bảng gọn còn 3 hàng ===== */
+    #appSidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 250px; z-index: 9000; background: #0f172a; color: #e2e8f0;
+      display: flex; flex-direction: column; padding: 14px 10px 60px; overflow-y: auto; box-shadow: 8px 0 30px rgba(2, 6, 23, .35);
+      transform: translateX(-105%); transition: transform .2s ease; }
+    #appSidebar.open { transform: none; }
+    #appDrawerBackdrop { position: fixed; inset: 0; z-index: 8990; background: rgba(15, 23, 42, .45); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+    #appDrawerBackdrop.open { opacity: 1; pointer-events: auto; }
+    #btnAppMenu { all: unset; box-sizing: border-box; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; font-size: 18px; color: #0f172a; background: #f1f5f9; border: 1px solid #e2e8f0; flex: none; }
+    #btnAppMenu:hover { background: #ffede6; border-color: #fdba9f; }
     #appSidebar .sb-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; padding: 2px 8px 12px; color: #fff; }
     #appSidebar .sb-brand i { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #ee4d2d, #ff8a50); display: grid; place-items: center; font-style: normal; }
     #appSidebar .sb-sec { font-size: 10px; font-weight: 800; letter-spacing: .09em; color: #64748b; text-transform: uppercase; padding: 12px 8px 5px; }
-    #appSidebar button { all: unset; box-sizing: border-box; width: 100%; display: flex !important; align-items: center; gap: 8px; padding: 7px 9px; margin: 1px 0;
-      border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #cbd5e1; cursor: pointer; white-space: nowrap; }
+    #appSidebar button { all: unset; box-sizing: border-box; width: 100%; display: flex !important; align-items: center; gap: 8px; padding: 8px 10px; margin: 1px 0;
+      border-radius: 9px; font-size: 13px; font-weight: 600; color: #cbd5e1; cursor: pointer; white-space: nowrap; }
     #appSidebar button:hover { background: #1e293b; color: #fff; transform: none; box-shadow: none; }
-    #appSidebar button > span[id], #appSidebar button > span:has(> span[id]) { margin-left: auto; }
-    #appSidebar button > span:has(> span[id]) { margin-left: 0; }
+    #appSidebar button > span[id] { margin-left: auto; }
     #appSidebar button span[id] { font-size: 10px !important; padding: 1px 7px !important; border-radius: 99px !important; background: #334155 !important; color: #e2e8f0 !important; font-family: inherit !important; }
     #appSidebar #kpiStrip { display: grid !important; grid-template-columns: 1fr 1fr; gap: 6px !important; padding: 0 !important; background: transparent !important; border: 0 !important; margin: 0 !important; }
     #appSidebar .ui-kpi { background: #1e293b; border: 0; border-radius: 11px; padding: 7px 9px; box-shadow: none; }
     #appSidebar .ui-kpi small { color: #94a3b8; font-size: 9.5px; line-height: 1.25; }
     #appSidebar .ui-kpi b { font-size: 19px; color: #fff; }
     #appSidebar .ui-kpi b[style] { filter: brightness(1.35); }
-    body.has-sidebar #stickyBottomDock { left: 0 !important; }
-    /* thanh trên: nền trắng, chữ tối, nút đồng kiểu */
-    body.has-sidebar > div:first-of-type > div.bg-\[\#ee4d2d\] { background: #fff !important; color: #0f172a !important; border-bottom: 1px solid var(--ui-line); padding: 8px 12px !important; }
-    body.has-sidebar > div:first-of-type > div.bg-\[\#ee4d2d\] h1 { color: #0f172a !important; text-shadow: none; font-size: 16px !important; letter-spacing: 0; text-transform: none; }
-    body.has-sidebar > div:first-of-type > div.bg-\[\#ee4d2d\] button { background: #f1f5f9 !important; background-image: none !important; color: #0f172a !important;
-      border: 1px solid #e2e8f0 !important; box-shadow: none !important; font-weight: 700 !important; }
-    body.has-sidebar > div:first-of-type > div.bg-\[\#ee4d2d\] button:hover { background: #ffede6 !important; border-color: #fdba9f !important; }
-    body.has-sidebar #appVersionBadge { background: #fff1ec !important; color: #c2410c !important; }
-    /* các hàng lọc: nền trắng đồng nhất, gọn */
-    body.has-sidebar > div:first-of-type > div.no-print { background: #fff !important; background-image: none !important; border-color: var(--ui-line) !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+    /* thanh trên: một hàng — ☰, tên app, ô tìm kiếm, vài nút */
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] { background: #fff !important; color: #0f172a !important; border-bottom: 1px solid var(--ui-line); padding: 8px 12px !important; flex-wrap: nowrap !important; gap: 10px !important; }
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] > div { flex-wrap: nowrap !important; }
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] > div:first-child { flex: 1 1 auto; min-width: 0; }
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] h1 { color: #0f172a !important; text-shadow: none; font-size: 15px !important; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] button:not(#btnAppMenu) { background: #f1f5f9 !important; background-image: none !important; color: #0f172a !important;
+      border: 1px solid #e2e8f0 !important; box-shadow: none !important; font-weight: 700 !important; white-space: nowrap; }
+    body.has-drawer > div:first-of-type > div.bg-\[\#ee4d2d\] button:not(#btnAppMenu):hover { background: #ffede6 !important; border-color: #fdba9f !important; }
+    body.has-drawer #appVersionBadge { background: #fff1ec !important; color: #c2410c !important; white-space: nowrap; }
+    body.has-drawer .ui-topsearch { flex: 1 1 320px; max-width: 560px !important; min-width: 220px !important; margin-left: 6px; }
+    /* hai hàng lọc: một dòng mỗi hàng, tràn thì cuộn ngang thay vì xuống dòng */
+    body.has-drawer > div:first-of-type > div.no-print { background: #fff !important; background-image: none !important; border-color: var(--ui-line) !important; padding-top: 5px !important; padding-bottom: 5px !important; }
+    body.has-drawer .ui-row-1line { font-size: 11px; flex-wrap: nowrap !important; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    body.has-drawer .ui-row-1line::-webkit-scrollbar { display: none; }
+    body.has-drawer .ui-row-1line > div, body.has-drawer .ui-row-1line #pipelineTabs { flex-wrap: nowrap !important; flex: none; }
+    body.has-drawer .ui-row-1line button, body.has-drawer .ui-row-1line span { white-space: nowrap; }
+    .ui-hidden-row { display: none !important; }
     /* bảng: tiêu đề một màu, hàng thấp hơn để thấy nhiều đơn hơn */
-    #mainTableScrollContainer { max-height: calc(100vh - 230px) !important; min-height: 360px !important; }
+    #mainTableScrollContainer { max-height: calc(100vh - 175px) !important; min-height: 360px !important; }
     #mainTableScrollContainer .excel-table thead th { background: #1e293b !important; background-image: none !important; color: #f8fafc !important; font-size: 11.5px !important; padding: 9px 8px !important; }
     #mainTableScrollContainer .excel-table thead th span { color: inherit !important; }
     #mainTableScrollContainer .excel-table tbody td { padding: 4px 8px !important; }
-    @media print { #appSidebar { display: none !important; } body.has-sidebar { padding: 0 !important; } }
-    @media (max-width: 1000px) { body.has-sidebar { padding-left: 10px !important; } #appSidebar { display: none; } }
+    @media print { #appSidebar, #appDrawerBackdrop, #btnAppMenu { display: none !important; } }
 
   </style>
 </head>
@@ -16858,22 +16868,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) { return false; }
     }
 
-    // ---- Bố cục ứng dụng (v1.9.19): chuyển các nút bảng/thao tác sang thanh bên trái, giữ nguyên id và chức năng ----
+    // ---- Bố cục ứng dụng (v1.9.19): menu ☰ trượt đè lên bảng (không đẩy bảng), bấm ra ngoài / Esc / chọn mục thì tự đóng.
+    //      Chỉ di chuyển các nút có sẵn (giữ nguyên id và chức năng).
+    function setAppDrawer(open) {
+      const side = document.getElementById('appSidebar'), bd = document.getElementById('appDrawerBackdrop');
+      if (!side || !bd) return;
+      side.classList.toggle('open', !!open); bd.classList.toggle('open', !!open);
+      if (open && typeof renderKpiStrip === 'function') renderKpiStrip();
+    }
     function buildAppSidebar() {
       if (typeof document === 'undefined' || !document.body || document.getElementById('appSidebar')) return;
       const side = document.createElement('aside');
       side.id = 'appSidebar'; side.className = 'no-print';
-      side.innerHTML = '<div class="sb-brand"><i>📦</i><span>Hàng Hoàn</span></div>'
+      side.innerHTML = '<div class="sb-brand"><i>📦</i><span>Quản Lý Hàng Hoàn</span></div>'
         + '<div class="sb-sec">Bảng dữ liệu</div><div id="sbNav"></div>'
         + '<div class="sb-sec">Thao tác</div><div id="sbTools"></div>'
         + '<div class="sb-sec">Tổng quan</div><div id="sbKpi"></div>';
-      document.body.appendChild(side);
+      const bd = document.createElement('div'); bd.id = 'appDrawerBackdrop'; bd.className = 'no-print';
+      bd.addEventListener('click', () => setAppDrawer(false));
+      document.body.appendChild(bd); document.body.appendChild(side);
       const move = (ids, target) => ids.forEach(id => { const el = document.getElementById(id); if (el) target.appendChild(el); });
       move(['btnOpenArchivedOrders', 'btnOpenCancelledOrders', 'btnNewOrdersHeader', 'btnOpenWatchlistModal', 'btnOpenStats'], side.querySelector('#sbNav'));
       const analytics = document.querySelector('button[onclick="openAnalyticsDashboardModal()"]');
       if (analytics) side.querySelector('#sbNav').appendChild(analytics);
-      move(['btnAddOrder', 'btnQuickCreateOrders', 'btnImportShopeeRow15', 'btnImportTikTokRow15', 'btnPhoneScanner', 'btnSessionScanHeader'], side.querySelector('#sbTools'));
+      move(['btnAddOrder', 'btnQuickCreateOrders', 'btnImportShopeeRow15', 'btnImportTikTokRow15', 'btnPhoneScanner', 'btnSessionScanHeader', 'btnSafeStorageHeader'], side.querySelector('#sbTools'));
       move(['kpiStrip'], side.querySelector('#sbKpi'));
+      // chọn một mục thì đóng menu rồi mới mở bảng
+      side.addEventListener('click', e => { if (e.target.closest('button')) setAppDrawer(false); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') setAppDrawer(false); });
       // Nhãn thường thay cho chữ in hoa (chỉ đổi phần chữ, giữ ô đếm có id).
       const relabel = { btnOpenArchivedOrders: '📦 Kho lưu trữ', btnOpenCancelledOrders: '🚫 Bảng đơn hủy', btnNewOrdersHeader: '📥 Đơn mới từ điện thoại',
         btnOpenStats: '📈 Thống kê', btnQuickCreateOrders: '⚡ Tạo đơn nhanh', btnOpenWatchlistModal: '⭐ Theo dõi' };
@@ -16884,7 +16906,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         plain[0].textContent = relabel[id];
         plain.slice(1).forEach(c => c.remove());
       });
-      document.body.classList.add('has-sidebar');
+      // Thanh trên: nút ☰ + ô tìm kiếm chuyển lên cùng hàng với tên app.
+      const top = document.querySelector('body > div:first-of-type > div.bg-\\[\\#ee4d2d\\]');
+      const titleBox = top ? top.firstElementChild : null;
+      if (titleBox) {
+        const menuBtn = document.createElement('button');
+        menuBtn.type = 'button'; menuBtn.id = 'btnAppMenu'; menuBtn.title = 'Mở menu'; menuBtn.textContent = '☰';
+        menuBtn.addEventListener('click', e => { e.stopPropagation(); setAppDrawer(!side.classList.contains('open')); });
+        titleBox.insertBefore(menuBtn, titleBox.firstChild);
+        const search = document.getElementById('searchInput');
+        const searchBox = search ? search.closest('div.flex.items-stretch') : null;
+        if (searchBox) { searchBox.classList.add('ui-topsearch'); titleBox.appendChild(searchBox); }
+      }
+      // Hàng lọc: gộp hàng sắp xếp/phân trang vào cùng hàng với các tab trạng thái; mỗi hàng chỉ một dòng.
+      const pipe = document.getElementById('pipelineTabs');
+      const row3 = pipe ? pipe.parentElement : null;
+      const pager = document.getElementById('tablePaginationBar');
+      const row4 = pager ? pager.parentElement : null;
+      if (row3 && row4 && row3 !== row4) {
+        Array.from(row4.children).forEach(ch => row3.appendChild(ch));
+        row4.classList.add('ui-hidden-row');
+        const prev = document.getElementById('searchPreviewBar');
+        if (prev) row3.parentElement.insertBefore(prev, row3.nextSibling);
+      }
+      if (row3) row3.classList.add('ui-row-1line');
+      const weeks = document.getElementById('weeklyImportTabsContainer');
+      const row2 = weeks ? weeks.closest('div.no-print') : null;
+      if (row2) row2.classList.add('ui-row-1line');
+      document.body.classList.add('has-drawer');
     }
     if (typeof document !== 'undefined' && document.addEventListener) {
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildAppSidebar); else buildAppSidebar();

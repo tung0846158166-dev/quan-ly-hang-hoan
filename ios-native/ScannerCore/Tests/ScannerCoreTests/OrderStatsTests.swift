@@ -71,6 +71,16 @@ final class OrderStatsTests: XCTestCase {
         XCTAssertEqual(res.soon, 1)
     }
 
+    func testReceivedByReceiveDate() {
+        var a = row("m", "A", rd: "01/11/2026", pd: false, rv: true); a.rcd = "05/11/2026 09:00"
+        var b = row("a", "B", rd: "01/11/2026", pd: false, rv: true); b.rcd = "05/11/2026 17:00"
+        var c = row("m", "C", rd: "01/11/2026", pd: false, rv: true); c.rcd = "06/11/2026"
+        let rows = [a, b, c].map { r -> OrderRow in var x = r; x.rd = x.rcd; x.pd = false; return x }
+        let res = OrderStats.compute(rows: rows, period: .day, now: 0, calendar: cal)
+        XCTAssertEqual(res.buckets.count, 2)
+        XCTAssertEqual(res.buckets.last?.total, 2)
+    }
+
     func testReturnVsCancelSplit() {
         XCTAssertTrue(OrderStats.isReturn(row("m", "A", rd: "")))
         XCTAssertTrue(OrderStats.isReturn(row("a", "B", rd: "")), "đơn trong kho lưu trữ tính vào đơn hoàn")

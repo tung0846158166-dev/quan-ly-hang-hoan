@@ -283,6 +283,8 @@ final class SyncEngine: ObservableObject {
 
     // MARK: quét
     func handleCameraCode(_ raw: String) {
+        // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
+        guard TrackingCode.isPlausibleScan(raw) else { return }
         _ = submit(raw: raw, kind: mode, photo: nil, useSnapshot: true)
     }
 

@@ -18,14 +18,14 @@ function make(orders, stored, other) {
 test('mã quét trước, đơn xuất hiện sau → tự đã nhận với giờ quét', () => {
   const orders = [];
   const t = make(orders);
-  const at = new Date(2026, 10, 16, 9, 5, 7).getTime();
+  const at = new Date(2026, 10, 10, 9, 5, 7).getTime();
   t.api.remember('spx123', at);
   assert.strictEqual(t.api.reconcile(true), 0);
   assert.strictEqual(t.api.list().length, 1);
   orders.push({ track: 'SPX123', status: 'Chưa nhận' });
   assert.strictEqual(t.api.reconcile(true), 1);
   assert.strictEqual(orders[0].status, 'Hàng đã trả');
-  assert.strictEqual(orders[0].recvDate, '16/11/2026 09:05:07');
+  assert.strictEqual(orders[0].recvDate, '10/11/2026 09:05:07');
   assert.strictEqual(t.api.list().length, 0);
   assert.strictEqual(t.notes.length, 1);
 });
@@ -71,14 +71,14 @@ test('v1.9.13: có ở kho lưu trữ/đơn hủy thì không tạo; trùng nhi�
 test('v1.9.13: đơn trong hộp, sau đó file sàn có đơn → đã nhận và gỡ khỏi hộp', () => {
   const orders = [];
   const t = make(orders);
-  const at = new Date(2026, 10, 16, 8, 0, 0).getTime();
+  const at = new Date(2026, 10, 10, 8, 0, 0).getTime();
   t.api.remember('LATE1', at, at);
   t.api.promote();
   assert.strictEqual(t.api.inbox().length, 1);
   orders.push({ track: 'LATE1', status: 'Chưa nhận' });
   assert.strictEqual(t.api.reconcile(true), 1);
   assert.strictEqual(orders[0].status, 'Hàng đã trả');
-  assert.strictEqual(orders[0].recvDate, '16/11/2026 08:00:00');
+  assert.strictEqual(orders[0].recvDate, '10/11/2026 08:00:00');
   assert.strictEqual(t.api.inbox().length, 0);
 });
 test('v1.9.13: đẩy từ hộp ra bảng chính ghi sẵn Hàng đã trả', () => {

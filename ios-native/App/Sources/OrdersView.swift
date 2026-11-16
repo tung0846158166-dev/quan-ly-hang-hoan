@@ -101,6 +101,7 @@ struct OrdersView: View {
             .onChange(of: platform) { _ in refresh() }
             .onChange(of: store.updatedAt) { _ in refresh() }
             .onChange(of: store.rows.count) { _ in refresh() }
+            .onChange(of: store.revision) { _ in refresh() }
             .onChange(of: engine.items.count) { _ in refresh() }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {

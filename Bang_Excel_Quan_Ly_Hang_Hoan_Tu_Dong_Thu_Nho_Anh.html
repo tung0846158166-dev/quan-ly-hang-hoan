@@ -3792,7 +3792,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
 
     // v1.9.9: chống trùng giữa Bảng chính, Kho lưu trữ và Bảng đơn hủy.
-    function orderIdentityCodes(o) {
+    // Nhận diện đơn: ưu tiên mã vận đơn (giao/hoàn/phụ). Mã đơn chỉ dùng khi một bên chưa có mã vận đơn nào,
+    // để đơn hoàn LẦN 2 của cùng một mã đơn (mã vận đơn hoàn khác) không bị coi là trùng đơn hoàn lần 1.
+    function orderTrackingCodes(o) {
       const set = new Set();
       if (!o || typeof o !== 'object') return set;
       const add = v => {
@@ -3802,30 +3804,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const c = extractCleanTrackingCode(t);
         if (c) set.add(c);
       };
-      [o.orderId, o.track, o.altTrack, o.returnTrack, o.forwardTrack].forEach(add);
+      [o.track, o.altTrack, o.returnTrack].forEach(add);
       if (Array.isArray(o.trackingCodes)) o.trackingCodes.forEach(add);
       return set;
     }
+    function orderIdKey(o) { return String((o && o.orderId) || '').trim().toUpperCase(); }
     function buildOtherTablesIndex() {
       const map = new Map();
+      const put = (k, where) => { if (k && !map.has(k)) map.set(k, where); };
       const addAll = (list, where) => {
-        (Array.isArray(list) ? list : []).forEach(o => orderIdentityCodes(o).forEach(c => { if (!map.has(c)) map.set(c, where); }));
+        (Array.isArray(list) ? list : []).forEach(o => {
+          const tr = orderTrackingCodes(o);
+          tr.forEach(c => put('T:' + c, where));
+          const oid = orderIdKey(o);
+          if (oid) { put('O:' + oid, where); if (!tr.size) put('N:' + oid, where); }
+        });
       };
       try { addAll(archivedOrders, 'archive'); } catch (e) {}
       try { addAll(cancelledOrders, 'cancelled'); } catch (e) {}
       return map;
     }
-    function findInOtherTables(index, orderData) {
-      for (const c of orderIdentityCodes(orderData)) { if (index.has(c)) return index.get(c); }
+    // loose = true (điện thoại quét một mã bất kỳ): mã quét có thể là mã đơn nên so cả mã đơn.
+    function findInOtherTables(index, orderData, loose = false) {
+      const tr = orderTrackingCodes(orderData);
+      for (const c of tr) { if (index.has('T:' + c)) return index.get('T:' + c); if (loose && index.has('O:' + c)) return index.get('O:' + c); }
+      const oid = orderIdKey(orderData);
+      if (oid) {
+        if (loose && index.has('O:' + oid)) return index.get('O:' + oid);
+        if (!tr.size && index.has('O:' + oid)) return index.get('O:' + oid);
+        if (tr.size && index.has('N:' + oid)) return index.get('N:' + oid);
+      }
       return null;
     }
+
     const EXISTING_TABLE_LABEL = { main: 'BẢNG CHÍNH', archive: 'KHO LƯU TRỮ', cancelled: 'BẢNG ĐƠN HỦY' };
     // v1.9.10: đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy thì không tạo lại (điện thoại tạo đơn mới, đơn hủy, đẩy ra bảng chính).
     function locateExistingAnywhere(code, orderId) {
       try {
         if (typeof findExistingMainOrder === 'function' && (findExistingMainOrder(code) || (orderId && findExistingMainOrder(orderId)))) return 'main';
       } catch (e) {}
-      return findInOtherTables(buildOtherTablesIndex(), { orderId: orderId || '', track: code, returnTrack: code });
+      return findInOtherTables(buildOtherTablesIndex(), { orderId: orderId || '', track: code }, true);
     }
     function isInboxItemDuplicate(it) {
       return Boolean(it && locateExistingAnywhere(it.track || it.code || '', it.orderId));
@@ -7198,7 +7216,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.10';
+    const APP_VERSION_NUMBER = '1.9.11';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13677,7 +13695,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.10',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.11',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };

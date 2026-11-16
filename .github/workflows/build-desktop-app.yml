@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.10
+          name: QuanLyHangHoan-Windows-Installer-v1.9.11
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.10
-          name: "Quản Lý Hàng Hoàn v1.9.10 — điện thoại tạo đơn mới/đơn hủy không tạo trùng"
+          tag_name: v1.9.11
+          name: "Quản Lý Hàng Hoàn v1.9.11 — rà soát: không coi đơn hoàn lần 2 là trùng"
           body: |
+            ### Bản sửa 1.9.11
+
+            - Chống trùng và công cụ Dọn Đơn Trùng so theo mã vận đơn trước; mã đơn chỉ dùng khi một bên chưa có mã vận đơn. Nhờ vậy đơn hoàn lần 2 của cùng một mã đơn (mã vận đơn hoàn khác) không bị bỏ qua hay xóa nhầm.
+
             ### Bản sửa 1.9.10
 
             - Điện thoại tạo đơn mới, tạo đơn hủy hoặc đẩy ra Bảng chính: đơn đã có ở Bảng chính, Kho lưu trữ hoặc Bảng đơn hủy thì máy tính báo "ĐÃ CÓ Ở …" và không tạo lại. Nhập từ Hộp Đơn Mới trên máy tính cũng bỏ qua đơn trùng.

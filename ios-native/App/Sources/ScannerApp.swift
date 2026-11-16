@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ScannerApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var engine = SyncEngine()
     @StateObject private var router = NotificationRouter.shared
@@ -13,6 +14,7 @@ struct ScannerApp: App {
                 .environmentObject(engine.snapshot)
                 .environmentObject(router)
                 .task { router.store = engine.snapshot; engine.start(); engine.snapshot.refreshAuthorization() }
+                .onChange(of: scenePhase) { phase in if phase != .active { engine.flushPersist() } }
         }
     }
 }

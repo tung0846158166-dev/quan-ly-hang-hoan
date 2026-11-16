@@ -12,6 +12,7 @@ struct HistoryView: View {
     @State private var confirmClear = false
     @State private var query = ""
     @State private var detail: ScanItem?
+    @State private var resentNote = ""
 
     private var filters: [HistoryFilter] { kind == .cancelOrder ? [.valid, .duplicate, .pending] : HistoryFilter.allCases }
 
@@ -46,6 +47,21 @@ struct HistoryView: View {
                                 .tint(filter == f ? .indigo : .gray)
                                 .font(.footnote.bold())
                         }
+                    }.padding(.horizontal)
+                }
+                let waiting = engine.items.filter { $0.kind == kind && !$0.isSettled }.count
+                if waiting > 0 {
+                    VStack(spacing: 4) {
+                        Button {
+                            let n = engine.resendAllPending(kind: kind)
+                            resentNote = "Đã đưa \(n) đơn vào hàng gửi lại, app gửi dần vài đơn mỗi nhịp."
+                            if SyncEngine.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.success) }
+                        } label: {
+                            Label("Gửi lại tất cả lên máy tính (\(waiting))", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent).tint(.orange).font(.footnote.bold())
+                        if !resentNote.isEmpty { Text(resentNote).font(.caption2).foregroundStyle(.secondary) }
                     }.padding(.horizontal)
                 }
                 List {

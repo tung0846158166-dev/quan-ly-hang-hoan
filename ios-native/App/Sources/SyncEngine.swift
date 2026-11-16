@@ -284,9 +284,15 @@ final class SyncEngine: ObservableObject {
     }
 
     // MARK: quét
+    private var lastCameraCode = ""
+    private var lastCameraTime = Date.distantPast
     func handleCameraCode(_ raw: String) {
         // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
         guard TrackingCode.isPlausibleScan(raw) else { return }
+        // Camera vẫn nhìn thấy cùng nhãn sau khi đã quét: không tạo thêm lượt "quét trùng" trong vài giây đầu.
+        let c = TrackingCode.clean(raw), now = Date()
+        if c == lastCameraCode && now.timeIntervalSince(lastCameraTime) < 6 { lastCameraTime = now; return }
+        lastCameraCode = c; lastCameraTime = now
         _ = submit(raw: raw, kind: mode, photo: nil, useSnapshot: true)
     }
 

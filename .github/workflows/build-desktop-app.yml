@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.15
+          name: QuanLyHangHoan-Windows-Installer-v1.9.16
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,10 +88,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.15
-          name: "Quản Lý Hàng Hoàn v1.9.15 — Bảng đơn hủy có lọc theo ngày"
+          tag_name: v1.9.16
+          name: "Quản Lý Hàng Hoàn v1.9.16 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
           body: |
-            ### Bản sửa 1.9.15
+            ### Bản sửa 1.9.16
+
+            - Nút "📊 THỐNG KÊ": thống kê đơn hoàn (gồm kho lưu trữ) và đơn hủy (bảng đơn hủy) theo ngày, tuần, tháng, kèm số đơn đã nhận, đang chờ, sắp đến hạn dưới 24 giờ và quá hạn.
 
             - Bảng đơn hủy: thêm lọc theo ngày (từ ngày – đến ngày), chọn lọc theo Ngày hủy hoặc Ngày nhận hàng; nút "Xóa lọc" xóa luôn cả khoảng ngày.
 

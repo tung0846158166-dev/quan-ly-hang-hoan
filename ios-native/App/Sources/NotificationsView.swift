@@ -28,6 +28,13 @@ struct NotificationsView: View {
                 Section {
                     NavigationLink { StatsView() } label: { Label("Thống kê đơn hoàn / hủy theo ngày, tuần, tháng", systemImage: "chart.bar.xaxis") }
                 }
+                Section {
+                    HStack(spacing: 10) {
+                        StatTile(title: "Quá hạn", value: a.overdue.count, icon: "exclamationmark.triangle.fill", color: .red)
+                        StatTile(title: "Sắp đến hạn <24h", value: a.soon.count, icon: "clock.fill", color: .orange)
+                    }
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                }
                 Section("🚨 Quá hạn (\(a.overdue.count))") {
                     if a.overdue.isEmpty { Text("Không có đơn quá hạn").foregroundStyle(.secondary) }
                     ForEach(a.overdue) { alertRow($0, now: now) }
@@ -75,7 +82,10 @@ struct NotificationsView: View {
             }
             if !r.n.isEmpty { Text(r.n).font(.footnote).lineLimit(1) }
             Text(Deadline.text(due: r.due, now: now)).font(.caption.bold())
+                .padding(.horizontal, 8).padding(.vertical, 2)
+                .background((level == .overdue ? Color.red : Color.orange).opacity(0.14))
                 .foregroundColor(level == .overdue ? .red : .orange)
+                .clipShape(Capsule())
         }
         .contentShape(Rectangle())
         .onTapGesture { router.openRow = r }

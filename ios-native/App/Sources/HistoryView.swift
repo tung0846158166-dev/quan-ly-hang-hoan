@@ -42,10 +42,7 @@ struct HistoryView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(filters, id: \.self) { f in
-                            Button(f.rawValue) { filter = (filter == f ? nil : f) }
-                                .buttonStyle(.borderedProminent)
-                                .tint(filter == f ? .indigo : .gray)
-                                .font(.footnote.bold())
+                            Chip(title: f.rawValue, selected: filter == f) { filter = (filter == f ? nil : f) }
                         }
                     }.padding(.horizontal)
                 }

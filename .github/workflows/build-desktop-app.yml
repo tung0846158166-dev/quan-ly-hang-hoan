@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.18
+          name: QuanLyHangHoan-Windows-Installer-v1.9.19
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,10 +88,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.18
-          name: "Quản Lý Hàng Hoàn v1.9.18 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
+          tag_name: v1.9.19
+          name: "Quản Lý Hàng Hoàn v1.9.19 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
           body: |
-            ### Bản sửa 1.9.18
+            ### Bản sửa 1.9.19
+
+            - Giao diện mới: thanh tiêu đề dải màu, bảng dạng danh sách (hàng kẻ nhẹ, tô xen kẽ, tiêu đề cố định, rê chuột sáng hàng), nút và ô nhập bo tròn, cửa sổ bo góc có hiệu ứng, thanh cuộn mảnh. Chức năng giữ nguyên.
 
             - Bảng thống kê: chọn xem cả 2 sàn, riêng Shopee hoặc riêng TikTok Shop (cả trên máy tính và iPhone).
 

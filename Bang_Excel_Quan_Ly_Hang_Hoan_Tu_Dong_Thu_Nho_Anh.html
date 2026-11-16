@@ -316,6 +316,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     tr.search-locate-flash > td { background-color: #fde047 !important; transition: background-color .3s; }
     tr.search-locate-flash { outline: 3px solid #f97316; outline-offset: -3px; }
+
+    /* ===== Giao diện hiện đại (v1.9.19): chỉ đổi cách hiển thị, không đổi chức năng ===== */
+    :root { --ui-accent: #ee4d2d; --ui-bg: #eef1f6; --ui-card: #ffffff; --ui-line: #e3e8ef; --ui-ink: #0f172a; }
+    body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif !important;
+           background: radial-gradient(1200px 500px at 10% -10%, #ffe7df 0%, transparent 60%), var(--ui-bg) !important; color: var(--ui-ink); -webkit-font-smoothing: antialiased; }
+    /* thanh tiêu đề: dải màu mượt, bo góc, đổ bóng nhẹ */
+    body > div:first-of-type { border-radius: 18px !important; border: 1px solid var(--ui-line) !important; box-shadow: 0 10px 30px rgba(15, 23, 42, .08) !important; overflow: visible; }
+    body > div:first-of-type > div.bg-\[\#ee4d2d\] { background: linear-gradient(120deg, #ee4d2d 0%, #ff7a45 55%, #ff9a5a 100%) !important; border-radius: 18px 18px 0 0; padding: 10px 14px !important; }
+    body > div:first-of-type h1 { font-size: 15px !important; letter-spacing: .04em; text-shadow: 0 1px 2px rgba(0, 0, 0, .18); }
+    /* nút bấm: bo tròn, nổi nhẹ khi rê chuột */
+    button { transition: transform .12s ease, box-shadow .12s ease, filter .12s ease, background-color .12s ease; }
+    button:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15, 23, 42, .18); filter: brightness(1.04); }
+    button:not(:disabled):active { transform: translateY(0); box-shadow: none; }
+    button.rounded-md, button.rounded-lg, button.rounded { border-radius: 10px !important; }
+    input[type="text"], input[type="search"], input[type="date"], input[type="number"], select, textarea { border-radius: 10px; transition: box-shadow .15s ease, border-color .15s ease; }
+    input:focus, select:focus, textarea:focus { outline: none !important; border-color: var(--ui-accent) !important; box-shadow: 0 0 0 3px rgba(238, 77, 45, .18) !important; }
+    /* bảng: như danh sách ứng dụng chứ không còn như file Excel */
+    .excel-table { border-collapse: separate !important; border-spacing: 0; background: var(--ui-card); }
+    .excel-table th, .excel-table td { border: 0 !important; border-bottom: 1px solid var(--ui-line) !important; padding: 7px 8px !important; font-size: 12px; }
+    .excel-table thead th { position: sticky; top: 0; z-index: 20; font-weight: 700; letter-spacing: .02em; border-bottom: 2px solid rgba(15, 23, 42, .12) !important; }
+    .excel-table tbody tr:nth-child(even) > td { background-color: rgba(238, 241, 246, .55); }
+    .excel-table tbody tr { transition: background-color .12s ease; }
+    .excel-table tbody tr:hover > td { background-color: #fff4ec !important; }
+    .excel-table tbody tr td:first-child, .excel-table thead tr th:first-child { padding-left: 12px !important; }
+    /* cuộn mượt, thanh cuộn mảnh */
+    * { scrollbar-width: thin; scrollbar-color: #c3cad6 transparent; }
+    *::-webkit-scrollbar { width: 9px; height: 9px; }
+    *::-webkit-scrollbar-thumb { background: #c3cad6; border-radius: 9px; border: 2px solid transparent; background-clip: content-box; }
+    *::-webkit-scrollbar-thumb:hover { background: #9aa5b6; background-clip: content-box; border: 2px solid transparent; }
+    /* cửa sổ (modal): bo góc lớn, bóng đổ sâu, hiện ra mượt */
+    .fixed.inset-0 > div[onclick*="stopPropagation"] { border-radius: 20px !important; box-shadow: 0 25px 60px rgba(2, 6, 23, .45) !important; animation: uiPop .16s ease-out; }
+    @keyframes uiPop { from { opacity: 0; transform: translateY(6px) scale(.985); } to { opacity: 1; transform: none; } }
+    @media print { body { background: #fff !important; } button { box-shadow: none !important; } }
   </style>
 </head>
 <body class="p-1 sm:p-1.5 md:p-2 bg-slate-100">

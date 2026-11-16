@@ -21,6 +21,7 @@ struct ScanView: View {
         .padding(.horizontal, 12).padding(.top, 4)
         }
         .scrollDismissesKeyboard(.interactively)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
             camera.onCode = { engine.handleCameraCode($0) }
@@ -51,8 +52,9 @@ struct ScanView: View {
         }
         .frame(height: 345)
         .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.indigo, lineWidth: 2))
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.modeColor(engine.mode), lineWidth: 3))
+        .shadow(color: Theme.modeColor(engine.mode).opacity(0.35), radius: 10, x: 0, y: 3)
     }
 
     /// Vài lần quét gần nhất của chế độ đang chọn; chạm vào để xem chi tiết và ảnh.
@@ -75,7 +77,7 @@ struct ScanView: View {
                             .font(.caption2).foregroundStyle(.secondary)
                         Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                     }
-                    .padding(8).background(Color(.secondarySystemBackground)).cornerRadius(8)
+                    .padding(10).background(Color(.secondarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .contentShape(Rectangle())
                     .onTapGesture { detail = it }
                 }
@@ -85,12 +87,7 @@ struct ScanView: View {
 
     private var statusBar: some View {
         VStack(spacing: 6) {
-            Picker("Chế độ", selection: $engine.mode) {
-                Text("Quét hoàn kho").tag(ScanKind.returnScan)
-                Text("Tạo đơn mới").tag(ScanKind.newOrder)
-                Text("Tạo đơn hủy").tag(ScanKind.cancelOrder)
-            }
-            .pickerStyle(.segmented)
+            ModePicker(mode: $engine.mode)
             HStack {
                 pill(engine.channelUp ? "Đã nối kênh" : "Mất kết nối", engine.channelUp ? .green : .red)
                 pill(engine.pcOnline ? "PC đang online" : "Chờ PC phản hồi", engine.pcOnline ? .green : .orange)
@@ -98,7 +95,7 @@ struct ScanView: View {
                 Spacer()
             }
         }
-        .padding(8).background(.ultraThinMaterial).cornerRadius(12)
+        .card(padding: 10)
     }
 
     private func pill(_ t: String, _ c: Color) -> some View {
@@ -112,8 +109,10 @@ struct ScanView: View {
             Text(b.code).font(.system(.title3, design: .monospaced).bold())
             if !b.sub.isEmpty { Text(b.sub).font(.footnote).multilineTextAlignment(.center) }
         }
-        .frame(maxWidth: .infinity).padding(10)
-        .background(b.color.opacity(0.9)).foregroundColor(.white).cornerRadius(12)
+        .frame(maxWidth: .infinity).padding(14)
+        .background(b.color.opacity(0.92)).foregroundColor(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: b.color.opacity(0.35), radius: 8, x: 0, y: 3)
     }
 
     private var controls: some View {
@@ -129,7 +128,7 @@ struct ScanView: View {
                     Label(zoom >= 2 ? "2x" : "1x", systemImage: "plus.magnifyingglass")
                 }
             }
-            .buttonStyle(.borderedProminent).tint(.indigo).font(.footnote.bold())
+            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Theme.accent).font(.footnote.bold())
             HStack {
                 TextField("Nhập mã tay", text: $manual)
                     .textInputAutocapitalization(.characters).autocorrectionDisabled()
@@ -142,7 +141,7 @@ struct ScanView: View {
                 TextField("Ghi chú đơn (không bắt buộc)", text: $engine.note).textFieldStyle(.roundedBorder).font(.footnote)
             }
         }
-        .padding(8).background(.ultraThinMaterial).cornerRadius(12)
+        .card(padding: 10)
     }
 
     private func sendManual() {

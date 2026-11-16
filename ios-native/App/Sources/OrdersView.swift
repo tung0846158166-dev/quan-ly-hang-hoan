@@ -74,8 +74,7 @@ struct OrdersView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
-                            Button("\(f.rawValue) (\(counts[f] ?? 0))") { filter = f }
-                                .buttonStyle(.borderedProminent).tint(filter == f ? .indigo : .gray).font(.footnote.bold())
+                            Chip(title: "\(f.rawValue) (\(counts[f] ?? 0))", selected: filter == f) { filter = f }
                         }
                     }.padding(.horizontal)
                 }

@@ -65,6 +65,7 @@ test('v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc c�
     getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền',
     getOrderReturnElapsedInfo: o => ({ level: o.lvl || 'safe' })
   };
+  c.getOrderAlertLevel = o => (!c.isOrderPending(o) ? '' : (o.lvl === 'danger' ? 'overdue' : (o.lvl === 'warning' ? 'soon' : '')));
   c.orders[1].lvl = 'danger'; c.orders[2].lvl = 'warning';
   vm.createContext(c); vm.runInContext(full, c);
   const st = JSON.parse(JSON.stringify(vm.runInContext('buildPhoneSnapshotStats(7)', c)));
@@ -73,9 +74,9 @@ test('v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc c�
 });
 
 test('v1.9.5: mỗi dòng gửi iPhone kèm mức cảnh báo Báo Đỏ/Báo Vàng như cột Hạn Cần Xử Lý', () => {
-  assert.match(src, /getOrderReturnElapsedInfo\(o\)\.level; return l === 'danger' \? 2 : \(l === 'warning' \? 1 : 0\)/);
+  assert.match(src, /const l = getOrderAlertLevel\(o\); return l === 'overdue' \? 2 : \(l === 'soon' \? 1 : 0\)/);
   assert.match(src, /if \(x\.lv !== undefined\) row\.lv = x\.lv;/);
-  assert.match(src, /rv: !!o\.received, lv: 0 \}/);
+  assert.match(src, /rv: !!o\.received, lv: clv \}/, 'đơn hủy gửi mức cảnh báo theo hạn xử lý như bảng Thông báo PC');
 });
 
 test('v1.9.6: PC nhận ghi chú đơn từ iPhone, đánh dấu theo dõi và báo lại', () => {
@@ -133,6 +134,7 @@ test('v1.9.19: Báo Đỏ/Báo Vàng trong bảng đối chiếu chỉ đếm đ
     isOrderReceived: () => false, isOrderPending: o => o.status !== 'Hư hỏng',
     getOrderType: () => 'Trả hàng/Hoàn tiền', getOrderReturnElapsedInfo: o => ({ level: o.lvl })
   };
+  c.getOrderAlertLevel = o => (!c.isOrderPending(o) ? '' : (o.lvl === 'danger' ? 'overdue' : (o.lvl === 'warning' ? 'soon' : '')));
   vm.createContext(c); vm.runInContext(full, c);
   const st = vm.runInContext('buildPhoneSnapshotStats(3)', c);
   assert.strictEqual(st.m_danger, 1);

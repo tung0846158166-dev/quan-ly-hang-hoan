@@ -38,7 +38,7 @@ test('thống kê chia theo ngày / tuần / tháng và đếm quá hạn, sắp
 
 test('đơn hoàn lấy cả kho lưu trữ, đơn hủy lấy bảng đơn hủy', () => {
   const ret = extract('collectReturnStatsItems');
-  assert.ok(ret.includes('archivedOrders') && ret.includes("'Đơn hủy'"));
+  assert.ok(ret.includes('archivedOrders') && !ret.includes("'Đơn hủy'"), 'đơn hoàn = toàn bộ bảng chính + kho lưu trữ');
   assert.ok(extract('collectCancelStatsItems').includes('cancelledOrders'));
   assert.ok(html.includes('id="statsModal"') && html.includes('openStatsModal()'));
 });
@@ -55,6 +55,6 @@ test('v1.9.19: thanh bên trái giữ nguyên id các nút, ô tổng quan dùng
   assert.ok(!sb.includes('innerHTML = \'\''), 'không xóa nút');
   assert.ok(html.includes('function setAppDrawer') && sb.includes("key === 'Escape'") && sb.includes('appDrawerBackdrop'), 'menu ☰ đóng khi bấm ra ngoài / Esc');
   const k = extract('renderKpiStrip');
-  assert.ok(k.includes('getOrderReturnElapsedInfo') && !k.includes('getDeadlineStatus'));
-  assert.ok(extract('collectReturnStatsItems').includes('getOrderReturnElapsedInfo'));
+  assert.ok(k.includes('getOrderAlertLevel'));
+  assert.ok(extract('collectReturnStatsItems').includes('getOrderAlertLevel'));
 });

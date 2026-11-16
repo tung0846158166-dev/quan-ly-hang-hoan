@@ -30,8 +30,8 @@ struct NotificationsView: View {
                 }
                 Section {
                     HStack(spacing: 10) {
-                        StatTile(title: "Quá hạn", value: a.overdue.count, icon: "exclamationmark.triangle.fill", color: .red)
-                        StatTile(title: "Sắp đến hạn <24h", value: a.soon.count, icon: "clock.fill", color: .orange)
+                        StatTile(title: "Báo Đỏ · quá hạn", value: a.overdue.count, icon: "exclamationmark.triangle.fill", color: .red)
+                        StatTile(title: "Báo Vàng · sắp hạn", value: a.soon.count, icon: "clock.fill", color: .orange)
                     }
                     .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }

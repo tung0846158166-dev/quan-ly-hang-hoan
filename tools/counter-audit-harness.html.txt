@@ -1,0 +1,129 @@
+<script>
+window.addEventListener('load', () => { setTimeout(() => {
+ const out = { checks: [], errors: [] };
+ const chk = (name, actual, expected) => out.checks.push({ name, actual: String(actual), expected: String(expected), ok: String(actual) === String(expected) });
+ try {
+  const p2 = n => String(n).padStart(2, '0');
+  const fmt = d => p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':00';
+  const ago = h => fmt(new Date(Date.now() - h * 3600000));
+  const ahead = h => fmt(new Date(Date.now() + h * 3600000));
+  const mk = (id, plat, retH, status, qty, extra) => Object.assign({ shipDate: ago(retH + 48), returnDate: ago(retH), recvDate: '', platform: plat, orderType: 'Giao không thành công',
+    preOrder: 'Đơn thường', orderId: 'OID' + id, track: 'TRK' + id, forwardTrack: '', returnTrack: '', carrier: 'SPX', price: 100000, status, photo: '', note: '',
+    items: [{ product: 'SP' + id, color: 'Đen', size: 'L', qty }] }, extra || {});
+  orders = [
+    mk(1, 'Shopee', 80, 'Chưa trả', 1),                                   // Báo Đỏ (quá 72h)
+    mk(2, 'Shopee', 60, 'Chưa trả', 1),                                   // Báo Vàng (48-72h)
+    mk(3, 'Shopee', 40, 'Chưa trả', 2),                                   // còn hạn
+    mk(4, 'TikTok Shop', 30, 'Chưa trả', 1, { deadline: ago(1) }),        // quá hạn sàn
+    mk(5, 'TikTok Shop', 10, 'Chưa trả', 1, { deadline: ahead(30) }),     // hạn sàn còn 30h -> Báo Vàng
+    mk(6, 'Shopee', 50, 'Hàng đã trả', 1, { recvDate: ago(2) }),          // về kho hôm nay
+    mk(7, 'Shopee', 90, 'Hàng đã trả', 2, { recvDate: ago(72) }),         // về kho 3 ngày trước
+    mk(8, 'TikTok Shop', 90, 'Không cần nhận', 1),
+    mk(9, 'Shopee', 100, 'Bị mất', 1),
+    mk(10, 'Shopee', 100, 'Hư hỏng', 1),                                  // quá 72h nhưng Hư hỏng: không được báo đỏ
+    mk(11, 'Shopee', 20, 'Chưa trả', 1, { orderType: 'Đơn hủy', isWatchlist: true }),
+  ];
+  archivedOrders = [ mk(21, 'Shopee', 100, 'Hàng đã trả', 1, { recvDate: ago(30) }), mk(22, 'TikTok Shop', 100, 'Hàng đã trả', 1, { recvDate: ago(1) }) ];
+  cancelledOrders = [
+    makeCancelledOrder({ id: 'c1', track: 'CX1', platform: 'Shopee', returnDate: ago(100) }),        // quá hạn
+    makeCancelledOrder({ id: 'c2', track: 'CX2', platform: 'TikTok Shop', returnDate: ago(100), received: true, recvDate: ago(3) }),
+    makeCancelledOrder({ id: 'c3', track: 'CX3', platform: 'Shopee', returnDate: ago(1) }),          // còn hạn
+    makeCancelledOrder({ id: 'c4', track: 'CX4', platform: 'Shopee', returnDate: ago(55) }),         // còn <24h
+  ];
+  setPlatformFilter('all');
+  renderAll(); updateArchivedOrdersBadge(); updateCancelledBadge(); updateWatchlistBadge(); renderKpiStrip();
+  const T = id => (document.getElementById(id) || {}).textContent;
+  // --- PC: tab trạng thái (cả 2 sàn) ---
+  chk('Tab Tất cả', T('tabCountAll'), 11);
+  chk('Tab Chưa nhận', T('tabCountWaiting'), 6);
+  chk('Tab Đã nhận', T('tabCountReturned'), 2);
+  chk('Tab K.cần nhận', T('tabCountUnneeded'), 1);
+  chk('Tab Báo Vàng', T('tabCountUpcomingDeadline'), 2);
+  chk('Tab Báo Đỏ', T('tabCountOverdue'), 2);
+  chk('Tab Bị mất/Hư hỏng', T('tabCountLost'), 2);
+  // số trên tab = số dòng khi bấm tab
+  const rowsFor = tab => { setPipelineFilter(tab); return document.querySelectorAll('#orderTableBody tr[id^="row_"], #orderTableBody > tr').length; };
+  ['waiting', 'returned', 'upcoming', 'overdue', 'lost', 'unneeded'].forEach(t => {
+    const idMap = { waiting: 'tabCountWaiting', returned: 'tabCountReturned', upcoming: 'tabCountUpcomingDeadline', overdue: 'tabCountOverdue', lost: 'tabCountLost', unneeded: 'tabCountUnneeded' };
+    const n = T(idMap[t]); const filtered = orders.filter((o, i) => { currentFilterTab = t; return true; });
+    chk('Bấm tab ' + t + ': số dòng = số trên tab', rowsFor(t), n);
+  });
+  setPipelineFilter('all');
+  // --- PC: sàn ---
+  chk('Sàn Shopee', T('platCount_Shopee'), '8 đơn (10 SP)');
+  const wk = document.getElementById('weeklyImportTabsContainer'); chk('Tab Tất cả các tuần', /11 đơn \(13 SP\)/.test(wk ? wk.textContent : ''), true);
+  chk('Sàn TikTok', T('platCount_TikTok'), '3 đơn (3 SP)');
+  // --- PC: thanh tổng dưới đáy (cả 2 sàn) ---
+  chk('Dock số đơn', T('dockOrdersBadge'), '11 đơn');
+  chk('Dock SP', T('dockQtyBadge'), '13 SP');
+  chk('Dock đã về', T('dockReturnedBadge'), '🟢 Đã về: 3 SP');
+  chk('Dock chưa về', T('dockUnreturnedBadge'), '🟠 Chưa về: 7 SP');
+  chk('Dock k.cần', T('dockUnneededBadge'), '⚪ K.cần nhận: 1 SP');
+  // --- PC: nút bảng ---
+  chk('Badge kho lưu trữ', T('archivedOrdersCountBadge'), '2 đơn');
+  chk('Badge đơn hủy', T('cancelledOrdersCountBadge'), '4 đơn');
+  chk('Badge theo dõi', T('headerWatchlistCountBadge'), 1);
+  // --- PC: ô tổng quan ---
+  chk('Ô Đang chờ nhận', T('kpiPending'), 6);
+  chk('Ô Về kho hôm nay', T('kpiRecvToday'), (() => { const d = new Date(); return [2, 1].filter(h => new Date(Date.now() - h * 3600000).getDate() === d.getDate()).length; })());
+  chk('Ô Báo Đỏ', T('kpiOverdue'), 2);
+  chk('Ô Báo Vàng', T('kpiSoon'), 2);
+  chk('Ô Đơn hủy đang chờ', T('kpiCancelPending'), 3);
+  // --- PC: bảng Thông báo (hạn xử lý) ---
+  const items = collectDeadlineItems();
+  chk('Thông báo PC: quá hạn', items.filter(i => i.level === 'overdue').length, 3);   // đơn 1, 4 + đơn hủy c1
+  chk('Thông báo PC: sắp hạn', items.filter(i => i.level !== 'overdue').length, 3);  // đơn 2, 5 + đơn hủy c4
+  chk('Thông báo PC: không báo đơn Hư hỏng', items.some(i => i.code === 'TRK10'), false);
+  // --- PC: thống kê ---
+  statsPeriod = 'month'; statsPlatform = 'all';
+  const ret = computeStats(collectReturnStatsItems(), 'month'), can = computeStats(collectCancelStatsItems(), 'month');
+  chk('Thống kê hoàn: tổng (bảng chính + lưu trữ)', ret.total, 13);
+  chk('Thống kê hoàn: đã nhận', ret.received, 4);
+  chk('Thống kê hoàn: đang chờ', ret.pending, 6);
+  chk('Thống kê hoàn: Báo Đỏ', ret.overdue, 2);
+  chk('Thống kê hoàn: Báo Vàng', ret.soon, 2);
+  chk('Thống kê hủy: tổng', can.total, 4);
+  chk('Thống kê hủy: quá hạn', can.overdue, 1);
+  chk('Thống kê hủy: <24h', can.soon, 1);
+  chk('Thống kê đã về kho (hoàn)', computeStats(collectReceivedStatsItems('return'), 'month').total, 4);
+  chk('Thống kê đã nhận (hủy)', computeStats(collectReceivedStatsItems('cancel'), 'month').total, 1);
+  statsPlatform = 'Shopee';
+  chk('Thống kê hoàn: chỉ Shopee', computeStats(statsByPlatform(collectReturnStatsItems()), 'month').total, 9);
+  chk('Thống kê hủy: chỉ Shopee', computeStats(statsByPlatform(collectCancelStatsItems()), 'month').total, 3);
+  statsPlatform = 'all';
+  // --- Điện thoại: mô phỏng đúng cách app iPhone đếm từ danh sách PC gửi ---
+  const rows = buildPhoneSnapshotRows(), st = buildPhoneSnapshotStats(rows.length);
+  const lvOf = r => (r.lv === undefined ? -1 : r.lv);
+  const level = r => { const lv = lvOf(r); if (lv >= 0) return lv >= 2 ? 'overdue' : (lv === 1 ? 'soon' : 'normal'); const left = (r.due || 0) - Date.now(); return !r.due ? 'unknown' : (left < 0 ? 'overdue' : (left <= 86400000 ? 'soon' : 'normal')); };
+  const pd = r => r.pd !== 0, rv = r => r.rv === 1;
+  chk('ĐT nhận đủ đơn', rows.length, 17);
+  chk('ĐT Thông báo: quá hạn = PC', rows.filter(r => pd(r) && level(r) === 'overdue').length, items.filter(i => i.level === 'overdue').length);
+  chk('ĐT Thông báo: sắp hạn = PC', rows.filter(r => pd(r) && level(r) === 'soon').length, items.filter(i => i.level !== 'overdue').length);
+  chk('ĐT tab Chưa nhận = PC tab Chưa nhận', rows.filter(r => pd(r) && r.k === 'm').length, T('tabCountWaiting'));
+  chk('ĐT Đã nhận (chính+lưu trữ)', rows.filter(r => rv(r) && r.k !== 'c').length, 4);
+  chk('ĐT Lưu trữ', rows.filter(r => r.k === 'a').length, 2);
+  chk('ĐT Đang theo dõi', rows.filter(r => r.wl === 1 && r.k === 'm').length, T('headerWatchlistCountBadge'));
+  // đối chiếu trong Cài đặt iPhone: PC tính vs ĐT đếm
+  const m = rows.filter(r => r.k === 'm');
+  chk('Đối chiếu: bảng chính', st.m_total, m.length);
+  chk('Đối chiếu: đã nhận', st.m_recv, m.filter(rv).length);
+  chk('Đối chiếu: đang chờ', st.m_pend, m.filter(pd).length);
+  chk('Đối chiếu: Báo Đỏ', st.m_danger, m.filter(r => pd(r) && level(r) === 'overdue').length);
+  chk('Đối chiếu: Báo Vàng', st.m_warn, m.filter(r => pd(r) && level(r) === 'soon').length);
+  chk('Đối chiếu: Báo Đỏ = tab PC', st.m_danger, T('tabCountOverdue'));
+  chk('Đối chiếu: lưu trữ', st.a_total, rows.filter(r => r.k === 'a').length);
+  chk('Đối chiếu: đơn hủy', st.c_total, rows.filter(r => r.k === 'c').length);
+  chk('Đối chiếu: đơn hủy đã nhận', st.c_recv, rows.filter(r => r.k === 'c' && rv(r)).length);
+  chk('Đối chiếu: không rớt đơn', st.dropped, 0);
+  // thống kê iPhone (k != c là đơn hoàn) = thống kê PC
+  chk('ĐT thống kê hoàn tổng = PC', rows.filter(r => r.k !== 'c').length, ret.total);
+  chk('ĐT thống kê hoàn Báo Đỏ = PC', rows.filter(r => r.k !== 'c' && pd(r) && level(r) === 'overdue').length, ret.overdue);
+  chk('ĐT thống kê hủy quá hạn = PC', rows.filter(r => r.k === 'c' && pd(r) && level(r) === 'overdue').length, can.overdue);
+  chk('ĐT thống kê hủy <24h = PC', rows.filter(r => r.k === 'c' && pd(r) && level(r) === 'soon').length, can.soon);
+  chk('ĐT có ngày nhận cho đơn đã nhận', rows.filter(r => rv(r) && !r.rcd).length, 0);
+  // danh sách khiếu nại (trước báo lỗi biến)
+  chk('Danh sách khiếu nại quá 72h chạy được', getOverdueOrdersList(72).length, 1);
+ } catch (e) { out.errors.push(String(e && e.stack || e)); }
+ const pre = document.createElement('pre'); pre.id = '__audit'; pre.textContent = JSON.stringify(out); document.body.appendChild(pre);
+}, 1500); });
+</script></body></html>

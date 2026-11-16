@@ -1127,8 +1127,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     <div id="kpiStrip" class="no-print grid grid-cols-2 md:grid-cols-5 gap-2 px-3 py-2.5 bg-slate-50 border-b border-slate-200">
       <div class="ui-kpi"><small>⏳ ĐƠN ĐANG CHỜ NHẬN</small><b id="kpiPending">0</b></div>
       <div class="ui-kpi"><small>✅ VỀ KHO HÔM NAY</small><b id="kpiRecvToday" style="color:#16a34a">0</b></div>
-      <div class="ui-kpi"><small>🚨 QUÁ HẠN</small><b id="kpiOverdue" style="color:#dc2626">0</b></div>
-      <div class="ui-kpi"><small>⏰ SẮP ĐẾN HẠN &lt;24H</small><b id="kpiSoon" style="color:#f59e0b">0</b></div>
+      <div class="ui-kpi"><small>🚨 BÁO ĐỎ (QUÁ HẠN)</small><b id="kpiOverdue" style="color:#dc2626">0</b></div>
+      <div class="ui-kpi"><small>⚠️ BÁO VÀNG (SẮP HẠN)</small><b id="kpiSoon" style="color:#f59e0b">0</b></div>
       <div class="ui-kpi"><small>🚫 ĐƠN HỦY ĐANG CHỜ</small><b id="kpiCancelPending" style="color:#be123c">0</b></div>
     </div>
     <div id="mainTableScrollContainer" class="overflow-x-auto max-h-[680px] min-h-[520px]">
@@ -3296,7 +3296,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function getOverdueOrdersList(thresholdHours = 72) {
       return orders.filter(o => {
         if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
-        return isOrderOverdue(o, thresholdDays);
+        return isOrderOverdue(o, thresholdHours);
       });
     }
 
@@ -7849,6 +7849,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll(false);
     }
 
+    // v1.9.19: MỘT cách tính Báo Đỏ / Báo Vàng cho mọi nơi (tab lọc, ô tổng quan, thống kê, danh sách gửi điện thoại).
+    // Chỉ đơn còn chờ nhận (không tính đơn đã nhận, không cần nhận, bị mất, hư hỏng).
+    function getOrderAlertLevel(order) {
+      if (!isOrderPending(order)) return '';
+      const st = getDeadlineStatus(order);
+      if (st === 'overdue' || isOrderOverdue(order, 72)) return 'overdue';
+      if (st === 'upcoming') return 'soon';
+      return '';
+    }
+
     function isOrderOverdue(order, thresholdHours = 72) {
       if (!isOrderPending(order)) return false;
       const elapsed = getOrderReturnElapsedInfo(order);
@@ -11064,8 +11074,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (currentFilterTab === 'waiting' && !isOrderPending(order)) return false;
         if (currentFilterTab === 'returned' && !isOrderReceived(order)) return false;
         if (currentFilterTab === 'unneeded' && !isOrderUnneeded(order)) return false;
-        if (currentFilterTab === 'upcoming' && getDeadlineStatus(order) !== 'upcoming') return false;
-        if (currentFilterTab === 'overdue' && getDeadlineStatus(order) !== 'overdue' && !isOrderOverdue(order, 72)) return false;
+        if (currentFilterTab === 'upcoming' && getOrderAlertLevel(order) !== 'soon') return false;
+        if (currentFilterTab === 'overdue' && getOrderAlertLevel(order) !== 'overdue') return false;
         if (currentFilterTab === 'lost' && order.status !== 'Bị mất' && order.status !== 'Hư hỏng') return false;
 
         // Date & Time Filtering (v1.5.2: Lọc Từ ngày - Đến ngày, Từ giờ - Đến giờ kết hợp hoặc độc lập)
@@ -12183,9 +12193,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           countLost++;
         } else {
           countWaiting++;
-          const dlSt = getDeadlineStatus(o);
-          if (dlSt === 'upcoming') countUpcoming++;
-          if (dlSt === 'overdue' || isOrderOverdue(o, 72)) countOverdue++;
+          const al = getOrderAlertLevel(o);
+          if (al === 'soon') countUpcoming++;
+          if (al === 'overdue') countOverdue++;
         }
       });
       const elAll = document.getElementById('tabCountAll');
@@ -12246,7 +12256,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           activeQty += q;
           if (isOrderReceived(o)) activeRetQty += q;
           else if (isOrderUnneeded(o)) activeUnneededQty += q;
-          else if (o.status !== 'Bị mất') activeUnretQty += q;
+          else if (isOrderPending(o)) activeUnretQty += q;
         });
       });
 
@@ -12261,7 +12271,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elFootTotalPrice) elFootTotalPrice.textContent = formatMoney(activePrice);
 
       const elFootReturnedSummary = document.getElementById('footReturnedSummary');
-      if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${activeRetQty}`;
+      if (elFootReturnedSummary) elFootReturnedSummary.textContent = `🟢 Đã về: ${activeRetQty} SP`;
 
       // Cập nhật Thanh Dock Cố Định ở đáy màn hình
       const dockOrd = document.getElementById('dockOrdersBadge');
@@ -12269,11 +12279,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const dockQty = document.getElementById('dockQtyBadge');
       if (dockQty) dockQty.textContent = `${activeQty} SP`;
       const dockRet = document.getElementById('dockReturnedBadge');
-      if (dockRet) dockRet.textContent = `🟢 Đã về: ${activeRetQty}`;
+      if (dockRet) dockRet.textContent = `🟢 Đã về: ${activeRetQty} SP`;
       const dockUnret = document.getElementById('dockUnreturnedBadge');
-      if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${activeUnretQty}`;
+      if (dockUnret) dockUnret.textContent = `🟠 Chưa về: ${activeUnretQty} SP`;
       const dockUnneeded = document.getElementById('dockUnneededBadge');
-      if (dockUnneeded) dockUnneeded.textContent = `⚪ K.cần nhận: ${activeUnneededQty}`;
+      if (dockUnneeded) dockUnneeded.textContent = `⚪ K.cần nhận: ${activeUnneededQty} SP`;
       const dockP = document.getElementById('dockPriceBadge');
       if (dockP) dockP.textContent = formatMoney(activePrice);
 
@@ -14079,7 +14089,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
         pack(kind, o, getOrderPlatform(o), info ? info.due : 0, o.returnDate, o.status,
           { ty: getOrderType(o), pre: o.preOrder === 'Hàng đặt trước', pd: pending, rv: isOrderReceived(o),
-            lv: (() => { try { const l = getOrderReturnElapsedInfo(o).level; return l === 'danger' ? 2 : (l === 'warning' ? 1 : 0); } catch (e) { return 0; } })() });
+            lv: (() => { try { const l = getOrderAlertLevel(o); return l === 'overdue' ? 2 : (l === 'soon' ? 1 : 0); } catch (e) { return 0; } })() });
       };
       (orders || []).forEach(o => packOrder('m', o));
       try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => packOrder('a', o)); } catch (e) {}
@@ -14087,7 +14097,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!o) return;
         const pending = !o.received;
         const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
-        pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy', { ty: 'Đơn hủy', pre: false, pd: pending, rv: !!o.received, lv: 0 });
+        const clv = (pending && info) ? (info.left < 0 ? 2 : (info.left <= 24 * 3600000 ? 1 : 0)) : 0;   // giống bảng Thông báo trên máy tính
+        pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy', { ty: 'Đơn hủy', pre: false, pd: pending, rv: !!o.received, lv: clv });
       });
       // Đơn đang chờ lên trước (hạn gần nhất trước), rồi tới các đơn còn lại.
       rows.sort((a, b) => ((b.pd === 0 ? 0 : 1) - (a.pd === 0 ? 0 : 1)) || ((a.due || 9e15) - (b.due || 9e15)));
@@ -14104,7 +14115,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const st = {
         m_total: ord.length, m_recv: cnt(ord, isOrderReceived), m_pend: cnt(ord, isOrderPending), m_watch: cnt(ord, o => o.isWatchlist),
         m_pre: cnt(ord, o => o.preOrder === 'Hàng đặt trước'),
-        m_danger: cnt(ord, o => isOrderPending(o) && getOrderReturnElapsedInfo(o).level === 'danger'), m_warn: cnt(ord, o => isOrderPending(o) && getOrderReturnElapsedInfo(o).level === 'warning'), m_cancelType: cnt(ord, o => getOrderType(o) === 'Đơn hủy'),
+        m_danger: cnt(ord, o => getOrderAlertLevel(o) === 'overdue'), m_warn: cnt(ord, o => getOrderAlertLevel(o) === 'soon'), m_cancelType: cnt(ord, o => getOrderType(o) === 'Đơn hủy'),
         a_total: arch.length, a_recv: cnt(arch, isOrderReceived),
         c_total: can.length, c_recv: cnt(can, o => o.received)
       };
@@ -15358,8 +15369,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           (currentFilterTab === 'waiting' && isOrderPending(targetOrder)) ||
           (currentFilterTab === 'returned' && isOrderReceived(targetOrder)) ||
           (currentFilterTab === 'unneeded' && isOrderUnneeded(targetOrder)) ||
-          (currentFilterTab === 'upcoming' && getDeadlineStatus(targetOrder) === 'upcoming') ||
-          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 72))) ||
+          (currentFilterTab === 'upcoming' && getOrderAlertLevel(targetOrder) === 'soon') ||
+          (currentFilterTab === 'overdue' && getOrderAlertLevel(targetOrder) === 'overdue') ||
           (currentFilterTab === 'lost' && (targetOrder.status === 'Bị mất' || targetOrder.status === 'Hư hỏng'))
         );
         if (!matchesTab) {
@@ -16956,8 +16967,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (!o) return;
           if (isOrderPending(o)) {
             pending++;
-            const lv = getOrderReturnElapsedInfo(o).level;   // giống tab Báo Đỏ / Báo Vàng và giống điện thoại
-            if (lv === 'danger') overdue++; else if (lv === 'warning') soon++;
+            const al = getOrderAlertLevel(o);   // giống tab Báo Đỏ / Báo Vàng và giống điện thoại
+            if (al === 'overdue') overdue++; else if (al === 'soon') soon++;
           }
         });
         const recvToday = o => { if (!o || !isOrderReceived(o)) return false; const d = parseFullDate(o.recvDate); return !!d && !isNaN(d.getTime()) && d.getTime() >= start && d.getTime() < end; };
@@ -17018,10 +17029,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const out = [];
       const add = o => {
         if (!o) return;
-        if (getOrderType(o) === 'Đơn hủy') return;   // đơn hủy tính ở bảng đơn hủy
         const received = !!isOrderReceived(o), pending = !!isOrderPending(o);
-        let level = '';
-        if (pending) { const lv = getOrderReturnElapsedInfo(o).level; level = lv === 'danger' ? 'overdue' : (lv === 'warning' ? 'soon' : ''); }
+        const level = getOrderAlertLevel(o);
         out.push({ rd: o.returnDate, received, pending, level, platform: getOrderPlatform(o) });
       };
       (Array.isArray(orders) ? orders : []).forEach(add);
@@ -17041,7 +17050,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const take = o => ({ rd: o.recvDate, received: true, pending: false, level: '', platform: kind === 'cancel' ? (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '')) : getOrderPlatform(o) });
       if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(take);
       const out = [];
-      const add = o => { if (o && getOrderType(o) !== 'Đơn hủy' && isOrderReceived(o)) out.push(take(o)); };
+      const add = o => { if (o && isOrderReceived(o)) out.push(take(o)); };
       (Array.isArray(orders) ? orders : []).forEach(add);
       try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
       return out;
@@ -17357,11 +17366,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function collectDeadlineItems() {
       const items = [];
       orders.forEach((o, idx) => {
-        const s = getDeadlineStatus(o);
-        if (s !== 'upcoming' && s !== 'overdue') return;
+        const al = getOrderAlertLevel(o);
+        if (!al) return;
         const info = computeDeadlineInfo(o.returnDate, o.deadline);
         if (!info) return;
-        items.push({ kind: 'main', idx, level: info.left < 0 ? 'overdue' : 'upcoming', info, code: o.track || o.orderId || '', orderId: o.orderId || '', platform: o.platform || '', from: o.returnDate || '' });
+        items.push({ kind: 'main', idx, level: al === 'overdue' ? 'overdue' : 'upcoming', info, code: o.track || o.orderId || '', orderId: o.orderId || '', platform: o.platform || '', from: o.returnDate || '' });
       });
       cancelledOrders.forEach(o => {
         if (o.received) return;
@@ -17400,17 +17409,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function collectDeadlineCandidates() {
       const list = [];
       orders.forEach(o => {
-        const s = getDeadlineStatus(o);
-        if (s !== 'upcoming' && s !== 'overdue') return;
-        list.push({ key: 'm:' + (o.orderId || '') + '|' + (o.track || ''), level: s, code: o.track || o.orderId || '' });
+        const al = getOrderAlertLevel(o);
+        if (!al) return;
+        list.push({ key: 'm:' + (o.orderId || '') + '|' + (o.track || ''), level: al === 'overdue' ? 'overdue' : 'upcoming', code: o.track || o.orderId || '' });
       });
       cancelledOrders.forEach(o => {
         if (o.received) return;
-        const dt = typeof parseFullDate === 'function' ? parseFullDate(o.returnDate) : null;
-        if (!dt || isNaN(dt.getTime())) return;
-        const hours = (Date.now() - dt.getTime()) / 3600000;
-        if (hours >= 72) list.push({ key: 'c:' + o.id, level: 'overdue', code: (o.track || o.orderId || '') + ' (hủy)' });
-        else if (hours >= 48) list.push({ key: 'c:' + o.id, level: 'upcoming', code: (o.track || o.orderId || '') + ' (hủy)' });
+        // cùng cách tính với bảng Thông báo (có hạn sàn thì theo hạn sàn)
+        const info = computeDeadlineInfo(o.returnDate, o.deadline);
+        if (!info) return;
+        if (info.left < 0) list.push({ key: 'c:' + o.id, level: 'overdue', code: (o.track || o.orderId || '') + ' (hủy)' });
+        else if (info.left <= 24 * 3600000) list.push({ key: 'c:' + o.id, level: 'upcoming', code: (o.track || o.orderId || '') + ' (hủy)' });
       });
       return list;
     }
@@ -19732,13 +19741,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // Counts for filter pills
       let countDanger = 0, countWarning = 0, countPending = 0, countReceived = 0;
       watchlistEntries.forEach(({ order }) => {
-        const elapsed = getOrderReturnElapsedInfo(order);
         if (isOrderReceived(order)) countReceived++;
-        else {
-          countPending++;
-          if (elapsed.level === 'danger') countDanger++;
-          else if (elapsed.level === 'warning') countWarning++;
-        }
+        if (isOrderPending(order)) countPending++;
+        const al = getOrderAlertLevel(order);
+        if (al === 'overdue') countDanger++;
+        else if (al === 'soon') countWarning++;
       });
 
       const elAll = document.getElementById('wlCount_all');
@@ -19754,12 +19761,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // Filter and search entries
       const filtered = watchlistEntries.filter(({ order }) => {
-        const elapsed = getOrderReturnElapsedInfo(order);
+        const al = getOrderAlertLevel(order);
         const isRecv = isOrderReceived(order);
 
-        if (currentWatchlistFilter === 'danger' && elapsed.level !== 'danger') return false;
-        if (currentWatchlistFilter === 'warning' && elapsed.level !== 'warning') return false;
-        if (currentWatchlistFilter === 'pending' && isRecv) return false;
+        if (currentWatchlistFilter === 'danger' && al !== 'overdue') return false;
+        if (currentWatchlistFilter === 'warning' && al !== 'soon') return false;
+        if (currentWatchlistFilter === 'pending' && !isOrderPending(order)) return false;
         if (currentWatchlistFilter === 'received' && !isRecv) return false;
 
         if (kw) {
@@ -19982,8 +19989,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           (currentFilterTab === 'waiting' && isPending) ||
           (currentFilterTab === 'returned' && isReceived) ||
           (currentFilterTab === 'unneeded' && isUnneeded) ||
-          (currentFilterTab === 'upcoming' && getDeadlineStatus(targetOrder) === 'upcoming') ||
-          (currentFilterTab === 'overdue' && (getDeadlineStatus(targetOrder) === 'overdue' || isOrderOverdue(targetOrder, 72))) ||
+          (currentFilterTab === 'upcoming' && getOrderAlertLevel(targetOrder) === 'soon') ||
+          (currentFilterTab === 'overdue' && getOrderAlertLevel(targetOrder) === 'overdue') ||
           (currentFilterTab === 'lost' && targetOrder.status === 'Bị mất');
         if (!matchesCurrentTab) {
           setPipelineFilter('all');

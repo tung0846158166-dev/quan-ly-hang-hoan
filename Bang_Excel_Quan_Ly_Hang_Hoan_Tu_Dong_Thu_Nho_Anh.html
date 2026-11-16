@@ -16836,8 +16836,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const search = val('cancelledSearchInput').trim().toLowerCase();
       const plat = val('cancelledPlatformFilter') || 'all';
       const st = val('cancelledStatusFilter') || 'all';
+      const dField = val('cancelledDateField') || 'returnDate';
+      const dayStart = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0).getTime() : null; };
+      const fromMs = dayStart(val('cancelledDateFrom'));
+      const toStart = dayStart(val('cancelledDateTo'));
+      const toMs = toStart === null ? null : toStart + 24 * 3600 * 1000 - 1;
       filteredCancelledOrders = cancelledOrders.filter(o => {
         if (plat !== 'all' && o.platform !== plat) return false;
+        if (fromMs !== null || toMs !== null) {
+          const dt = (typeof parseFullDate === 'function') ? parseFullDate(o[dField]) : null;
+          if (!dt || isNaN(dt.getTime())) return false;
+          const t = dt.getTime();
+          if (fromMs !== null && t < fromMs) return false;
+          if (toMs !== null && t > toMs) return false;
+        }
         if (st === 'received' && !o.received) return false;
         if (st === 'pending' && o.received) return false;
         if (search && !cancelledMatchesKeyword(o, search)) return false;
@@ -16850,6 +16862,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       ['cancelledSearchInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       const p = document.getElementById('cancelledPlatformFilter'); if (p) p.value = 'all';
       const s = document.getElementById('cancelledStatusFilter'); if (s) s.value = 'all';
+      ['cancelledDateFrom', 'cancelledDateTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      const df = document.getElementById('cancelledDateField'); if (df) df.value = 'returnDate';
       cancelledCurrentPage = 1; applyCancelledFilters();
     }
     function changeCancelledPage(d) {
@@ -19846,6 +19860,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <select id="cancelledStatusFilter" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5">
           <option value="all">Mọi trạng thái nhận</option><option value="pending">Chưa nhận</option><option value="received">Đã nhận</option>
         </select>
+        <select id="cancelledDateField" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5" title="Lọc theo ngày nào">
+          <option value="returnDate">Ngày hủy</option><option value="recvDate">Ngày nhận hàng</option>
+        </select>
+        <span class="text-slate-400 font-bold">Từ</span>
+        <input type="date" id="cancelledDateFrom" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 outline-none" />
+        <span class="text-slate-400 font-bold">Đến</span>
+        <input type="date" id="cancelledDateTo" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 outline-none" />
         <button type="button" onclick="resetCancelledFilters()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold cursor-pointer">✕ Xóa lọc</button>
       </div>
       <div id="cancelledBulkBar" class="hidden px-4 py-2 bg-indigo-950 border-b border-indigo-500/40 flex flex-wrap items-center gap-2 text-xs">

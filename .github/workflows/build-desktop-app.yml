@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.14
+          name: QuanLyHangHoan-Windows-Installer-v1.9.15
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.14
-          name: "Quản Lý Hàng Hoàn v1.9.14 — quét lúc máy tính tắt: không có đơn thì vào Hộp Đơn Mới ngay"
+          tag_name: v1.9.15
+          name: "Quản Lý Hàng Hoàn v1.9.15 — Bảng đơn hủy có lọc theo ngày"
           body: |
+            ### Bản sửa 1.9.15
+
+            - Bảng đơn hủy: thêm lọc theo ngày (từ ngày – đến ngày), chọn lọc theo Ngày hủy hoặc Ngày nhận hàng; nút "Xóa lọc" xóa luôn cả khoảng ngày.
+
             ### Bản sửa 1.9.14
 
             - Lượt quét nằm trong hàng chờ điện thoại (quét lúc máy tính tắt hoặc mất kết nối): khi máy tính bật lại, đối chiếu mà vẫn không có đơn thì đưa vào Hộp Đơn Mới ngay (kèm giờ quét và ảnh). Lượt quét trực tiếp lúc cả hai máy đang bật mà chưa có đơn vẫn chờ 10 phút để kịp nạp file sàn.

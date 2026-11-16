@@ -152,6 +152,10 @@ struct OrdersView: View {
                 if hasBoth || r.o.isEmpty {
                     Text(hasBoth ? "Vận đơn: \(r.c)" : r.c).font(.system(.subheadline, design: .monospaced)).foregroundColor(hasBoth ? .secondary : .primary)
                 }
+                // Đơn đang theo dõi: hiện nội dung theo dõi 1 dòng, dài quá thì cắt và thêm "…" ở cuối.
+                if r.wl && !r.wr.isEmpty {
+                    Text(r.wr).font(.footnote).foregroundColor(.orange).lineLimit(1).truncationMode(.tail)
+                }
             }
             Spacer()
             if r.wl { Text("⭐").font(.caption) }

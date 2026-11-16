@@ -10,12 +10,22 @@ final class SnapshotStore: ObservableObject {
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
     @Published var stats: [String: Int] = [:]
+    // Số đếm tính sẵn một lần mỗi khi danh sách đổi (trước đây mỗi lần giao diện vẽ lại đều quét cả ~3000 đơn).
+    @Published private(set) var overdueCount = 0
+    @Published private(set) var soonCount = 0
+    @Published private(set) var alertCount = 0
     /// Tăng mỗi khi danh sách đổi (kể cả đổi tại chỗ như ghi chú/theo dõi) để màn hình vẽ lại danh sách đã lọc.
     @Published var revision = 0
     /// Thông báo đã ẩn trên điện thoại (khóa = id đơn + hạn; không đồng bộ với máy tính).
     @Published var dismissed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissedAlerts") ?? [])
 
     private let assembler = SnapshotAssembler()
+    /// Giải mã, dựng chỉ mục và ghi file chạy ở luồng nền để không làm đứng giao diện khi đang đồng bộ.
+    private let work = DispatchQueue(label: "snapshot.work", qos: .userInitiated)
+    private var progressReceived = 0
+    private var progressTotal = 0
+    private var progressError: String?
+    private var lastInfoAt = Date.distantPast
     private var index: [String: OrderRow] = [:]
     private var fileURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("snapshot.json") }
 
@@ -25,30 +35,85 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    var overdueCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .overdue }.count }
-    var soonCount: Int { rows.filter { $0.pd && $0.alertLevel(now: nowMs()) == .soon }.count }
     var hasData: Bool { updatedAt != nil }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
-    var incomplete: Bool { assembler.lastError == nil && assembler.partsTotal > 0 && assembler.partsReceived < assembler.partsTotal }
+    var incomplete: Bool { progressError == nil && progressTotal > 0 && progressReceived < progressTotal }
 
     func ingest(_ chunk: SnapshotChunk) {
-        let p = assembler.add(chunk)
-        assembleInfo = assembler.lastError.map { "Lỗi giải mã: \($0)" } ?? "Đã ghép \(assembler.partsReceived)/\(assembler.partsTotal) mảnh"
-        if let p = p { set(p, save: true) }
+        let asm = assembler
+        let url = fileURL
+        work.async { [weak self] in
+            let p = asm.add(chunk)
+            let received = asm.partsReceived, total = asm.partsTotal, error = asm.lastError
+            var built: [String: OrderRow]? = nil
+            if let p = p {
+                built = Self.buildIndex(p.rows)
+                if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) }
+            }
+            Task { @MainActor [weak self] in
+                self?.finishIngest(payload: p, index: built, received: received, total: total, error: error)
+            }
+        }
+    }
+
+    private func finishIngest(payload: SnapshotPayload?, index built: [String: OrderRow]?, received: Int, total: Int, error: String?) {
+        progressReceived = received; progressTotal = total; progressError = error
+        // Chỉ cập nhật dòng tiến độ vài lần mỗi giây (mỗi mảnh một lần làm các màn hình vẽ lại liên tục).
+        let now = Date()
+        if payload != nil || error != nil || now.timeIntervalSince(lastInfoAt) > 0.5 {
+            lastInfoAt = now
+            assembleInfo = error.map { "Lỗi giải mã: \($0)" } ?? "Đã ghép \(received)/\(total) mảnh"
+        }
+        if let p = payload, let idx = built { apply(p, index: idx) }
+    }
+
+    /// Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.
+    nonisolated private static func buildIndex(_ rows: [OrderRow]) -> [String: OrderRow] {
+        var index: [String: OrderRow] = [:]
+        index.reserveCapacity(rows.count * 2)
+        for r in rows {
+            let kc = r.c.uppercased()
+            if index[kc] == nil { index[kc] = r }
+            if !r.o.isEmpty { let ko = r.o.uppercased(); if index[ko] == nil { index[ko] = r } }
+        }
+        return index
+    }
+
+    private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
+        rows = p.rows
+        stats = p.stats
+        updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
+        index = built
+        recount()
+        scheduleNotifications()
+    }
+
+    /// Tính lại số quá hạn / sắp đến hạn / thông báo; gọi khi danh sách, danh sách ẩn đổi hoặc theo thời gian (mỗi phút).
+    func recount() {
+        let now = nowMs()
+        var o = 0, s = 0, a = 0
+        for r in rows where r.pd {
+            switch r.alertLevel(now: now) {
+            case .overdue: o += 1; if !dismissed.contains(dismissKey(r)) { a += 1 }
+            case .soon: s += 1; if !dismissed.contains(dismissKey(r)) { a += 1 }
+            default: break
+            }
+        }
+        if overdueCount != o { overdueCount = o }
+        if soonCount != s { soonCount = s }
+        if alertCount != a { alertCount = a }
     }
 
     private func set(_ p: SnapshotPayload, save: Bool) {
         rows = p.rows
         stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
-        index = [:]
-        // Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.
-        for r in p.rows {
-            let kc = r.c.uppercased()
-            if index[kc] == nil { index[kc] = r }
-            if !r.o.isEmpty { let ko = r.o.uppercased(); if index[ko] == nil { index[ko] = r } }
+        index = Self.buildIndex(p.rows)
+        recount()
+        if save {
+            let url = fileURL
+            work.async { if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) } }
         }
-        if save, let data = try? JSONEncoder().encode(p) { try? data.write(to: fileURL, options: .atomic) }
         scheduleNotifications()
     }
 
@@ -128,16 +193,16 @@ final class SnapshotStore: ObservableObject {
         return (overdue, soon)
     }
 
-    var alertCount: Int { let a = alerts(); return a.overdue.count + a.soon.count }
-
     func dismissAlerts(_ list: [OrderRow]) {
         for r in list { dismissed.insert(dismissKey(r)) }
         UserDefaults.standard.set(Array(dismissed), forKey: "dismissedAlerts")
+        recount()
     }
 
     func restoreDismissed() {
         dismissed = []
         UserDefaults.standard.removeObject(forKey: "dismissedAlerts")
+        recount()
     }
 
     /// Id đơn nằm trong id thông báo ("warn-<id>" hoặc "due-<id>"); bản tóm tắt hằng ngày không có.

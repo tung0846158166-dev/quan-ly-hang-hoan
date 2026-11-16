@@ -17,7 +17,10 @@ final class SyncEngine: ObservableObject {
     @Published var sseConnected = false
     @Published var brokerUp: Set<String> = []
     @Published var snapshotChunksSeen = 0
-    @Published var snapshotLastChunkAt: Date?
+    // Không @Published: cập nhật theo từng mảnh sẽ làm mọi màn hình vẽ lại liên tục khi đang đồng bộ.
+    var snapshotLastChunkAt: Date?
+    private var chunkCounter = 0
+    private var chunkPublishedAt = Date.distantPast
     @Published var pcLastSeen: Date?
     @Published var banner: Banner?
     @Published var mode: ScanKind = .returnScan
@@ -204,8 +207,9 @@ final class SyncEngine: ObservableObject {
             pcLastSeen = Date()
         case .snapshotChunk(let ch):
             pcLastSeen = Date()
-            snapshotChunksSeen += 1
+            chunkCounter += 1
             snapshotLastChunkAt = Date()
+            if Date().timeIntervalSince(chunkPublishedAt) > 0.5 { chunkPublishedAt = Date(); snapshotChunksSeen = chunkCounter }
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
         case .watchSync(let t, let items):
@@ -467,6 +471,8 @@ final class SyncEngine: ObservableObject {
 
     private func tick() async {
         tickCount += 1
+        if tickCount % 30 == 0 { snapshot.recount() }   // quá hạn/sắp đến hạn đổi theo thời gian
+        if snapshotChunksSeen != chunkCounter { snapshotChunksSeen = chunkCounter }
         // Danh sách đơn ghép dở và đã 10 giây không có mảnh mới: xin PC gửi lại (tối đa 4 lần mỗi đợt).
         if snapshot.incomplete, let t = snapshotLastChunkAt, Date().timeIntervalSince(t) > 10, snapshotRetries < 4 {
             snapshotRetries += 1

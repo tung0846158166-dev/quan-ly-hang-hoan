@@ -68,6 +68,22 @@ final class SyncEngine: ObservableObject {
         banner = Banner(code: it.code, text: "ĐÃ GỬI LẠI, CHỜ PC", color: .orange)
     }
 
+    /// Đưa tất cả lượt quét chưa được máy tính xác nhận (và ảnh chưa gửi xong) vào hàng gửi lại ngay.
+    /// Mỗi nhịp app gửi tối đa 6 lượt quét + 1 ảnh nên không dồn cục; 100 đơn mất khoảng nửa phút.
+    @discardableResult
+    func resendAllPending(kind: ScanKind? = nil) -> Int {
+        var n = 0
+        for i in items.indices where !items[i].isSettled && (kind == nil || items[i].kind == kind) {
+            n += 1
+            if !items[i].scanConfirmed { items[i].lastSendAt = 0; items[i].attempts = 0 }
+            if items[i].photoFile != nil && !items[i].photoConfirmed && !items[i].reviewRequired {
+                items[i].photoAttempts = 0; items[i].photoSentAt = 0
+            }
+        }
+        if n > 0 { persist() }
+        return n
+    }
+
     /// Các mã đã quét hoàn kho thành công trên điện thoại (dùng để đánh dấu trong danh sách đơn).
     var scannedReturnCodes: Set<String> {
         Set(items.filter { $0.kind == .returnScan && $0.scanConfirmed && ($0.status == .success || $0.status == .duplicate) }.map { $0.code.uppercased() })

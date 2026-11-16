@@ -311,7 +311,17 @@ final class SyncEngine: ObservableObject {
         items.insert(item, at: 0)
         trimHistory()
         persist()
-        banner = Banner(code: code, text: "ĐANG CHỜ PC XÁC NHẬN", color: .orange, sub: localHint(code: code, kind: kind))
+        // Dùng dữ liệu đã lưu trên điện thoại ngay cả khi máy tính tắt: có đơn đang chờ thì đánh dấu đã nhận luôn,
+        // lệnh quét vẫn nằm trong hàng chờ và tự gửi sang máy tính khi máy tính bật. Chưa có đơn trên điện thoại thì chờ máy tính xác nhận.
+        let hint = localHint(code: code, kind: kind)
+        if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
+            banner = Banner(code: code, text: "TRÙNG: ĐÃ NHẬN HOÀN KHO TRƯỚC ĐÓ", color: .red, sub: hint)
+        } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.pd {
+            snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"])
+            banner = Banner(code: code, text: "ĐÃ NHẬN HOÀN KHO, CHỜ PC GHI NHẬN", color: .green, sub: hint)
+        } else {
+            banner = Banner(code: code, text: "CHƯA CÓ TRÊN ĐIỆN THOẠI, CHỜ PC XÁC NHẬN", color: .orange, sub: hint)
+        }
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         transmit(rid)
         if file != nil { transmitPhoto(rid) }

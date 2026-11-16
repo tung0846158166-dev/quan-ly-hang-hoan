@@ -330,6 +330,7 @@ final class SyncEngine: ObservableObject {
         var file: String? = nil
         if let d = photoData {
             file = rid + ".jpg"
+            // File ảnh phải có trước khi gửi: ghi ngay (vài chục KB, nhanh) nhưng không mã hóa/ghi cả danh sách ở đây nữa.
             try? d.write(to: photosDir.appendingPathComponent(file!))
         }
         let item = ScanItem(requestId: rid, code: code, kind: kind, time: nowMs(), photoFile: file)
@@ -450,29 +451,34 @@ final class SyncEngine: ObservableObject {
     }
 
     private func transmitPhoto(_ id: String) {
-        guard let i = items.firstIndex(where: { $0.requestId == id }), let file = items[i].photoFile,
-              let data = try? Data(contentsOf: photosDir.appendingPathComponent(file)) else { return }
+        guard let i = items.firstIndex(where: { $0.requestId == id }), let file = items[i].photoFile else { return }
         items[i].photoSentAt = nowMs()
         items[i].photoAttempts += 1
         let it = items[i]
         let r = room
         persist()
-        let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
-        let chunks = SyncProtocol.photoChunks(dataURL: dataURL, code: it.code, kind: it.kind, requestId: it.requestId,
-            captureId: it.captureId, captureTime: it.time, room: r, now: nowMs(), photoId: "ph_\(nowMs())_\(it.attempts)")
+        let url = photosDir.appendingPathComponent(file)
+        let stamp = nowMs()
         // Ảnh chỉ đi qua MỘT broker MQTT (không nhân ba); ntfy chỉ dùng khi nó đang nối hoặc MQTT chưa nối được.
         let mq = mqttClients.last(where: { $0.isConnected })
         let useNtfy = sseConnected || mq == nil
         let mqTopic = SyncProtocol.mqttTopic(room: r)
-        Task {
+        let ntfyTopic = SyncProtocol.topic(room: r)
+        let client = self.client
+        // Đọc file, mã hóa base64 và cắt mảnh ở luồng nền (trước đây làm ngay trên luồng giao diện).
+        Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url) else { return }
+            let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
+            let chunks = SyncProtocol.photoChunks(dataURL: dataURL, code: it.code, kind: it.kind, requestId: it.requestId,
+                captureId: it.captureId, captureTime: it.time, room: r, now: stamp, photoId: "ph_\(stamp)_\(it.attempts)")
             for c in chunks {
                 let body = SyncProtocol.json(c)
                 mq?.publish(topic: mqTopic, body: body)
                 if useNtfy {
-                    try? await client.post(topic: SyncProtocol.topic(room: r), title: "Shopee Photo Chunk", body: body)
+                    try? await client.post(topic: ntfyTopic, title: "Shopee Photo Chunk", body: body)
                     try? await Task.sleep(nanoseconds: 45_000_000)
                 } else {
-                    try? await Task.sleep(nanoseconds: 4_000_000)
+                    try? await Task.sleep(nanoseconds: 15_000_000)
                 }
             }
         }
@@ -494,15 +500,20 @@ final class SyncEngine: ObservableObject {
         } else if !snapshot.incomplete { snapshotRetries = 0 }
         let n = nowMs()
         var needPoll = false
-        for it in items where !it.isSettled {
+        // Giới hạn số lượt gửi lại mỗi nhịp, ưu tiên lượt quét cũ nhất: tránh dồn hàng loạt cùng lúc khi nối lại kênh
+        // (nhiều lượt quét + ảnh bị đẩy cùng lúc làm kẹt luồng giao diện và có thể làm broker ngắt kết nối).
+        var scanBudget = 6, photoBudget = 1
+        let backlog = items.reduce(0) { $0 + (($1.isSettled || $1.scanConfirmed) ? 0 : 1) }
+        for it in items.reversed() where !it.isSettled {
             if !it.scanConfirmed {
                 needPoll = true
-                if n >= it.nextRetryDue() { transmit(it.requestId) }
+                if scanBudget > 0 && n >= it.nextRetryDue() { scanBudget -= 1; transmit(it.requestId) }
             }
             if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired && it.photoAttempts < 6
                 && n - it.photoSentAt > 30_000 && n - it.time > 8_000 {
                 needPoll = true
-                transmitPhoto(it.requestId)
+                // Đang còn nhiều lượt quét chưa được xác nhận thì dành đường truyền cho lượt quét trước, ảnh gửi sau.
+                if photoBudget > 0 && backlog <= 10 { photoBudget -= 1; transmitPhoto(it.requestId) }
             }
         }
         // Hỏi lại ntfy để bắt phản hồi bị lỡ khi mất kết nối.
@@ -539,8 +550,27 @@ final class SyncEngine: ObservableObject {
         items.removeAll { ids.contains($0.requestId) }
     }
 
+    /// Ghi danh sách quét xuống máy: gom nhiều lần gọi liên tiếp thành một, mã hóa + ghi ở luồng nền
+    /// (trước đây mỗi lần gửi lại đều mã hóa cả ~800 dòng ngay trên luồng giao diện nên màn hình quét bị đứng khi quét nhiều).
+    private var persistScheduled = false
+    private let persistQueue = DispatchQueue(label: "items.persist", qos: .utility)
+
     private func persist() {
-        if let data = try? JSONEncoder().encode(items) { try? data.write(to: storeURL, options: .atomic) }
+        guard !persistScheduled else { return }
+        persistScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            self?.flushPersist()
+        }
+    }
+
+    /// Ghi ngay (gọi khi app chuyển nền để không mất lượt quét cuối).
+    func flushPersist() {
+        persistScheduled = false
+        let snapshot = items, url = storeURL
+        persistQueue.async {
+            if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: url, options: .atomic) }
+        }
     }
 
     private func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1000) }

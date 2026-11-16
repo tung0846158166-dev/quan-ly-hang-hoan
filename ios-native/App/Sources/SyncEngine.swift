@@ -218,8 +218,12 @@ final class SyncEngine: ObservableObject {
             sseConnected = true
             channelOpened()
         }
-        guard let msg = SyncProtocol.parseIncoming(sseData: data, room: room) else { return }
-        dispatch(msg)
+        // Giải mã JSON (mỗi mảnh danh sách đơn khá lớn) ở luồng nền, chỉ phần xử lý kết quả mới về luồng giao diện.
+        let r = room
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let msg = SyncProtocol.parseIncoming(sseData: data, room: r) else { return }
+            await self?.dispatch(msg)
+        }
     }
 
     private func dispatch(_ msg: PcMessage) {

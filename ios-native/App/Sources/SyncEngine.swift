@@ -297,6 +297,14 @@ final class SyncEngine: ObservableObject {
             return true
         }
 
+        // Tạo đơn mới / đơn hủy: đơn đã có trên điện thoại (bảng chính, kho lưu trữ hoặc bảng đơn hủy) thì báo luôn, không tạo lại.
+        if kind != .returnScan, snapshot.hasData, let r = snapshot.lookup(code) {
+            let where_ = r.k == "a" ? "KHO LƯU TRỮ" : (r.k == "c" ? "BẢNG ĐƠN HỦY" : "BẢNG CHÍNH")
+            banner = Banner(code: code, text: "ĐƠN ĐÃ CÓ Ở \(where_), KHÔNG TẠO LẠI", color: .orange, sub: r.n)
+            if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+            return false
+        }
+
         seq += 1
         let rid = "\(sessionId)-\(seq)-\(nowMs() % 100000)"
         var photoData = photo

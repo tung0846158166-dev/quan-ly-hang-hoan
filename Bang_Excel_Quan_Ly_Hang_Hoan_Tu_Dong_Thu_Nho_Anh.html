@@ -618,6 +618,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </button>
 
               <button
+                onclick="closeAllHeaderMenus(); removeDuplicatesAcrossTables();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+              >
+                <div class="w-7 h-7 rounded-lg bg-slate-900 text-amber-300 flex items-center justify-center shrink-0 rounded-lg font-bold text-xs">🧹</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Dọn Đơn Trùng Giữa Các Bảng</div>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Xóa khỏi Bảng chính các đơn đã có ở Kho lưu trữ / Bảng đơn hủy</p>
+                </div>
+              </button>
+
+              <button
                 onclick="closeAllHeaderMenus(); openAuditLogModal();"
                 class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
@@ -3779,6 +3790,73 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return (Array.isArray(codes) ? codes : []).map(code => extractCleanTrackingCode(code || '')).filter(Boolean);
     }
 
+
+    // v1.9.9: chống trùng giữa Bảng chính, Kho lưu trữ và Bảng đơn hủy.
+    function orderIdentityCodes(o) {
+      const set = new Set();
+      if (!o || typeof o !== 'object') return set;
+      const add = v => {
+        const t = String(v || '').trim().toUpperCase();
+        if (!t) return;
+        set.add(t);
+        const c = extractCleanTrackingCode(t);
+        if (c) set.add(c);
+      };
+      [o.orderId, o.track, o.altTrack, o.returnTrack, o.forwardTrack].forEach(add);
+      if (Array.isArray(o.trackingCodes)) o.trackingCodes.forEach(add);
+      return set;
+    }
+    function buildOtherTablesIndex() {
+      const map = new Map();
+      const addAll = (list, where) => {
+        (Array.isArray(list) ? list : []).forEach(o => orderIdentityCodes(o).forEach(c => { if (!map.has(c)) map.set(c, where); }));
+      };
+      try { addAll(archivedOrders, 'archive'); } catch (e) {}
+      try { addAll(cancelledOrders, 'cancelled'); } catch (e) {}
+      return map;
+    }
+    function findInOtherTables(index, orderData) {
+      for (const c of orderIdentityCodes(orderData)) { if (index.has(c)) return index.get(c); }
+      return null;
+    }
+    const EXISTING_TABLE_LABEL = { main: 'BẢNG CHÍNH', archive: 'KHO LƯU TRỮ', cancelled: 'BẢNG ĐƠN HỦY' };
+    // v1.9.10: đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy thì không tạo lại (điện thoại tạo đơn mới, đơn hủy, đẩy ra bảng chính).
+    function locateExistingAnywhere(code, orderId) {
+      try {
+        if (typeof findExistingMainOrder === 'function' && (findExistingMainOrder(code) || (orderId && findExistingMainOrder(orderId)))) return 'main';
+      } catch (e) {}
+      return findInOtherTables(buildOtherTablesIndex(), { orderId: orderId || '', track: code, returnTrack: code });
+    }
+    function isInboxItemDuplicate(it) {
+      return Boolean(it && locateExistingAnywhere(it.track || it.code || '', it.orderId));
+    }
+
+    async function removeDuplicatesAcrossTables() {
+      const index = buildOtherTablesIndex();
+      const dups = [];
+      orders.forEach((o, i) => { const where = findInOtherTables(index, o); if (where) dups.push({ i, where }); });
+      const arc = dups.filter(d => d.where === 'archive').length, can = dups.length - arc;
+      if (!dups.length) { appAlert('Không có đơn nào ở Bảng chính bị trùng với Kho lưu trữ hoặc Bảng đơn hủy.', 'Dọn Đơn Trùng'); return; }
+      const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính trùng với bảng khác (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy).\n\nXóa bản trùng khỏi Bảng chính, giữ bản ở Kho lưu trữ / Bảng đơn hủy? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng Giữa Các Bảng');
+      if (!ok) return;
+      let removed = 0, kept = 0;
+      const backup = [];
+      for (let k = dups.length - 1; k >= 0; k--) {
+        const { i } = dups[k];
+        if (isLocked || hasLockedCellsInOrder(i)) { kept++; continue; }
+        backup.push(orders[i]);
+        orders.splice(i, 1);
+        shiftCellLocksAfterOrderDelete(i);
+        shiftCellEditHistoryAfterOrderDelete(i);
+        removed++;
+      }
+      try { localStorage.setItem('dedupe_removed_orders_backup', JSON.stringify({ at: Date.now(), orders: backup.slice(0, 2000) })); } catch (e) {}
+      addAuditLog('🧹 DỌN ĐƠN TRÙNG', `Đã xóa ${removed} đơn trùng khỏi Bảng chính (giữ ${kept} đơn đang khóa)`);
+      saveOrders();
+      renderAll();
+      showAppToast(`🧹 Đã dọn ${removed} đơn trùng khỏi Bảng chính${kept ? `, giữ lại ${kept} đơn đang khóa` : ''}.`, 'success', 6000);
+    }
+
     function findExistingReturnParcelIndex(orderData) {
       // Importing used to compare every incoming row with every order (rows x orders). The index only narrows
       // the candidates; isSameReturnParcel still decides, so the result is the same as comparing against all.
@@ -5304,10 +5382,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
+      let skippedOther = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
         findExistingReturnParcelIndex.index = null;
+        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex() : new Map();
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
@@ -5341,6 +5421,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               });
             }
           } else {
+            // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -5418,6 +5500,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         `  Giữ nguyên dòng sản phẩm "Premium Cao Cấp": ${premiumItemCount} SP\n` +
         (pushToMain ? `  Đã đẩy vào bảng: ${newTableCount} đơn mới | Cập nhật: ${enrichedTableCount} đơn\n` : '') +
         (skippedCount > 0 ? `  Đã tự động lọc bỏ ${skippedCount} đơn vận chuyển thông thường (không phải đơn hoàn)\n` : '') +
+        (skippedOther > 0 ? `  Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') +
         '\n👉 Hệ thống đã tự động chuyển giao diện sang tab [⚫ SÀN TIKTOK SHOP] để bạn theo dõi riêng biệt!'
       );
       return { success: true };
@@ -6040,10 +6123,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
+      let skippedOther = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
         findExistingReturnParcelIndex.index = null;
+        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex() : new Map();
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanAltTrack = extractCleanTrackingCode(orderData.altTrack || '');
@@ -6080,6 +6165,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               });
             }
           } else {
+            // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -6128,6 +6215,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         });
 
+        if (skippedOther > 0) runImportUi('showAppToast', `⏭️ Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (không đẩy trùng ra bảng chính).`, 'info', 6000);
         if (importState && !(await commitImportState(importState))) return { success: false };
         runImportUi('renderAll');
         if (enrichedTableCount > 0) {
@@ -6143,6 +6231,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       notifyImportResult(`🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SHOPEE!\n\n` +
             `• Phân loại sàn: 🟠 Sàn Shopee (${shopeeAddedCount} đơn)${tiktokAddedCount > 0 ? ` | ⚫ Sàn TikTok Shop (${tiktokAddedCount} đơn)` : ''}\n` +
             (pushToMain ? `• Đã tự động đẩy ${newTableCount} đơn mới ra Bảng chính (Trạng thái: 🟡 Chưa trả - Đang chờ)!\n• Cập nhật đè thông tin cho: ${enrichedTableCount} đơn có sẵn\n` : '') +
+            (skippedOther > 0 ? `• Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') +
             (multiItemAppendedCount > 0 ? `• Đã tự động gộp ${multiItemAppendedCount} sản phẩm thứ 2, 3 vào đúng đơn hàng nhiều SP!\n` : '') +
             (skippedSuccessCount > 0 ? `• Đã tự động lọc bỏ ${skippedSuccessCount} dòng đơn giao thành công hoặc yêu cầu trả hàng đã hủy.\n` : ''));
       return { success: true };
@@ -7109,7 +7198,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.8';
+    const APP_VERSION_NUMBER = '1.9.10';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13588,7 +13677,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.8',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.10',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14381,6 +14470,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const pushCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
         const reply = (msg, outcome) => sendAckToPhone(0, pushCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'push' });
         const inboxItem = (newOrdersInbox || []).find(it => it && [it.track, it.orderId, it.code].some(v => v && extractCleanTrackingCode(v) === pushCode));
+        if (inboxItem && typeof isInboxItemDuplicate === 'function' && isInboxItemDuplicate(inboxItem)) {
+          const w = locateExistingAnywhere(inboxItem.track || inboxItem.code || pushCode, inboxItem.orderId);
+          newOrdersInbox = (newOrdersInbox || []).filter(it => it !== inboxItem);
+          saveNewOrdersInbox();
+          reply('Đơn ' + pushCode + ' đã có ở ' + EXISTING_TABLE_LABEL[w] + ', không đẩy lại', 'duplicate');
+          return { success: true };
+        }
         if (inboxItem) { importSingleNewOrder(inboxItem.id); reply('ĐÃ ĐẨY ĐƠN ' + pushCode + ' RA BẢNG CHÍNH', 'success'); return { success: true }; }
         if (phoneOrderMatches(pushCode).length) { reply('Đơn ' + pushCode + ' đã có trên Bảng chính', 'duplicate'); return { success: true }; }
         reply('Không thấy đơn ' + pushCode + ' trong Bảng đơn mới', 'not_found');
@@ -14390,6 +14486,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (data.type === 'new_order_scan') {
         const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
         if (!trackCode) return;
+        const dupWhere = typeof locateExistingAnywhere === 'function' ? locateExistingAnywhere(trackCode, data.orderId) : null;
+        if (dupWhere) {
+          sendAckToPhone(0, trackCode, 'ĐƠN ĐÃ CÓ Ở ' + EXISTING_TABLE_LABEL[dupWhere] + ', KHÔNG TẠO LẠI', 'duplicate', true, data.requestId || '', data.room || '', { ackStage: 'scan', photoSaved: false, captureId: data.captureId || '' });
+          try { if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone(); } catch (e) {}
+          showAppToast(`⚠️ Đơn ${trackCode} đã có ở ${EXISTING_TABLE_LABEL[dupWhere]}, không tạo lại`, 'warning');
+          return { success: true };
+        }
 
         const existingInboxIdx = (newOrdersInbox || []).findIndex(item => extractCleanTrackingCode(item.track || item.code) === trackCode);
         if (existingInboxIdx !== -1) {
@@ -15596,6 +15699,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const idx = (newOrdersInbox || []).findIndex(it => it && it.id === id);
       if (idx === -1) return;
       const item = newOrdersInbox[idx];
+      if (isInboxItemDuplicate(item)) {
+        newOrdersInbox.splice(idx, 1);
+        saveNewOrdersInbox();
+        showAppToast(`⚠️ Đơn ${item.track || item.orderId} đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại (đã gỡ khỏi Hộp Đơn Mới).`, 'warning', 6000);
+        return;
+      }
       const newOrd = convertInboxItemToOrder(item);
 
       orders.unshift(newOrd);
@@ -15625,7 +15734,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const selectedIds = new Set(selectedItems.map(it => it.id));
-      const newOrderObjects = selectedItems.map(it => convertInboxItemToOrder(it));
+      const dupSelected = selectedItems.filter(isInboxItemDuplicate);
+      const newOrderObjects = selectedItems.filter(it => !dupSelected.includes(it)).map(it => convertInboxItemToOrder(it));
+      if (dupSelected.length) showAppToast(`⚠️ ${dupSelected.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
+      if (!newOrderObjects.length) { newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id)); saveNewOrdersInbox(); return; }
 
       orders.unshift(...newOrderObjects);
       newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id));
@@ -15655,7 +15767,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const count = newOrdersInbox.length;
       if (!confirm(`Bạn có chắc muốn nhập TOÀN BỘ ${count} đơn mới ra ngoài Bảng chính không?`)) return;
 
-      const newOrderObjects = newOrdersInbox.map(it => convertInboxItemToOrder(it));
+      const dupAll = newOrdersInbox.filter(isInboxItemDuplicate);
+      const newOrderObjects = newOrdersInbox.filter(it => !dupAll.includes(it)).map(it => convertInboxItemToOrder(it));
+      if (dupAll.length) showAppToast(`⚠️ ${dupAll.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
       orders.unshift(...newOrderObjects);
       newOrdersInbox = [];
 
@@ -16354,6 +16468,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ack('ĐƠN HỦY ĐÃ TẠO TRƯỚC ĐÓ', 'duplicate', true);
         if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
         showAppToast(`🚫 Đơn hủy ${trackCode} đã tạo rồi`, 'warning');
+        return { success: true };
+      }
+      const dupWhere2 = typeof locateExistingAnywhere === 'function' ? locateExistingAnywhere(trackCode, data.orderId) : null;
+      if (dupWhere2) {
+        ack('ĐƠN ĐÃ CÓ Ở ' + EXISTING_TABLE_LABEL[dupWhere2] + ', KHÔNG TẠO ĐƠN HỦY', 'duplicate', true);
+        if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
+        showAppToast(`⚠️ Đơn ${trackCode} đã có ở ${EXISTING_TABLE_LABEL[dupWhere2]}, không tạo đơn hủy`, 'warning');
         return { success: true };
       }
       const platform = (data.platform && data.platform !== 'auto') ? data.platform : autoDetectPlatformFromCode(trackCode);

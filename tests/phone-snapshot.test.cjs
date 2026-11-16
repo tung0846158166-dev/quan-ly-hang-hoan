@@ -102,3 +102,23 @@ test('v1.9.8: PC nhận sửa/xóa đơn từ iPhone và tự gửi lại danh s
   assert.match(src, /schedulePhoneWatchSync\(\); schedulePhoneSnapshotSync\(\);/);
   assert.match(src, /function schedulePhoneSnapshotSync[\s\S]*?broadcastOrdersSnapshot\(false\)/);
 });
+
+test('v1.9.9: nạp file sàn không đẩy lại đơn đã có ở Kho lưu trữ / Bảng đơn hủy ra Bảng chính', () => {
+  assert.strictEqual((src.match(/findInOtherTables === 'function' && findInOtherTables\(otherIdx, orderData\)\) \{ skippedOther\+\+; return; \}/g) || []).length, 2, 'cả nạp Shopee và TikTok');
+  const ctx = { archivedOrders: [{ orderId: 'a1', track: 'spx111' }], cancelledOrders: [{ orderId: 'B2', returnTrack: 'T222' }],
+    extractCleanTrackingCode: v => String(v || '').trim().toUpperCase() };
+  vm.createContext(ctx);
+  vm.runInContext(['orderIdentityCodes', 'buildOtherTablesIndex', 'findInOtherTables'].map(n => src.match(new RegExp('function ' + n + '[\\s\\S]*?\\r?\\n    \\}\\r?\\n'))[0]).join('\n'), ctx);
+  vm.runInContext('var idx = buildOtherTablesIndex();', ctx);
+  assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'A1' })", ctx), 'archive');
+  assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'x', returnTrack: 't222' })", ctx), 'cancelled');
+  assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'NEW', track: 'zzz' })", ctx), null);
+});
+
+test('v1.9.10: tạo đơn mới / đơn hủy / đẩy ra bảng chính từ điện thoại bỏ qua đơn đã có ở bất kỳ bảng nào', () => {
+  assert.match(src, /const dupWhere = typeof locateExistingAnywhere === 'function' \? locateExistingAnywhere\(trackCode, data\.orderId\) : null;/);
+  assert.match(src, /const dupWhere2 = typeof locateExistingAnywhere === 'function' \? locateExistingAnywhere\(trackCode, data\.orderId\) : null;/);
+  assert.match(src, /inboxItem && typeof isInboxItemDuplicate === 'function' && isInboxItemDuplicate\(inboxItem\)/);
+  assert.match(src, /dupSelected = selectedItems\.filter\(isInboxItemDuplicate\)/);
+  assert.match(src, /dupAll = newOrdersInbox\.filter\(isInboxItemDuplicate\)/);
+});

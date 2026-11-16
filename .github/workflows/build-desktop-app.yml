@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.11
+          name: QuanLyHangHoan-Windows-Installer-v1.9.12
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.11
-          name: "Quản Lý Hàng Hoàn v1.9.11 — rà soát: không coi đơn hoàn lần 2 là trùng"
+          tag_name: v1.9.12
+          name: "Quản Lý Hàng Hoàn v1.9.12 — tự khớp đơn đã quét trước khi nạp file sàn"
           body: |
+            ### Bản sửa 1.9.12
+
+            - Điện thoại quét một mã mà lúc đó máy tính chưa có đơn: máy tính nhớ lại mã và giờ quét (tối đa 30 ngày). Khi nạp file sàn hoặc thêm đơn làm đơn đó xuất hiện, máy tính tự chuyển đơn sang "Hàng đã trả" với giờ nhận là giờ quét thật rồi báo trên màn hình. Mã trùng nhiều đơn thì giữ lại để kiểm tra, không tự khớp.
+
             ### Bản sửa 1.9.11
 
             - Chống trùng và công cụ Dọn Đơn Trùng so theo mã vận đơn trước; mã đơn chỉ dùng khi một bên chưa có mã vận đơn. Nhờ vậy đơn hoàn lần 2 của cùng một mã đơn (mã vận đơn hoàn khác) không bị bỏ qua hay xóa nhầm.

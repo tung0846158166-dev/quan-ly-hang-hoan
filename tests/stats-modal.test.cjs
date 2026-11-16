@@ -1,0 +1,44 @@
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
+
+function extract(name) {
+  const i = html.indexOf('function ' + name + '(');
+  assert.ok(i >= 0, name);
+  let depth = 0, j = html.indexOf('{', i);
+  for (let k = j; k < html.length; k++) { if (html[k] === '{') depth++; else if (html[k] === '}') { depth--; if (!depth) return html.slice(i, k + 1); } }
+}
+const ctx = {};
+vm.createContext(ctx);
+vm.runInContext('function parseFullDate(v){const m=String(v||"").match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null}', ctx);
+for (const n of ['statsBucketKey', 'statsBucketLabel', 'computeStats']) vm.runInContext(extract(n), ctx);
+
+test('thống kê chia theo ngày / tuần / tháng và đếm quá hạn, sắp đến hạn', () => {
+  const list = [
+    { rd: '02/11/2026 10:00', received: true, pending: false, level: '' },
+    { rd: '02/11/2026', received: true, pending: false, level: '' },
+    { rd: '03/11/2026', received: false, pending: true, level: 'overdue' },
+    { rd: '09/11/2026', received: false, pending: true, level: 'soon' },
+    { rd: '', received: false, pending: true, level: '' },
+  ];
+  const day = ctx.computeStats(list, 'day');
+  assert.strictEqual(day.buckets.length, 3);
+  assert.strictEqual(day.unknown, 1);
+  assert.strictEqual(day.total, 5);
+  assert.strictEqual(day.overdue, 1);
+  assert.strictEqual(day.soon, 1);
+  const week = ctx.computeStats(list, 'week');
+  assert.strictEqual(week.buckets.length, 2);   // thứ Hai 02/11 và 09/11/2026
+  assert.strictEqual(week.buckets[1].total, 3);
+  const month = ctx.computeStats(list, 'month');
+  assert.strictEqual(month.buckets.length, 1);
+  assert.strictEqual(month.buckets[0].received, 2);
+});
+
+test('đơn hoàn lấy cả kho lưu trữ, đơn hủy lấy bảng đơn hủy', () => {
+  const ret = extract('collectReturnStatsItems');
+  assert.ok(ret.includes('archivedOrders') && ret.includes("'Đơn hủy'"));
+  assert.ok(extract('collectCancelStatsItems').includes('cancelledOrders'));
+  assert.ok(html.includes('id="statsModal"') && html.includes('openStatsModal()'));
+});

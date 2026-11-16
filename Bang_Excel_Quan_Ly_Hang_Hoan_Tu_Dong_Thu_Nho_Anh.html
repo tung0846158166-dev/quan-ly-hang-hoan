@@ -793,6 +793,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span id="archivedOrdersCountBadge" class="bg-amber-400 text-slate-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0 đơn</span>
         </button>
 
+        <button type="button" onclick="openStatsModal()" id="btnOpenStats"
+                class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-sky-700 to-blue-800 hover:from-sky-800 hover:to-blue-900 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-sky-400"
+                title="Thống kê đơn hoàn (gồm kho lưu trữ) và đơn hủy theo ngày, tuần, tháng; số đơn sắp đến hạn và quá hạn">
+          <span>📊 THỐNG KÊ</span>
+        </button>
+
         <button type="button" onclick="openCancelledOrdersModal()" id="btnOpenCancelledOrders"
                 class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-rose-700 to-red-800 hover:from-rose-800 hover:to-red-900 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-rose-400"
                 title="Bảng riêng cho đơn hủy: nhập file, nhận đơn hủy từ điện thoại, đối chiếu khi quét nhận hàng">
@@ -16770,6 +16776,98 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) { return false; }
     }
 
+    // ---- Thống kê đơn hoàn / đơn hủy theo ngày, tuần, tháng (tính theo ngày hoàn/hủy khách bấm) ----
+    let statsPeriod = 'day';
+    function statsBucketKey(d, period) {
+      const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
+      if (period === 'month') return new Date(y, m, 1).getTime();
+      if (period === 'week') { const off = (d.getDay() + 6) % 7; return new Date(y, m, day - off).getTime(); }
+      return new Date(y, m, day).getTime();
+    }
+    function statsBucketLabel(ts, period) {
+      const d = new Date(ts), p2 = n => String(n).padStart(2, '0');
+      if (period === 'month') return 'Tháng ' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+      if (period === 'week') { const e = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 6); return 'Tuần ' + p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + ' – ' + p2(e.getDate()) + '/' + p2(e.getMonth() + 1) + '/' + e.getFullYear(); }
+      return p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+    }
+    // list: [{ rd, received, pending, level: 'overdue'|'soon'|'' }] -> { buckets, total, received, pending, overdue, soon, unknown }
+    function computeStats(list, period) {
+      const res = { buckets: [], total: 0, received: 0, pending: 0, overdue: 0, soon: 0, unknown: 0 };
+      const map = new Map();
+      list.forEach(it => {
+        res.total++;
+        if (it.received) res.received++;
+        if (it.pending) res.pending++;
+        if (it.level === 'overdue') res.overdue++;
+        if (it.level === 'soon') res.soon++;
+        const dt = parseFullDate(it.rd);
+        if (!dt || isNaN(dt.getTime())) { res.unknown++; return; }
+        const key = statsBucketKey(dt, period);
+        let b = map.get(key);
+        if (!b) { b = { key, total: 0, received: 0, pending: 0, overdue: 0, soon: 0 }; map.set(key, b); }
+        b.total++;
+        if (it.received) b.received++;
+        if (it.pending) b.pending++;
+        if (it.level === 'overdue') b.overdue++;
+        if (it.level === 'soon') b.soon++;
+      });
+      res.buckets = Array.from(map.values()).sort((a, b) => b.key - a.key);
+      return res;
+    }
+    function collectReturnStatsItems() {
+      const out = [];
+      const add = o => {
+        if (!o) return;
+        if (getOrderType(o) === 'Đơn hủy') return;   // đơn hủy tính ở bảng đơn hủy
+        const received = !!isOrderReceived(o), pending = !!isOrderPending(o);
+        let level = '';
+        if (pending) { const s = getDeadlineStatus(o); level = s === 'overdue' ? 'overdue' : (s === 'upcoming' ? 'soon' : ''); }
+        out.push({ rd: o.returnDate, received, pending, level });
+      };
+      (Array.isArray(orders) ? orders : []).forEach(add);
+      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
+      return out;
+    }
+    function collectCancelStatsItems() {
+      return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(Boolean).map(o => {
+        const received = !!o.received, pending = !received;
+        let level = '';
+        if (pending) { const info = computeDeadlineInfo(o.returnDate, o.deadline); if (info) level = info.left < 0 ? 'overdue' : (info.left <= 24 * 3600000 ? 'soon' : ''); }
+        return { rd: o.returnDate, received, pending, level };
+      });
+    }
+    function setStatsPeriod(p) { statsPeriod = p; renderStatsModal(); }
+    function renderStatsModal() {
+      const box = document.getElementById('statsModalBody'); if (!box) return;
+      ['day', 'week', 'month'].forEach(p => {
+        const b = document.getElementById('statsPeriodBtn_' + p);
+        if (b) b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ' + (p === statsPeriod ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700');
+      });
+      const ret = computeStats(collectReturnStatsItems(), statsPeriod);
+      const can = computeStats(collectCancelStatsItems(), statsPeriod);
+      const limit = statsPeriod === 'day' ? 31 : 24;
+      const card = (title, s, color) => {
+        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800">
+            <td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td>
+            <td class="px-2 py-1.5 text-center font-mono">${b.total}</td>
+            <td class="px-2 py-1.5 text-center font-mono text-emerald-300">${b.received}</td>
+            <td class="px-2 py-1.5 text-center font-mono text-amber-300">${b.pending}</td>
+            <td class="px-2 py-1.5 text-center font-mono ${b.overdue ? 'text-rose-400 font-bold' : 'text-slate-500'}">${b.overdue}</td>
+            <td class="px-2 py-1.5 text-center font-mono ${b.soon ? 'text-orange-300 font-bold' : 'text-slate-500'}">${b.soon}</td></tr>`).join('');
+        return `<div class="flex-1 min-w-[320px] bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
+          <div class="px-3 py-2 font-black text-sm flex flex-wrap justify-between gap-2"><span>${title}</span>
+            <span class="text-[11px] font-bold text-slate-300">Tổng ${s.total} · đã nhận ${s.received} · đang chờ ${s.pending}</span></div>
+          <div class="px-3 pb-2 text-[11px] font-bold flex gap-4"><span class="text-rose-400">🚨 Quá hạn: ${s.overdue}</span><span class="text-orange-300">⏰ Sắp đến hạn &lt;24h: ${s.soon}</span></div>
+          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr>
+            <th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')}</th><th class="px-2 py-1.5">Số đơn</th><th class="px-2 py-1.5">Đã nhận</th><th class="px-2 py-1.5">Chờ</th><th class="px-2 py-1.5">Quá hạn</th><th class="px-2 py-1.5">&lt;24h</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="6" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
+          ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn không có ngày hoàn/hủy nên không xếp vào ngày nào.</div>` : ''}</div>`;
+      };
+      box.innerHTML = card('↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ)', ret, 'border-sky-500/40') + card('🚫 ĐƠN HỦY (bảng đơn hủy)', can, 'border-rose-500/40');
+    }
+    function openStatsModal() { const m = document.getElementById('statsModal'); if (!m) return; m.classList.remove('hidden'); renderStatsModal(); }
+    function closeStatsModal() { const m = document.getElementById('statsModal'); if (m) m.classList.add('hidden'); }
+
     function openCancelledOrdersModal() {
       const m = document.getElementById('cancelledOrdersModal'); if (!m) return;
       restoreCancelledPhotosFromDisk();
@@ -16836,8 +16934,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const search = val('cancelledSearchInput').trim().toLowerCase();
       const plat = val('cancelledPlatformFilter') || 'all';
       const st = val('cancelledStatusFilter') || 'all';
+      const dField = val('cancelledDateField') || 'returnDate';
+      const dayStart = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0).getTime() : null; };
+      const fromMs = dayStart(val('cancelledDateFrom'));
+      const toStart = dayStart(val('cancelledDateTo'));
+      const toMs = toStart === null ? null : toStart + 24 * 3600 * 1000 - 1;
       filteredCancelledOrders = cancelledOrders.filter(o => {
         if (plat !== 'all' && o.platform !== plat) return false;
+        if (fromMs !== null || toMs !== null) {
+          const dt = (typeof parseFullDate === 'function') ? parseFullDate(o[dField]) : null;
+          if (!dt || isNaN(dt.getTime())) return false;
+          const t = dt.getTime();
+          if (fromMs !== null && t < fromMs) return false;
+          if (toMs !== null && t > toMs) return false;
+        }
         if (st === 'received' && !o.received) return false;
         if (st === 'pending' && o.received) return false;
         if (search && !cancelledMatchesKeyword(o, search)) return false;
@@ -16850,6 +16960,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       ['cancelledSearchInput'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       const p = document.getElementById('cancelledPlatformFilter'); if (p) p.value = 'all';
       const s = document.getElementById('cancelledStatusFilter'); if (s) s.value = 'all';
+      ['cancelledDateFrom', 'cancelledDateTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      const df = document.getElementById('cancelledDateField'); if (df) df.value = 'returnDate';
       cancelledCurrentPage = 1; applyCancelledFilters();
     }
     function changeCancelledPage(d) {
@@ -19822,6 +19934,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
   <!-- =============================================================== -->
   <!-- BẢNG ĐƠN HỦY (v1.8.36) -->
+  <div id="statsModal" onclick="closeStatsModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-sky-500/40 overflow-hidden">
+      <div class="px-5 py-3 bg-gradient-to-r from-sky-950 via-slate-900 to-slate-900 border-b border-sky-500/30 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-black text-base text-white">📊 THỐNG KÊ ĐƠN HOÀN / ĐƠN HỦY</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="statsPeriodBtn_day" onclick="setStatsPeriod('day')">Theo ngày</button>
+          <button type="button" id="statsPeriodBtn_week" onclick="setStatsPeriod('week')">Theo tuần</button>
+          <button type="button" id="statsPeriodBtn_month" onclick="setStatsPeriod('month')">Theo tháng</button>
+          <button type="button" onclick="closeStatsModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg cursor-pointer">✕ Đóng</button>
+        </div>
+      </div>
+      <div class="px-4 py-1.5 text-[11px] text-slate-400 border-b border-slate-800">Tính theo ngày hoàn/hủy khách bấm. Đơn hoàn gồm cả kho lưu trữ; đơn hủy lấy từ bảng đơn hủy.</div>
+      <div id="statsModalBody" class="p-4 flex flex-wrap gap-4 overflow-auto"></div>
+    </div>
+  </div>
+
   <div id="cancelledOrdersModal" onclick="closeCancelledOrdersModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
     <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-rose-500/40 overflow-hidden">
       <div class="px-5 py-3 bg-gradient-to-r from-rose-950 via-slate-900 to-slate-900 border-b border-rose-500/30 flex flex-wrap items-center justify-between gap-3">
@@ -19846,6 +19974,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <select id="cancelledStatusFilter" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5">
           <option value="all">Mọi trạng thái nhận</option><option value="pending">Chưa nhận</option><option value="received">Đã nhận</option>
         </select>
+        <select id="cancelledDateField" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5" title="Lọc theo ngày nào">
+          <option value="returnDate">Ngày hủy</option><option value="recvDate">Ngày nhận hàng</option>
+        </select>
+        <span class="text-slate-400 font-bold">Từ</span>
+        <input type="date" id="cancelledDateFrom" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 outline-none" />
+        <span class="text-slate-400 font-bold">Đến</span>
+        <input type="date" id="cancelledDateTo" onchange="cancelledCurrentPage = 1; applyCancelledFilters()" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-slate-100 outline-none" />
         <button type="button" onclick="resetCancelledFilters()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold cursor-pointer">✕ Xóa lọc</button>
       </div>
       <div id="cancelledBulkBar" class="hidden px-4 py-2 bg-indigo-950 border-b border-indigo-500/40 flex flex-wrap items-center gap-2 text-xs">

@@ -63,6 +63,14 @@ final class OrderStatsTests: XCTestCase {
         XCTAssertEqual(r.buckets[0].overdue, 1)
     }
 
+    func testCancelledUsesDueEvenWhenPcLevelIsZero() {
+        let now = 1_000_000_000_000
+        let r = [row("c", "X", rd: "02/11/2026", due: now - 1000, lv: 0), row("c", "Y", rd: "02/11/2026", due: now + 3_600_000, lv: 0)]
+        let res = OrderStats.compute(rows: r, period: .day, now: now, calendar: cal)
+        XCTAssertEqual(res.overdue, 1)
+        XCTAssertEqual(res.soon, 1)
+    }
+
     func testReturnVsCancelSplit() {
         XCTAssertTrue(OrderStats.isReturn(row("m", "A", rd: "")))
         XCTAssertTrue(OrderStats.isReturn(row("a", "B", rd: "")), "đơn trong kho lưu trữ tính vào đơn hoàn")

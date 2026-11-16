@@ -78,7 +78,8 @@ public enum OrderStats {
         var map: [Date: StatsBucket] = [:]
         for r in rows {
             var level = DeadlineLevel.normal
-            if r.pd { level = r.alertLevel(now: now) }
+            // Đơn hủy PC không tính mức cảnh báo (lv = 0) nên dựa vào hạn xử lý; đơn hoàn dùng mức cảnh báo của PC như tab Thông báo.
+            if r.pd { level = r.isCancelled ? Deadline.level(due: r.due, now: now) : r.alertLevel(now: now) }
             result.total += 1
             if r.rv { result.received += 1 }
             if r.pd { result.pending += 1 }

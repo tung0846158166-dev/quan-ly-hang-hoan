@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.9
+          name: QuanLyHangHoan-Windows-Installer-v1.9.10
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.9
-          name: "Quản Lý Hàng Hoàn v1.9.9 — chống trùng đơn giữa Bảng chính, Kho lưu trữ và Bảng đơn hủy"
+          tag_name: v1.9.10
+          name: "Quản Lý Hàng Hoàn v1.9.10 — điện thoại tạo đơn mới/đơn hủy không tạo trùng"
           body: |
+            ### Bản sửa 1.9.10
+
+            - Điện thoại tạo đơn mới, tạo đơn hủy hoặc đẩy ra Bảng chính: đơn đã có ở Bảng chính, Kho lưu trữ hoặc Bảng đơn hủy thì máy tính báo "ĐÃ CÓ Ở …" và không tạo lại. Nhập từ Hộp Đơn Mới trên máy tính cũng bỏ qua đơn trùng.
+
             ### Bản sửa 1.9.9
 
             - Nạp file Shopee/TikTok: đơn đã có ở Kho lưu trữ hoặc Bảng đơn hủy không còn bị đẩy lại ra Bảng chính như đơn mới.

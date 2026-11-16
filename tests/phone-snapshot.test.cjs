@@ -114,3 +114,11 @@ test('v1.9.9: nạp file sàn không đẩy lại đơn đã có ở Kho lưu tr
   assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'x', returnTrack: 't222' })", ctx), 'cancelled');
   assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'NEW', track: 'zzz' })", ctx), null);
 });
+
+test('v1.9.10: tạo đơn mới / đơn hủy / đẩy ra bảng chính từ điện thoại bỏ qua đơn đã có ở bất kỳ bảng nào', () => {
+  assert.match(src, /const dupWhere = typeof locateExistingAnywhere === 'function' \? locateExistingAnywhere\(trackCode, data\.orderId\) : null;/);
+  assert.match(src, /const dupWhere2 = typeof locateExistingAnywhere === 'function' \? locateExistingAnywhere\(trackCode, data\.orderId\) : null;/);
+  assert.match(src, /inboxItem && typeof isInboxItemDuplicate === 'function' && isInboxItemDuplicate\(inboxItem\)/);
+  assert.match(src, /dupSelected = selectedItems\.filter\(isInboxItemDuplicate\)/);
+  assert.match(src, /dupAll = newOrdersInbox\.filter\(isInboxItemDuplicate\)/);
+});

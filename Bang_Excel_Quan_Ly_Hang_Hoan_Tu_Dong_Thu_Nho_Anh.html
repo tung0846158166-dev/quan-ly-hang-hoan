@@ -3819,6 +3819,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       for (const c of orderIdentityCodes(orderData)) { if (index.has(c)) return index.get(c); }
       return null;
     }
+    const EXISTING_TABLE_LABEL = { main: 'BẢNG CHÍNH', archive: 'KHO LƯU TRỮ', cancelled: 'BẢNG ĐƠN HỦY' };
+    // v1.9.10: đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy thì không tạo lại (điện thoại tạo đơn mới, đơn hủy, đẩy ra bảng chính).
+    function locateExistingAnywhere(code, orderId) {
+      try {
+        if (typeof findExistingMainOrder === 'function' && (findExistingMainOrder(code) || (orderId && findExistingMainOrder(orderId)))) return 'main';
+      } catch (e) {}
+      return findInOtherTables(buildOtherTablesIndex(), { orderId: orderId || '', track: code, returnTrack: code });
+    }
+    function isInboxItemDuplicate(it) {
+      return Boolean(it && locateExistingAnywhere(it.track || it.code || '', it.orderId));
+    }
+
     async function removeDuplicatesAcrossTables() {
       const index = buildOtherTablesIndex();
       const dups = [];
@@ -7186,7 +7198,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.9';
+    const APP_VERSION_NUMBER = '1.9.10';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13665,7 +13677,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.9',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.10',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14458,6 +14470,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const pushCode = extractCleanTrackingCode(data.code || '') || String(data.code || '').trim();
         const reply = (msg, outcome) => sendAckToPhone(0, pushCode, msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'push' });
         const inboxItem = (newOrdersInbox || []).find(it => it && [it.track, it.orderId, it.code].some(v => v && extractCleanTrackingCode(v) === pushCode));
+        if (inboxItem && typeof isInboxItemDuplicate === 'function' && isInboxItemDuplicate(inboxItem)) {
+          const w = locateExistingAnywhere(inboxItem.track || inboxItem.code || pushCode, inboxItem.orderId);
+          newOrdersInbox = (newOrdersInbox || []).filter(it => it !== inboxItem);
+          saveNewOrdersInbox();
+          reply('Đơn ' + pushCode + ' đã có ở ' + EXISTING_TABLE_LABEL[w] + ', không đẩy lại', 'duplicate');
+          return { success: true };
+        }
         if (inboxItem) { importSingleNewOrder(inboxItem.id); reply('ĐÃ ĐẨY ĐƠN ' + pushCode + ' RA BẢNG CHÍNH', 'success'); return { success: true }; }
         if (phoneOrderMatches(pushCode).length) { reply('Đơn ' + pushCode + ' đã có trên Bảng chính', 'duplicate'); return { success: true }; }
         reply('Không thấy đơn ' + pushCode + ' trong Bảng đơn mới', 'not_found');
@@ -14467,6 +14486,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (data.type === 'new_order_scan') {
         const trackCode = extractCleanTrackingCode(data.code || data.track || '') || String(data.code || data.track || '').trim();
         if (!trackCode) return;
+        const dupWhere = typeof locateExistingAnywhere === 'function' ? locateExistingAnywhere(trackCode, data.orderId) : null;
+        if (dupWhere) {
+          sendAckToPhone(0, trackCode, 'ĐƠN ĐÃ CÓ Ở ' + EXISTING_TABLE_LABEL[dupWhere] + ', KHÔNG TẠO LẠI', 'duplicate', true, data.requestId || '', data.room || '', { ackStage: 'scan', photoSaved: false, captureId: data.captureId || '' });
+          try { if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone(); } catch (e) {}
+          showAppToast(`⚠️ Đơn ${trackCode} đã có ở ${EXISTING_TABLE_LABEL[dupWhere]}, không tạo lại`, 'warning');
+          return { success: true };
+        }
 
         const existingInboxIdx = (newOrdersInbox || []).findIndex(item => extractCleanTrackingCode(item.track || item.code) === trackCode);
         if (existingInboxIdx !== -1) {
@@ -15673,6 +15699,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const idx = (newOrdersInbox || []).findIndex(it => it && it.id === id);
       if (idx === -1) return;
       const item = newOrdersInbox[idx];
+      if (isInboxItemDuplicate(item)) {
+        newOrdersInbox.splice(idx, 1);
+        saveNewOrdersInbox();
+        showAppToast(`⚠️ Đơn ${item.track || item.orderId} đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại (đã gỡ khỏi Hộp Đơn Mới).`, 'warning', 6000);
+        return;
+      }
       const newOrd = convertInboxItemToOrder(item);
 
       orders.unshift(newOrd);
@@ -15702,7 +15734,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const selectedIds = new Set(selectedItems.map(it => it.id));
-      const newOrderObjects = selectedItems.map(it => convertInboxItemToOrder(it));
+      const dupSelected = selectedItems.filter(isInboxItemDuplicate);
+      const newOrderObjects = selectedItems.filter(it => !dupSelected.includes(it)).map(it => convertInboxItemToOrder(it));
+      if (dupSelected.length) showAppToast(`⚠️ ${dupSelected.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
+      if (!newOrderObjects.length) { newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id)); saveNewOrdersInbox(); return; }
 
       orders.unshift(...newOrderObjects);
       newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id));
@@ -15732,7 +15767,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const count = newOrdersInbox.length;
       if (!confirm(`Bạn có chắc muốn nhập TOÀN BỘ ${count} đơn mới ra ngoài Bảng chính không?`)) return;
 
-      const newOrderObjects = newOrdersInbox.map(it => convertInboxItemToOrder(it));
+      const dupAll = newOrdersInbox.filter(isInboxItemDuplicate);
+      const newOrderObjects = newOrdersInbox.filter(it => !dupAll.includes(it)).map(it => convertInboxItemToOrder(it));
+      if (dupAll.length) showAppToast(`⚠️ ${dupAll.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
       orders.unshift(...newOrderObjects);
       newOrdersInbox = [];
 
@@ -16431,6 +16468,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ack('ĐƠN HỦY ĐÃ TẠO TRƯỚC ĐÓ', 'duplicate', true);
         if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
         showAppToast(`🚫 Đơn hủy ${trackCode} đã tạo rồi`, 'warning');
+        return { success: true };
+      }
+      const dupWhere2 = typeof locateExistingAnywhere === 'function' ? locateExistingAnywhere(trackCode, data.orderId) : null;
+      if (dupWhere2) {
+        ack('ĐƠN ĐÃ CÓ Ở ' + EXISTING_TABLE_LABEL[dupWhere2] + ', KHÔNG TẠO ĐƠN HỦY', 'duplicate', true);
+        if (typeof playScanDuplicateTone === 'function') playScanDuplicateTone();
+        showAppToast(`⚠️ Đơn ${trackCode} đã có ở ${EXISTING_TABLE_LABEL[dupWhere2]}, không tạo đơn hủy`, 'warning');
         return { success: true };
       }
       const platform = (data.platform && data.platform !== 'auto') ? data.platform : autoDetectPlatformFromCode(trackCode);

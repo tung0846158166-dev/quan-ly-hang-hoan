@@ -7216,7 +7216,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.12';
+    const APP_VERSION_NUMBER = '1.9.13';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13696,7 +13696,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.12',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.13',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -14218,30 +14218,78 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       unmatchedPhoneScans.push({ code: c, t: at || Date.now() });
       persistUnmatchedScans();
     }
+    // Ảnh điện thoại chụp cùng lượt quét: giữ lại (IndexedDB) để đối chiếu với hàng thật khi đơn xuất hiện.
+    function attachPhotoToUnmatched(code, dataUrl) {
+      if (typeof dataUrl !== 'string' || !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl)) return false;
+      const c = extractCleanTrackingCode(code) || String(code || '').trim().toUpperCase();
+      if (!c) return false;
+      rememberUnmatchedScan(c);
+      const e = unmatchedPhoneScans.find(x => x.code === c);
+      if (!e) return false;
+      e.photoId = e.photoId || 'um_' + c;
+      photoMemoryCache.set(e.photoId, dataUrl);
+      try { savePhotoToDb(e.photoId, dataUrl); } catch (x) {}
+      persistUnmatchedScans();
+      return true;
+    }
+    function unmatchedPhotoOf(e) { return (e && e.photoId && photoMemoryCache.get(e.photoId)) || ''; }
+    function giveScanPhotoToOrder(o, photo) {
+      if (!o || !photo || o.photo) return;
+      o.photo = photo;
+      if (!o.photoId) o.photoId = 'p_' + (o.track || o.orderId || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+      try { savePhotoToDb(o.photoId, photo); } catch (x) {}
+    }
+    function dropScanPhoto(e) { try { if (e && e.photoId) { photoMemoryCache.delete(e.photoId); deletePhotoFromDb(e.photoId); } } catch (x) {} }
     function formatScanTime(ms) {
       const d = new Date(ms), p = n => String(n).padStart(2, '0');
       return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     let lastUnmatchedReconcileAt = 0;
+    function inboxHasScanItems() {
+      try { return Array.isArray(newOrdersInbox) && newOrdersInbox.some(it => it && it.fromUnmatchedScan); } catch (e) { return false; }
+    }
     function reconcileUnmatchedScans(force) {
-      if (!unmatchedPhoneScans.length) return 0;
+      if (!unmatchedPhoneScans.length && !inboxHasScanItems()) return 0;
       const now = Date.now();
       if (!force && now - lastUnmatchedReconcileAt < 2000) return 0;
       lastUnmatchedReconcileAt = now;
       let applied = 0, changed = false;
       const keep = [];
+      // Đơn đã được đưa vào Hộp Đơn Mới nhưng sau đó file sàn nạp đúng đơn đó: đánh dấu đã nhận ở bảng chính và gỡ khỏi hộp.
+      let inboxChanged = false;
+      if (inboxHasScanItems()) {
+        const stay = [];
+        for (const it of newOrdersInbox) {
+          if (!(it && it.fromUnmatchedScan)) { stay.push(it); continue; }
+          const code = extractCleanTrackingCode(it.track || '');
+          const m = code ? phoneOrderMatches(code) : [];
+          if (m.length === 1) {
+            const o = m[0].order;
+            if (o.status !== 'Hàng đã trả') {
+              o.status = 'Hàng đã trả';
+              if (!o.recvDate) o.recvDate = it.scanTime ? formatScanTime(it.scanTime) : getNowDateTimeString();
+              giveScanPhotoToOrder(o, it.photo);
+              applied++;
+              try { addAuditLog('📱 TỰ KHỚP LƯỢT QUÉT TRƯỚC', `Mã [${code}] trong Hộp Đơn Mới nay đã có đơn ở Bảng chính ➔ chuyển [🟢 Hàng đã trả], gỡ khỏi hộp`); } catch (x) {}
+            }
+            inboxChanged = true;
+          } else stay.push(it);
+        }
+        if (inboxChanged) { newOrdersInbox = stay; try { saveNewOrdersInbox(); } catch (x) {} }
+      }
       for (const e of unmatchedPhoneScans) {
-        if (now - e.t > UNMATCHED_SCANS_MAX_AGE_MS) { changed = true; continue; }
+        if (now - e.t > UNMATCHED_SCANS_MAX_AGE_MS) { changed = true; dropScanPhoto(e); continue; }
         const matches = phoneOrderMatches(e.code);
         if (matches.length === 1) {
           const o = matches[0].order;
           if (o.status !== 'Hàng đã trả') {
             o.status = 'Hàng đã trả';
             if (!o.recvDate) o.recvDate = formatScanTime(e.t);
+            giveScanPhotoToOrder(o, unmatchedPhotoOf(e));
             applied++;
             try { addAuditLog('📱 TỰ KHỚP LƯỢT QUÉT TRƯỚC', `Mã [${e.code}] đã quét lúc ${formatScanTime(e.t)} ➔ đơn vừa có trên hệ thống, chuyển [🟢 Hàng đã trả]`); } catch (x) {}
           }
-          changed = true;
+          changed = true; dropScanPhoto(e);
         } else keep.push(e);   // chưa có đơn, hoặc có nhiều đơn trùng mã: giữ lại để kiểm tra
       }
       if (changed) { unmatchedPhoneScans = keep; persistUnmatchedScans(); }
@@ -14251,6 +14299,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       return applied;
     }
+
+
+    // Mã quét trước mà sau một lúc (đã có cơ hội nạp file sàn) vẫn chưa có đơn: tự đưa vào Hộp Đơn Mới để không bỏ sót hàng đã về.
+    const UNMATCHED_PROMOTE_AFTER_MS = 10 * 60 * 1000;
+    function promoteUnmatchedScans() {
+      if (!unmatchedPhoneScans.length) return 0;
+      if (typeof activeImportBatch !== 'undefined' && activeImportBatch) return 0;
+      reconcileUnmatchedScans(true);
+      const now = Date.now();
+      let moved = 0, changed = false;
+      const keep = [];
+      if (!Array.isArray(newOrdersInbox)) return 0;
+      for (const e of unmatchedPhoneScans) {
+        if (now - e.t < UNMATCHED_PROMOTE_AFTER_MS) { keep.push(e); continue; }
+        if (phoneOrderMatches(e.code).length > 0) { keep.push(e); continue; }   // trùng nhiều đơn: để người dùng kiểm tra
+        changed = true;
+        if (locateExistingAnywhere(e.code, '')) { dropScanPhoto(e); continue; }   // đã có ở kho lưu trữ / đơn hủy: không tạo
+        if (newOrdersInbox.some(it => extractCleanTrackingCode(it.track || it.code || '') === e.code)) continue;
+        const plat = autoDetectPlatformFromCode(e.code);
+        newOrdersInbox.unshift({
+          requestId: '', captureId: '', id: 'inbox_' + now + '_' + Math.random().toString(36).substr(2, 6),
+          track: e.code, orderId: e.code, platform: plat,
+          carrier: (typeof detectCarrierByTrackingCode === 'function' ? detectCarrierByTrackingCode(e.code) : '') || '',
+          time: formatScanTime(e.t), scanTime: e.t, fromUnmatchedScan: true, photo: unmatchedPhotoOf(e),
+          note: 'Hàng đã về (điện thoại quét lúc ' + formatScanTime(e.t) + ') nhưng chưa có đơn trong file sàn',
+          product: 'Chưa rõ sản phẩm (hàng đã về, chưa có đơn)', color: '', size: '', qty: 1, price: 0, checked: false
+        });
+        dropScanPhoto(e);
+        moved++;
+      }
+      if (changed) { unmatchedPhoneScans = keep; persistUnmatchedScans(); }
+      if (moved) {
+        try { saveNewOrdersInbox(); } catch (x) {}
+        try { addAppNotification({ type: 'phone_new_order', title: '📥 Hàng đã về nhưng chưa có đơn', detail: `${moved} mã điện thoại đã quét mà file sàn chưa có đơn, đã đưa vào Hộp Đơn Mới. Đẩy ra Bảng chính sẽ tự ghi Hàng đã trả; nếu sau này file sàn có đơn thì tự khớp.`, code: '', orderIdx: null }); } catch (x) {}
+        try { showAppToast(`📥 ${moved} mã đã quét chưa có đơn → đã vào Hộp Đơn Mới`, 'warning', 6000); } catch (x) {}
+      }
+      return moved;
+    }
+    setInterval(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 5 * 60 * 1000);
+    setTimeout(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 90 * 1000);
 
     function phoneOrderMatches(rawCode) {
       if (typeof getPhoneOrderMatches === 'function') return getPhoneOrderMatches(rawCode);
@@ -14359,6 +14447,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       const candidates = cleanCode ? phoneOrderMatches(cleanCode) : [];
+      // Chưa có đơn nào mang mã này: giữ ảnh cùng lượt quét chưa khớp để đối chiếu sau.
+      if (cleanCode && candidates.length === 0 && typeof attachPhotoToUnmatched === 'function' &&
+          !(typeof locateExistingAnywhere === 'function' && locateExistingAnywhere(cleanCode, ''))) {
+        if (attachPhotoToUnmatched(cleanCode, photoDataUrl)) return true;
+      }
       // A missing/ambiguous code must never attach to the selected or last row.
       if (candidates.length !== 1) return false;
       const targetIdx = candidates[0].index;
@@ -15737,7 +15830,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {
         shipDate: item.time || getNowDateTimeString(),
         returnDate: item.time || getNowDateTimeString(),
-        recvDate: '',
+        recvDate: item.fromUnmatchedScan && item.scanTime ? formatScanTime(item.scanTime) : '',
         platform: assignedPlat,
         orderType: 'Trả hàng/Hoàn tiền',
         platformStatus: 'Đang chuyển hoàn',
@@ -15748,7 +15841,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         altTrack: '',
         carrier: assignedCarrier,
         price: Number(item.price) || 0,
-        status: 'Chưa trả',
+        status: item.fromUnmatchedScan ? 'Hàng đã trả' : 'Chưa trả',
         photo: item.photo || '',
         note: item.note || 'Đơn mới tạo từ máy quét điện thoại',
         buyerNote: '',

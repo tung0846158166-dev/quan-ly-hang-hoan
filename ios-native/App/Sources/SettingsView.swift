@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage("soundOn") private var soundOn = true
     @AppStorage("hapticOn") private var hapticOn = true
     @AppStorage("sendPhoto") private var sendPhoto = true
+    @AppStorage("minCodeSize") private var minCodeSize = 0.12
 
     /// (nhãn, số PC, số điện thoại): điện thoại đếm lại từ danh sách đã nhận để so với số PC tự tính.
     private var reconcile: [(String, Int, Int)] {
@@ -72,6 +73,12 @@ struct SettingsView: View {
                     Toggle("Âm thanh khi có kết quả", isOn: $soundOn)
                     Toggle("Rung khi quét", isOn: $hapticOn)
                     Toggle("Gửi kèm ảnh khi quét hoàn kho", isOn: $sendPhoto)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(minCodeSize <= 0 ? "Giới hạn khoảng cách quét: tắt" : "Giới hạn khoảng cách quét (mã phải đủ to trong khung)")
+                        Slider(value: $minCodeSize, in: 0...0.3, step: 0.01)
+                        Text("Kéo sang phải: chỉ nhận mã ở gần hơn. Kéo về 0: nhận mọi mã. Mặc định 0,12 ≈ dưới khoảng 30 cm với nhãn thường; mã to nhỏ khác nhau nên chỉ là gần đúng.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Section("Giới thiệu") {
                     LabeledContent("Phiên bản", value: (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") + " (app gốc)")

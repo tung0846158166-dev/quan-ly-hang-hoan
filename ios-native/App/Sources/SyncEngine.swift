@@ -309,10 +309,11 @@ final class SyncEngine: ObservableObject {
     func handleCameraCode(_ raw: String) {
         // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
         guard TrackingCode.isPlausibleScan(raw) else { return }
-        // Camera vẫn nhìn thấy cùng nhãn sau khi đã quét: không tạo thêm lượt "quét trùng" trong vài giây đầu.
+        // Camera vẫn nhìn thấy cùng nhãn sau khi đã quét: không tạo thêm lượt "quét trùng" khi nhãn vẫn nằm trước camera.
         // Khóa theo cả chế độ quét: đổi sang chế độ khác (Tạo đơn mới, Đơn hủy…) thì quét lại cùng nhãn phải nhận ngay.
         let c = "\(mode.rawValue)|" + TrackingCode.clean(raw), now = Date()
-        if c == lastCameraCode && now.timeIntervalSince(lastCameraTime) < 6 { lastCameraTime = now; return }
+        // Mỗi lần camera còn thấy nhãn thì mốc được gia hạn: chỉ khi nhãn rời khung hình hơn 1 giây rồi quay lại mới tính là lượt quét mới.
+        if c == lastCameraCode && now.timeIntervalSince(lastCameraTime) < 1.0 { lastCameraTime = now; return }
         lastCameraCode = c; lastCameraTime = now
         _ = submit(raw: raw, kind: mode, photo: nil, useSnapshot: true)
     }

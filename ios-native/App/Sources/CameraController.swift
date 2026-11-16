@@ -125,6 +125,9 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         for obj in metadataObjects {
             guard let m = obj as? AVMetadataMachineReadableCodeObject, let s = m.stringValue, !s.isEmpty else { continue }
+            // Giới hạn khoảng cách (gần đúng): mã ở xa thì chiếm phần nhỏ của khung hình, bỏ qua mã nhỏ hơn ngưỡng người dùng đặt.
+            let minSize = UserDefaults.standard.object(forKey: "minCodeSize") as? Double ?? 0.12
+            if minSize > 0, Double(max(m.bounds.width, m.bounds.height)) < minSize { continue }
             if weakTypes.contains(m.type) {
                 let now = Date()
                 if let c = weakCandidate, c.code == s, now.timeIntervalSince(c.last) < 1.0 {

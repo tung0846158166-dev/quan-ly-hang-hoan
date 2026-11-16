@@ -25,6 +25,9 @@ struct NotificationsView: View {
                 if !store.hasData {
                     Section { Text("Chưa nhận danh sách đơn từ máy tính nên chưa có thông báo.").foregroundStyle(.secondary) }
                 }
+                Section {
+                    NavigationLink { StatsView() } label: { Label("Thống kê đơn hoàn / hủy theo ngày, tuần, tháng", systemImage: "chart.bar.xaxis") }
+                }
                 Section("🚨 Quá hạn (\(a.overdue.count))") {
                     if a.overdue.isEmpty { Text("Không có đơn quá hạn").foregroundStyle(.secondary) }
                     ForEach(a.overdue) { alertRow($0, now: now) }

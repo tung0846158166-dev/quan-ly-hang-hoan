@@ -7,6 +7,8 @@ struct StatsView: View {
     @State private var period: StatsPeriod = .day
     @State private var returns = StatsResult()
     @State private var cancels = StatsResult()
+    @State private var returnsRecv = StatsResult()
+    @State private var cancelsRecv = StatsResult()
     @State private var loading = true
 
     var body: some View {
@@ -29,7 +31,9 @@ struct StatsView: View {
                     deadlineRow("Đơn hủy", cancels)
                 }
                 group("Đơn hoàn", returns)
+                recvGroup("✅ Đơn hoàn đã về kho (theo ngày nhận)", returnsRecv)
                 group("Đơn hủy", cancels)
+                recvGroup("✅ Đơn hủy đã nhận (theo ngày nhận)", cancelsRecv)
             }
         }
         .navigationTitle("Thống kê đơn")
@@ -40,12 +44,15 @@ struct StatsView: View {
     private func reload() async {
         let rows = store.rows, p = period
         let now = Int(Date().timeIntervalSince1970 * 1000)
-        let (r, c) = await Task.detached(priority: .userInitiated) { () -> (StatsResult, StatsResult) in
+        let (r, c, rr, cr) = await Task.detached(priority: .userInitiated) { () -> (StatsResult, StatsResult, StatsResult, StatsResult) in
             let ret = OrderStats.compute(rows: rows.filter { OrderStats.isReturn($0) }, period: p, now: now)
             let can = OrderStats.compute(rows: rows.filter { OrderStats.isCancel($0) }, period: p, now: now)
-            return (ret, can)
+            let recv: (OrderRow) -> OrderRow = { var x = $0; x.rd = x.rcd; x.pd = false; return x }
+            let retR = OrderStats.compute(rows: rows.filter { OrderStats.isReturn($0) && $0.rv }.map(recv), period: p, now: now)
+            let canR = OrderStats.compute(rows: rows.filter { OrderStats.isCancel($0) && $0.rv }.map(recv), period: p, now: now)
+            return (ret, can, retR, canR)
         }.value
-        returns = r; cancels = c; loading = false
+        returns = r; cancels = c; returnsRecv = rr; cancelsRecv = cr; loading = false
     }
 
     private func deadlineRow(_ title: String, _ s: StatsResult) -> some View {
@@ -73,6 +80,23 @@ struct StatsView: View {
             }
             if s.unknownDate > 0 {
                 Text("\(s.unknownDate) đơn không có ngày hoàn/hủy nên không xếp vào ngày nào").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func recvGroup(_ title: String, _ s: StatsResult) -> some View {
+        Section("\(title) — tổng \(s.total)") {
+            if s.buckets.isEmpty { Text("Chưa có đơn đã nhận").foregroundStyle(.secondary) }
+            ForEach(s.buckets.prefix(period == .day ? 31 : 24)) { b in
+                HStack {
+                    Text(label(b.start)).font(.subheadline.bold())
+                    Spacer()
+                    Text("\(b.total) đơn").font(.subheadline)
+                }
+            }
+            if s.unknownDate > 0 {
+                Text("\(s.unknownDate) đơn đã nhận nhưng chưa có ngày nhận (máy tính cũ chưa gửi ngày nhận — cập nhật máy tính lên bản mới)").font(.caption).foregroundStyle(.secondary)
             }
         }
     }

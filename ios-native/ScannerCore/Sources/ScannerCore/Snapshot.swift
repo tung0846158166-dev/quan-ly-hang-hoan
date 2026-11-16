@@ -20,6 +20,7 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var wl: Bool = false     // đang theo dõi
     public var wr: String = ""      // lý do/ghi chú theo dõi
     public var nt: String = ""      // ghi chú đơn
+    public var rcd: String = ""     // ngày giờ nhận tại kho (khi đã nhận)
     public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=72h), 1 = Báo Vàng (>=48h), 0 = an toàn; -1 = PC cũ không gửi
 
     public var id: String { k + "|" + c }
@@ -72,7 +73,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd }
 private enum PayloadKeys: String, CodingKey { case time, count, rows, stats }
 
 extension OrderRow {
@@ -82,7 +83,7 @@ extension OrderRow {
                   co: c.flexString(.co), sz: c.flexString(.sz), q: c.flexInt(.q, default: 1), rd: c.flexString(.rd),
                   due: c.flexInt(.due), st: c.flexString(.st),
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
-                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), lv: c.flexInt(.lv, default: -1))
+                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1))
     }
 }
 

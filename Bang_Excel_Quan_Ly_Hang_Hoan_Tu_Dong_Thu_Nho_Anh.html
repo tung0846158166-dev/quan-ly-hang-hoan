@@ -13972,6 +13972,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           rd: rd || '', due: due || 0, st: status || ''
         };
         if (x.ty) row.ty = x.ty;
+        if (o.recvDate) row.rcd = String(o.recvDate).slice(0, 24);   // ngày giờ nhận tại kho (cho thống kê hàng đã về kho trên iPhone)
         if (x.pre) row.pre = 1;
         if (x.lv !== undefined) row.lv = x.lv;
         if (!x.pd) row.pd = 0;
@@ -16836,6 +16837,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return { rd: o.returnDate, received, pending, level };
       });
     }
+    // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo ngày nhận.
+    function collectReceivedStatsItems(kind) {
+      const take = o => ({ rd: o.recvDate, received: true, pending: false, level: '' });
+      if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(take);
+      const out = [];
+      const add = o => { if (o && getOrderType(o) !== 'Đơn hủy' && isOrderReceived(o)) out.push(take(o)); };
+      (Array.isArray(orders) ? orders : []).forEach(add);
+      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
+      return out;
+    }
     function setStatsPeriod(p) { statsPeriod = p; renderStatsModal(); }
     function renderStatsModal() {
       const box = document.getElementById('statsModalBody'); if (!box) return;
@@ -16845,7 +16856,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       const ret = computeStats(collectReturnStatsItems(), statsPeriod);
       const can = computeStats(collectCancelStatsItems(), statsPeriod);
+      const retRecv = computeStats(collectReceivedStatsItems('return'), statsPeriod);
+      const canRecv = computeStats(collectReceivedStatsItems('cancel'), statsPeriod);
       const limit = statsPeriod === 'day' ? 31 : 24;
+      const recvCard = (title, s, color) => {
+        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td><td class="px-2 py-1.5 text-center font-mono text-emerald-300 font-bold">${b.total}</td></tr>`).join('');
+        return `<div class="flex-1 min-w-[260px] bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
+          <div class="px-3 py-2 font-black text-sm flex flex-wrap justify-between gap-2"><span>${title}</span><span class="text-[11px] font-bold text-slate-300">Tổng ${s.total} đơn đã về kho</span></div>
+          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr><th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')} nhận tại kho</th><th class="px-2 py-1.5">Đã về kho</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="2" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
+          ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn đã nhận nhưng không có ngày nhận.</div>` : ''}</div>`;
+      };
       const card = (title, s, color) => {
         const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800">
             <td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td>
@@ -16863,7 +16884,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <tbody>${rows || '<tr><td colspan="6" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
           ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn không có ngày hoàn/hủy nên không xếp vào ngày nào.</div>` : ''}</div>`;
       };
-      box.innerHTML = card('↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ)', ret, 'border-sky-500/40') + card('🚫 ĐƠN HỦY (bảng đơn hủy)', can, 'border-rose-500/40');
+      box.innerHTML = card('↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ) — theo ngày hoàn', ret, 'border-sky-500/40') + recvCard('✅ ĐƠN HOÀN ĐÃ VỀ KHO — theo ngày nhận', retRecv, 'border-emerald-500/40')
+        + card('🚫 ĐƠN HỦY (bảng đơn hủy) — theo ngày hủy', can, 'border-rose-500/40') + recvCard('✅ ĐƠN HỦY ĐÃ NHẬN — theo ngày nhận', canRecv, 'border-emerald-500/40');
     }
     function openStatsModal() { const m = document.getElementById('statsModal'); if (!m) return; m.classList.remove('hidden'); renderStatsModal(); }
     function closeStatsModal() { const m = document.getElementById('statsModal'); if (m) m.classList.add('hidden'); }
@@ -19945,7 +19967,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <button type="button" onclick="closeStatsModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg cursor-pointer">✕ Đóng</button>
         </div>
       </div>
-      <div class="px-4 py-1.5 text-[11px] text-slate-400 border-b border-slate-800">Tính theo ngày hoàn/hủy khách bấm. Đơn hoàn gồm cả kho lưu trữ; đơn hủy lấy từ bảng đơn hủy.</div>
+      <div class="px-4 py-1.5 text-[11px] text-slate-400 border-b border-slate-800">Bảng "theo ngày hoàn/hủy" tính theo ngày khách bấm; bảng "đã về kho" tính đơn đã chuyển sang Đã nhận ở cột nhận tại kho, theo ngày nhận. Đơn hoàn gồm cả kho lưu trữ; đơn hủy lấy từ bảng đơn hủy.</div>
       <div id="statsModalBody" class="p-4 flex flex-wrap gap-4 overflow-auto"></div>
     </div>
   </div>

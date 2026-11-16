@@ -10,6 +10,8 @@ final class SnapshotStore: ObservableObject {
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
     @Published var stats: [String: Int] = [:]
+    /// Tăng mỗi khi danh sách đổi (kể cả đổi tại chỗ như ghi chú/theo dõi) để màn hình vẽ lại danh sách đã lọc.
+    @Published var revision = 0
     /// Thông báo đã ẩn trên điện thoại (khóa = id đơn + hạn; không đồng bộ với máy tính).
     @Published var dismissed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissedAlerts") ?? [])
 
@@ -56,6 +58,7 @@ final class SnapshotStore: ObservableObject {
     private func commit() {
         let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
         set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
+        revision += 1
     }
 
     /// Sửa ghi chú / theo dõi ngay trên điện thoại (PC nhận cùng nội dung và gửi lại danh sách theo dõi chính thức).

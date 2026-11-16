@@ -108,11 +108,13 @@ test('v1.9.9: nạp file sàn không đẩy lại đơn đã có ở Kho lưu tr
   const ctx = { archivedOrders: [{ orderId: 'a1', track: 'spx111' }], cancelledOrders: [{ orderId: 'B2', returnTrack: 'T222' }],
     extractCleanTrackingCode: v => String(v || '').trim().toUpperCase() };
   vm.createContext(ctx);
-  vm.runInContext(['orderIdentityCodes', 'buildOtherTablesIndex', 'findInOtherTables'].map(n => src.match(new RegExp('function ' + n + '[\\s\\S]*?\\r?\\n    \\}\\r?\\n'))[0]).join('\n'), ctx);
+  vm.runInContext(['orderTrackingCodes', 'orderIdKey', 'buildOtherTablesIndex', 'findInOtherTables'].map(n => src.match(new RegExp('function ' + n + '[\\s\\S]*?\\r?\\n    \\}\\r?\\n'))[0]).join('\n'), ctx);
   vm.runInContext('var idx = buildOtherTablesIndex();', ctx);
   assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'A1' })", ctx), 'archive');
   assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'x', returnTrack: 't222' })", ctx), 'cancelled');
   assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'NEW', track: 'zzz' })", ctx), null);
+  assert.strictEqual(vm.runInContext("findInOtherTables(idx, { orderId: 'A1', returnTrack: 'NEWRET' })", ctx), null, 'đơn hoàn lần 2 của cùng mã đơn không bị coi là trùng');
+  assert.strictEqual(vm.runInContext("findInOtherTables(idx, { track: 'a1' }, true)", ctx), 'archive', 'điện thoại quét mã đơn vẫn nhận ra');
 });
 
 test('v1.9.10: tạo đơn mới / đơn hủy / đẩy ra bảng chính từ điện thoại bỏ qua đơn đã có ở bất kỳ bảng nào', () => {

@@ -79,11 +79,22 @@ final class SnapshotStore: ObservableObject {
         return index
     }
 
+    /// Các mã đã quét hoàn kho trên điện thoại mà PC chưa xác nhận: danh sách mới từ PC chưa có lượt quét này nên không được ghi đè.
+    var unconfirmedReturnCodes: () -> Set<String> = { [] }
+
     private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
         rows = p.rows
         stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = built
+        let waiting = unconfirmedReturnCodes()
+        if !waiting.isEmpty {
+            var touched = false
+            for i in rows.indices where rows[i].pd && waiting.contains(rows[i].c.uppercased()) {
+                rows[i].st = "Hàng đã trả"; rows[i].rv = true; rows[i].pd = false; touched = true
+            }
+            if touched { index = Self.buildIndex(rows) }
+        }
         recount()
         scheduleNotifications()
     }

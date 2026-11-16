@@ -1,0 +1,72 @@
+import XCTest
+@testable import ScannerCore
+
+final class OrderStatsTests: XCTestCase {
+    var cal: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        c.firstWeekday = 2
+        return c
+    }()
+
+    private func row(_ k: String, _ c: String, rd: String, pd: Bool = true, rv: Bool = false, ty: String = "", due: Int = 0, lv: Int = -1) -> OrderRow {
+        var r = OrderRow(k: k, c: c, o: "", p: "Shopee", n: "", co: "", sz: "", q: 1, rd: rd, due: due, st: "")
+        r.pd = pd; r.rv = rv; r.ty = ty; r.lv = lv
+        return r
+    }
+
+    func testParseDateFormats() {
+        XCTAssertNotNil(OrderStats.parseDate("31/12/2026 14:30", calendar: cal))
+        XCTAssertNotNil(OrderStats.parseDate("2026-12-31", calendar: cal))
+        XCTAssertNotNil(OrderStats.parseDate("05-01-2026 08:00:15", calendar: cal))
+        XCTAssertNil(OrderStats.parseDate("", calendar: cal))
+        XCTAssertNil(OrderStats.parseDate("dd/mm/yyyy", calendar: cal))
+        XCTAssertNil(OrderStats.parseDate("32/13/2026", calendar: cal))
+        let d = OrderStats.parseDate("05/01/2026", calendar: cal)!
+        XCTAssertEqual(cal.component(.day, from: d), 5)
+        XCTAssertEqual(cal.component(.month, from: d), 1)
+    }
+
+    func testBucketsByDayWeekMonth() {
+        let rows = [
+            row("m", "A", rd: "02/11/2026 10:00", rv: true, pd: false),
+            row("a", "B", rd: "02/11/2026 23:00", rv: true, pd: false),
+            row("m", "C", rd: "03/11/2026"),
+            row("m", "D", rd: "09/11/2026"),
+            row("m", "E", rd: ""),
+        ]
+        let day = OrderStats.compute(rows: rows, period: .day, now: 0, calendar: cal)
+        XCTAssertEqual(day.buckets.count, 3)
+        XCTAssertEqual(day.unknownDate, 1)
+        XCTAssertEqual(day.total, 5)
+        XCTAssertEqual(day.buckets.last?.total, 2)   // 02/11 có 2 đơn, nằm cuối vì xếp mới nhất trước
+        let week = OrderStats.compute(rows: rows, period: .week, now: 0, calendar: cal)
+        XCTAssertEqual(week.buckets.count, 2)        // 02-08/11 và 09-15/11 (thứ Hai 02/11/2026, 09/11/2026)
+        XCTAssertEqual(week.buckets.last?.total, 3)
+        let month = OrderStats.compute(rows: rows, period: .month, now: 0, calendar: cal)
+        XCTAssertEqual(month.buckets.count, 1)
+        XCTAssertEqual(month.buckets[0].received, 2)
+        XCTAssertEqual(month.pending, 3)
+    }
+
+    func testOverdueAndSoonOnlyForPending() {
+        let now = 1_000_000_000_000
+        let rows = [
+            row("m", "A", rd: "02/11/2026", due: now - 1000),                 // quá hạn
+            row("m", "B", rd: "02/11/2026", due: now + 3_600_000),            // sắp đến hạn (< 24h)
+            row("m", "C", rd: "02/11/2026", pd: false, rv: true, due: now - 1000), // đã nhận: không tính quá hạn
+            row("m", "D", rd: "02/11/2026", due: now + 5 * 86_400_000),       // còn xa
+        ]
+        let r = OrderStats.compute(rows: rows, period: .month, now: now, calendar: cal)
+        XCTAssertEqual(r.overdue, 1)
+        XCTAssertEqual(r.soon, 1)
+        XCTAssertEqual(r.buckets[0].overdue, 1)
+    }
+
+    func testReturnVsCancelSplit() {
+        XCTAssertTrue(OrderStats.isReturn(row("m", "A", rd: "")))
+        XCTAssertTrue(OrderStats.isReturn(row("a", "B", rd: "")), "đơn trong kho lưu trữ tính vào đơn hoàn")
+        XCTAssertTrue(OrderStats.isCancel(row("c", "C", rd: "")))
+        XCTAssertFalse(OrderStats.isReturn(row("c", "C", rd: "")))
+    }
+}

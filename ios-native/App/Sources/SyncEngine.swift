@@ -80,6 +80,9 @@ final class SyncEngine: ObservableObject {
 
     // MARK: vòng đời
     func start() {
+        snapshot.unconfirmedReturnCodes = { [weak self] in
+            Set((self?.items ?? []).filter { $0.kind == .returnScan && !$0.scanConfirmed }.map { $0.code.uppercased() })
+        }
         guard sseTask == nil else { return }
         startSSE()
         startMQTT()

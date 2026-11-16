@@ -45,13 +45,13 @@ test('không ghi đè giờ nhận có sẵn và không nhận hai lần', () =>
   assert.strictEqual(t.api.list().length, 0);
 });
 test('đã nối vào xử lý quét và saveOrders', () => {
-  assert.match(html, /rememberUnmatchedScan\(cleanCode\)/);
+  assert.match(html, /rememberUnmatchedScan\(cleanCode, capture/);
   assert.match(html, /reconcileUnmatchedScans\(importCommit\)/);
 });
 
 test('v1.9.13: mã chưa có đơn sau 10 phút → vào Hộp Đơn Mới; chưa đủ 10 phút thì giữ', () => {
   const t = make([]);
-  t.api.remember('NEW1', Date.now() - 11 * 60 * 1000);
+  t.api.remember('NEW1', Date.now() - 11 * 60 * 1000, Date.now() - 11 * 60 * 1000);
   t.api.remember('FRESH', Date.now() - 60 * 1000);
   assert.strictEqual(t.api.promote(), 1);
   const inbox = t.api.inbox();
@@ -62,8 +62,8 @@ test('v1.9.13: mã chưa có đơn sau 10 phút → vào Hộp Đơn Mới; chư
 });
 test('v1.9.13: có ở kho lưu trữ/đơn hủy thì không tạo; trùng nhiều đơn thì giữ', () => {
   const t = make([{ track: 'DUP', status: 'x' }, { track: 'DUP', status: 'x' }], null, ['ARC1']);
-  t.api.remember('ARC1', Date.now() - 20 * 60 * 1000);
-  t.api.remember('DUP', Date.now() - 20 * 60 * 1000);
+  t.api.remember('ARC1', Date.now() - 20 * 60 * 1000, Date.now() - 20 * 60 * 1000);
+  t.api.remember('DUP', Date.now() - 20 * 60 * 1000, Date.now() - 20 * 60 * 1000);
   assert.strictEqual(t.api.promote(), 0);
   assert.strictEqual(t.api.inbox().length, 0);
   assert.strictEqual(t.api.list().map(e => e.code).join(','), 'DUP');
@@ -72,7 +72,7 @@ test('v1.9.13: đơn trong hộp, sau đó file sàn có đơn → đã nhận v
   const orders = [];
   const t = make(orders);
   const at = new Date(2026, 10, 16, 8, 0, 0).getTime();
-  t.api.remember('LATE1', at);
+  t.api.remember('LATE1', at, at);
   t.api.promote();
   assert.strictEqual(t.api.inbox().length, 1);
   orders.push({ track: 'LATE1', status: 'Chưa nhận' });
@@ -89,7 +89,7 @@ test('v1.9.13: đẩy từ hộp ra bảng chính ghi sẵn Hàng đã trả', (
 const PHOTO = 'data:image/jpeg;base64,AAAA';
 test('v1.9.13: ảnh đi kèm mã chưa có đơn → sang Hộp Đơn Mới', () => {
   const t = make([]);
-  t.api.remember('IMG1', Date.now() - 20 * 60 * 1000);
+  t.api.remember('IMG1', Date.now() - 20 * 60 * 1000, Date.now() - 20 * 60 * 1000);
   assert.strictEqual(t.api.attach('IMG1', PHOTO), true);
   assert.strictEqual(t.api.attach('IMG1', 'khong-phai-anh'), false);
   t.api.promote();
@@ -105,5 +105,20 @@ test('v1.9.13: ảnh đi kèm → gắn vào đơn khi file sàn có đơn', () 
   assert.ok(orders[0].photoId);
 });
 test('v1.9.13: ảnh từ điện thoại được nối vào applyIncomingPhonePhoto', () => {
-  assert.match(html, /attachPhotoToUnmatched\(cleanCode, photoDataUrl\)/);
+  assert.match(html, /attachPhotoToUnmatched\(cleanCode, photoDataUrl, capture/);
+});
+
+test('v1.9.13: giờ quét thật được giữ, nhưng chờ 10 phút tính từ lúc máy tính nhận', () => {
+  const t = make([]);
+  const old = Date.now() - 5 * 3600 * 1000;      // quét cách đây 5 giờ lúc máy tính tắt
+  t.api.remember('OFF1', old);                    // vừa được gửi lại sau khi máy tính bật
+  assert.strictEqual(t.api.list()[0].t, old);
+  assert.strictEqual(t.api.promote(), 0);          // chưa đủ 10 phút kể từ lúc nhận → chưa vào hộp
+  assert.strictEqual(t.api.list().length, 1);
+});
+test('v1.9.13: giờ quét vô lý (tương lai/0) thì dùng giờ hiện tại', () => {
+  const t = make([]);
+  t.api.remember('BAD1', Date.now() + 5 * 24 * 3600 * 1000);
+  t.api.remember('BAD2', 0);
+  assert.ok(t.api.list().every(e => e.t <= Date.now() + 1000));
 });

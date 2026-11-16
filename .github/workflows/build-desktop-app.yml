@@ -94,6 +94,7 @@ jobs:
             ### Bản sửa 1.9.14
 
             - Lượt quét nằm trong hàng chờ điện thoại (quét lúc máy tính tắt hoặc mất kết nối): khi máy tính bật lại, đối chiếu mà vẫn không có đơn thì đưa vào Hộp Đơn Mới ngay (kèm giờ quét và ảnh). Lượt quét trực tiếp lúc cả hai máy đang bật mà chưa có đơn vẫn chờ 10 phút để kịp nạp file sàn.
+            - Nạp file sàn có đơn đã nằm ở Kho lưu trữ hoặc Bảng đơn hủy (kể cả đơn tạo từ điện thoại): không tạo đơn mới ở bảng chính, chỉ bổ sung thông tin (mã đơn thật, sản phẩm, trạng thái sàn, hạn xử lý…) cho đơn đó; trạng thái nhận hàng, ngày nhận và ảnh giữ nguyên.
 
             ### Bản sửa 1.9.13
 

@@ -143,3 +143,42 @@ test('v1.9.14: ảnh tới sau khi mã đã vào hộp thì gắn vào dòng tro
   assert.strictEqual(t.api.inbox()[0].photo, 'data:image/jpeg;base64,AAAA');
   assert.strictEqual(t.api.list().length, 0);
 });
+
+// --- v1.9.14: file sàn cập nhật đơn ở kho lưu trữ / đơn hủy ---
+function makeEnrich(archived, cancelled) {
+  const a = html.indexOf('    function orderTrackingCodes(o)'), b = html.indexOf('    const EXISTING_TABLE_LABEL');
+  const e = html.indexOf('    // v1.9.14: file sàn có đơn đã nằm ở Kho lưu trữ');
+  assert.ok(a > 0 && e > a && b > e);
+  const saved = [];
+  const ctx = { archivedOrders: archived, cancelledOrders: cancelled, extractCleanTrackingCode: v => String(v || '').trim().toUpperCase(),
+    saveCancelledOrders() { saved.push('c'); }, saveArchivedOrders() { saved.push('a'); }, renderAll() {}, setTimeout: fn => { fn(); return 1; }, JSON, Array, Set, String, Number };
+  vm.createContext(ctx);
+  vm.runInContext(html.slice(a, html.indexOf('    function buildOtherTablesIndex')) + html.slice(e, b) + '\nthis.fn=enrichOtherTableEntry;', ctx);
+  return { fn: ctx.fn, saved };
+}
+test('v1.9.14: đơn hủy tạo từ điện thoại được file sàn bổ sung thông tin, giữ nguyên trạng thái nhận', () => {
+  const cancelled = [{ orderId: 'SPX9', track: 'SPX9', platform: 'Shopee', items: [], received: true, recvDate: '01/01/2026 08:00:00', photoId: 'p1' }];
+  const t = makeEnrich([], cancelled);
+  const r = t.fn({ orderId: '2611ABCD', track: 'SPX9', platform: 'Shopee', platformStatus: 'Đang chuyển hoàn', items: [{ product: 'Áo thun', color: 'Đen', size: 'M', qty: 2 }], price: 150000 });
+  assert.strictEqual(r.where, 'cancelled'); assert.strictEqual(r.changed, true);
+  assert.strictEqual(cancelled[0].orderId, '2611ABCD');
+  assert.strictEqual(cancelled[0].items[0].product, 'Áo thun');
+  assert.strictEqual(cancelled[0].platStatus, 'Đang chuyển hoàn');
+  assert.strictEqual(cancelled[0].received, true);
+  assert.strictEqual(cancelled[0].recvDate, '01/01/2026 08:00:00');
+  assert.strictEqual(cancelled[0].photoId, 'p1');
+  assert.deepStrictEqual(t.saved, ['c']);
+});
+test('v1.9.14: kho lưu trữ: bổ sung, không ghi đè sản phẩm thật, không có gì mới thì không đổi', () => {
+  const archived = [{ orderId: 'OID1', track: 'TRK1', items: [{ product: 'Quần', color: '', size: '', qty: 1 }], status: 'Hàng đã trả' }];
+  const t = makeEnrich(archived, []);
+  const r = t.fn({ orderId: 'OID1', track: 'TRK1', items: [{ product: 'Khác', color: '', size: '', qty: 9 }] });
+  assert.strictEqual(r.where, 'archive');
+  assert.strictEqual(r.changed, false);
+  assert.strictEqual(archived[0].items[0].product, 'Quần');
+  assert.strictEqual(archived[0].status, 'Hàng đã trả');
+  assert.strictEqual(t.fn({ orderId: 'NOPE', track: 'ZZZ' }).where, null);
+});
+test('v1.9.14: nhập file gọi bổ sung thay vì chỉ bỏ qua', () => {
+  assert.strictEqual((html.match(/const eo = enrichOtherTableEntry\(orderData\)/g) || []).length, 2);
+});

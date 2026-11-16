@@ -3837,6 +3837,58 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return null;
     }
 
+    // v1.9.14: file sàn có đơn đã nằm ở Kho lưu trữ / Bảng đơn hủy: không tạo đơn mới ở bảng chính, chỉ bổ sung thông tin cho đơn đó.
+    // Không đụng tới trạng thái nhận hàng, ngày nhận, ảnh.
+    function enrichOtherTableEntry(orderData) {
+      const result = { where: null, changed: false };
+      try {
+        const codes = orderTrackingCodes(orderData), oid = orderIdKey(orderData);
+        const lists = [[archivedOrders, 'archive'], [cancelledOrders, 'cancelled']];
+        for (const [list, where] of lists) {
+          if (!Array.isArray(list)) continue;
+          const entry = list.find(o => {
+            const tr = orderTrackingCodes(o);
+            for (const c of codes) if (tr.has(c)) return true;
+            const eoid = orderIdKey(o);
+            return Boolean(oid && eoid === oid && (!codes.size || !tr.size));
+          });
+          if (!entry) continue;
+          result.where = where;
+          const set = (k, v) => { if (v !== undefined && v !== null && v !== '' && entry[k] !== v) { entry[k] = v; result.changed = true; } };
+          const fill = (k, v) => { if (v && !entry[k]) { entry[k] = v; result.changed = true; } };
+          // Đơn tạo từ điện thoại dùng mã vận đơn làm mã đơn: thay bằng mã đơn thật của sàn.
+          const eTrack = String(entry.track || '').trim().toUpperCase();
+          if (orderData.orderId && (!entry.orderId || String(entry.orderId).trim().toUpperCase() === eTrack)) set('orderId', orderData.orderId);
+          fill('returnOrderId', orderData.returnOrderId);
+          fill('track', orderData.track); fill('returnTrack', orderData.returnTrack); fill('carrier', orderData.carrier);
+          fill('shipDate', orderData.shipDate);
+          if (orderData.platform) set('platform', orderData.platform);
+          if (orderData.deadline) set('deadline', orderData.deadline);
+          if (where === 'cancelled') { if (orderData.platformStatus) set('platStatus', orderData.platformStatus); fill('preorder', orderData.preOrder); }
+          else { if (orderData.platformStatus) set('platformStatus', orderData.platformStatus); fill('preOrder', orderData.preOrder); }
+          if (!Number(entry.price) && Number(orderData.price)) { entry.price = orderData.price; result.changed = true; }
+          const hasReal = Array.isArray(entry.items) && entry.items.some(it => it && it.product && !/Sản phẩm mới|Chưa rõ sản phẩm/.test(it.product));
+          if (!hasReal && Array.isArray(orderData.items) && orderData.items.some(it => it && it.product)) {
+            entry.items = JSON.parse(JSON.stringify(orderData.items)); result.changed = true;
+          }
+          const merged = Array.from(new Set([...(Array.isArray(entry.trackingCodes) ? entry.trackingCodes : []), ...(Array.isArray(orderData.trackingCodes) ? orderData.trackingCodes : [])]));
+          if (merged.length && JSON.stringify(entry.trackingCodes || []) !== JSON.stringify(merged)) { entry.trackingCodes = merged; result.changed = true; }
+          if (result.changed) {
+            enrichOtherTableEntry.dirty = enrichOtherTableEntry.dirty || {};
+            enrichOtherTableEntry.dirty[where] = true;
+            if (!enrichOtherTableEntry.timer) enrichOtherTableEntry.timer = setTimeout(() => {
+              const d = enrichOtherTableEntry.dirty || {}; enrichOtherTableEntry.dirty = {}; enrichOtherTableEntry.timer = null;
+              try { if (d.cancelled) saveCancelledOrders(); } catch (e) {}
+              try { if (d.archive) saveArchivedOrders(); } catch (e) {}
+              try { if (typeof renderAll === 'function') renderAll(false); } catch (e) {}
+            }, 0);
+          }
+          return result;
+        }
+      } catch (e) {}
+      return result;
+    }
+
     const EXISTING_TABLE_LABEL = { main: 'BẢNG CHÍNH', archive: 'KHO LƯU TRỮ', cancelled: 'BẢNG ĐƠN HỦY' };
     // v1.9.10: đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy thì không tạo lại (điện thoại tạo đơn mới, đơn hủy, đẩy ra bảng chính).
     function locateExistingAnywhere(code, orderId) {
@@ -5400,7 +5452,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
-      let skippedOther = 0;
+      let skippedOther = 0, enrichedOtherCount = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
@@ -5440,7 +5492,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
           } else {
             // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
-            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { skippedOther++; return; }
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -5518,6 +5570,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         `  Giữ nguyên dòng sản phẩm "Premium Cao Cấp": ${premiumItemCount} SP\n` +
         (pushToMain ? `  Đã đẩy vào bảng: ${newTableCount} đơn mới | Cập nhật: ${enrichedTableCount} đơn\n` : '') +
         (skippedCount > 0 ? `  Đã tự động lọc bỏ ${skippedCount} đơn vận chuyển thông thường (không phải đơn hoàn)\n` : '') +
+        (enrichedOtherCount > 0 ? `  Cập nhật thông tin ${enrichedOtherCount} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (không tạo đơn mới)\n` : '') +
         (skippedOther > 0 ? `  Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') +
         '\n👉 Hệ thống đã tự động chuyển giao diện sang tab [⚫ SÀN TIKTOK SHOP] để bạn theo dõi riêng biệt!'
       );
@@ -6141,7 +6194,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
-      let skippedOther = 0;
+      let skippedOther = 0, enrichedOtherCount = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
@@ -6184,7 +6237,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
           } else {
             // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
-            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { skippedOther++; return; }
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -6233,6 +6286,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           }
         });
 
+        if (enrichedOtherCount > 0) runImportUi('showAppToast', `🔄 Đã cập nhật thông tin ${enrichedOtherCount} đơn có sẵn ở Kho lưu trữ / Bảng đơn hủy (không tạo đơn mới).`, 'info', 6000);
         if (skippedOther > 0) runImportUi('showAppToast', `⏭️ Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (không đẩy trùng ra bảng chính).`, 'info', 6000);
         if (importState && !(await commitImportState(importState))) return { success: false };
         runImportUi('renderAll');

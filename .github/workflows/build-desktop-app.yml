@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.8
+          name: QuanLyHangHoan-Windows-Installer-v1.9.9
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.8
-          name: "Quản Lý Hàng Hoàn v1.9.8 — sửa/xóa đơn đồng bộ 2 chiều với iPhone"
+          tag_name: v1.9.9
+          name: "Quản Lý Hàng Hoàn v1.9.9 — chống trùng đơn giữa Bảng chính, Kho lưu trữ và Bảng đơn hủy"
           body: |
+            ### Bản sửa 1.9.9
+
+            - Nạp file Shopee/TikTok: đơn đã có ở Kho lưu trữ hoặc Bảng đơn hủy không còn bị đẩy lại ra Bảng chính như đơn mới.
+            - Thêm công cụ Hệ Thống → "Dọn Đơn Trùng Giữa Các Bảng" để xóa các bản trùng đã lỡ vào Bảng chính (có hỏi xác nhận, giữ đơn đang khóa, có lưu bản sao).
+
             ### Bản sửa 1.9.8
 
             - iPhone sửa đơn (sản phẩm, màu, size, số lượng, trạng thái, loại đơn) hoặc xóa đơn thì máy tính làm theo (đơn bị khóa thì từ chối, đơn xóa được lưu bản sao trong bộ nhớ). Sửa/xóa đơn trên máy tính thì danh sách trên iPhone tự cập nhật sau vài giây.

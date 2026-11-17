@@ -75,6 +75,7 @@ struct OrdersView: View {
         NavigationStack {
             VStack(spacing: 6) {
                 summary(shown: shown.count)
+                tables
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
@@ -134,6 +135,24 @@ struct OrdersView: View {
                 }
             }
         }
+    }
+
+    /// Lối vào Bảng đơn mới (Hộp Đơn Mới trên PC) và Bảng đơn hủy: tích chọn để đẩy ra / đánh dấu đã nhận.
+    private var tables: some View {
+        let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
+        return HStack(spacing: 8) {
+            NavigationLink { InboxView() } label: {
+                Label("Đơn mới (\(store.inbox.count))", systemImage: "tray.and.arrow.down.fill")
+                    .font(.subheadline.bold()).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered).tint(store.inbox.isEmpty ? .gray : .blue)
+            NavigationLink { CancelledTableView() } label: {
+                Label("Đơn hủy · chưa nhận \(cancelledPending)", systemImage: "xmark.bin.fill")
+                    .font(.subheadline.bold()).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered).tint(cancelledPending == 0 ? .gray : .red)
+        }
+        .padding(.horizontal)
     }
 
     private func summary(shown: Int) -> some View {

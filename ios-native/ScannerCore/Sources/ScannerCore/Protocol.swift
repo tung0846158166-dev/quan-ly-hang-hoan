@@ -116,6 +116,16 @@ public enum SyncProtocol {
               "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
+    /// Đẩy nhiều đơn trong Hộp Đơn Mới (theo id trên PC) ra bảng chính.
+    public static func inboxPushMany(ids: [String], room: String, requestId: String) -> String {
+        json(["type": "inbox_push_many", "ids": ids, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
+    /// Đánh dấu đã nhận / chưa nhận nhiều đơn trong bảng đơn hủy (theo id trên PC).
+    public static func cancelReceive(ids: [String], received: Bool, room: String, requestId: String) -> String {
+        json(["type": "cancel_receive", "ids": ids, "received": received, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
+    }
+
     public static func inboxPush(code: String, room: String, requestId: String) -> String {
         json(["type": "inbox_push", "code": code, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
     }

@@ -394,12 +394,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     .ui-stat-num { all: unset; cursor: pointer; padding: 1px 6px; border-radius: 6px; } .ui-stat-num:hover { background: #1e3a5f; text-decoration: underline; }
     #statsModalBody > div { flex-shrink: 0; }
     .ui-stat-sep { width: 10px; padding: 0 !important; background: rgba(148, 163, 184, .08); }
-    #tableFooterPager { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 12px; background: #fff; border-top: 1px solid var(--ui-line); font-size: 12px; }
-    #tableFooterPager #paginationSummaryText { margin-right: 8px; font-size: 12.5px !important; font-weight: 700; color: #0f172a; display: inline !important; }
-    #tableFooterPager #tablePaginationBar { background: transparent !important; border: 0 !important; gap: 6px !important; }
-    #tableFooterPager #btnPrevPage, #tableFooterPager #btnNextPage { min-width: 34px; height: 30px; border-radius: 9px !important; border: 1px solid #e2e8f0 !important; font-size: 13px; }
-    #tableFooterPager #pageIndicatorText { font-size: 12px !important; padding: 5px 10px !important; border-radius: 9px !important; }
-    #tableFooterPager select { font-size: 12px !important; padding: 4px 6px !important; }
+    /* thanh chuyển trang dưới bảng: một dòng thấp (~26px) để bảng có thêm chỗ */
+    #tableFooterPager, body.has-drawer #tableFooterPager { display: flex; align-items: center; justify-content: flex-start; gap: 8px; padding: 1px 12px !important; background: #fff !important; border-top: 1px solid var(--ui-line); font-size: 11.5px; line-height: 1; }
+    #tableFooterPager #paginationSummaryText { margin-right: 6px; font-size: 11.5px !important; font-weight: 700; color: #0f172a; display: inline !important; }
+    #tableFooterPager #tablePaginationBar { background: transparent !important; border: 0 !important; gap: 4px !important; padding: 0 !important; }
+    #tableFooterPager #btnPrevPage, #tableFooterPager #btnNextPage { min-width: 26px; height: 22px; padding: 0 6px !important; border-radius: 7px !important; border: 1px solid #e2e8f0 !important; font-size: 11px; }
+    #tableFooterPager #pageIndicatorText { font-size: 11px !important; padding: 4px 8px !important; border-radius: 7px !important; }
+    #tableFooterPager select { font-size: 11px !important; padding: 2px 4px !important; height: 22px; }
+    #tableFooterPager > div.inline-flex { padding-top: 1px !important; padding-bottom: 1px !important; }
+    #tableFooterPager #gotoPageInput { height: 20px; padding: 0 4px !important; }
     /* bảng: tiêu đề một màu, hàng thấp hơn để thấy nhiều đơn hơn */
     #mainTableScrollContainer { max-height: calc(100vh - 215px) !important; min-height: 360px !important; }
     #mainTableScrollContainer .excel-table thead th { background: #1e293b !important; background-image: none !important; color: #f8fafc !important; font-size: 11.5px !important; padding: 9px 8px !important; }
@@ -12057,7 +12060,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pager = document.getElementById('tableFooterPager');
       const pagerH = pager ? pager.offsetHeight : 0;
       const absTop = c.getBoundingClientRect().top + (window.pageYOffset || 0);
-      const h = Math.max(260, Math.floor(window.innerHeight - absTop - dockH - pagerH - 6));
+      const h = Math.max(260, Math.floor(window.innerHeight - absTop - dockH - pagerH - 1));
       c.style.setProperty('max-height', h + 'px', 'important');
       c.style.setProperty('min-height', '0px', 'important');
     }
@@ -14188,10 +14191,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
         const clv = (pending && info) ? (info.left < 0 ? 2 : (info.left <= 24 * 3600000 ? 1 : 0)) : 0;   // giống bảng Thông báo trên máy tính
         pack('c', o, o.platform, info ? info.due : 0, o.returnDate, 'Đơn hủy', { ty: 'Đơn hủy', pre: false, pd: pending, rv: !!o.received, lv: clv });
+        if (o.id && rows.length) rows[rows.length - 1].ci = String(o.id);   // để iPhone đánh dấu đã nhận đúng đơn hủy
       });
       // Đơn đang chờ lên trước (hạn gần nhất trước), rồi tới các đơn còn lại.
       rows.sort((a, b) => ((b.pd === 0 ? 0 : 1) - (a.pd === 0 ? 0 : 1)) || ((a.due || 9e15) - (b.due || 9e15)));
       return rows.filter(r => r.c).slice(0, PHONE_SNAPSHOT_MAX_ROWS);
+    }
+
+    // v1.9.27: Hộp Đơn Mới gửi sang iPhone (bảng đơn mới có nút chọn để đẩy ra Bảng chính).
+    //   id: id trên PC | c: mã vận đơn | o: mã đơn | p: sàn | n: sản phẩm | t: giờ tạo | u: 1 = lượt quét ở kho chưa có đơn
+    //   (đẩy ra sẽ ghi Hàng đã trả) | dup: 1 = đã có ở bảng khác (đẩy ra chỉ gỡ khỏi hộp)
+    function buildPhoneInboxRows() {
+      return (Array.isArray(newOrdersInbox) ? newOrdersInbox : []).filter(it => it && it.id).slice(0, 3000).map(it => {
+        const r = { id: String(it.id), c: String(it.track || it.code || '').trim(), o: String(it.orderId || '').trim(), p: String(it.platform || ''),
+          n: String(it.product || '').slice(0, 100), t: String(it.time || '').slice(0, 24) };
+        if (it.fromUnmatchedScan) r.u = 1;
+        try { if (isInboxItemDuplicate(it)) r.dup = 1; } catch (e) {}
+        return r;
+      });
     }
 
     // v1.9.4: bảng đối chiếu số đơn tính trên dữ liệu gốc của PC; iPhone so với số nó nhận được để biết lệch ở đâu.
@@ -14269,7 +14286,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try {
         const room = phoneRoomId || 'SHP-2026';
         const rows = buildPhoneSnapshotRows();
-        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, stats: buildPhoneSnapshotStats(rows.length), rows }));
+        let inbox = []; try { inbox = buildPhoneInboxRows(); } catch (e) {}
+        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, stats: buildPhoneSnapshotStats(rows.length), rows, inbox }));
         const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
         const snapshotId = 'snap_' + Date.now();
         const topic = getNtfyTopic();
@@ -14890,6 +14908,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         saveOrders();
         try { renderAll(false); } catch (e) {}
         ereply('PC đã cập nhật đơn ' + eCode, 'success');
+        return { success: true };
+      }
+      // v1.9.27: iPhone chọn nhiều đơn trong Bảng đơn mới để đẩy ra Bảng chính (hoặc đẩy hết)
+      if (data.type === 'inbox_push_many') {
+        const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
+        const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
+        const resend = () => setTimeout(() => { try { broadcastOrdersSnapshot(true); } catch (e) {} }, 1200);
+        const picked = (newOrdersInbox || []).filter(it => it && ids.has(String(it.id)));
+        if (!picked.length) { reply('Các đơn đã chọn không còn trong Hộp Đơn Mới (có thể đã được đẩy ra)', 'duplicate'); resend(); return { success: true }; }
+        if (isLocked) { reply('Bảng chính đang khóa trên máy tính, mở khóa rồi đẩy lại', 'locked'); return { success: false }; }
+        const dups = picked.filter(it => { try { return isInboxItemDuplicate(it); } catch (e) { return false; } });
+        const fresh = picked.filter(it => !dups.includes(it)).map(it => convertInboxItemToOrder(it));
+        const prevOrders = orders.slice(), prevInbox = newOrdersInbox.slice();
+        if (fresh.length) orders.unshift(...fresh);
+        newOrdersInbox = newOrdersInbox.filter(it => !(it && ids.has(String(it.id))));
+        const sv = saveNewOrdersInbox();
+        if (!sv || !sv.success) { orders = prevOrders; newOrdersInbox = prevInbox; reply('Máy tính chưa lưu được, thử lại', 'error'); return { success: false }; }
+        saveOrders();
+        try { renderAll(true); recalcTotalsAndSummary(); } catch (e) {}
+        if (fresh.length) {
+          addAuditLog('📱 ĐẨY ĐƠN MỚI TỪ ĐT', `iPhone đẩy ${fresh.length} đơn từ Hộp Đơn Mới ra Bảng chính`);
+          addAppNotification({ type: 'new_order_import', title: `✨ iPhone đẩy ${fresh.length} đơn mới ra Bảng chính`, detail: `Đã đẩy ${fresh.length} đơn từ Hộp Đơn Mới ra Bảng chính` + (dups.length ? `, gỡ ${dups.length} đơn đã có ở bảng khác` : ''), code: fresh[0].track || fresh[0].orderId || '', orderIdx: 0 });
+        }
+        reply(`PC đã đẩy ${fresh.length} đơn ra Bảng chính` + (dups.length ? `, gỡ ${dups.length} đơn đã có` : ''), 'success');
+        resend();
+        return { success: true };
+      }
+      // v1.9.27: iPhone đánh dấu đã nhận / chưa nhận nhiều đơn trong Bảng đơn hủy
+      if (data.type === 'cancel_receive') {
+        const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
+        const want = data.received !== false;
+        const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
+        const resend = () => setTimeout(() => { try { broadcastOrdersSnapshot(true); } catch (e) {} }, 1200);
+        const list = (cancelledOrders || []).filter(o => o && ids.has(String(o.id)) && !!o.received !== want);
+        if (!list.length) { reply('Các đơn hủy đã chọn đã ở trạng thái này rồi', 'duplicate'); resend(); return { success: true }; }
+        const before = list.map(o => ({ o, received: o.received, recvDate: o.recvDate }));
+        list.forEach(o => applyCancelledReceived(o, want));
+        if (!saveCancelledOrders().success) { before.forEach(b => { b.o.received = b.received; b.o.recvDate = b.recvDate; }); reply('Máy tính chưa lưu được bảng đơn hủy, thử lại', 'error'); return { success: false }; }
+        try { renderCancelledTable(); } catch (e) {}
+        addAuditLog('📱 ĐƠN HỦY TỪ ĐT', `iPhone đánh dấu ${want ? 'đã nhận' : 'chưa nhận'} ${list.length} đơn hủy`);
+        reply(`PC đã đánh dấu ${want ? 'đã nhận' : 'chưa nhận'} ${list.length} đơn hủy`, 'success');
+        resend();
         return { success: true };
       }
       if (data.type === 'inbox_push') {
@@ -15910,6 +15970,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         localStorage.setItem('shopee_new_orders_inbox_v1', serialized);
         if (localStorage.getItem('shopee_new_orders_inbox_v1') !== serialized) throw new Error('Không xác nhận được bản lưu');
         updateNewOrdersBadge(); renderNewOrdersTable();
+        try { schedulePhoneSnapshotSync(); } catch (e) {}
         return { success: true };
       } catch (error) {
         showAppToast('Chưa lưu được hộp đơn mới; giữ hàng đợi điện thoại để thử lại.', 'error');
@@ -16721,6 +16782,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (localStorage.getItem(CANCELLED_STORAGE_KEY) !== serialized) throw new Error('Không xác nhận được bản lưu');
         updateCancelledBadge();
         if (document.getElementById('cancelledOrdersModal') && !document.getElementById('cancelledOrdersModal').classList.contains('hidden')) applyCancelledFilters();
+        try { schedulePhoneSnapshotSync(); } catch (e) {}
         return { success: true };
       } catch (e) {
         if (typeof showAppToast === 'function') showAppToast('❌ Chưa lưu được bảng đơn hủy.', 'error');

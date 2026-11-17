@@ -58,3 +58,22 @@ test('v1.9.19: thanh bên trái giữ nguyên id các nút, ô tổng quan dùng
   assert.ok(k.includes('getOrderAlertLevel'));
   assert.ok(extract('collectReturnStatsItems').includes('getOrderAlertLevel'));
 });
+
+test('v1.9.20: thống kê đã về kho tách Bảng chính / Lưu trữ và không tính trùng đơn ở cả 2 nơi', () => {
+  const c = { orders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', recvDate: '16/11/2026' }, { orderId: 'B', track: '2', status: 'Hàng đã trả', recvDate: '16/11/2026' }],
+    archivedOrders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', recvDate: '16/11/2026' }, { orderId: 'C', track: '3', status: 'Hàng đã trả', recvDate: '16/11/2026' }],
+    cancelledOrders: [], isOrderReceived: o => o.status === 'Hàng đã trả', getOrderPlatform: () => 'Shopee' };
+  vm.createContext(c);
+  vm.runInContext('function parseFullDate(v){const m=String(v||"").match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null}', c);
+  for (const n of ['statsBucketKey', 'computeStats', 'collectReceivedStatsItems']) vm.runInContext(extract(n), c);
+  const r = vm.runInContext("computeStats(collectReceivedStatsItems('return'), 'day')", c);
+  assert.strictEqual(r.total, 3);
+  assert.strictEqual(r.buckets[0].main, 2);
+  assert.strictEqual(r.buckets[0].arch, 1);
+});
+
+test('v1.9.20: thanh phân trang nằm ngay dưới bảng, có ◀ ▶, số đơn đang xem và ô đến trang', () => {
+  const sb = extract('buildAppSidebar');
+  assert.ok(sb.includes("tableFooterPager") && sb.includes('gotoPageInput') && sb.includes('paginationSummaryText'));
+  assert.ok(html.includes('Đang xem đơn ${startIdx + 1}–${endIdx} / ${totalFiltered} đơn'));
+});

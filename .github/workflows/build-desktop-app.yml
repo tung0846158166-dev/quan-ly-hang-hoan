@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.19
+          name: QuanLyHangHoan-Windows-Installer-v1.9.20
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.19
-          name: "Quản Lý Hàng Hoàn v1.9.19 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
+          tag_name: v1.9.20
+          name: "Quản Lý Hàng Hoàn v1.9.20 — Thanh phân trang dưới bảng; thống kê đã về kho tách Bảng chính / Lưu trữ"
           body: |
+            ### Bản sửa 1.9.20
+
+            - Thanh phân trang ngay dưới bảng: "Đang xem đơn 1–50 / N đơn", nút ◀ ▶, số đơn mỗi trang, ô đến trang (bản 1.9.19 bị đẩy ra ngoài màn hình).
+            - Thống kê "Đơn hoàn đã về kho" tách cột Bảng chính / Lưu trữ: đơn đã nhận quá 24 giờ tự chuyển sang kho lưu trữ nên tab "Đã nhận" chỉ còn phần Bảng chính. Đơn nằm ở cả 2 nơi chỉ tính 1 lần.
+
             ### Bản sửa 1.9.19
 
             - Bố cục ứng dụng: menu ☰ trượt ra đè lên bảng (không thu hẹp bảng), bấm ra ngoài hoặc Esc tự đóng; ô tìm kiếm lên thanh trên; phần trên bảng còn 3 hàng một dòng; tiêu đề bảng một màu, hàng thấp hơn để thấy nhiều đơn hơn.

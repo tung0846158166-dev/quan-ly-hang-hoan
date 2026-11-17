@@ -1,16 +1,19 @@
 import SwiftUI
 import ScannerCore
 
+// Các mục đầu tiên khớp đúng các tab trên máy tính (chỉ tính BẢNG CHÍNH): Bảng chính = "Tất cả các tuần",
+// Chưa nhận, Đã nhận, Quá hạn = Báo Đỏ, Sắp đến hạn = Báo Vàng. Lưu trữ / Đơn hủy là các bảng riêng trên máy tính;
+// "Toàn bộ" gồm cả 3 bảng (dùng khi tìm / quét mã).
 private enum OrderFilter: String, CaseIterable {
-    case all = "Tất cả", pending = "Chưa nhận", overdue = "Quá hạn", soon = "Sắp đến hạn", watch = "Đang theo dõi"
-    case received = "Đã nhận", cancelled = "Đơn hủy", pre = "Đặt trước", archived = "Lưu trữ"
+    case main = "Bảng chính", pending = "Chưa nhận", received = "Đã nhận", overdue = "Quá hạn", soon = "Sắp đến hạn", watch = "Đang theo dõi"
+    case cancelled = "Đơn hủy", archived = "Lưu trữ", pre = "Đặt trước", all = "Toàn bộ"
 }
 
 struct OrdersView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
     @State private var query = ""
-    @State private var filter: OrderFilter = .all
+    @State private var filter: OrderFilter = .main
     @State private var selected: OrderRow?
     @State private var platform = ""
     @State private var showScanner = false
@@ -31,11 +34,12 @@ struct OrdersView: View {
     private func belongs(_ r: OrderRow, _ f: OrderFilter, now: Int) -> Bool {
         switch f {
         case .all: return true
+        case .main: return r.k == "m"
         case .pending: return r.pd && r.k == "m"
-        case .overdue: return r.pd && r.alertLevel(now: now) == .overdue
-        case .soon: return r.pd && r.alertLevel(now: now) == .soon
+        case .overdue: return r.pd && r.k == "m" && r.alertLevel(now: now) == .overdue   // = tab Báo Đỏ trên PC
+        case .soon: return r.pd && r.k == "m" && r.alertLevel(now: now) == .soon          // = tab Báo Vàng trên PC
         case .watch: return r.wl && r.k == "m"   // giống bảng Theo Dõi trên PC: chỉ tính bảng chính
-        case .received: return r.rv && r.k != "c"   // đã nhận ở bảng chính và kho lưu trữ; đơn hủy đã nhận nằm ở mục Đơn hủy
+        case .received: return r.rv && r.k == "m"   // = tab Đã nhận trên PC; đơn đã sang kho lưu trữ xem ở mục Lưu trữ
         case .cancelled: return r.isCancelled
         case .pre: return r.pre
         case .archived: return r.isArchived
@@ -134,10 +138,11 @@ struct OrdersView: View {
 
     private func summary(shown: Int) -> some View {
         HStack {
-            Text("Hiển thị \(shown) / \(store.rows.count) đơn").font(.caption.bold())
+            Text("Hiển thị \(shown) đơn · toàn bộ \(store.rows.count)").font(.caption.bold())
             Spacer()
-            Text("🚨 \(store.overdueCount)").font(.caption.bold()).foregroundColor(.red)
-            Text("⏰ \(store.soonCount)").font(.caption.bold()).foregroundColor(.orange)
+            // Cùng cách tính với tab Báo Đỏ / Báo Vàng của bảng chính trên PC.
+            Text("🚨 \(counts[.overdue] ?? 0)").font(.caption.bold()).foregroundColor(.red)
+            Text("⏰ \(counts[.soon] ?? 0)").font(.caption.bold()).foregroundColor(.orange)
             if let t = store.updatedAt { Text(t.formatted(date: .omitted, time: .shortened)).font(.caption2).foregroundStyle(.secondary) }
         }.padding(.horizontal)
     }

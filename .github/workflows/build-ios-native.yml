@@ -26,7 +26,9 @@ jobs:
 
       - name: Kiểm thử lõi (ScannerCore)
         working-directory: ios-native/ScannerCore
-        run: swift test 2>&1 | tail -60
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tail -60
 
       - name: Cài XcodeGen
         run: brew install xcodegen
@@ -42,6 +44,7 @@ jobs:
       - name: Build (không ký)
         working-directory: ios-native/App
         run: |
+          set -o pipefail
           xcodebuild -project QuetHangHoan.xcodeproj -scheme QuetHangHoan -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/build/App.xcarchive" archive \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tail -80

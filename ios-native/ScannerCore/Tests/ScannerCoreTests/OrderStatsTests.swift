@@ -29,8 +29,8 @@ final class OrderStatsTests: XCTestCase {
 
     func testBucketsByDayWeekMonth() {
         let rows = [
-            row("m", "A", rd: "02/11/2026 10:00", rv: true, pd: false),
-            row("a", "B", rd: "02/11/2026 23:00", rv: true, pd: false),
+            row("m", "A", rd: "02/11/2026 10:00", pd: false, rv: true),
+            row("a", "B", rd: "02/11/2026 23:00", pd: false, rv: true),
             row("m", "C", rd: "03/11/2026"),
             row("m", "D", rd: "09/11/2026"),
             row("m", "E", rd: ""),

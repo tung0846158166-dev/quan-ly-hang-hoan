@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.25
+          name: QuanLyHangHoan-Windows-Installer-v1.9.26
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.25
-          name: "Quản Lý Hàng Hoàn v1.9.25 — Google Sheet: lấy đơn từ một ngày cố định (vd 01/11/2026)"
+          tag_name: v1.9.26
+          name: "Quản Lý Hàng Hoàn v1.9.26 — Hiện lại thanh chuyển trang dưới bảng"
           body: |
+            ### Bản sửa 1.9.26
+
+            - Thanh chuyển trang (◀ Trang x/y ▶, số đơn/trang, Đến trang) bị đẩy xuống dưới thanh tổng ở đáy màn hình khi mở Bộ lọc nâng cao: chiều cao bảng giờ tự tính lại theo phần đầu trang, thanh chuyển trang luôn hiện ngay dưới bảng.
+
             ### Bản sửa 1.9.25
 
             - Google Sheet: ô "Lấy đơn từ ngày" nhận ngày cố định (vd 01/11/2026): luôn lấy đơn từ ngày đó đến nay và tiếp tục cập nhật, không bị trôi mất đơn đầu tháng như khi ghi số ngày gần nhất. Vẫn nhận số ngày (vd 30) như cũ.

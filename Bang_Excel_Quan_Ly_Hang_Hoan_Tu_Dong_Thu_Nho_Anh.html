@@ -4956,9 +4956,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         alert('❌ Chưa nạp dữ liệu: ' + (error.message || error));
         return { success: false };
       } finally { if (target) target.value = ''; }
+      const res = await importParsedPlatformFiles(parsedFiles, forcedPlatform);
+      if (res.message) alert(res.message);
+      return res.success ? { success: true, fileCount: parsedFiles.length, duplicateCount: res.duplicateCount } : { success: false };
+      } finally { handlePlatformExcelUpload.busy = false; }
+    }
+
+    // Nạp các bảng đã đọc (từ file Excel hoặc Google Sheet): cập nhật đơn đã có, không tạo trùng; lỗi thì phục hồi nguyên trạng.
+    async function importParsedPlatformFiles(parsedFiles, forcedPlatform) {
       const prepared = preparePlatformImportGroups(parsedFiles);
-      if (!prepared.groups.length) { alert('⚠️ Không có dòng dữ liệu đơn hàng để nạp.'); return { success: false }; }
-      if (activeImportBatch) { alert('⚠️ Đang nạp dữ liệu. Vui lòng chờ hoàn tất.'); return { success: false }; }
+      if (!prepared.groups.length) return { success: false, message: '⚠️ Không có dòng dữ liệu đơn hàng để nạp.' };
+      if (activeImportBatch) return { success: false, busy: true, message: '⚠️ Đang nạp dữ liệu. Vui lòng chờ hoàn tất.' };
       const snapshot = captureImportState();
       activeImportBatch = { messages: [] };
       try {
@@ -4977,14 +4985,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const effects = activeImportBatch.effects || [];
         activeImportBatch = null;
         effects.forEach(effect => { try { effect(); } catch (error) { console.warn('Import display update failed:', error); } });
-        alert(messages.join('\n\n') + (prepared.duplicateCount ? '\n\nĐã bỏ qua ' + prepared.duplicateCount + ' dòng trùng giữa các file.' : ''));
-        return { success: true, fileCount: parsedFiles.length, duplicateCount: prepared.duplicateCount };
+        return { success: true, messages, duplicateCount: prepared.duplicateCount,
+          message: messages.join('\n\n') + (prepared.duplicateCount ? '\n\nĐã bỏ qua ' + prepared.duplicateCount + ' dòng trùng giữa các file.' : '') };
       } catch (error) {
         await rollbackImportState(snapshot);
-        alert('❌ Chưa nạp dữ liệu: ' + (error.message || error));
-        return { success: false };
+        return { success: false, message: '❌ Chưa nạp dữ liệu: ' + (error.message || error) };
       } finally { activeImportBatch = null; }
-      } finally { handlePlatformExcelUpload.busy = false; }
     }
 
     // =========================================================================
@@ -7375,7 +7381,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.22';
+    const APP_VERSION_NUMBER = '1.9.23';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13874,7 +13880,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.22',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.23',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -16920,7 +16926,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const analytics = document.querySelector('button[onclick="openAnalyticsDashboardModal()"]');
       if (analytics) side.querySelector('#sbNav').appendChild(analytics);
       move(['btnAddOrder', 'btnQuickCreateOrders', 'btnImportShopeeRow15', 'btnImportTikTokRow15', 'btnPhoneScanner', 'btnSessionScanHeader', 'btnSafeStorageHeader'], side.querySelector('#sbTools'));
+      const sheetBtn = document.createElement('button');
+      sheetBtn.type = 'button'; sheetBtn.id = 'btnSheetSync';
+      sheetBtn.innerHTML = '<span>🔗 Google Sheet (Shopee)</span><span id="sbSheetSyncDot">tắt</span>';
+      sheetBtn.addEventListener('click', () => openSheetSyncModal());
+      side.querySelector('#sbTools').appendChild(sheetBtn);
       move(['kpiStrip'], side.querySelector('#sbKpi'));
+      try { renderSheetSyncStatus(); } catch (e) {}
       // chọn một mục thì đóng menu rồi mới mở bảng
       side.addEventListener('click', e => { if (e.target.closest('button')) setAppDrawer(false); });
       document.addEventListener('keydown', e => { if (e.key === 'Escape') setAppDrawer(false); });
@@ -16978,6 +16990,196 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     if (typeof document !== 'undefined' && document.addEventListener) {
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildAppSidebar); else buildAppSidebar();
+    }
+
+    // ---- v1.9.23: Tự cập nhật đơn Shopee từ Google Sheet (10 phút/lần) ----
+    // Sheet được đọc như một file Excel Shopee nạp vào app: cùng bộ nhận diện cột, cùng quy tắc chỉ cập nhật đơn đã có, không tạo trùng.
+    const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';
+    const SHEET_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+    function loadSheetSyncCfg() {
+      let c = {};
+      try { c = JSON.parse(localStorage.getItem(SHEET_SYNC_KEY) || '{}') || {}; } catch (e) { c = {}; }
+      if (!c.token) {
+        const a = new Uint8Array(12); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256); }
+        c.token = Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+        try { localStorage.setItem(SHEET_SYNC_KEY, JSON.stringify(c)); } catch (e) {}
+      }
+      return c;
+    }
+    function saveSheetSyncCfg(c) { try { localStorage.setItem(SHEET_SYNC_KEY, JSON.stringify(c)); } catch (e) {} }
+    function sheetSyncHash(text) { let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0; return (h >>> 0).toString(16) + ':' + text.length; }
+    function buildSheetSyncUrl(c) {
+      const base = String(c.url || '').trim();
+      if (!base) return '';
+      return base + (base.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(c.token) + '&t=' + Date.now();
+    }
+    async function fetchSheetSyncText(url) {
+      if (typeof window !== 'undefined' && window.desktopDiskAPI && typeof window.desktopDiskAPI.fetchSheetText === 'function') {
+        const r = await window.desktopDiskAPI.fetchSheetText(url);
+        if (!r || !r.ok) throw new Error((r && r.error) || 'Không tải được dữ liệu');
+        return r.text;
+      }
+      const res = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+      if (!res.ok) throw new Error('Máy chủ Google trả mã ' + res.status);
+      return await res.text();
+    }
+    let sheetSyncRunning = false;
+    async function runSheetSync(manual) {
+      const c = loadSheetSyncCfg();
+      if (!c.url) { if (manual) alert('⚠️ Chưa dán địa chỉ Apps Script của Google Sheet.'); return { success: false }; }
+      if (sheetSyncRunning || (typeof handlePlatformExcelUpload === 'function' && handlePlatformExcelUpload.busy) || activeImportBatch) {
+        if (manual) alert('⚠️ Đang nạp dữ liệu khác, thử lại sau ít giây.');
+        return { success: false, busy: true };
+      }
+      sheetSyncRunning = true;
+      const finish = (ok, note) => {
+        const cfg = loadSheetSyncCfg();
+        cfg.lastAt = Date.now(); cfg.lastOk = ok; cfg.lastNote = note;
+        if (ok) cfg.lastOkAt = cfg.lastAt;
+        saveSheetSyncCfg(cfg); renderSheetSyncStatus();
+      };
+      try {
+        const tabs = sheetSyncTabs(c);
+        const texts = [];
+        for (const tab of (tabs.length ? tabs : [''])) {
+          const text = await fetchSheetSyncText(buildSheetSyncUrl(c) + (tab ? '&tab=' + encodeURIComponent(tab) : ''));
+          const head = String(text || '').trim().slice(0, 200);
+          if (/^\{\s*"error"/.test(head)) { let m = head; try { m = JSON.parse(text).error; } catch (e) {} throw new Error((tab ? 'Tab "' + tab + '": ' : '') + m); }
+          if (/^<!doctype html|^<html/i.test(head)) throw new Error('Google trả về trang web thay vì dữ liệu — kiểm tra lại bước "Triển khai" (Ai có quyền truy cập: Bất kỳ ai).');
+          texts.push({ tab, text });
+        }
+        const hash = sheetSyncHash(texts.map(t => t.tab + '\u0001' + t.text).join('\u0002'));
+        if (!manual && hash === c.lastHash) { finish(true, 'Sheet không thay đổi'); return { success: true, unchanged: true }; }
+        const files = [], skipped = [];
+        for (const t of texts) {
+          let r = [];
+          try { r = readWorkbookRowsFromBuffer(new TextEncoder().encode(t.text).buffer, true); } catch (e) { r = []; }
+          if (r.length) files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: r }); else skipped.push(t.tab || 'tab đầu tiên');
+        }
+        if (!files.length) throw new Error('Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
+        const rows = files.reduce((a, f) => a.concat(f.rows), []);
+        const res = await importParsedPlatformFiles(files, 'Shopee');
+        if (!res.success) throw new Error(String(res.message || 'Không nạp được').replace(/^[^\wÀ-ỹ]+/, ''));
+        const cfg = loadSheetSyncCfg(); cfg.lastHash = hash; saveSheetSyncCfg(cfg);
+        const summary = (res.messages || []).join(' | ').replace(/\s+/g, ' ').slice(0, 300);
+        finish(true, rows.length + ' dòng từ ' + files.length + ' tab' + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
+        if (typeof addAuditLog === 'function') try { addAuditLog('🔗 GOOGLE SHEET', 'Tự cập nhật từ Google Sheet: ' + rows.length + ' dòng. ' + summary); } catch (e) {}
+        if (manual) alert('✅ Đã cập nhật từ Google Sheet (' + rows.length + ' dòng).\n\n' + (res.message || ''));
+        return { success: true };
+      } catch (e) {
+        finish(false, String(e && e.message || e));
+        if (manual) alert('❌ Chưa cập nhật được từ Google Sheet: ' + (e && e.message || e));
+        return { success: false };
+      } finally { sheetSyncRunning = false; }
+    }
+    function renderSheetSyncStatus() {
+      const el = document.getElementById('sheetSyncStatus'); const badge = document.getElementById('sbSheetSyncDot');
+      const c = loadSheetSyncCfg();
+      const t = ms => { const d = new Date(ms), p = n => String(n).padStart(2, '0'); return p(d.getHours()) + ':' + p(d.getMinutes()) + ' ' + p(d.getDate()) + '/' + p(d.getMonth() + 1); };
+      const txt = !c.url ? 'Chưa kết nối.' : (!c.lastAt ? (c.enabled ? 'Đã bật, chờ lần cập nhật đầu tiên…' : 'Đã lưu địa chỉ, chưa bật tự cập nhật.')
+        : (c.lastOk ? '✅ ' : '❌ ') + 'Lần gần nhất ' + t(c.lastAt) + ': ' + (c.lastNote || '') + (c.enabled ? ' · Tự cập nhật mỗi 10 phút.' : ' · Tự cập nhật đang TẮT.'));
+      if (el) { el.textContent = txt; el.className = 'text-xs font-semibold ' + (c.lastAt && !c.lastOk ? 'text-rose-600' : 'text-slate-600'); }
+      if (badge) badge.textContent = !c.url || !c.enabled ? 'tắt' : (c.lastAt && !c.lastOk ? 'lỗi' : 'bật');
+    }
+    // Nhiều tab: ngăn cách bằng dấu ; hoặc xuống dòng. Trống = tab đầu tiên.
+    function sheetSyncTabs(c) {
+      return String((c && c.sheetTab) || '').split(/[;\n]/).map(t => t.trim()).filter(Boolean);
+    }
+    function sheetIdFromLink(v) {
+      const m = String(v || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || String(v || '').match(/^\s*([a-zA-Z0-9_-]{30,})\s*$/);
+      return m ? m[1] : '';
+    }
+    function sheetSyncScriptText() {
+      const c = loadSheetSyncCfg();
+      const sid = String(c.sheetId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const tabs = sheetSyncTabs(c).map(t => "'" + t.replace(/\\/g, '').replace(/'/g, "\\'") + "'");
+      return [
+        "// Dự án Apps Script RIÊNG cho app Quản Lý Hàng Hoàn (tạo tại script.google.com > Dự án mới).",
+        "// Chỉ ĐỌC sheet, không sửa sheet, không ảnh hưởng các phần mềm / đoạn mã khác đang dùng sheet.",
+        "// Triển khai > Tùy chọn triển khai mới > Ứng dụng web (Thực thi với tư cách: Tôi · Ai có quyền truy cập: Bất kỳ ai).",
+        "// Không có mã bí mật bên dưới thì không ai đọc được dữ liệu.",
+        "const TOKEN = '" + c.token + "';",
+        "const SHEET_ID = '" + sid + "'; // mã của Google Sheet (lấy từ link)",
+        "const SHEET_NAMES = [" + tabs.join(', ') + "]; // CHỈ các tab này được đọc; để trống [] = tab đầu tiên",
+        "function doGet(e) {",
+        "  if (!e || !e.parameter || e.parameter.token !== TOKEN) {",
+        "    return ContentService.createTextOutput(JSON.stringify({ error: 'Sai mã bí mật' })).setMimeType(ContentService.MimeType.JSON);",
+        "  }",
+        "  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();",
+        "  const want = String(e.parameter.tab || '');",
+        "  if (SHEET_NAMES.length && want && SHEET_NAMES.indexOf(want) < 0) {",
+        "    return ContentService.createTextOutput(JSON.stringify({ error: 'Tab không nằm trong danh sách được phép: ' + want })).setMimeType(ContentService.MimeType.JSON);",
+        "  }",
+        "  const name = want || SHEET_NAMES[0] || '';",
+        "  const sh = name ? ss.getSheetByName(name) : ss.getSheets()[0];",
+        "  if (!sh) return ContentService.createTextOutput(JSON.stringify({ error: 'Không thấy tab ' + name })).setMimeType(ContentService.MimeType.JSON);",
+        "  const values = sh.getDataRange().getDisplayValues();",
+        "  const csv = values.map(r => r.map(v => { v = String(v); return /[\",\\n\\r]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v; }).join(',')).join('\\r\\n');",
+        "  return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.CSV);",
+        "}"
+      ].join('\n');
+    }
+    // Tệp kê khai: giới hạn quyền ở mức CHỈ ĐỌC bảng tính — Google tự chặn mọi lệnh ghi/xóa, kể cả nếu đoạn mã bị sửa nhầm.
+    function sheetSyncManifestText() {
+      return JSON.stringify({
+        timeZone: 'Asia/Ho_Chi_Minh',
+        exceptionLogging: 'STACKDRIVER',
+        runtimeVersion: 'V8',
+        oauthScopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+        webapp: { executeAs: 'USER_DEPLOYING', access: 'ANYONE_ANONYMOUS' }
+      }, null, 2);
+    }
+    function copySheetSyncManifest() {
+      const ta = document.getElementById('sheetSyncManifest'); if (!ta) return;
+      const done = () => { const b = document.getElementById('btnCopySheetManifest'); if (b) { b.textContent = '✓ Đã chép'; setTimeout(() => { b.textContent = '📋 Chép tệp kê khai'; }, 2000); } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { ta.select(); document.execCommand('copy'); done(); });
+      else { ta.select(); document.execCommand('copy'); done(); }
+    }
+    function openSheetSyncModal() {
+      const m = document.getElementById('sheetSyncModal'); if (!m) return;
+      const c = loadSheetSyncCfg();
+      document.getElementById('sheetSyncUrl').value = c.url || '';
+      document.getElementById('sheetSyncSheetLink').value = c.sheetLink || '';
+      document.getElementById('sheetSyncTab').value = c.sheetTab || '';
+      document.getElementById('sheetSyncEnabled').checked = !!c.enabled;
+      document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
+      document.getElementById('sheetSyncManifest').value = sheetSyncManifestText();
+      renderSheetSyncStatus();
+      m.classList.remove('hidden');
+    }
+    // gõ link sheet / tên tab thì đoạn mã cập nhật ngay
+    function onSheetSyncSourceInput() {
+      const c = loadSheetSyncCfg();
+      c.sheetLink = String(document.getElementById('sheetSyncSheetLink').value || '').trim();
+      c.sheetId = sheetIdFromLink(c.sheetLink);
+      c.sheetTab = String(document.getElementById('sheetSyncTab').value || '').trim();
+      saveSheetSyncCfg(c);
+      document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
+      const w = document.getElementById('sheetSyncLinkWarn');
+      if (w) w.textContent = c.sheetLink && !c.sheetId ? '⚠️ Không đọc được mã sheet từ link này — dán nguyên link dạng https://docs.google.com/spreadsheets/d/…' : (c.sheetId ? '✓ Mã sheet: ' + c.sheetId : '');
+    }
+    function closeSheetSyncModal() { const m = document.getElementById('sheetSyncModal'); if (m) m.classList.add('hidden'); }
+    function saveSheetSyncFromModal(runNow) {
+      const c = loadSheetSyncCfg();
+      const url = String(document.getElementById('sheetSyncUrl').value || '').trim();
+      if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(\?.*)?$/i.test(url)) {
+        alert('⚠️ Địa chỉ phải có dạng https://script.google.com/macros/s/…/exec (lấy ở bước Triển khai của Apps Script).');
+        return;
+      }
+      if (url !== c.url) c.lastHash = '';
+      c.url = url; c.enabled = !!document.getElementById('sheetSyncEnabled').checked && !!url;
+      saveSheetSyncCfg(c); renderSheetSyncStatus();
+      if (runNow) runSheetSync(true);
+    }
+    function copySheetSyncScript() {
+      const ta = document.getElementById('sheetSyncScript'); if (!ta) return;
+      const done = () => { const b = document.getElementById('btnCopySheetScript'); if (b) { b.textContent = '✓ Đã chép'; setTimeout(() => { b.textContent = '📋 Chép đoạn mã'; }, 2000); } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { ta.select(); document.execCommand('copy'); done(); });
+      else { ta.select(); document.execCommand('copy'); done(); }
+    }
+    if (typeof setTimeout === 'function' && typeof setInterval === 'function' && typeof document !== 'undefined') {
+      setTimeout(() => { const c = loadSheetSyncCfg(); if (c.enabled && c.url) runSheetSync(false); }, 45 * 1000);
+      setInterval(() => { const c = loadSheetSyncCfg(); if (c.enabled && c.url) runSheetSync(false); }, SHEET_SYNC_INTERVAL_MS);
     }
 
     // ---- Dải số liệu tổng quan trên bảng chính (v1.9.19) ----
@@ -20286,6 +20488,51 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
   <!-- MODAL KHO LƯU TRỮ ĐƠN HOÀN ĐÃ VỀ KHO TRÊN 24 GIỜ (v1.8.4)        -->
   <!-- =============================================================== -->
   <!-- BẢNG ĐƠN HỦY (v1.8.36) -->
+  <div id="sheetSyncModal" onclick="closeSheetSyncModal()" class="fixed inset-0 bg-slate-950/70 z-50 hidden flex items-center justify-center p-3 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[94vh] overflow-auto">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h2 class="font-black text-base">🔗 Tự cập nhật đơn Shopee từ Google Sheet</h2>
+        <button type="button" onclick="closeSheetSyncModal()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">✕ Đóng</button>
+      </div>
+      <div class="p-5 space-y-4 text-sm">
+        <div class="text-xs text-slate-600">Mỗi 10 phút app đọc sheet như một file Excel Shopee nạp vào: đơn đã có (ở bảng chính, kho lưu trữ hay bảng đơn hủy) chỉ được cập nhật, đơn chưa có thì thêm mới. Sheet không đổi thì bỏ qua. Dòng tiêu đề cần có tên cột như file xuất từ Shopee (Mã đơn hàng, Mã vận đơn, Tên sản phẩm, Số lượng, Trạng thái…).</div>
+        <ol class="list-decimal pl-5 space-y-1 text-xs text-slate-700">
+          <li>Dán <b>link Google Sheet</b> và <b>tên các tab cần lấy</b> (ngăn cách bằng dấu ;) vào 2 ô dưới — đoạn mã tự điền sẵn. Chỉ các tab này được đọc; các tab khác không bị đụng tới.</li>
+          <li>Mở <b>script.google.com</b> → <b>Dự án mới</b> (dự án riêng, <b>không</b> mở từ trong sheet, không xóa hay sửa đoạn mã nào đang có) → dán đoạn mã bên dưới thay cho nội dung mặc định của dự án mới, bấm Lưu. Đoạn mã chỉ <b>đọc</b> sheet nên không ảnh hưởng các phần mềm khác đang dùng sheet.</li>
+          <li><b>Khóa chỉ đọc (nên làm):</b> trong dự án bấm ⚙️ <b>Cài đặt dự án</b> → tích <b>Hiển thị tệp kê khai "appsscript.json" trong trình chỉnh sửa</b> → quay lại <b>Trình chỉnh sửa</b>, mở tệp <code>appsscript.json</code>, chọn hết và dán <b>tệp kê khai</b> bên dưới, Lưu. Khi đó Google chỉ cho đoạn mã quyền <b>xem</b> bảng tính: không thể ghi, sửa hay xóa gì trên sheet.</li>
+          <li>Trong dự án mới đó bấm <b>Triển khai › Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b>, Thực thi với tư cách <b>Tôi</b>, Ai có quyền truy cập <b>Bất kỳ ai</b> → Triển khai, cấp quyền.</li>
+          <li>Chép <b>URL ứng dụng web</b> (dạng https://script.google.com/macros/s/…/exec) dán vào ô dưới, bật tự cập nhật và bấm <b>Lưu & cập nhật ngay</b>.</li>
+        </ol>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-2"><b class="text-xs">Link Google Sheet</b>
+            <input id="sheetSyncSheetLink" oninput="onSheetSyncSourceInput()" type="text" placeholder="https://docs.google.com/spreadsheets/d/…" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <div id="sheetSyncLinkWarn" class="text-[11px] mt-0.5 text-slate-500"></div></div>
+          <div><b class="text-xs">Các tab cần lấy</b>
+            <input id="sheetSyncTab" oninput="onSheetSyncSourceInput()" type="text" placeholder="vd: Hàng hoàn; Trả hàng" title="Gõ đúng tên tab, nhiều tab ngăn cách bằng dấu ;" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <div class="text-[11px] mt-0.5 text-slate-500">Đúng tên tab, ngăn cách bằng dấu ; — chỉ các tab này được đọc.</div></div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1"><b class="text-xs">Đoạn mã Apps Script</b><button type="button" id="btnCopySheetScript" onclick="copySheetSyncScript()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép đoạn mã</button></div>
+          <textarea id="sheetSyncScript" readonly rows="9" class="w-full font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-lg p-2"></textarea>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1"><b class="text-xs">Tệp kê khai appsscript.json (khóa chỉ đọc)</b><button type="button" id="btnCopySheetManifest" onclick="copySheetSyncManifest()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép tệp kê khai</button></div>
+          <textarea id="sheetSyncManifest" readonly rows="5" class="w-full font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-lg p-2"></textarea>
+        </div>
+        <div>
+          <b class="text-xs">URL ứng dụng web</b>
+          <input id="sheetSyncUrl" type="text" placeholder="https://script.google.com/macros/s/…/exec" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <label class="flex items-center gap-2 text-sm font-bold"><input id="sheetSyncEnabled" type="checkbox" class="w-4 h-4" /> Tự cập nhật mỗi 10 phút</label>
+        <div id="sheetSyncStatus" class="text-xs font-semibold text-slate-600"></div>
+        <div class="flex gap-2 justify-end">
+          <button type="button" onclick="saveSheetSyncFromModal(false)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Lưu</button>
+          <button type="button" onclick="saveSheetSyncFromModal(true)" class="px-3 py-2 bg-[#ee4d2d] hover:bg-orange-700 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu & cập nhật ngay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="statsModal" onclick="closeStatsModal()" class="fixed inset-0 bg-slate-950/85 z-50 hidden flex items-center justify-center p-2 sm:p-4 backdrop-blur-xs">
     <div onclick="event.stopPropagation()" class="bg-slate-900 text-slate-100 rounded-2xl shadow-2xl w-full max-w-[98vw] max-h-[94vh] flex flex-col border border-sky-500/40 overflow-hidden">
       <div class="px-5 py-3 bg-gradient-to-r from-sky-950 via-slate-900 to-slate-900 border-b border-sky-500/30 flex flex-wrap items-center justify-between gap-3">

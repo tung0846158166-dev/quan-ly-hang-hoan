@@ -402,6 +402,35 @@ ipcMain.handle('set-autostart-status', (event, enabled) => {
   return { openAtLogin: getAutoStart() };
 });
 
+// v1.9.23: tải dữ liệu Google Sheet (Apps Script) cho tính năng tự cập nhật đơn Shopee.
+// Chỉ cho phép https tới máy chủ Google; tự theo tối đa 5 lần chuyển hướng; giới hạn 30 MB, 60 giây.
+const SHEET_ALLOWED_HOSTS = /^(script\.google\.com|script\.googleusercontent\.com|docs\.google\.com)$/i;
+function fetchSheetText(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(url); } catch (e) { return reject(new Error('Địa chỉ không hợp lệ')); }
+    if (u.protocol !== 'https:' || !SHEET_ALLOWED_HOSTS.test(u.hostname)) return reject(new Error('Chỉ hỗ trợ địa chỉ Google (script.google.com)'));
+    const req = require('https').get(u, { headers: { 'User-Agent': 'QuanLyHangHoan' } }, res => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        res.resume();
+        if (redirectsLeft <= 0) return reject(new Error('Chuyển hướng quá nhiều lần'));
+        return resolve(fetchSheetText(new URL(res.headers.location, u).toString(), redirectsLeft - 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error('Máy chủ Google trả mã ' + res.statusCode)); }
+      const chunks = []; let size = 0;
+      res.on('data', c => { size += c.length; if (size > 30 * 1024 * 1024) { req.destroy(new Error('Dữ liệu quá lớn')); return; } chunks.push(c); });
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      res.on('error', reject);
+    });
+    req.setTimeout(60000, () => req.destroy(new Error('Quá thời gian chờ')));
+    req.on('error', reject);
+  });
+}
+ipcMain.handle('fetch-sheet-text', async (event, url) => {
+  try { return { ok: true, text: await fetchSheetText(String(url || '')) }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });

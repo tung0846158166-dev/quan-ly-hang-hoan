@@ -4055,6 +4055,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return Boolean(it && locateExistingAnywhere(it.track || it.code || '', it.orderId));
     }
 
+    // v1.9.28: tự gỡ "đơn bóng" ở Bảng chính. Ví dụ: hàng về kho được quét khi chưa có đơn (mã đơn tạm = mã vận đơn),
+    // đã sang Kho lưu trữ; sau đó Google Sheet (tab Huỷ không có mã vận đơn) tạo đơn theo mã đơn thật ở Bảng chính
+    // -> lúc đó chưa nối được; đến khi bản ở kho lưu trữ có mã đơn thật thì 2 bản trùng nhau.
+    // Chỉ gỡ đơn Bảng chính CHƯA NHẬN và chưa có dữ liệu kho (ảnh, ngày nhận, ghi chú, theo dõi, ô khóa); thông tin sàn của nó
+    // được bổ sung vào bản ở Kho lưu trữ / Bảng đơn hủy trước khi gỡ. Có lưu bản sao để khôi phục.
+    function autoRemoveShadowDuplicates() {
+      if (isLocked || !Array.isArray(orders) || !orders.length) return 0;
+      const hasOther = (Array.isArray(archivedOrders) && archivedOrders.length) || (Array.isArray(cancelledOrders) && cancelledOrders.length);
+      if (!hasOther) return 0;
+      const index = buildOtherTablesIndex();
+      const drop = [];
+      orders.forEach((o, i) => {
+        if (!o || isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim()) return;
+        if (!findInOtherTables(index, o)) return;
+        try { if (hasLockedCellsInOrder(i)) return; } catch (e) { return; }
+        drop.push(i);
+      });
+      if (!drop.length) return 0;
+      const backup = [];
+      for (let k = drop.length - 1; k >= 0; k--) {
+        const i = drop[k];
+        const o = orders[i];
+        try { enrichOtherTableEntry(o); } catch (e) {}
+        backup.push(o);
+        orders.splice(i, 1);
+        try { shiftCellLocksAfterOrderDelete(i); shiftCellEditHistoryAfterOrderDelete(i); } catch (e) {}
+      }
+      try {
+        const key = 'auto_shadow_removed_backup';
+        const old = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem(key, JSON.stringify(old.concat(backup.map(order => ({ at: Date.now(), order }))).slice(-500)));
+      } catch (e) {}
+      try { saveArchivedOrders(); } catch (e) {}
+      try { saveCancelledOrders(); } catch (e) {}
+      saveOrders();
+      try { renderAll(false); } catch (e) {}
+      addAuditLog('🧹 TỰ GỠ ĐƠN TRÙNG', `Gỡ ${drop.length} đơn chưa nhận ở Bảng chính vì đơn đó đã có ở Kho lưu trữ / Bảng đơn hủy: ` + backup.slice(0, 20).map(o => o.orderId || o.track).join(', '));
+      return drop.length;
+    }
+
     async function removeDuplicatesAcrossTables() {
       const index = buildOtherTablesIndex();
       const dups = [];
@@ -17359,6 +17399,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       sheetSyncRunning = true;
       const finish = (ok, note) => {
+        if (ok) { try { const n = autoRemoveShadowDuplicates(); if (n) note += ` · gỡ ${n} đơn trùng với Kho lưu trữ / Bảng đơn hủy`; } catch (e) {} }
         const cfg = loadSheetSyncCfg();
         cfg.lastAt = Date.now(); cfg.lastOk = ok; cfg.lastNote = note;
         if (ok) cfg.lastOkAt = cfg.lastAt;

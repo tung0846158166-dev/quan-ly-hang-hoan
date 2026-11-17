@@ -12,6 +12,9 @@ public struct StatsBucket: Identifiable, Equatable {
     public var total = 0
     public var received = 0
     public var pending = 0
+    public var other = 0       // không cần nhận / bị mất / hư hỏng (total = received + pending + other)
+    public var main = 0        // về kho: còn ở bảng chính
+    public var arch = 0        // về kho: đã sang kho lưu trữ
     public var overdue = 0     // còn chờ và đã quá hạn
     public var soon = 0        // còn chờ và sắp đến hạn trong 24 giờ
     public var id: Date { start }
@@ -24,6 +27,7 @@ public struct StatsResult: Equatable {
     public var total = 0
     public var received = 0
     public var pending = 0
+    public var other = 0
     public var overdue = 0
     public var soon = 0
     public init() {}
@@ -78,19 +82,19 @@ public enum OrderStats {
         var map: [Date: StatsBucket] = [:]
         for r in rows {
             var level = DeadlineLevel.normal
-            // Đơn hủy PC không tính mức cảnh báo (lv = 0) nên dựa vào hạn xử lý; đơn hoàn dùng mức cảnh báo của PC như tab Thông báo.
-            if r.pd { level = r.isCancelled ? Deadline.level(due: r.due, now: now) : r.alertLevel(now: now) }
+            // Mức Báo Đỏ / Báo Vàng do máy tính tính sẵn (giống tab trên máy tính); bản PC cũ không gửi thì dựa vào hạn xử lý.
+            if r.pd && !r.rv { level = r.alertLevel(now: now) }
             result.total += 1
-            if r.rv { result.received += 1 }
-            if r.pd { result.pending += 1 }
+            // mỗi đơn đúng 1 nhóm: đã về / còn chờ / khác — giống bảng thống kê trên máy tính
+            if r.rv { result.received += 1 } else if r.pd { result.pending += 1 } else { result.other += 1 }
             if r.pd && level == .overdue { result.overdue += 1 }
             if r.pd && level == .soon { result.soon += 1 }
             guard let d = parseDate(r.rd, calendar: calendar) else { result.unknownDate += 1; continue }
             let key = bucketStart(d, period: period, calendar: calendar)
             var b = map[key] ?? StatsBucket(start: key)
             b.total += 1
-            if r.rv { b.received += 1 }
-            if r.pd { b.pending += 1 }
+            if r.k == "m" { b.main += 1 } else if r.k == "a" { b.arch += 1 }
+            if r.rv { b.received += 1 } else if r.pd { b.pending += 1 } else { b.other += 1 }
             if r.pd && level == .overdue { b.overdue += 1 }
             if r.pd && level == .soon { b.soon += 1 }
             map[key] = b

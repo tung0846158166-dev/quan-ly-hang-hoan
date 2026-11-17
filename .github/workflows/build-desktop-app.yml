@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.24
+          name: QuanLyHangHoan-Windows-Installer-v1.9.25
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.24
-          name: "Quản Lý Hàng Hoàn v1.9.24 — Google Sheet: ghép 3 tab Hàng hoàn · Trả hàng · Huỷ, chịu được 50.000 đơn"
+          tag_name: v1.9.25
+          name: "Quản Lý Hàng Hoàn v1.9.25 — Google Sheet: lấy đơn từ một ngày cố định (vd 01/11/2026)"
           body: |
+            ### Bản sửa 1.9.25
+
+            - Google Sheet: ô "Lấy đơn từ ngày" nhận ngày cố định (vd 01/11/2026): luôn lấy đơn từ ngày đó đến nay và tiếp tục cập nhật, không bị trôi mất đơn đầu tháng như khi ghi số ngày gần nhất. Vẫn nhận số ngày (vd 30) như cũ.
+
             ### Bản sửa 1.9.24
 
             - Google Sheet: đọc cả 3 tab "Hàng hoàn", "Trả hàng", "Huỷ · chi tiết" và GHÉP thành 1 đơn cho mỗi mã đơn hàng: ô có ở nhiều tab lấy giá trị mới nhất (theo cột Cập nhật), ô chỉ một tab có (mã vận đơn, màu/size ở tab Hàng hoàn; ghi chú khách ở tab Trả hàng) được giữ; tab nào báo Bom thì đơn là Bom. Không còn đơn trùng.

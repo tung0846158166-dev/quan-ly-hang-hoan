@@ -95,6 +95,10 @@ test('Sheet 3 tab: lọc theo số ngày gần nhất (trống = lấy hết, đ
   const r = c.filterSheetParcelsByDays(ps, 30, now);
   assert.deepStrictEqual(r.parcels.map(p => p.orderId).join(','), 'A,C');
   assert.strictEqual(r.dropped, 1);
+  // ngày cố định: không trôi theo thời gian
+  const later = new Date(2026, 11, 20).getTime();
+  assert.deepStrictEqual(c.filterSheetParcelsByDays(ps, '01/11/2026', later).parcels.map(p => p.orderId).join(','), 'A,C');
+  assert.deepStrictEqual(c.filterSheetParcelsByDays(ps, '01/09/2026', later).parcels.map(p => p.orderId).join(','), 'A,B,C');
 });
 
 test('Bộ nhớ tra cứu lớn: không ghi được localStorage thì lưu IndexedDB, không báo lỗi nạp', async () => {

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.20
+          name: QuanLyHangHoan-Windows-Installer-v1.9.21
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.20
-          name: "Quản Lý Hàng Hoàn v1.9.20 — Thanh phân trang dưới bảng; thống kê đã về kho tách Bảng chính / Lưu trữ"
+          tag_name: v1.9.21
+          name: "Quản Lý Hàng Hoàn v1.9.21 — Làm lại bảng thống kê: số liệu cộng khớp, bấm vào số để xem danh sách đơn"
           body: |
+            ### Bản sửa 1.9.21
+
+            - Làm lại bảng thống kê: mỗi loại (đơn hoàn, đơn hủy) một bảng theo ngày/tuần/tháng. Bên trái: đơn về kho trong ngày (theo ngày nhận; đơn hoàn tách Bảng chính / Lưu trữ). Bên phải: đơn hoàn/hủy phát sinh trong ngày và tình trạng hiện tại, Số đơn = Đã về + Còn chờ + Khác (không cần nhận / bị mất / hư hỏng).
+            - Có dòng TỔNG và dòng "Chưa có ngày" ngay trong bảng (trước đó đơn thiếu ngày bị bỏ ra ngoài làm các bảng lệch nhau).
+            - Bấm vào bất kỳ con số nào để xem đúng danh sách đơn tạo nên con số đó (mã vận đơn, mã đơn, ngày hoàn, ngày về kho, trạng thái, nằm ở bảng nào).
+            - Đơn nằm ở cả bảng chính và kho lưu trữ chỉ tính 1 lần ở mọi bảng.
+
             ### Bản sửa 1.9.20
 
             - Thanh phân trang ngay dưới bảng: "Đang xem đơn 1–50 / N đơn", nút ◀ ▶, số đơn mỗi trang, ô đến trang (bản 1.9.19 bị đẩy ra ngoài màn hình).

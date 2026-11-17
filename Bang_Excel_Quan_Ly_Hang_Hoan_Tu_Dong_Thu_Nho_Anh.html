@@ -391,6 +391,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     body.has-drawer .ui-row-1line > div, body.has-drawer .ui-row-1line #pipelineTabs { flex-wrap: nowrap !important; flex: none; }
     body.has-drawer .ui-row-1line button, body.has-drawer .ui-row-1line span { white-space: nowrap; }
     .ui-hidden-row { display: none !important; }
+    .ui-stat-num { all: unset; cursor: pointer; padding: 1px 6px; border-radius: 6px; } .ui-stat-num:hover { background: #1e3a5f; text-decoration: underline; }
+    .ui-stat-sep { width: 10px; padding: 0 !important; background: rgba(148, 163, 184, .08); }
     #tableFooterPager { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 12px; background: #fff; border-top: 1px solid var(--ui-line); font-size: 12px; }
     #tableFooterPager #paginationSummaryText { margin-right: 8px; font-size: 12.5px !important; font-weight: 700; color: #0f172a; display: inline !important; }
     #tableFooterPager #tablePaginationBar { background: transparent !important; border: 0 !important; gap: 6px !important; }
@@ -7372,7 +7374,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.20';
+    const APP_VERSION_NUMBER = '1.9.21';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -13863,7 +13865,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.20',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.21',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -17018,39 +17020,42 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     // list: [{ rd, received, pending, level: 'overdue'|'soon'|'' }] -> { buckets, total, received, pending, overdue, soon, unknown }
     function computeStats(list, period) {
-      const res = { buckets: [], total: 0, received: 0, pending: 0, overdue: 0, soon: 0, unknown: 0 };
+      // Mỗi đơn đúng 1 nhóm: đã nhận / chờ / khác (không cần nhận, bị mất, hư hỏng) => Số đơn = Đã nhận + Chờ + Khác
+      const res = { buckets: [], total: 0, received: 0, pending: 0, other: 0, overdue: 0, soon: 0, unknown: 0, unknownItems: [] };
       const map = new Map();
       list.forEach(it => {
         res.total++;
-        if (it.received) res.received++;
-        if (it.pending) res.pending++;
+        if (it.received) res.received++; else if (it.pending) res.pending++; else res.other++;
         if (it.level === 'overdue') res.overdue++;
         if (it.level === 'soon') res.soon++;
         const dt = parseFullDate(it.rd);
-        if (!dt || isNaN(dt.getTime())) { res.unknown++; return; }
+        if (!dt || isNaN(dt.getTime())) { res.unknown++; res.unknownItems.push(it); return; }
         const key = statsBucketKey(dt, period);
         let b = map.get(key);
-        if (!b) { b = { key, total: 0, received: 0, pending: 0, overdue: 0, soon: 0, main: 0, arch: 0 }; map.set(key, b); }
-        b.total++;
+        if (!b) { b = { key, total: 0, received: 0, pending: 0, other: 0, overdue: 0, soon: 0, main: 0, arch: 0, items: [] }; map.set(key, b); }
+        b.total++; b.items.push(it);
         if (it.src === 'main') b.main++; else if (it.src === 'arch') b.arch++;
-        if (it.received) b.received++;
-        if (it.pending) b.pending++;
+        if (it.received) b.received++; else if (it.pending) b.pending++; else b.other++;
         if (it.level === 'overdue') b.overdue++;
         if (it.level === 'soon') b.soon++;
       });
       res.buckets = Array.from(map.values()).sort((a, b) => b.key - a.key);
       return res;
     }
+    const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();
+    // Đơn hoàn: bảng chính + kho lưu trữ (đơn nằm ở cả 2 nơi chỉ tính 1 lần, ưu tiên bảng chính)
     function collectReturnStatsItems() {
-      const out = [];
-      const add = o => {
+      const out = [], seen = new Set();
+      const add = (o, src) => {
         if (!o) return;
+        const k = statsOrderKey(o);
+        if (k !== '|') { if (seen.has(k)) return; seen.add(k); }
         const received = !!isOrderReceived(o), pending = !!isOrderPending(o);
         const level = getOrderAlertLevel(o);
-        out.push({ rd: o.returnDate, received, pending, level, platform: getOrderPlatform(o) });
+        out.push({ rd: o.returnDate, received, pending, level, src, o, platform: getOrderPlatform(o) });
       };
-      (Array.isArray(orders) ? orders : []).forEach(add);
-      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
+      (Array.isArray(orders) ? orders : []).forEach(o => add(o, 'main'));
+      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => add(o, 'arch')); } catch (e) {}
       return out;
     }
     function collectCancelStatsItems() {
@@ -17058,62 +17063,89 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const received = !!o.received, pending = !received;
         let level = '';
         if (pending) { const info = computeDeadlineInfo(o.returnDate, o.deadline); if (info) level = info.left < 0 ? 'overdue' : (info.left <= 24 * 3600000 ? 'soon' : ''); }
-        return { rd: o.returnDate, received, pending, level, platform: o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '') };
+        return { rd: o.returnDate, received, pending, level, src: 'cancel', o, platform: o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '') };
       });
     }
-    // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo ngày nhận.
+    // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo NGÀY NHẬN.
     function collectReceivedStatsItems(kind) {
-      const take = (o, src) => ({ rd: o.recvDate, received: true, pending: false, level: '', src, platform: kind === 'cancel' ? (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '')) : getOrderPlatform(o) });
-      if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(o => take(o, 'cancel'));
-      const out = [];
-      const seen = new Set();
-      const keyOf = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();
-      // bảng chính trước; đơn trùng (vừa ở bảng chính vừa ở kho lưu trữ) chỉ tính 1 lần
-      (Array.isArray(orders) ? orders : []).forEach(o => { if (o && isOrderReceived(o)) { seen.add(keyOf(o)); out.push(take(o, 'main')); } });
-      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => { if (o && isOrderReceived(o) && !seen.has(keyOf(o))) out.push(take(o, 'arch')); }); } catch (e) {}
-      return out;
+      const base = kind === 'cancel' ? collectCancelStatsItems() : collectReturnStatsItems();
+      return base.filter(it => it.received).map(it => Object.assign({}, it, { rd: it.o.recvDate, pending: false, level: '' }));
     }
     function setStatsPeriod(p) { statsPeriod = p; renderStatsModal(); }
+    let statsDetailSets = {};
     function renderStatsModal() {
       const box = document.getElementById('statsModalBody'); if (!box) return;
       ['day', 'week', 'month'].forEach(p => {
         const b = document.getElementById('statsPeriodBtn_' + p);
         if (b) b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ' + (p === statsPeriod ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700');
       });
-      const ret = computeStats(statsByPlatform(collectReturnStatsItems()), statsPeriod);
-      const can = computeStats(statsByPlatform(collectCancelStatsItems()), statsPeriod);
-      const retRecv = computeStats(statsByPlatform(collectReceivedStatsItems('return')), statsPeriod);
-      const canRecv = computeStats(statsByPlatform(collectReceivedStatsItems('cancel')), statsPeriod);
+      statsDetailSets = {};
       const limit = statsPeriod === 'day' ? 31 : 24;
-      const recvCard = (title, s, color) => {
-        const split = s.buckets.some(b => b.main || b.arch);
-        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td>${split ? `<td class="px-2 py-1.5 text-center font-mono">${b.main}</td><td class="px-2 py-1.5 text-center font-mono text-slate-400">${b.arch}</td>` : ''}<td class="px-2 py-1.5 text-center font-mono text-emerald-300 font-bold">${b.total}</td></tr>`).join('');
-        return `<div class="flex-1 min-w-[260px] bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
-          <div class="px-3 py-2 font-black text-sm flex flex-wrap justify-between gap-2"><span>${title}</span><span class="text-[11px] font-bold text-slate-300">Tổng ${s.total} đơn đã về kho</span></div>
-          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr><th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')} nhận tại kho</th>${split ? '<th class="px-2 py-1.5" title="Đơn còn ở bảng chính (tab Đã nhận)">Bảng chính</th><th class="px-2 py-1.5" title="Đơn đã tự chuyển sang kho lưu trữ sau 24 giờ">Lưu trữ</th>' : ''}<th class="px-2 py-1.5">Tổng</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="4" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
-          ${split ? '<div class="px-3 py-1.5 text-[11px] text-slate-400">Đơn đã nhận quá 24 giờ tự chuyển sang kho lưu trữ, nên tab "Đã nhận" ở bảng chính chỉ còn cột "Bảng chính".</div>' : ''}
-          ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn đã nhận nhưng không có ngày nhận.</div>` : ''}</div>`;
+      const unitName = statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng');
+      let setId = 0;
+      // ô số bấm được: mở danh sách đúng các đơn tạo nên con số đó
+      const cell = (list, label, cls) => {
+        const n = list.length;
+        if (!n) return `<td class="px-2 py-1.5 text-center font-mono text-slate-600">0</td>`;
+        const id = 's' + (setId++); statsDetailSets[id] = { list, label };
+        return `<td class="px-2 py-1.5 text-center font-mono"><button type="button" onclick="showStatsDetail('${id}')" class="ui-stat-num ${cls || ''}">${n}</button></td>`;
       };
-      const card = (title, s, color) => {
-        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800">
-            <td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td>
-            <td class="px-2 py-1.5 text-center font-mono">${b.total}</td>
-            <td class="px-2 py-1.5 text-center font-mono text-emerald-300">${b.received}</td>
-            <td class="px-2 py-1.5 text-center font-mono text-amber-300">${b.pending}</td>
-            <td class="px-2 py-1.5 text-center font-mono ${b.overdue ? 'text-rose-400 font-bold' : 'text-slate-500'}">${b.overdue}</td>
-            <td class="px-2 py-1.5 text-center font-mono ${b.soon ? 'text-orange-300 font-bold' : 'text-slate-500'}">${b.soon}</td></tr>`).join('');
-        return `<div class="flex-1 min-w-[320px] bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
-          <div class="px-3 py-2 font-black text-sm flex flex-wrap justify-between gap-2"><span>${title}</span>
-            <span class="text-[11px] font-bold text-slate-300">Tổng ${s.total} · đã nhận ${s.received} · đang chờ ${s.pending}</span></div>
-          <div class="px-3 pb-2 text-[11px] font-bold flex gap-4"><span class="text-rose-400">🚨 Quá hạn: ${s.overdue}</span><span class="text-orange-300">⏰ Sắp đến hạn &lt;24h: ${s.soon}</span></div>
-          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr>
-            <th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')}</th><th class="px-2 py-1.5">Số đơn</th><th class="px-2 py-1.5">Đã nhận</th><th class="px-2 py-1.5">Chờ</th><th class="px-2 py-1.5">Quá hạn</th><th class="px-2 py-1.5">&lt;24h</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="6" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
-          ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn không có ngày hoàn/hủy nên không xếp vào ngày nào.</div>` : ''}</div>`;
+      const section = (title, color, flowItems, recvItems, isCancel) => {
+        const flow = computeStats(statsByPlatform(flowItems), statsPeriod);
+        const recv = computeStats(statsByPlatform(recvItems), statsPeriod);
+        const keys = Array.from(new Set(flow.buckets.map(b => b.key).concat(recv.buckets.map(b => b.key)))).sort((a, b) => b - a).slice(0, limit);
+        const fMap = new Map(flow.buckets.map(b => [b.key, b])), rMap = new Map(recv.buckets.map(b => [b.key, b]));
+        const pick = (b, fn) => (b ? b.items.filter(fn) : []);
+        const row = (lab, fb, rb, fItems, rItems) => {
+          const fi = fItems || (fb ? fb.items : []), ri = rItems || (rb ? rb.items : []);
+          return `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold whitespace-nowrap">${lab}</td>`
+            + (isCancel ? '' : cell(ri.filter(x => x.src === 'main'), lab + ' · về kho · còn ở bảng chính'))
+            + (isCancel ? '' : cell(ri.filter(x => x.src === 'arch'), lab + ' · về kho · đã sang kho lưu trữ', 'text-slate-400'))
+            + cell(ri, lab + ' · về kho trong ' + unitName.toLowerCase() + ' này', 'text-emerald-300 font-black')
+            + `<td class="ui-stat-sep"></td>`
+            + cell(fi, lab + ' · ' + (isCancel ? 'hủy' : 'hoàn') + ' trong ' + unitName.toLowerCase() + ' này', 'font-bold')
+            + cell(fi.filter(x => x.received), lab + ' · trong số đó đã về kho', 'text-emerald-300')
+            + cell(fi.filter(x => !x.received && x.pending), lab + ' · trong số đó còn chờ', 'text-amber-300')
+            + cell(fi.filter(x => !x.received && !x.pending), lab + ' · trong số đó không cần nhận / bị mất / hư hỏng', 'text-slate-400')
+            + cell(fi.filter(x => x.level === 'overdue'), lab + ' · trong số đó quá hạn', 'text-rose-400 font-bold')
+            + cell(fi.filter(x => x.level === 'soon'), lab + ' · trong số đó sắp hạn', 'text-orange-300 font-bold') + `</tr>`;
+        };
+        let rows = keys.map(k => row(statsBucketLabel(k, statsPeriod), fMap.get(k), rMap.get(k))).join('');
+        if (flow.unknown || recv.unknown) rows += row('Chưa có ngày', null, null, flow.unknownItems, recv.unknownItems);
+        const T = (lab, l) => cell(l, lab);
+        const allF = flowItems.length ? statsByPlatform(flowItems) : [], allR = recvItems.length ? statsByPlatform(recvItems) : [];
+        rows += `<tr class="border-t-2 border-slate-600 bg-slate-900"><td class="px-2 py-1.5 font-black">TỔNG</td>`
+          + (isCancel ? '' : T('Tổng · về kho · bảng chính', allR.filter(x => x.src === 'main')) + T('Tổng · về kho · kho lưu trữ', allR.filter(x => x.src === 'arch')))
+          + T('Tổng · đã về kho', allR) + `<td class="ui-stat-sep"></td>` + T('Tổng · tất cả đơn', allF)
+          + T('Tổng · đã về kho', allF.filter(x => x.received)) + T('Tổng · còn chờ', allF.filter(x => !x.received && x.pending))
+          + T('Tổng · không cần nhận / bị mất / hư hỏng', allF.filter(x => !x.received && !x.pending))
+          + T('Tổng · quá hạn', allF.filter(x => x.level === 'overdue')) + T('Tổng · sắp hạn', allF.filter(x => x.level === 'soon')) + `</tr>`;
+        const recvCols = isCancel ? 1 : 3;
+        return `<div class="w-full bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
+          <div class="px-3 py-2 font-black text-sm">${title}</div>
+          <div class="overflow-auto max-h-[38vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0">
+            <tr><th rowspan="2" class="px-2 py-1.5 text-left">${unitName}</th>
+              <th colspan="${recvCols}" class="px-2 pt-1.5 text-emerald-300 border-b border-slate-700">ĐÃ VỀ KHO trong ${unitName.toLowerCase()} (theo ngày nhận)</th><th class="ui-stat-sep"></th>
+              <th colspan="6" class="px-2 pt-1.5 text-sky-300 border-b border-slate-700">${isCancel ? 'ĐƠN HỦY' : 'ĐƠN HOÀN'} PHÁT SINH trong ${unitName.toLowerCase()} (theo ngày ${isCancel ? 'hủy' : 'hoàn'}) — tình trạng hiện tại</th></tr>
+            <tr>${isCancel ? '' : '<th class="px-2 py-1" title="Còn ở bảng chính = tab Đã nhận">Bảng chính</th><th class="px-2 py-1" title="Đã nhận quá 24 giờ, tự chuyển sang kho lưu trữ">Lưu trữ</th>'}<th class="px-2 py-1">Tổng về kho</th><th class="ui-stat-sep"></th>
+              <th class="px-2 py-1">Số đơn</th><th class="px-2 py-1">Đã về</th><th class="px-2 py-1">Còn chờ</th><th class="px-2 py-1" title="Không cần nhận / Bị mất / Hư hỏng">Khác</th><th class="px-2 py-1">Quá hạn</th><th class="px-2 py-1">Sắp hạn</th></tr></thead>
+            <tbody>${rows}</tbody></table></div></div>`;
       };
-      box.innerHTML = card('↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ) — theo ngày hoàn', ret, 'border-sky-500/40') + recvCard('✅ ĐƠN HOÀN ĐÃ VỀ KHO — theo ngày nhận', retRecv, 'border-emerald-500/40')
-        + card('🚫 ĐƠN HỦY (bảng đơn hủy) — theo ngày hủy', can, 'border-rose-500/40') + recvCard('✅ ĐƠN HỦY ĐÃ NHẬN — theo ngày nhận', canRecv, 'border-emerald-500/40');
+      box.innerHTML = section('↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ)', 'border-sky-500/40', collectReturnStatsItems(), collectReceivedStatsItems('return'), false)
+        + section('🚫 ĐƠN HỦY (bảng đơn hủy)', 'border-rose-500/40', collectCancelStatsItems(), collectReceivedStatsItems('cancel'), true)
+        + `<div id="statsDetail" class="w-full hidden"></div>`;
+    }
+    function showStatsDetail(id) {
+      const set = statsDetailSets[id]; const el = document.getElementById('statsDetail'); if (!set || !el) return;
+      const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const where = { main: 'Bảng chính', arch: 'Kho lưu trữ', cancel: 'Bảng đơn hủy' };
+      const shown = set.list.slice(0, 1000);
+      const rows = shown.map((it, i) => { const o = it.o || {}; return `<tr class="border-t border-slate-800"><td class="px-2 py-1 text-slate-500">${i + 1}</td><td class="px-2 py-1 font-mono">${esc(o.track || o.returnTrack || '')}</td><td class="px-2 py-1 font-mono">${esc(o.orderId || '')}</td><td class="px-2 py-1">${esc(it.platform)}</td><td class="px-2 py-1">${esc(o.returnDate || '')}</td><td class="px-2 py-1">${esc(o.recvDate || '')}</td><td class="px-2 py-1">${esc(it.src === 'cancel' ? (o.received ? 'Đã nhận' : 'Chưa nhận') : (o.status || ''))}</td><td class="px-2 py-1">${where[it.src] || ''}</td></tr>`; }).join('');
+      el.className = 'w-full bg-slate-950/80 border border-sky-500/50 rounded-xl overflow-hidden';
+      el.innerHTML = `<div class="px-3 py-2 flex justify-between items-center"><b class="text-sm">📋 ${esc(set.label)}: ${set.list.length} đơn</b><button type="button" onclick="document.getElementById('statsDetail').classList.add('hidden')" class="px-2 py-1 rounded bg-slate-800 text-xs font-bold">✕ Đóng danh sách</button></div>
+        <div class="overflow-auto max-h-[40vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr><th class="px-2 py-1">#</th><th class="px-2 py-1 text-left">Mã vận đơn</th><th class="px-2 py-1 text-left">Mã đơn</th><th class="px-2 py-1 text-left">Sàn</th><th class="px-2 py-1 text-left">Ngày hoàn/hủy</th><th class="px-2 py-1 text-left">Ngày về kho</th><th class="px-2 py-1 text-left">Trạng thái</th><th class="px-2 py-1 text-left">Nằm ở</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${set.list.length > shown.length ? `<div class="px-3 py-1 text-[11px] text-slate-400">Chỉ hiện 1000 đơn đầu.</div>` : ''}`;
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     function openStatsModal() { const m = document.getElementById('statsModal'); if (!m) return; m.classList.remove('hidden'); renderStatsModal(); }
     function closeStatsModal() { const m = document.getElementById('statsModal'); if (m) m.classList.add('hidden'); }
@@ -20196,8 +20228,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <button type="button" onclick="closeStatsModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg cursor-pointer">✕ Đóng</button>
         </div>
       </div>
-      <div class="px-4 py-1.5 text-[11px] text-slate-400 border-b border-slate-800">Bảng "theo ngày hoàn/hủy" tính theo ngày khách bấm; bảng "đã về kho" tính đơn đã chuyển sang Đã nhận ở cột nhận tại kho, theo ngày nhận. Đơn hoàn gồm cả kho lưu trữ; đơn hủy lấy từ bảng đơn hủy.</div>
-      <div id="statsModalBody" class="p-4 flex flex-wrap gap-4 overflow-auto"></div>
+      <div class="px-4 py-1.5 text-[11px] text-slate-400 border-b border-slate-800">Tính trên TOÀN BỘ dữ liệu (mọi tuần, không theo bộ lọc ngoài bảng đơn). Bên trái: đơn về kho trong ngày (theo ngày nhận). Bên phải: đơn khách hoàn/hủy trong ngày (theo ngày hoàn/hủy) và tình trạng hiện tại: Số đơn = Đã về + Còn chờ + Khác. Bấm vào một con số để xem đúng danh sách đơn.</div>
+      <div id="statsModalBody" class="p-4 flex flex-col gap-4 overflow-auto"></div>
     </div>
   </div>
 

@@ -63,7 +63,7 @@ test('v1.9.20: thống kê đã về kho tách Bảng chính / Lưu trữ và kh
   const c = { orders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', recvDate: '16/11/2026' }, { orderId: 'B', track: '2', status: 'Hàng đã trả', recvDate: '16/11/2026' }],
     archivedOrders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', recvDate: '16/11/2026' }, { orderId: 'C', track: '3', status: 'Hàng đã trả', recvDate: '16/11/2026' }],
     cancelledOrders: [], isOrderReceived: o => o.status === 'Hàng đã trả', getOrderPlatform: () => 'Shopee',
-    isOrderPending: o => o.status === 'Chưa trả', getOrderAlertLevel: () => '', computeDeadlineInfo: () => null };
+    isOrderPending: o => o.status === 'Chưa trả', getOrderAlertLevel: () => '', computeDeadlineInfo: () => null, statsScope: 'all', currentPlatformFilter: 'all', orderMatchesTableScope: () => true };
   vm.createContext(c);
   vm.runInContext('function parseFullDate(v){const m=String(v||"").match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null}', c);
   vm.runInContext("const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();", c);
@@ -84,7 +84,7 @@ test('v1.9.21: mỗi dòng thống kê cộng khớp: Số đơn = Đã về + C
   const c = { orders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', returnDate: '15/11/2026', recvDate: '16/11/2026' }, { orderId: 'B', track: '2', status: 'Chưa trả', returnDate: '15/11/2026' }, { orderId: 'D', track: '4', status: 'Không cần nhận', returnDate: '15/11/2026' }],
     archivedOrders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', returnDate: '15/11/2026', recvDate: '16/11/2026' }],
     cancelledOrders: [{ id: 'x', received: true, recvDate: '15/11/2026' }], isOrderReceived: o => o.status === 'Hàng đã trả', getOrderPlatform: () => 'Shopee',
-    isOrderPending: o => o.status === 'Chưa trả', getOrderAlertLevel: () => '', computeDeadlineInfo: () => null };
+    isOrderPending: o => o.status === 'Chưa trả', getOrderAlertLevel: () => '', computeDeadlineInfo: () => null, statsScope: 'all', currentPlatformFilter: 'all', orderMatchesTableScope: () => true };
   vm.createContext(c);
   vm.runInContext('function parseFullDate(v){const m=String(v||"").match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/);return m?new Date(+m[3],+m[2]-1,+m[1]):null}', c);
   vm.runInContext("const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();", c);
@@ -97,4 +97,19 @@ test('v1.9.21: mỗi dòng thống kê cộng khớp: Số đơn = Đã về + C
   const can = vm.runInContext("computeStats(collectCancelStatsItems(), 'day')", c);
   assert.strictEqual(can.unknown, 1, 'đơn hủy không có ngày hủy vẫn được đếm ở dòng Chưa có ngày');
   assert.ok(html.includes('function showStatsDetail'), 'bấm vào số để xem danh sách đơn');
+});
+
+test('v1.9.21: phạm vi "Đúng như bảng chính" chỉ lấy đơn bảng chính khớp bộ lọc (giống số trên tab), không lấy kho lưu trữ', () => {
+  const c = { orders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', p: 'Shopee' }, { orderId: 'B', track: '2', status: 'Chưa trả', p: 'TikTok Shop' }],
+    archivedOrders: [{ orderId: 'C', track: '3', status: 'Hàng đã trả' }], cancelledOrders: [],
+    isOrderReceived: o => o.status === 'Hàng đã trả', isOrderPending: o => o.status === 'Chưa trả', getOrderAlertLevel: () => '', getOrderPlatform: o => o.p,
+    statsScope: 'table', currentPlatformFilter: 'Shopee', orderMatchesTableScope: o => o.p === 'Shopee' };
+  vm.createContext(c);
+  vm.runInContext("const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();", c);
+  vm.runInContext(extract('collectReturnStatsItems'), c);
+  const r = vm.runInContext('collectReturnStatsItems()', c);
+  assert.strictEqual(r.length, 1);
+  assert.strictEqual(r[0].o.orderId, 'A');
+  const tabs = html.slice(html.indexOf('let countAll = 0, countWaiting = 0'), html.indexOf('countAll++;'));
+  assert.ok(tabs.includes('orderMatchesTableScope(o)'), 'số trên tab dùng cùng hàm phạm vi');
 });

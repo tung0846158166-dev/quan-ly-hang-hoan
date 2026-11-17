@@ -65,7 +65,8 @@ final class OrderStatsTests: XCTestCase {
 
     func testCancelledUsesDueEvenWhenPcLevelIsZero() {
         let now = 1_000_000_000_000
-        let r = [row("c", "X", rd: "02/11/2026", due: now - 1000, lv: 0), row("c", "Y", rd: "02/11/2026", due: now + 3_600_000, lv: 0)]
+        // máy tính gửi sẵn mức cảnh báo cho đơn hủy (2 = quá hạn, 1 = sắp hạn); thiếu mức (-1) thì dựa vào hạn xử lý
+        let r = [row("c", "X", rd: "02/11/2026", due: now + 9_000_000_000, lv: 2), row("c", "Y", rd: "02/11/2026", due: now + 3_600_000, lv: -1)]
         let res = OrderStats.compute(rows: r, period: .day, now: now, calendar: cal)
         XCTAssertEqual(res.overdue, 1)
         XCTAssertEqual(res.soon, 1)
@@ -79,6 +80,15 @@ final class OrderStatsTests: XCTestCase {
         let res = OrderStats.compute(rows: rows, period: .day, now: 0, calendar: cal)
         XCTAssertEqual(res.buckets.count, 2)
         XCTAssertEqual(res.buckets.last?.total, 2)
+    }
+
+    func testEachOrderInExactlyOneGroup() {
+        let rows = [row("m", "A", rd: "02/11/2026", pd: false, rv: true), row("m", "B", rd: "02/11/2026"), row("m", "C", rd: "02/11/2026", pd: false, rv: false)]
+        let r = OrderStats.compute(rows: rows, period: .day, now: 0, calendar: cal)
+        XCTAssertEqual(r.total, r.received + r.pending + r.other)
+        XCTAssertEqual(r.other, 1)
+        XCTAssertEqual(r.buckets[0].total, r.buckets[0].received + r.buckets[0].pending + r.buckets[0].other)
+        XCTAssertEqual(r.buckets[0].main, 3)
     }
 
     func testReturnVsCancelSplit() {

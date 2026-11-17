@@ -12052,10 +12052,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!c || c.classList.contains('hidden')) return;
       const dock = document.getElementById('stickyBottomDock');
       const dockH = dock ? dock.offsetHeight : 0;
+      // Thanh chuyển trang nằm ngay dưới bảng: chừa chỗ cho nó, nếu không nó bị đẩy xuống dưới thanh tổng cố định ở đáy
+      // (nhất là khi mở Bộ lọc nâng cao làm phần đầu cao thêm một hàng).
+      const pager = document.getElementById('tableFooterPager');
+      const pagerH = pager ? pager.offsetHeight : 0;
       const absTop = c.getBoundingClientRect().top + (window.pageYOffset || 0);
-      const h = Math.max(260, Math.floor(window.innerHeight - absTop - dockH - 6));
-      c.style.maxHeight = h + 'px';
-      c.style.minHeight = '0px';
+      const h = Math.max(260, Math.floor(window.innerHeight - absTop - dockH - pagerH - 6));
+      c.style.setProperty('max-height', h + 'px', 'important');
+      c.style.setProperty('min-height', '0px', 'important');
     }
     window.addEventListener('resize', () => requestAnimationFrame(fitMainTableHeight));
 
@@ -17049,6 +17053,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (sum) { sum.classList.remove('hidden'); foot.insertBefore(sum, foot.firstChild); }
       }
       document.body.classList.add('has-drawer');
+      // Phần đầu trang đổi chiều cao (mở bộ lọc, hàng nút xuống dòng, thanh tổng ở đáy đổi) -> tính lại chiều cao bảng
+      try {
+        if (typeof ResizeObserver === 'function') {
+          const ro = new ResizeObserver(() => requestAnimationFrame(fitMainTableHeight));
+          [scroller && scroller.previousElementSibling, document.getElementById('stickyBottomDock'), document.getElementById('tableFooterPager'), document.getElementById('advancedFilterPanel')]
+            .forEach(el => { if (el) ro.observe(el); });
+          const head = scroller ? scroller.parentElement && scroller.parentElement.firstElementChild : null;
+          if (head) ro.observe(head);
+        }
+      } catch (e) {}
+      requestAnimationFrame(fitMainTableHeight);
     }
     if (typeof document !== 'undefined' && document.addEventListener) {
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildAppSidebar); else buildAppSidebar();

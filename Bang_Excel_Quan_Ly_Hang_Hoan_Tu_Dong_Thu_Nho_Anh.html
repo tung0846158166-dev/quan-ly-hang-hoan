@@ -4270,8 +4270,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       if (typeof match.isPartialReturn === 'boolean' && order.isPartialReturn !== match.isPartialReturn) { order.isPartialReturn = match.isPartialReturn; changed = true; }
       if (match.priceModes && typeof match.priceModes === 'object') {
-        order.priceModes = Object.assign({}, order.priceModes || {}, match.priceModes);
-        changed = true;
+        const mergedModes = Object.assign({}, order.priceModes || {}, match.priceModes);
+        // chỉ coi là "thay đổi" khi giá trị thật sự khác (tránh báo cập nhật cho mọi đơn mỗi lần nạp lại)
+        if (JSON.stringify(mergedModes) !== JSON.stringify(order.priceModes || {})) { order.priceModes = mergedModes; changed = true; }
       }
       if (match.priceHasValue !== false && typeof match.price === 'number' && Number.isFinite(match.price) && (forceOverwrite || !order.price || order.price === 0)) {
         if (order.price !== match.price) {
@@ -4334,13 +4335,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       }
       if (match.rawDetails) {
-        order.rawDetails = Object.assign({}, order.rawDetails || {}, match.rawDetails);
-        changed = true;
+        const mergedRaw = Object.assign({}, order.rawDetails || {}, match.rawDetails);
+        if (JSON.stringify(mergedRaw) !== JSON.stringify(order.rawDetails || {})) { order.rawDetails = mergedRaw; changed = true; }
       }
       if (match.items && match.items.length > 0) {
         const curFirst = order.items && order.items[0];
         const isCurBlank = !curFirst || (!curFirst.product && !curFirst.color && !curFirst.size);
         if (forceOverwrite || isCurBlank || (match.items.length > (order.items ? order.items.length : 0))) {
+          const itemsBefore = JSON.stringify(order.items || []);
           order.items = mergeImportedItems(order.items, match.items);
           (order.items || []).forEach(it => {
             if (it.size && isReturnReasonText(it.size)) {
@@ -4356,7 +4358,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               it.size = '';
             }
           });
-          changed = true;
+          if (JSON.stringify(order.items || []) !== itemsBefore) changed = true;
         } else {
           if (!curFirst.product && match.items[0].product) {
             curFirst.product = match.items[0].product;

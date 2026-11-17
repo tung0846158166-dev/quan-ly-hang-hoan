@@ -190,3 +190,11 @@ test('Nhiều yêu cầu cùng 1 đơn: giữ yêu cầu còn hiệu lực mới
   const hh = [{ 'Mã': 'K1', 'Mã đơn': 'X', 'Trạng thái về': 'Đang về', 'Ngày': '16/11/2026' }, { 'Mã': 'K2', 'Mã đơn': 'Y', 'Trạng thái về': 'Đang về', 'Ngày': '16/11/2026' }];
   assert.strictEqual(c.keepLatestRequestPerOrder(hh).removed, 0);
 });
+
+test('Nạp lại dữ liệu không đổi không bị tính là "cập nhật" (không bắn thông báo cho mọi đơn)', () => {
+  const html2 = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
+  const fn = html2.match(/^    function applyShopeeDbMatchToOrder\([^]*?^    }/m)[0];
+  assert.ok(/JSON\.stringify\(mergedModes\) !== JSON\.stringify\(order\.priceModes/.test(fn));
+  assert.ok(/JSON\.stringify\(mergedRaw\) !== JSON\.stringify\(order\.rawDetails/.test(fn));
+  assert.ok(/JSON\.stringify\(order\.items \|\| \[\]\) !== itemsBefore/.test(fn));
+});

@@ -17070,18 +17070,27 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (el) { el.textContent = txt; el.className = 'text-xs font-semibold ' + (c.lastAt && !c.lastOk ? 'text-rose-600' : 'text-slate-600'); }
       if (badge) badge.textContent = !c.url || !c.enabled ? 'tắt' : (c.lastAt && !c.lastOk ? 'lỗi' : 'bật');
     }
+    function sheetIdFromLink(v) {
+      const m = String(v || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || String(v || '').match(/^\s*([a-zA-Z0-9_-]{30,})\s*$/);
+      return m ? m[1] : '';
+    }
     function sheetSyncScriptText() {
       const c = loadSheetSyncCfg();
+      const sid = String(c.sheetId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      const tab = String(c.sheetTab || '').replace(/\\/g, '').replace(/'/g, "\\'");
       return [
-        "// Dán toàn bộ đoạn này vào Google Sheet: Tiện ích mở rộng > Apps Script, rồi Triển khai > Tùy chọn triển khai mới > Ứng dụng web",
-        "// (Thực thi với tư cách: Tôi · Ai có quyền truy cập: Bất kỳ ai). Không có mã bí mật bên dưới thì không ai đọc được dữ liệu.",
+        "// Dự án Apps Script RIÊNG cho app Quản Lý Hàng Hoàn (tạo tại script.google.com > Dự án mới).",
+        "// Chỉ ĐỌC sheet, không sửa sheet, không ảnh hưởng các phần mềm / đoạn mã khác đang dùng sheet.",
+        "// Triển khai > Tùy chọn triển khai mới > Ứng dụng web (Thực thi với tư cách: Tôi · Ai có quyền truy cập: Bất kỳ ai).",
+        "// Không có mã bí mật bên dưới thì không ai đọc được dữ liệu.",
         "const TOKEN = '" + c.token + "';",
-        "const SHEET_NAME = ''; // tên tab chứa đơn Shopee; để trống = tab đầu tiên",
+        "const SHEET_ID = '" + sid + "'; // mã của Google Sheet (lấy từ link)",
+        "const SHEET_NAME = '" + tab + "'; // tên tab chứa đơn Shopee; để trống = tab đầu tiên",
         "function doGet(e) {",
         "  if (!e || !e.parameter || e.parameter.token !== TOKEN) {",
         "    return ContentService.createTextOutput(JSON.stringify({ error: 'Sai mã bí mật' })).setMimeType(ContentService.MimeType.JSON);",
         "  }",
-        "  const ss = SpreadsheetApp.getActiveSpreadsheet();",
+        "  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();",
         "  const sh = SHEET_NAME ? ss.getSheetByName(SHEET_NAME) : ss.getSheets()[0];",
         "  if (!sh) return ContentService.createTextOutput(JSON.stringify({ error: 'Không thấy tab ' + SHEET_NAME })).setMimeType(ContentService.MimeType.JSON);",
         "  const values = sh.getDataRange().getDisplayValues();",
@@ -17094,10 +17103,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const m = document.getElementById('sheetSyncModal'); if (!m) return;
       const c = loadSheetSyncCfg();
       document.getElementById('sheetSyncUrl').value = c.url || '';
+      document.getElementById('sheetSyncSheetLink').value = c.sheetLink || '';
+      document.getElementById('sheetSyncTab').value = c.sheetTab || '';
       document.getElementById('sheetSyncEnabled').checked = !!c.enabled;
       document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
       renderSheetSyncStatus();
       m.classList.remove('hidden');
+    }
+    // gõ link sheet / tên tab thì đoạn mã cập nhật ngay
+    function onSheetSyncSourceInput() {
+      const c = loadSheetSyncCfg();
+      c.sheetLink = String(document.getElementById('sheetSyncSheetLink').value || '').trim();
+      c.sheetId = sheetIdFromLink(c.sheetLink);
+      c.sheetTab = String(document.getElementById('sheetSyncTab').value || '').trim();
+      saveSheetSyncCfg(c);
+      document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
+      const w = document.getElementById('sheetSyncLinkWarn');
+      if (w) w.textContent = c.sheetLink && !c.sheetId ? '⚠️ Không đọc được mã sheet từ link này — dán nguyên link dạng https://docs.google.com/spreadsheets/d/…' : (c.sheetId ? '✓ Mã sheet: ' + c.sheetId : '');
     }
     function closeSheetSyncModal() { const m = document.getElementById('sheetSyncModal'); if (m) m.classList.add('hidden'); }
     function saveSheetSyncFromModal(runNow) {
@@ -20438,10 +20460,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="p-5 space-y-4 text-sm">
         <div class="text-xs text-slate-600">Mỗi 10 phút app đọc sheet như một file Excel Shopee nạp vào: đơn đã có (ở bảng chính, kho lưu trữ hay bảng đơn hủy) chỉ được cập nhật, đơn chưa có thì thêm mới. Sheet không đổi thì bỏ qua. Dòng tiêu đề cần có tên cột như file xuất từ Shopee (Mã đơn hàng, Mã vận đơn, Tên sản phẩm, Số lượng, Trạng thái…).</div>
         <ol class="list-decimal pl-5 space-y-1 text-xs text-slate-700">
-          <li>Mở Google Sheet → <b>Tiện ích mở rộng › Apps Script</b>, xóa hết mã có sẵn, dán đoạn mã bên dưới (đã kèm mã bí mật riêng của máy này). Nếu đơn không ở tab đầu tiên, điền tên tab vào <code>SHEET_NAME</code>.</li>
-          <li>Bấm <b>Triển khai › Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b>, Thực thi với tư cách <b>Tôi</b>, Ai có quyền truy cập <b>Bất kỳ ai</b> → Triển khai, cấp quyền.</li>
+          <li>Dán <b>link Google Sheet</b> và tên tab chứa đơn vào 2 ô dưới — đoạn mã tự điền sẵn.</li>
+          <li>Mở <b>script.google.com</b> → <b>Dự án mới</b> (dự án riêng, <b>không</b> mở từ trong sheet, không xóa hay sửa đoạn mã nào đang có) → dán đoạn mã bên dưới thay cho nội dung mặc định của dự án mới, bấm Lưu. Đoạn mã chỉ <b>đọc</b> sheet nên không ảnh hưởng các phần mềm khác đang dùng sheet.</li>
+          <li>Trong dự án mới đó bấm <b>Triển khai › Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b>, Thực thi với tư cách <b>Tôi</b>, Ai có quyền truy cập <b>Bất kỳ ai</b> → Triển khai, cấp quyền.</li>
           <li>Chép <b>URL ứng dụng web</b> (dạng https://script.google.com/macros/s/…/exec) dán vào ô dưới, bật tự cập nhật và bấm <b>Lưu & cập nhật ngay</b>.</li>
         </ol>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-2"><b class="text-xs">Link Google Sheet</b>
+            <input id="sheetSyncSheetLink" oninput="onSheetSyncSourceInput()" type="text" placeholder="https://docs.google.com/spreadsheets/d/…" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <div id="sheetSyncLinkWarn" class="text-[11px] mt-0.5 text-slate-500"></div></div>
+          <div><b class="text-xs">Tên tab chứa đơn</b>
+            <input id="sheetSyncTab" oninput="onSheetSyncSourceInput()" type="text" placeholder="để trống = tab đầu" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+        </div>
         <div>
           <div class="flex items-center justify-between mb-1"><b class="text-xs">Đoạn mã Apps Script</b><button type="button" id="btnCopySheetScript" onclick="copySheetSyncScript()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép đoạn mã</button></div>
           <textarea id="sheetSyncScript" readonly rows="9" class="w-full font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-lg p-2"></textarea>

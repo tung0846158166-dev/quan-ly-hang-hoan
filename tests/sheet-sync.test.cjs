@@ -21,7 +21,7 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
+  for (const n of ['sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -59,10 +59,19 @@ test('Google Sheet: đoạn mã Apps Script hợp lệ và kiểm tra mã bí m�
   assert.doesNotThrow(() => new vm.Script(code));
   const tok = vm.runInContext('loadSheetSyncCfg().token', c);
   assert.ok(code.includes("const TOKEN = '" + tok + "'"));
+  assert.ok(code.includes("SpreadsheetApp.openById(SHEET_ID)"), 'dự án riêng mở sheet theo mã, không cần cài vào sheet');
+  // link sheet -> mã sheet đưa vào đoạn mã
+  const id = vm.runInContext("sheetIdFromLink('https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/edit#gid=0')", c);
+  assert.strictEqual(id, '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789');
+  const cfg = vm.runInContext('loadSheetSyncCfg()', c); cfg.sheetId = id; cfg.sheetTab = "Đơn hoàn"; vm.runInContext('saveSheetSyncCfg', c)(cfg);
+  const code2 = vm.runInContext('sheetSyncScriptText()', c);
+  assert.ok(code2.includes("const SHEET_ID = '" + id + "'") && code2.includes("const SHEET_NAME = 'Đơn hoàn'"));
+  assert.doesNotThrow(() => new vm.Script(code2));
   // chạy thử doGet với ContentService/SpreadsheetApp giả
   const out = {};
   const g = { ContentService: { MimeType: { JSON: 'json', CSV: 'csv' }, createTextOutput: t => ({ setMimeType: m => { out.t = t; out.m = m; return out; } }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheets: () => [{ getDataRange: () => ({ getDisplayValues: () => [['Mã đơn hàng', 'Tên sản phẩm'], ['A1', 'Áo, "len"']] }) }] }) } };
+  g.SpreadsheetApp.openById = () => g.SpreadsheetApp.getActiveSpreadsheet();
   vm.createContext(g); vm.runInContext(code, g);
   g.doGet({ parameter: { token: 'sai' } }); assert.strictEqual(out.m, 'json');
   g.doGet({ parameter: { token: tok } }); assert.strictEqual(out.m, 'csv');

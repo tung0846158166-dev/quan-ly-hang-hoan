@@ -14,6 +14,37 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(p.rows[1].isCancelled)
     }
 
+    func testDecodeInboxAndCancelledId() throws {
+        let json = """
+        {"time":1,"count":1,"rows":[{"k":"c","c":"SPX1","o":"O1","p":"Shopee","n":"","co":"","sz":"","q":1,"rd":"","due":0,"st":"Đơn hủy","ci":"cxl_1"}],
+         "inbox":[{"id":"inbox_1","c":"SPX9","p":"Shopee","t":"18/11/2026 05:00:00","u":1},{"id":"inbox_2","c":863,"dup":1},{"c":"thiếu id"},"rác"]}
+        """
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows[0].ci, "cxl_1")
+        XCTAssertEqual(p.inbox.map { $0.id }, ["inbox_1", "inbox_2"], "đơn lỗi / thiếu id bị bỏ, không bỏ cả hộp")
+        XCTAssertTrue(p.inbox[0].u)
+        XCTAssertEqual(p.inbox[1].c, "863")
+        XCTAssertTrue(p.inbox[1].dup)
+        // PC cũ không gửi hộp đơn mới
+        let old = try JSONDecoder().decode(SnapshotPayload.self, from: Data(#"{"time":1,"count":0,"rows":[]}"#.utf8))
+        XCTAssertTrue(old.inbox.isEmpty)
+        // lưu file rồi đọc lại vẫn giữ hộp
+        let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
+        XCTAssertEqual(again.inbox, p.inbox)
+        XCTAssertEqual(again.rows[0].ci, "cxl_1")
+    }
+
+    func testInboxPushManyAndCancelReceiveMessages() throws {
+        let a = SyncProtocol.inboxPushMany(ids: ["inbox_1", "inbox_2"], room: "R", requestId: "q1")
+        let ja = try JSONSerialization.jsonObject(with: Data(a.utf8)) as! [String: Any]
+        XCTAssertEqual(ja["type"] as? String, "inbox_push_many")
+        XCTAssertEqual(ja["ids"] as? [String], ["inbox_1", "inbox_2"])
+        let b = SyncProtocol.cancelReceive(ids: ["cxl_1"], received: true, room: "R", requestId: "q2")
+        let jb = try JSONSerialization.jsonObject(with: Data(b.utf8)) as! [String: Any]
+        XCTAssertEqual(jb["type"] as? String, "cancel_receive")
+        XCTAssertEqual(jb["received"] as? Bool, true)
+    }
+
     func testAssemblerOutOfOrderAndStale() {
         let a = SnapshotAssembler()
         let half = fixture.count / 2

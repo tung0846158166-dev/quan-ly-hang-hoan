@@ -6,6 +6,8 @@ import ScannerCore
 @MainActor
 final class SnapshotStore: ObservableObject {
     @Published var rows: [OrderRow] = []
+    /// Hộp Đơn Mới trên PC (chờ đẩy ra bảng chính).
+    @Published var inbox: [InboxRow] = []
     @Published var updatedAt: Date?
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
@@ -118,6 +120,7 @@ final class SnapshotStore: ObservableObject {
     private func set(_ p: SnapshotPayload, save: Bool) {
         rows = p.rows
         stats = p.stats
+        inbox = p.inbox
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = Self.buildIndex(p.rows)
         recount()
@@ -133,7 +136,7 @@ final class SnapshotStore: ObservableObject {
     /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi một đơn đổi theo dõi/ghi chú.
     private func commit() {
         let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
-        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
+        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats, inbox: inbox), save: true)
         revision += 1
     }
 
@@ -160,6 +163,26 @@ final class SnapshotStore: ObservableObject {
             rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất" || v == "Hư hỏng")
         }
         commit()
+    }
+
+    /// Gỡ ngay khỏi Bảng đơn mới trên điện thoại các đơn vừa gửi lệnh đẩy (PC gửi lại danh sách chính thức sau).
+    func removeInboxLocal(ids: Set<String>) {
+        inbox.removeAll { ids.contains($0.id) }
+        commit()
+    }
+
+    /// Đánh dấu đã nhận / chưa nhận ngay trên điện thoại cho các đơn hủy đã chọn.
+    func applyCancelledReceivedLocal(ids: Set<String>, received: Bool) {
+        var changed = false
+        let f = DateFormatter(); f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        for i in rows.indices where rows[i].k == "c" && ids.contains(rows[i].ci) && rows[i].rv != received {
+            rows[i].rv = received
+            rows[i].pd = !received
+            rows[i].lv = 0
+            rows[i].rcd = received ? f.string(from: Date()) : ""
+            changed = true
+        }
+        if changed { commit() }
     }
 
     func removeLocal(rowId: String) {

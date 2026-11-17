@@ -22,6 +22,7 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var nt: String = ""      // ghi chú đơn
     public var rcd: String = ""     // ngày giờ nhận tại kho (khi đã nhận)
     public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=72h), 1 = Báo Vàng (>=48h), 0 = an toàn; -1 = PC cũ không gửi
+    public var ci: String = ""      // id đơn trong bảng đơn hủy trên PC (để đánh dấu đã nhận từ điện thoại); PC cũ không gửi
 
     public var id: String { k + "|" + c }
     /// Thuộc nhóm đơn hủy: nằm trong bảng đơn hủy, hoặc ở bảng chính nhưng loại đơn là "Đơn hủy".
@@ -34,15 +35,33 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     }
 }
 
+/// Một đơn trong Hộp Đơn Mới trên PC (chờ đẩy ra bảng chính).
+public struct InboxRow: Codable, Identifiable, Equatable, Hashable {
+    public var id: String     // id trên PC
+    public var c: String      // mã vận đơn
+    public var o: String      // mã đơn hàng
+    public var p: String      // sàn
+    public var n: String      // sản phẩm
+    public var t: String      // giờ tạo / giờ quét
+    public var u: Bool = false    // lượt quét ở kho chưa có đơn: đẩy ra sẽ ghi Hàng đã trả
+    public var dup: Bool = false  // đã có ở bảng khác: đẩy ra chỉ gỡ khỏi hộp
+
+    public init(id: String, c: String, o: String = "", p: String = "", n: String = "", t: String = "", u: Bool = false, dup: Bool = false) {
+        self.id = id; self.c = c; self.o = o; self.p = p; self.n = n; self.t = t; self.u = u; self.dup = dup
+    }
+}
+
 public struct SnapshotPayload: Codable, Equatable {
     public var time: Int
     public var count: Int
     public var rows: [OrderRow]
     /// Bảng đối chiếu số đơn do PC tính trên dữ liệu gốc (PC cũ không gửi thì rỗng).
     public var stats: [String: Int] = [:]
+    /// Hộp Đơn Mới trên PC (PC cũ không gửi thì rỗng).
+    public var inbox: [InboxRow] = []
 
-    public init(time: Int, count: Int, rows: [OrderRow], stats: [String: Int] = [:]) {
-        self.time = time; self.count = count; self.rows = rows; self.stats = stats
+    public init(time: Int, count: Int, rows: [OrderRow], stats: [String: Int] = [:], inbox: [InboxRow] = []) {
+        self.time = time; self.count = count; self.rows = rows; self.stats = stats; self.inbox = inbox
     }
 }
 
@@ -73,8 +92,9 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd }
-private enum PayloadKeys: String, CodingKey { case time, count, rows, stats }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci }
+private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, inbox }
+private enum InboxKeys: String, CodingKey { case id, c, o, p, n, t, u, dup }
 
 extension OrderRow {
     public init(from decoder: Decoder) throws {
@@ -83,7 +103,16 @@ extension OrderRow {
                   co: c.flexString(.co), sz: c.flexString(.sz), q: c.flexInt(.q, default: 1), rd: c.flexString(.rd),
                   due: c.flexInt(.due), st: c.flexString(.st),
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
-                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1))
+                  wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1),
+                  ci: c.flexString(.ci))
+    }
+}
+
+extension InboxRow {
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: InboxKeys.self)
+        self.init(id: c.flexString(.id), c: c.flexString(.c), o: c.flexString(.o), p: c.flexString(.p), n: c.flexString(.n), t: c.flexString(.t),
+                  u: c.flexBool(.u, default: false), dup: c.flexBool(.dup, default: false))
     }
 }
 
@@ -92,8 +121,15 @@ extension SnapshotPayload {
         let c = try decoder.container(keyedBy: PayloadKeys.self)
         let rows = try c.decode([OrderRow].self, forKey: .rows)
         let stats = (try? c.decode([String: Int].self, forKey: .stats)) ?? [:]
-        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows, stats: stats)
+        // Đơn nào trong hộp lỗi thì bỏ đơn đó, không bỏ cả danh sách.
+        let inbox = ((try? c.decode([FailableInbox].self, forKey: .inbox)) ?? []).compactMap { $0.row }.filter { !$0.id.isEmpty }
+        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows, stats: stats, inbox: inbox)
     }
+}
+
+private struct FailableInbox: Decodable {
+    let row: InboxRow?
+    init(from decoder: Decoder) throws { row = try? InboxRow(from: decoder) }
 }
 
 public struct SnapshotChunk: Equatable {

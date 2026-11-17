@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.26
+          name: QuanLyHangHoan-Windows-Installer-v1.9.27
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.26
-          name: "Quản Lý Hàng Hoàn v1.9.26 — Hiện lại thanh chuyển trang dưới bảng"
+          tag_name: v1.9.27
+          name: "Quản Lý Hàng Hoàn v1.9.27 — iPhone: Bảng đơn mới & Bảng đơn hủy có nút chọn; thanh chuyển trang gọn"
           body: |
+            ### Bản sửa 1.9.27 (dùng cùng app iPhone 0.10.27)
+
+            - Gửi Hộp Đơn Mới sang iPhone; iPhone tích chọn đơn để đẩy ra Bảng chính hoặc đẩy ra hết (đơn đã có ở bảng khác chỉ gỡ khỏi hộp, lượt quét ở kho ghi Hàng đã trả).
+            - iPhone tích chọn đơn trong Bảng đơn hủy để đánh dấu Đã nhận / Chưa nhận, hoặc nhận hết đơn chưa nhận.
+            - Thanh chuyển trang dưới bảng thấp lại còn một dòng (~27px), bảng có thêm chỗ.
+
             ### Bản sửa 1.9.26
 
             - Thanh chuyển trang (◀ Trang x/y ▶, số đơn/trang, Đến trang) bị đẩy xuống dưới thanh tổng ở đáy màn hình khi mở Bộ lọc nâng cao: chiều cao bảng giờ tự tính lại theo phần đầu trang, thanh chuyển trang luôn hiện ngay dưới bảng.

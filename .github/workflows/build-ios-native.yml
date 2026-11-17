@@ -7,6 +7,10 @@ on:
         description: "Số phiên bản app iPhone gốc (vd 0.2.0)"
         required: true
         default: "0.2.0"
+  # Kiểm tra build app iPhone cho mọi PR có sửa code iPhone (không phát hành).
+  pull_request:
+    paths:
+      - "ios-native/**"
 
 permissions:
   contents: write

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.21
+          name: QuanLyHangHoan-Windows-Installer-v1.9.22
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.21
-          name: "Quản Lý Hàng Hoàn v1.9.21 — Làm lại bảng thống kê: số liệu cộng khớp, bấm vào số để xem danh sách đơn"
+          tag_name: v1.9.22
+          name: "Quản Lý Hàng Hoàn v1.9.22 — Thống kê: phạm vi Toàn bộ đúng bộ lọc, thêm bảng Theo sàn"
           body: |
+            ### Bản sửa 1.9.22
+
+            - Thống kê "Bảng chính + kho lưu trữ": kho lưu trữ nay lọc theo đúng sàn / tuần / bộ lọc đang chọn như bảng chính (trước đó lấy hết kho lưu trữ bất kể bộ lọc nên lệch). Có dòng cộng: Bảng chính + Kho lưu trữ (bỏ đơn trùng) = Tổng.
+            - Thêm bảng "Theo sàn": Shopee, TikTok Shop và Tổng, cho đơn hoàn (số đơn, đã về, còn chờ, khác, quá hạn, sắp hạn) và đơn hủy; bấm số để xem danh sách đơn.
+            - Sàn của các bảng theo ngày đi theo tab sàn của bảng chính.
+
             ### Bản sửa 1.9.21
 
             - Làm lại bảng thống kê: mỗi loại (đơn hoàn, đơn hủy) một bảng theo ngày/tuần/tháng. Bên trái: đơn về kho trong ngày (theo ngày nhận; đơn hoàn tách Bảng chính / Lưu trữ). Bên phải: đơn hoàn/hủy phát sinh trong ngày và tình trạng hiện tại, Số đơn = Đã về + Còn chờ + Khác (không cần nhận / bị mất / hư hỏng).

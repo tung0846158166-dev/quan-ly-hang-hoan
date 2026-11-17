@@ -113,3 +113,18 @@ test('v1.9.21: phạm vi "Đúng như bảng chính" chỉ lấy đơn bảng ch
   const tabs = html.slice(html.indexOf('let countAll = 0, countWaiting = 0'), html.indexOf('countAll++;'));
   assert.ok(tabs.includes('orderMatchesTableScope(o)'), 'số trên tab dùng cùng hàm phạm vi');
 });
+
+test('v1.9.22: phạm vi "bảng chính + kho lưu trữ" lọc kho lưu trữ theo cùng bộ lọc với bảng chính', () => {
+  const c = { orders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', p: 'Shopee' }],
+    archivedOrders: [{ orderId: 'A', track: '1', status: 'Hàng đã trả', p: 'Shopee' }, { orderId: 'C', track: '3', status: 'Hàng đã trả', p: 'Shopee' }, { orderId: 'D', track: '4', status: 'Hàng đã trả', p: 'TikTok Shop' }],
+    isOrderReceived: o => o.status === 'Hàng đã trả', isOrderPending: () => false, getOrderAlertLevel: () => '', getOrderPlatform: o => o.p,
+    statsScope: 'all', currentPlatformFilter: 'Shopee', lastStatsMerge: null,
+    orderMatchesTableScope: (o, ignorePlatform) => ignorePlatform || o.p === 'Shopee' };
+  vm.createContext(c);
+  vm.runInContext("const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();", c);
+  vm.runInContext(extract('collectReturnStatsItems'), c);
+  assert.strictEqual(vm.runInContext('collectReturnStatsItems().length', c), 2, 'A (bảng chính) + C (lưu trữ Shopee); D là TikTok bị lọc; A trùng bỏ');
+  assert.strictEqual(vm.runInContext('lastStatsMerge.dup', c), 1);
+  assert.strictEqual(vm.runInContext('collectReturnStatsItems(true).length', c), 3, 'bảng Theo sàn bỏ qua tab sàn');
+  assert.ok(html.includes('🏬 THEO SÀN'));
+});

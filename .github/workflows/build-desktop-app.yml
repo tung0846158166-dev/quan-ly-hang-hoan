@@ -94,6 +94,7 @@ jobs:
             ### Bản sửa 1.9.24
 
             - Google Sheet: đọc đúng kiểu tab "Hàng hoàn" (Mã | Mã đơn | Loại | Mã vận đơn | Trạng thái về | Về shop lúc | Hạn khiếu nại | Hàng | SL | Tiền | Lý do | Ngày). Cột Hàng có nhiều sản phẩm ("TÊN · Màu, Size × SL; …") được tách đúng từng sản phẩm, màu, size, số lượng; Loại "Bom" thành Giao không thành công; Trạng thái về thành Trạng thái sàn; Lý do, Ngày, Tiền, Hạn khiếu nại vào đúng cột.
+            - Đoạn mã Apps Script đọc sheet qua Google Sheets API (chỉ cần quyền XEM; bản cũ dùng SpreadsheetApp.openById bị Google đòi quyền sửa nên báo lỗi "Các quyền được chỉ định không đủ"). Tệp kê khai tự bật Google Sheets API.
             - Tự cập nhật từ Google Sheet vẫn chạy khi bảng đang khóa (không bật hộp mật khẩu mỗi 10 phút).
 
             ### Bản sửa 1.9.23

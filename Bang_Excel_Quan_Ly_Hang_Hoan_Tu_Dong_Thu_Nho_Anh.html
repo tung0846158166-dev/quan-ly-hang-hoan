@@ -392,6 +392,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     body.has-drawer .ui-row-1line button, body.has-drawer .ui-row-1line span { white-space: nowrap; }
     .ui-hidden-row { display: none !important; }
     .ui-stat-num { all: unset; cursor: pointer; padding: 1px 6px; border-radius: 6px; } .ui-stat-num:hover { background: #1e3a5f; text-decoration: underline; }
+    #statsModalBody > div { flex-shrink: 0; }
     .ui-stat-sep { width: 10px; padding: 0 !important; background: rgba(148, 163, 184, .08); }
     #tableFooterPager { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 12px; background: #fff; border-top: 1px solid var(--ui-line); font-size: 12px; }
     #tableFooterPager #paginationSummaryText { margin-right: 8px; font-size: 12.5px !important; font-weight: 700; color: #0f172a; display: inline !important; }
@@ -7374,7 +7375,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.21';
+    const APP_VERSION_NUMBER = '1.9.22';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -7869,9 +7870,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     // v1.9.21: phạm vi đơn mà các tab của bảng chính đang đếm (Sàn, Tuần, Khoảng ngày giờ, Loại đơn, Đặt trước, MVĐ).
     // Dùng chung cho số trên tab và bảng thống kê để hai nơi luôn khớp nhau.
-    function orderMatchesTableScope(o) {
+    function orderMatchesTableScope(o, ignorePlatform) {
       if (!o) return false;
-      if (currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
+      if (!ignorePlatform && currentPlatformFilter !== 'all' && getOrderPlatform(o) !== currentPlatformFilter) return false;
       if (currentImportWeekFilter !== 'all' && getOrderImportWeek(o) !== currentImportWeekFilter) return false;
       if (!checkOrderDateTimeMatch(o)) return false;
       if (currentOrderTypeFilter === 'partial_return') {
@@ -13873,7 +13874,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.21',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.22',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -17017,7 +17018,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let statsScope = 'table';
     function setStatsScope(v) { statsScope = v === 'all' ? 'all' : 'table'; renderStatsModal(); }
     function setStatsPlatform(v) { statsPlatform = v; renderStatsModal(); }
-    const statsByPlatform = list => (statsScope === 'table' || statsPlatform === 'all') ? list : list.filter(it => it.platform === statsPlatform);
+    // v1.9.22: sàn theo đúng tab sàn của bảng chính; bảng "Theo sàn" trong cửa sổ thống kê tách riêng từng sàn
+    const statsByPlatform = list => list;
+    let lastStatsMerge = { main: 0, arch: 0, dup: 0 };
     function statsBucketKey(d, period) {
       const y = d.getFullYear(), m = d.getMonth(), day = d.getDate();
       if (period === 'month') return new Date(y, m, 1).getTime();
@@ -17056,31 +17059,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     const statsOrderKey = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();
     // Đơn hoàn: bảng chính + kho lưu trữ (đơn nằm ở cả 2 nơi chỉ tính 1 lần, ưu tiên bảng chính)
-    function collectReturnStatsItems() {
-      if (statsScope === 'table') {
-        return (Array.isArray(orders) ? orders : []).filter(o => o && orderMatchesTableScope(o)).map(o => ({
-          rd: o.returnDate, received: !!isOrderReceived(o), pending: !!isOrderPending(o), level: getOrderAlertLevel(o), src: 'main', o, platform: getOrderPlatform(o) }));
-      }
+    // Đơn hoàn. Cả hai phạm vi dùng CÙNG bộ lọc với các tab bảng chính (sàn, tuần, khoảng ngày giờ, loại đơn, đặt trước, MVĐ):
+    //   'table' = bảng chính;  'all' = bảng chính + kho lưu trữ (đơn có ở cả 2 nơi chỉ tính 1 lần, ưu tiên bảng chính).
+    function collectReturnStatsItems(ignorePlatform) {
       const out = [], seen = new Set();
+      const merge = { main: 0, arch: 0, dup: 0 };
       const add = (o, src) => {
-        if (!o) return;
+        if (!o || !orderMatchesTableScope(o, ignorePlatform)) return;
         const k = statsOrderKey(o);
-        if (k !== '|') { if (seen.has(k)) return; seen.add(k); }
-        const received = !!isOrderReceived(o), pending = !!isOrderPending(o);
-        const level = getOrderAlertLevel(o);
-        out.push({ rd: o.returnDate, received, pending, level, src, o, platform: getOrderPlatform(o) });
+        if (src === 'arch' && k !== '|' && seen.has(k)) { merge.dup++; return; }
+        if (k !== '|') seen.add(k);
+        merge[src]++;
+        out.push({ rd: o.returnDate, received: !!isOrderReceived(o), pending: !!isOrderPending(o), level: getOrderAlertLevel(o), src, o, platform: getOrderPlatform(o) });
       };
       (Array.isArray(orders) ? orders : []).forEach(o => add(o, 'main'));
-      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => add(o, 'arch')); } catch (e) {}
+      if (statsScope === 'all') {
+        try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => add(o, 'arch')); } catch (e) {}
+      }
+      if (!ignorePlatform) lastStatsMerge = merge;
       return out;
     }
-    function collectCancelStatsItems() {
+    function collectCancelStatsItems(ignorePlatform) {
       const normPlat = o => (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || ''));
-      return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && (statsScope !== 'table' || currentPlatformFilter === 'all' || normPlat(o) === currentPlatformFilter)).map(o => {
+      return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && (ignorePlatform || currentPlatformFilter === 'all' || normPlat(o) === currentPlatformFilter)).map(o => {
         const received = !!o.received, pending = !received;
         let level = '';
         if (pending) { const info = computeDeadlineInfo(o.returnDate, o.deadline); if (info) level = info.left < 0 ? 'overdue' : (info.left <= 24 * 3600000 ? 'soon' : ''); }
-        return { rd: o.returnDate, received, pending, level, src: 'cancel', o, platform: o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '') };
+        return { rd: o.returnDate, received, pending, level, src: 'cancel', o, platform: normPlat(o) };
       });
     }
     // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo NGÀY NHẬN.
@@ -17150,11 +17155,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <tbody>${rows}</tbody></table></div></div>`;
       };
       const scopeSel = document.getElementById('statsScopeSelect'); if (scopeSel) scopeSel.value = statsScope;
-      const platSel = document.getElementById('statsPlatformSelect'); if (platSel) platSel.style.display = statsScope === 'table' ? 'none' : '';
+      const platSel = document.getElementById('statsPlatformSelect'); if (platSel) platSel.style.display = 'none';
       // Dòng đối chiếu với số trên các tab của bảng chính
       let recon = '';
-      if (statsScope === 'table') {
-        const items = collectReturnStatsItems();
+      {
+        const items = collectReturnStatsItems().filter(x => x.src === 'main');
         const tabN = id => { const el = document.getElementById(id); const n = el ? parseInt(String(el.textContent).replace(/\D/g, ''), 10) : NaN; return isNaN(n) ? null : n; };
         const pairs = [
           ['Tất cả', items.length, tabN('tabCountAll')],
@@ -17168,11 +17173,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         recon = `<div class="w-full rounded-xl px-3 py-2 text-[12px] font-bold ${allOk ? 'bg-emerald-950/60 border border-emerald-600/50 text-emerald-200' : 'bg-rose-950/60 border border-rose-600/60 text-rose-200'}">
           ${allOk ? '✓ Khớp với bảng chính đang hiển thị' : '⚠️ Lệch với bảng chính — báo lại cho người làm app'} (${esc0(document.getElementById('platCount_all') ? (currentPlatformFilter === 'all' ? 'cả 2 sàn' : currentPlatformFilter) : '')}${currentImportWeekFilter !== 'all' ? ', tuần đang chọn' : ', tất cả các tuần'}): `
           + pairs.map(p => `${p[0]} <span class="font-mono">${p[1]}</span>${p[2] === null ? '' : (p[1] === p[2] ? ' ✓' : ` ≠ tab ${p[2]}`)}`).join(' · ')
-          + `<div class="text-[11px] font-semibold opacity-80 mt-0.5">Đơn đã nhận quá 24 giờ tự chuyển sang kho lưu trữ nên không còn trong bảng chính — chọn "Toàn bộ" để tính cả kho lưu trữ.</div></div>`;
+          + (statsScope === 'all'
+            ? `<div class="text-[12px] mt-1">➕ Toàn bộ = Bảng chính <span class="font-mono">${lastStatsMerge.main}</span> + Kho lưu trữ <span class="font-mono">${lastStatsMerge.arch}</span>${lastStatsMerge.dup ? ` (bỏ ${lastStatsMerge.dup} đơn trùng đã có ở bảng chính)` : ''} = <span class="font-mono">${lastStatsMerge.main + lastStatsMerge.arch}</span> đơn — kho lưu trữ cũng lọc theo đúng sàn/tuần/bộ lọc đang chọn.</div>`
+            : `<div class="text-[11px] font-semibold opacity-80 mt-0.5">Đơn đã nhận quá 24 giờ tự chuyển sang kho lưu trữ nên không còn trong bảng chính — chọn "Toàn bộ" để tính cả kho lưu trữ.</div>`)
+          + `</div>`;
       }
+      // Bảng theo sàn: từng sàn riêng (bỏ qua tab sàn, giữ các bộ lọc còn lại)
+      const platBlock = (() => {
+        const ret = collectReturnStatsItems(true), can = collectCancelStatsItems(true);
+        const plats = ['Shopee', 'TikTok Shop'];
+        const others = Array.from(new Set(ret.concat(can).map(x => x.platform).filter(p => p && !plats.includes(p))));
+        const list = plats.concat(others);
+        const nm = p => (p === 'Shopee' ? '🟠 Shopee' : (p === 'TikTok Shop' ? '⚫ TikTok Shop' : (p || 'Không rõ sàn')));
+        const rowOf = (lab, r, c) => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold whitespace-nowrap">${lab}</td>`
+          + cell(r, lab + ' · đơn hoàn', 'font-bold') + cell(r.filter(x => x.received), lab + ' · đơn hoàn đã về', 'text-emerald-300')
+          + cell(r.filter(x => !x.received && x.pending), lab + ' · đơn hoàn còn chờ', 'text-amber-300') + cell(r.filter(x => !x.received && !x.pending), lab + ' · đơn hoàn khác', 'text-slate-400')
+          + cell(r.filter(x => x.level === 'overdue'), lab + ' · đơn hoàn quá hạn', 'text-rose-400 font-bold') + cell(r.filter(x => x.level === 'soon'), lab + ' · đơn hoàn sắp hạn', 'text-orange-300 font-bold')
+          + `<td class="ui-stat-sep"></td>` + cell(c, lab + ' · đơn hủy', 'font-bold') + cell(c.filter(x => x.received), lab + ' · đơn hủy đã về', 'text-emerald-300')
+          + cell(c.filter(x => !x.received), lab + ' · đơn hủy còn chờ', 'text-amber-300') + cell(c.filter(x => x.level === 'overdue'), lab + ' · đơn hủy quá hạn', 'text-rose-400 font-bold') + `</tr>`;
+        const rows = list.map(p => rowOf(nm(p), ret.filter(x => x.platform === p), can.filter(x => x.platform === p))).join('')
+          + (ret.some(x => !x.platform) || can.some(x => !x.platform) ? rowOf('Không rõ sàn', ret.filter(x => !x.platform), can.filter(x => !x.platform)) : '')
+          + rowOf('TỔNG', ret, can).replace('<tr class="border-t border-slate-800">', '<tr class="border-t-2 border-slate-600 bg-slate-900">');
+        return `<div class="w-full bg-slate-950/60 border border-violet-500/40 rounded-xl overflow-hidden">
+          <div class="px-3 py-2 font-black text-sm">🏬 THEO SÀN <span class="text-[11px] font-semibold text-slate-400">(${statsScope === 'all' ? 'bảng chính + kho lưu trữ' : 'bảng chính'}; theo tuần/bộ lọc đang chọn, không theo tab sàn)</span></div>
+          <div class="overflow-auto"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300"><tr><th rowspan="2" class="px-2 py-1.5 text-left">Sàn</th>
+            <th colspan="6" class="px-2 pt-1.5 text-sky-300 border-b border-slate-700">ĐƠN HOÀN</th><th class="ui-stat-sep"></th><th colspan="4" class="px-2 pt-1.5 text-rose-300 border-b border-slate-700">ĐƠN HỦY</th></tr>
+            <tr><th class="px-2 py-1">Số đơn</th><th class="px-2 py-1">Đã về</th><th class="px-2 py-1">Còn chờ</th><th class="px-2 py-1">Khác</th><th class="px-2 py-1">Quá hạn</th><th class="px-2 py-1">Sắp hạn</th><th class="ui-stat-sep"></th>
+            <th class="px-2 py-1">Số đơn</th><th class="px-2 py-1">Đã về</th><th class="px-2 py-1">Còn chờ</th><th class="px-2 py-1">Quá hạn</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      })();
       function esc0(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-      box.innerHTML = recon + section(statsScope === 'table' ? '↩️ ĐƠN HOÀN (đúng như bảng chính đang hiển thị)' : '↩️ ĐƠN HOÀN (bảng chính + kho lưu trữ)', 'border-sky-500/40', collectReturnStatsItems(), collectReceivedStatsItems('return'), false)
-        + section('🚫 ĐƠN HỦY (bảng đơn hủy)', 'border-rose-500/40', collectCancelStatsItems(), collectReceivedStatsItems('cancel'), true)
+      const platLabel = currentPlatformFilter === 'all' ? 'cả 2 sàn' : currentPlatformFilter;
+      box.innerHTML = recon + platBlock + section(statsScope === 'table' ? `↩️ ĐƠN HOÀN — bảng chính (${platLabel})` : `↩️ ĐƠN HOÀN — bảng chính + kho lưu trữ (${platLabel})`, 'border-sky-500/40', collectReturnStatsItems(), collectReceivedStatsItems('return'), false)
+        + section(`🚫 ĐƠN HỦY — bảng đơn hủy (${platLabel})`, 'border-rose-500/40', collectCancelStatsItems(), collectReceivedStatsItems('cancel'), true)
         + `<div id="statsDetail" class="w-full hidden"></div>`;
     }
     function showStatsDetail(id) {
@@ -20260,7 +20292,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <h2 class="font-black text-base text-white">📊 THỐNG KÊ ĐƠN HOÀN / ĐƠN HỦY</h2>
         <div class="flex flex-wrap items-center gap-2">
           <select id="statsScopeSelect" onchange="setStatsScope(this.value)" class="bg-slate-800 border border-sky-600 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-100" title="Phạm vi số liệu">
-            <option value="table">📋 Đúng như bảng chính đang hiển thị</option><option value="all">🗂 Toàn bộ: bảng chính + kho lưu trữ</option>
+            <option value="table">📋 Đúng như bảng chính đang hiển thị</option><option value="all">🗂 Bảng chính + kho lưu trữ (cùng bộ lọc)</option>
           </select>
           <select id="statsPlatformSelect" onchange="setStatsPlatform(this.value)" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-100">
             <option value="all">Cả 2 sàn</option><option value="Shopee">🟠 Shopee</option><option value="TikTok Shop">⚫ TikTok Shop</option>

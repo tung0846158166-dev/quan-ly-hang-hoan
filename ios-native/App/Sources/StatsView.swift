@@ -18,9 +18,16 @@ struct StatsView: View {
         var flowRows: [OrderRow] = []
         var recvRows: [OrderRow] = []
     }
+    struct PlatRow: Identifiable {
+        let name: String
+        let ret: StatsResult
+        let can: StatsResult
+        var id: String { name }
+    }
     struct StatsData {
         var ret = Section2()
         var can = Section2()
+        var plats: [PlatRow] = []
     }
 
     var body: some View {
@@ -46,6 +53,7 @@ struct StatsView: View {
             if !store.hasData {
                 Section { Text("Chưa nhận danh sách đơn từ máy tính.").foregroundStyle(.secondary) }
             } else if let d = data {
+                platSection(d.plats)
                 totals("↩️ Đơn hoàn", d.ret)
                 buckets("Đơn hoàn theo \(period.title.lowercased())", d.ret, cancel: false)
                 totals("🚫 Đơn hủy", d.can)
@@ -74,9 +82,37 @@ struct StatsView: View {
                                 recv: OrderStats.compute(rows: recvRows, period: p, now: now),
                                 flowRows: rows, recvRows: recvRows)
             }
-            return StatsData(ret: make(retRows), can: make(canRows))
+            // Theo sàn: từng sàn riêng (không theo ô chọn sàn), cùng phạm vi Bảng chính / Toàn bộ
+            let scoped = all.filter { $0.k == "c" || (sc == "main" ? $0.k == "m" : ($0.k == "m" || $0.k == "a")) }
+            func norm(_ p: String) -> String { p == "TikTok" ? "TikTok Shop" : (p.isEmpty ? "Không rõ sàn" : p) }
+            var names = ["Shopee", "TikTok Shop"]
+            for n in Set(scoped.map { norm($0.p) }) where !names.contains(n) { names.append(n) }
+            var plats: [PlatRow] = names.map { n in
+                let rs = scoped.filter { norm($0.p) == n }
+                return PlatRow(name: n, ret: OrderStats.compute(rows: rs.filter { $0.k != "c" }, period: p, now: now),
+                               can: OrderStats.compute(rows: rs.filter { $0.k == "c" }, period: p, now: now))
+            }
+            plats.append(PlatRow(name: "Tổng", ret: OrderStats.compute(rows: scoped.filter { $0.k != "c" }, period: p, now: now),
+                                 can: OrderStats.compute(rows: scoped.filter { $0.k == "c" }, period: p, now: now)))
+            return StatsData(ret: make(retRows), can: make(canRows), plats: plats)
         }.value
         data = d
+    }
+
+    @ViewBuilder
+    private func platSection(_ rows: [PlatRow]) -> some View {
+        Section("🏬 Theo sàn (\(scope == "main" ? "bảng chính" : "bảng chính + lưu trữ"))") {
+            ForEach(rows) { r in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(r.name == "Shopee" ? "🟠 Shopee" : (r.name == "TikTok Shop" ? "⚫ TikTok Shop" : r.name))
+                        .font(.subheadline.bold())
+                    Text("Hoàn \(r.ret.total) = về \(r.ret.received) + chờ \(r.ret.pending) + khác \(r.ret.other) · quá hạn \(r.ret.overdue) · sắp hạn \(r.ret.soon)")
+                        .font(.caption)
+                    Text("Hủy \(r.can.total) = về \(r.can.received) + chờ \(r.can.pending) · quá hạn \(r.can.overdue)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     @ViewBuilder

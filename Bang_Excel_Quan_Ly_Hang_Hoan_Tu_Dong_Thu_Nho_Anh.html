@@ -925,7 +925,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           id="searchInput"
           type="text"
           oninput="handleSearchInputDebounced()"
-          placeholder="Tìm mọi tuần: Mã đơn, MVĐ, Tên SP, Màu, Size..."
+          placeholder="Tìm mọi tuần: Mã đơn, MVĐ, Tên SP, Màu, Size... (dán nhiều mã để kiểm tra hàng loạt)"
           class="flex-1 bg-[#fef9c3] border border-[#ee4d2d] px-2 py-1 text-xs font-bold text-orange-950 placeholder:font-normal placeholder:text-amber-700/70 focus:outline-none rounded-r-lg h-7"
         />
         <label class="ml-2 inline-flex items-center text-[10.5px] font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
@@ -10037,8 +10037,70 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return fields.filter(([, value]) => has(value)).map(([label]) => label);
     }
 
+    // v1.9.29: dán một loạt mã (mã đơn / mã vận đơn) vào ô tìm kiếm -> tìm từng mã, liệt kê mã nào có / không có.
+    // Chỉ lấy các "từ" giống mã: chữ + số, dài >= 8, có ít nhất 1 chữ số (bỏ chữ thừa như "(2 dòng sản phẩm)").
+    function parseBatchSearchCodes(kw) {
+      const raw = String(kw || '');
+      const cache = parseBatchSearchCodes.cache || (parseBatchSearchCodes.cache = { kw: null, codes: null });
+      if (cache.kw === raw) return cache.codes;
+      let codes = null;
+      if (/[\s,;|]/.test(raw.trim())) {
+        const toks = raw.split(/[\s,;|]+/).map(t => t.replace(/[^A-Za-z0-9]/g, '').toUpperCase()).filter(t => t.length >= 8 && /\d/.test(t));
+        const uniq = Array.from(new Set(toks));
+        if (uniq.length >= 2) codes = uniq;
+      }
+      cache.kw = raw; cache.codes = codes;
+      return codes;
+    }
+    function orderSearchCodes(o) {
+      const set = new Set();
+      const add = v => { const c = String(v || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); if (c) set.add(c); };
+      if (!o) return set;
+      [o.orderId, o.track, o.altTrack, o.returnTrack, o.forwardTrack, o.returnOrderId, o.claimId, o.rawDetails && o.rawDetails.claimId, o.code].forEach(add);
+      if (Array.isArray(o.trackingCodes)) o.trackingCodes.forEach(add);
+      return set;
+    }
+    // Kết quả từng mã: ở bảng nào (bảng chính kèm số dòng + trạng thái, kho lưu trữ, bảng đơn hủy, hộp đơn mới) hay không có.
+    function batchSearchReport(codes) {
+      const where = new Map(codes.map(c => [c, []]));
+      const scan = (list, label, info) => (Array.isArray(list) ? list : []).forEach((o, i) => {
+        orderSearchCodes(o).forEach(c => { const w = where.get(c); if (w) w.push({ label, text: info(o, i) }); });
+      });
+      scan(orders, 'main', (o, i) => `dòng #${i + 1} · ${o.status || ''}`);
+      try { scan(archivedOrders, 'archive', o => `về kho ${o.recvDate || ''}`.trim()); } catch (e) {}
+      try { scan(cancelledOrders, 'cancelled', o => o.received ? 'đã nhận' : 'chưa nhận'); } catch (e) {}
+      try { scan(newOrdersInbox, 'inbox', () => 'chờ đẩy ra'); } catch (e) {}
+      return where;
+    }
+    function batchSearchHtml(codes) {
+      const rep = batchSearchReport(codes);
+      const LABEL = { main: '📋 Bảng chính', archive: '📦 Kho lưu trữ', cancelled: '🚫 Bảng đơn hủy', inbox: '📥 Hộp đơn mới' };
+      const missing = codes.filter(c => !rep.get(c).length);
+      const cnt = { main: 0, archive: 0, cancelled: 0, inbox: 0 };
+      codes.forEach(c => { const seen = new Set(rep.get(c).map(h => h.label)); seen.forEach(l => cnt[l]++); });
+      window._batchMissingCodes = missing;
+      const parts = Object.keys(cnt).filter(k => cnt[k]).map(k => `${LABEL[k]} ${cnt[k]}`).join(' · ');
+      const rows = codes.map((c, i) => {
+        const hits = rep.get(c);
+        const res = hits.length ? hits.map(h => `<span class="whitespace-nowrap">${LABEL[h.label]} <span class="text-slate-500">(${escapeAttr(h.text)})</span></span>`).join(' · ') : '<b class="text-rose-700">❌ Không có</b>';
+        return `<tr class="${hits.length ? '' : 'bg-rose-50'}"><td class="pr-2 text-slate-500">${i + 1}</td><td class="pr-3 font-mono font-bold">${escapeAttr(c)}</td><td>${res}</td></tr>`;
+      }).join('');
+      return `<div class="font-bold">🔎 Tìm ${codes.length} mã: ✅ <span class="text-emerald-700">${codes.length - missing.length} có</span>${parts ? ' (' + parts + ')' : ''} · ❌ <span class="text-rose-700">${missing.length} không có</span>`
+        + (missing.length ? ` <button type="button" onclick="copyBatchMissingCodes()" class="ml-1 px-2 py-0.5 rounded bg-rose-600 text-white font-bold cursor-pointer">📋 Chép ${missing.length} mã không có</button>` : '')
+        + ` <button type="button" onclick="const c=document.getElementById('chkFilterOnly'); if (c) { c.checked = true; currentPage = 1; renderAll(); }" class="ml-1 px-2 py-0.5 rounded bg-slate-700 text-white font-bold cursor-pointer">Chỉ hiện đơn có ở bảng chính</button></div>`
+        + `<div class="mt-1 max-h-48 overflow-auto bg-white/70 rounded border border-amber-300 px-2 py-1"><table class="text-[11px] w-full">${rows}</table></div>`;
+    }
+    function copyBatchMissingCodes() {
+      const text = (window._batchMissingCodes || []).join('\n');
+      const done = () => showAppToast(`📋 Đã chép ${(window._batchMissingCodes || []).length} mã không có`, 'success');
+      try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, () => { prompt('Chép các mã:', text); }); return; } } catch (e) {}
+      prompt('Chép các mã:', text);
+    }
+
     function isOrderMatch(order, kw) {
       if (!kw) return false;
+      const batch = typeof parseBatchSearchCodes === 'function' ? parseBatchSearchCodes(kw) : null;
+      if (batch) { const own = orderSearchCodes(order); return batch.some(c => own.has(c)); }
       const kwTrim = String(kw).trim();
       const itemsText = (order.items || []).map(it => `${it.product} ${it.color} ${it.size}`).join(' ');
       const plat = getOrderPlatform(order);
@@ -12424,7 +12486,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const previewEl = document.getElementById('searchPreviewBar');
       if (!previewEl) return;
-      if (!kw) {
+      const batchCodes = kw ? parseBatchSearchCodes(kw) : null;
+      if (batchCodes) {
+        previewEl.classList.remove('hidden');
+        try { previewEl.innerHTML = batchSearchHtml(batchCodes); } catch (e) { previewEl.textContent = 'Lỗi tìm nhiều mã: ' + e.message; }
+      } else if (!kw) {
         previewEl.classList.add('hidden');
         previewEl.innerHTML = '';
       } else if (matchCount === 0) {
@@ -12446,7 +12512,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         previewEl.innerHTML = `✅ Tìm thấy <b>${matchCount} đơn</b> khớp! Đơn đầu tiên (#${firstMatchIdx}): Mã đơn <b>${escapeAttr(firstMatch.orderId)}</b> | MVĐ: <b>${escapeAttr(firstMatch.track)}</b> | Ngày bấm hoàn: <b>${escapeAttr(firstMatch.returnDate)}</b> | Gồm ${firstMatch.items.length} SP: <b>${escapeAttr(spSummary)}</b> | Trạng thái: <b>[${firstMatch.status}]</b>` + (() => { const where = getOrderMatchFieldLabels(firstMatch, kw); return where.length ? ` | Khớp ở: <b>${escapeAttr(where.join(', '))}</b>` : ''; })();
       }
 
-      if (kw) {
+      if (kw && !batchCodes) {
         let otherHtml = '';
         try { otherHtml = buildOtherTablesSearchHtml(kw); } catch (e) { otherHtml = ''; }
         if (otherHtml) { previewEl.classList.remove('hidden'); previewEl.innerHTML += otherHtml; }

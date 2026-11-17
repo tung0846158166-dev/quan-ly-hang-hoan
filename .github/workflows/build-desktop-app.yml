@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.22
+          name: QuanLyHangHoan-Windows-Installer-v1.9.23
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.22
-          name: "Quản Lý Hàng Hoàn v1.9.22 — Thống kê: phạm vi Toàn bộ đúng bộ lọc, thêm bảng Theo sàn"
+          tag_name: v1.9.23
+          name: "Quản Lý Hàng Hoàn v1.9.23 — Tự cập nhật đơn Shopee từ Google Sheet (10 phút/lần)"
           body: |
+            ### Bản sửa 1.9.23
+
+            - Mới: tự cập nhật đơn Shopee từ Google Sheet mỗi 10 phút (menu ☰ › 🔗 Google Sheet). Kết nối qua Apps Script có mã bí mật riêng; sheet được nạp như file Excel Shopee: đơn đã có (bảng chính, kho lưu trữ, bảng đơn hủy) chỉ cập nhật, đơn chưa có thì thêm mới; sheet không đổi thì bỏ qua. Có trạng thái lần cập nhật gần nhất và nút cập nhật ngay.
+
             ### Bản sửa 1.9.22
 
             - Thống kê "Bảng chính + kho lưu trữ": kho lưu trữ nay lọc theo đúng sàn / tuần / bộ lọc đang chọn như bảng chính (trước đó lấy hết kho lưu trữ bất kể bộ lọc nên lệch). Có dòng cộng: Bảng chính + Kho lưu trữ (bỏ đơn trùng) = Tổng.

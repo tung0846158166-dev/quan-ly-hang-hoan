@@ -18,7 +18,7 @@ function context() {
     ingestShopeeRecords: async rows => { calls.push(['Auto', rows]); c.activeImportBatch.messages.push('Auto committed'); return { success: true }; }
   };
   vm.createContext(c);
-  for (const name of ['readWorkbookRowsFromBuffer', 'preparePlatformImportGroups', 'handlePlatformExcelUpload']) {
+  for (const name of ['readWorkbookRowsFromBuffer', 'preparePlatformImportGroups', 'handlePlatformExcelUpload', 'importParsedPlatformFiles']) {
     const match = source.match(new RegExp('^    (?:async )?function ' + name + '\\([^]*?^    }', 'm'));
     assert(match, name); vm.runInContext(match[0], c);
   }

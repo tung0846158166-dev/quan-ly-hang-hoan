@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   auxReadAllSync: () => ipcRenderer.sendSync('aux-read-all-sync'),
   auxSave: (key, value) => ipcRenderer.invoke('aux-save', key, value),
   runAutoBackup: () => ipcRenderer.invoke('run-auto-backup'),
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  fetchSheetText: (url) => ipcRenderer.invoke('fetch-sheet-text', url)
 });

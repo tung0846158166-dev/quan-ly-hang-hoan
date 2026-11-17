@@ -28,3 +28,7 @@ test('ô tìm kiếm chính có nút Xóa', () => {
   assert.match(src, /id="btnClearMainSearch" onclick="clearMainSearch\(\)"/);
   assert.match(src, /function clearMainSearch\(\) \{[\s\S]*?value = ''[\s\S]*?renderAll\(\)/);
 });
+test('ô lọc giờ có onclick ép nhận focus (Electron/Windows)', () => {
+  assert.match(src, /id="filterTimeFrom" onchange="applyDateTimeFilter\(\)" onclick="this.focus\(\); this.select\(\)"/);
+  assert.match(src, /id="filterTimeTo" onchange="applyDateTimeFilter\(\)" onclick="this.focus\(\); this.select\(\)"/);
+});

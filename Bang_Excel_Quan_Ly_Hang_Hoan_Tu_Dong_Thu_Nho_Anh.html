@@ -17049,7 +17049,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       // chỉ áp dụng cho kiểu sheet này (có cột "Hàng" và "Mã đơn", không có cột Tên sản phẩm của file Shopee)
       if (!byNorm.hang || !byNorm.madon || byNorm.tensanpham) return rows;
       const rename = { ma: 'Mã số khiếu nại', madon: 'Mã đơn hàng', mavandon: 'Mã vận đơn', trangthaive: 'Trạng thái Trả hàng/Hoàn tiền',
-        veshopluc: 'Thời gian hoàn trả hàng thành công', hankhieunai: 'Người bán cần phản hồi trước', tien: 'Tổng số tiền hoàn trả',
+        veshopluc: 'Thời gian giao hàng thành công', hankhieunai: 'Người bán cần phản hồi trước', tien: 'Tổng số tiền hoàn trả',
         lydo: 'Lý do trả hàng/hoàn tiền', ngay: 'Thời gian yêu cầu' };
       const drop = new Set(['hang', 'sl', 'loai', 'capnhat']);
       const out = [];

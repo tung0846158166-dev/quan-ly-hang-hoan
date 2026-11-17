@@ -150,6 +150,7 @@ test('Sheet "Hàng hoàn": đổi tên cột sang kiểu file Shopee, tách nhi�
   assert.strictEqual(out[0]['Trạng thái Trả hàng/Hoàn tiền'], 'Đang về');
   assert.strictEqual(out[0]['Lý do trả hàng/hoàn tiền'], 'Đổi ý');
   assert.strictEqual(out[0]['Thời gian yêu cầu'], '16/11/2026 00:40');
+  assert.ok('Thời gian giao hàng thành công' in out[0] && !('Thời gian hoàn trả hàng thành công' in out[0]), 'Về shop lúc không được trùng mẫu Ngày hoàn');
   assert.strictEqual(out[0]['Người bán cần phản hồi trước'], '20/11/2026');
   assert.strictEqual(out[0]['Tên sản phẩm'] + '|' + out[0]['Tên phân loại hàng'] + '|' + out[0]['Số lượng'], 'KUNTA|Xám Tiêu Đậm, XL|3');
   assert.strictEqual(out[1]['Tên sản phẩm'] + '|' + out[1]['Số lượng'], 'PRETTY IN CAO SU|1');

@@ -391,8 +391,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     body.has-drawer .ui-row-1line > div, body.has-drawer .ui-row-1line #pipelineTabs { flex-wrap: nowrap !important; flex: none; }
     body.has-drawer .ui-row-1line button, body.has-drawer .ui-row-1line span { white-space: nowrap; }
     .ui-hidden-row { display: none !important; }
+    #tableFooterPager { display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 6px 12px; background: #fff; border-top: 1px solid var(--ui-line); font-size: 12px; }
+    #tableFooterPager #paginationSummaryText { margin-right: 8px; font-size: 12.5px !important; font-weight: 700; color: #0f172a; display: inline !important; }
+    #tableFooterPager #tablePaginationBar { background: transparent !important; border: 0 !important; gap: 6px !important; }
+    #tableFooterPager #btnPrevPage, #tableFooterPager #btnNextPage { min-width: 34px; height: 30px; border-radius: 9px !important; border: 1px solid #e2e8f0 !important; font-size: 13px; }
+    #tableFooterPager #pageIndicatorText { font-size: 12px !important; padding: 5px 10px !important; border-radius: 9px !important; }
+    #tableFooterPager select { font-size: 12px !important; padding: 4px 6px !important; }
     /* bảng: tiêu đề một màu, hàng thấp hơn để thấy nhiều đơn hơn */
-    #mainTableScrollContainer { max-height: calc(100vh - 175px) !important; min-height: 360px !important; }
+    #mainTableScrollContainer { max-height: calc(100vh - 215px) !important; min-height: 360px !important; }
     #mainTableScrollContainer .excel-table thead th { background: #1e293b !important; background-image: none !important; color: #f8fafc !important; font-size: 11.5px !important; padding: 9px 8px !important; }
     #mainTableScrollContainer .excel-table thead th span { color: inherit !important; }
     #mainTableScrollContainer .excel-table tbody td { padding: 4px 8px !important; }
@@ -7366,7 +7372,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.19';
+    const APP_VERSION_NUMBER = '1.9.20';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -11200,7 +11206,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (totalFiltered === 0) {
           sumEl.textContent = '0 đơn khớp';
         } else {
-          sumEl.textContent = `Đơn ${startIdx + 1}-${endIdx} / ${totalFiltered}`;
+          sumEl.textContent = `Đang xem đơn ${startIdx + 1}–${endIdx} / ${totalFiltered} đơn`;
         }
       }
       const pageIndEl = document.getElementById('pageIndicatorText');
@@ -13857,7 +13863,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.19',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.20',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -16943,10 +16949,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (row3) row3.classList.add('ui-row-1line');
       const weeks = document.getElementById('weeklyImportTabsContainer');
       const row2 = weeks ? weeks.closest('div.no-print') : null;
-      if (row2) {
-        row2.classList.add('ui-row-1line');
-        // phân trang lên hàng tuần/sàn (còn trống bên phải) để luôn nhìn thấy, không bị đẩy ra ngoài màn hình
-        if (pager) { pager.style.marginLeft = 'auto'; row2.appendChild(pager); }
+      if (row2) row2.classList.add('ui-row-1line');
+      // Phân trang: thanh riêng ngay dưới bảng (số đơn đang xem, ◀ trang ▶, số đơn/trang, đến trang)
+      const scroller = document.getElementById('mainTableScrollContainer');
+      const gotoInput = document.getElementById('gotoPageInput');
+      const gotoBox = gotoInput ? gotoInput.closest('div.inline-flex') : null;
+      if (scroller && pager) {
+        const foot = document.createElement('div');
+        foot.id = 'tableFooterPager'; foot.className = 'no-print';
+        scroller.parentNode.insertBefore(foot, scroller.nextSibling);
+        foot.appendChild(pager);
+        if (gotoBox) foot.appendChild(gotoBox);
+        const sum = document.getElementById('paginationSummaryText');
+        if (sum) { sum.classList.remove('hidden'); foot.insertBefore(sum, foot.firstChild); }
       }
       document.body.classList.add('has-drawer');
     }
@@ -17015,8 +17030,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!dt || isNaN(dt.getTime())) { res.unknown++; return; }
         const key = statsBucketKey(dt, period);
         let b = map.get(key);
-        if (!b) { b = { key, total: 0, received: 0, pending: 0, overdue: 0, soon: 0 }; map.set(key, b); }
+        if (!b) { b = { key, total: 0, received: 0, pending: 0, overdue: 0, soon: 0, main: 0, arch: 0 }; map.set(key, b); }
         b.total++;
+        if (it.src === 'main') b.main++; else if (it.src === 'arch') b.arch++;
         if (it.received) b.received++;
         if (it.pending) b.pending++;
         if (it.level === 'overdue') b.overdue++;
@@ -17047,12 +17063,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     // Hàng đã về kho = đơn đã chuyển sang "đã nhận" ở cột nhận tại kho; xếp theo ngày nhận.
     function collectReceivedStatsItems(kind) {
-      const take = o => ({ rd: o.recvDate, received: true, pending: false, level: '', platform: kind === 'cancel' ? (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '')) : getOrderPlatform(o) });
-      if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(take);
+      const take = (o, src) => ({ rd: o.recvDate, received: true, pending: false, level: '', src, platform: kind === 'cancel' ? (o.platform === 'TikTok' ? 'TikTok Shop' : (o.platform || '')) : getOrderPlatform(o) });
+      if (kind === 'cancel') return (Array.isArray(cancelledOrders) ? cancelledOrders : []).filter(o => o && o.received).map(o => take(o, 'cancel'));
       const out = [];
-      const add = o => { if (o && isOrderReceived(o)) out.push(take(o)); };
-      (Array.isArray(orders) ? orders : []).forEach(add);
-      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(add); } catch (e) {}
+      const seen = new Set();
+      const keyOf = o => String(o.orderId || '').trim() + '|' + String(o.track || '').trim();
+      // bảng chính trước; đơn trùng (vừa ở bảng chính vừa ở kho lưu trữ) chỉ tính 1 lần
+      (Array.isArray(orders) ? orders : []).forEach(o => { if (o && isOrderReceived(o)) { seen.add(keyOf(o)); out.push(take(o, 'main')); } });
+      try { (typeof archivedOrders !== 'undefined' && Array.isArray(archivedOrders) ? archivedOrders : []).forEach(o => { if (o && isOrderReceived(o) && !seen.has(keyOf(o))) out.push(take(o, 'arch')); }); } catch (e) {}
       return out;
     }
     function setStatsPeriod(p) { statsPeriod = p; renderStatsModal(); }
@@ -17068,11 +17086,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const canRecv = computeStats(statsByPlatform(collectReceivedStatsItems('cancel')), statsPeriod);
       const limit = statsPeriod === 'day' ? 31 : 24;
       const recvCard = (title, s, color) => {
-        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td><td class="px-2 py-1.5 text-center font-mono text-emerald-300 font-bold">${b.total}</td></tr>`).join('');
+        const split = s.buckets.some(b => b.main || b.arch);
+        const rows = s.buckets.slice(0, limit).map(b => `<tr class="border-t border-slate-800"><td class="px-2 py-1.5 font-bold">${statsBucketLabel(b.key, statsPeriod)}</td>${split ? `<td class="px-2 py-1.5 text-center font-mono">${b.main}</td><td class="px-2 py-1.5 text-center font-mono text-slate-400">${b.arch}</td>` : ''}<td class="px-2 py-1.5 text-center font-mono text-emerald-300 font-bold">${b.total}</td></tr>`).join('');
         return `<div class="flex-1 min-w-[260px] bg-slate-950/60 border ${color} rounded-xl overflow-hidden">
           <div class="px-3 py-2 font-black text-sm flex flex-wrap justify-between gap-2"><span>${title}</span><span class="text-[11px] font-bold text-slate-300">Tổng ${s.total} đơn đã về kho</span></div>
-          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr><th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')} nhận tại kho</th><th class="px-2 py-1.5">Đã về kho</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="2" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
+          <div class="overflow-auto max-h-[52vh]"><table class="w-full text-xs"><thead class="bg-slate-800 text-slate-300 sticky top-0"><tr><th class="px-2 py-1.5 text-left">${statsPeriod === 'day' ? 'Ngày' : (statsPeriod === 'week' ? 'Tuần' : 'Tháng')} nhận tại kho</th>${split ? '<th class="px-2 py-1.5" title="Đơn còn ở bảng chính (tab Đã nhận)">Bảng chính</th><th class="px-2 py-1.5" title="Đơn đã tự chuyển sang kho lưu trữ sau 24 giờ">Lưu trữ</th>' : ''}<th class="px-2 py-1.5">Tổng</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" class="px-2 py-3 text-center text-slate-500">Không có dữ liệu</td></tr>'}</tbody></table></div>
+          ${split ? '<div class="px-3 py-1.5 text-[11px] text-slate-400">Đơn đã nhận quá 24 giờ tự chuyển sang kho lưu trữ, nên tab "Đã nhận" ở bảng chính chỉ còn cột "Bảng chính".</div>' : ''}
           ${s.unknown ? `<div class="px-3 py-1.5 text-[11px] text-slate-400">${s.unknown} đơn đã nhận nhưng không có ngày nhận.</div>` : ''}</div>`;
       };
       const card = (title, s, color) => {

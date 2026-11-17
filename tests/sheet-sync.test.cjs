@@ -21,7 +21,7 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
+  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -168,4 +168,25 @@ test('Tự cập nhật khi bảng đang khóa không bật hộp nhập mật k
   const html2 = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
   const fn = html2.slice(html2.indexOf('async function requireUnlocked'), html2.indexOf('appPrompt', html2.indexOf('async function requireUnlocked')));
   assert.ok(fn.includes('sheetSyncRunning'));
+});
+
+test('Nhiều yêu cầu cùng 1 đơn: giữ yêu cầu còn hiệu lực mới nhất; không làm mất đơn bom; giữ đủ các dòng nhiều sản phẩm', () => {
+  const c = ctx(async () => ({ ok: true, text: '' }));
+  const R = (ngay, ma, madon, loai, tt, sp) => ({ 'Ngày': ngay, 'Mã': ma, 'Mã đơn': madon, 'Loại': loai, 'Trạng thái': tt, 'Sản phẩm': sp || 'Áo' });
+  const rows = [
+    R('16/11/2026 16:49', 'Y2', 'A', 'Trả hàng + hoàn tiền', 'Đang xử lý'),
+    R('16/11/2026 13:17', 'Y1', 'A', 'Trả hàng + hoàn tiền', 'Khách huỷ'),        // cũ, đã hủy -> bỏ
+    R('12/11/2026 12:21', 'Z2', 'B', 'Chỉ hoàn tiền', 'Khách huỷ'),               // mới hơn nhưng đã hủy -> bỏ
+    R('11/11/2026 21:26', 'Z1', 'B', 'Bom hàng', 'Đã huỷ'),                       // bom còn hiệu lực -> giữ
+    R('17/10/2026 12:09', 'W2', 'C', 'Chỉ hoàn tiền', 'Khách huỷ'),               // đều hủy -> giữ mới nhất
+    R('17/10/2026 12:01', 'W1', 'C', 'Chỉ hoàn tiền', 'Khách huỷ'),
+    R('15/11/2026 10:00', 'V1', 'D', 'Trả hàng + hoàn tiền', 'Đã đồng ý', 'Áo 1'),  // 1 yêu cầu 2 sản phẩm -> giữ cả 2
+    R('15/11/2026 10:00', 'V1', 'D', 'Trả hàng + hoàn tiền', 'Đã đồng ý', 'Áo 2'),
+  ];
+  const r = c.keepLatestRequestPerOrder(rows);
+  assert.strictEqual(r.rows.map(x => x['Mã']).join(','), 'Y2,Z1,W2,V1,V1');
+  assert.strictEqual(r.removed, 3);
+  // kiểu tab Hàng hoàn (cột Trạng thái về) vẫn hoạt động, không có trùng thì không bỏ gì
+  const hh = [{ 'Mã': 'K1', 'Mã đơn': 'X', 'Trạng thái về': 'Đang về', 'Ngày': '16/11/2026' }, { 'Mã': 'K2', 'Mã đơn': 'Y', 'Trạng thái về': 'Đang về', 'Ngày': '16/11/2026' }];
+  assert.strictEqual(c.keepLatestRequestPerOrder(hh).removed, 0);
 });

@@ -17074,6 +17074,34 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       return out;
     }
+    // Một đơn có nhiều yêu cầu (khách hủy rồi gửi lại, chỉ hoàn tiền rồi đổi sang trả hàng, bom rồi xin hoàn tiền…):
+    // chỉ giữ 1 yêu cầu — ưu tiên yêu cầu CÒN HIỆU LỰC (không phải "Khách huỷ"/"Đã đóng"), trong đó lấy cái MỚI NHẤT;
+    // nếu mọi yêu cầu đều đã hủy/đóng thì lấy cái mới nhất. Các dòng cùng mã yêu cầu (nhiều sản phẩm) giữ nguyên.
+    function keepLatestRequestPerOrder(rows) {
+      if (!Array.isArray(rows) || rows.length < 2) return { rows, removed: 0 };
+      const norm = k => removeVietnameseTones(String(k || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const keys = Object.keys(rows[0] || {});
+      const pick = (...names) => keys.find(k => names.includes(norm(k)));
+      const orderK = pick('madon', 'madonhang'), claimK = pick('ma', 'matrahang', 'masokhieunai', 'mayeucau');
+      const dateK = pick('ngay', 'ngayyeucau', 'thoigianyeucau'), statusK = pick('trangthai', 'trangthaive');
+      if (!orderK || !claimK) return { rows, removed: 0 };
+      const ts = v => { const d = parseFullDate(String(v || '')); return d && !isNaN(d.getTime()) ? d.getTime() : 0; };
+      const inactive = r => /khach huy|da dong/.test(removeVietnameseTones(String(statusK ? r[statusK] : '')).toLowerCase());
+      const best = new Map();   // mã đơn -> mã yêu cầu được giữ
+      rows.forEach(r => {
+        const o = String(r[orderK] || '').trim(), c = String(r[claimK] || '').trim();
+        if (!o || !c) return;
+        const cand = { c, active: inactive(r) ? 0 : 1, t: dateK ? ts(r[dateK]) : 0 };
+        const cur = best.get(o);
+        if (!cur || cand.active > cur.active || (cand.active === cur.active && cand.t > cur.t)) best.set(o, cand);
+      });
+      const out = rows.filter(r => {
+        const o = String(r[orderK] || '').trim(), c = String(r[claimK] || '').trim();
+        if (!o || !c) return true;
+        return best.get(o).c === c;
+      });
+      return { rows: out, removed: rows.length - out.length };
+    }
     let sheetSyncRunning = false;
     async function runSheetSync(manual) {
       const c = loadSheetSyncCfg();
@@ -17102,10 +17130,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const hash = sheetSyncHash(texts.map(t => t.tab + '\u0001' + t.text).join('\u0002'));
         if (!manual && hash === c.lastHash) { finish(true, 'Sheet không thay đổi'); return { success: true, unchanged: true }; }
         const files = [], skipped = [];
+        let oldRequests = 0;
         for (const t of texts) {
           let r = [];
           try { r = readWorkbookRowsFromBuffer(new TextEncoder().encode(t.text).buffer, true); } catch (e) { r = []; }
-          if (r.length) files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: normalizeSheetRows(r) }); else skipped.push(t.tab || 'tab đầu tiên');
+          if (r.length) {
+            const kept = keepLatestRequestPerOrder(r);
+            if (kept.removed) oldRequests += kept.removed;
+            files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: normalizeSheetRows(kept.rows) });
+          } else skipped.push(t.tab || 'tab đầu tiên');
         }
         if (!files.length) throw new Error('Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
         const rows = files.reduce((a, f) => a.concat(f.rows), []);
@@ -17113,7 +17146,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!res.success) throw new Error(String(res.message || 'Không nạp được').replace(/^[^\wÀ-ỹ]+/, ''));
         const cfg = loadSheetSyncCfg(); cfg.lastHash = hash; saveSheetSyncCfg(cfg);
         const summary = (res.messages || []).join(' | ').replace(/\s+/g, ' ').slice(0, 300);
-        finish(true, rows.length + ' dòng từ ' + files.length + ' tab' + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
+        finish(true, rows.length + ' dòng từ ' + files.length + ' tab' + (oldRequests ? ' (bỏ ' + oldRequests + ' dòng yêu cầu cũ / đã hủy của cùng đơn)' : '') + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
         if (typeof addAuditLog === 'function') try { addAuditLog('🔗 GOOGLE SHEET', 'Tự cập nhật từ Google Sheet: ' + rows.length + ' dòng. ' + summary); } catch (e) {}
         if (manual) alert('✅ Đã cập nhật từ Google Sheet (' + rows.length + ' dòng).\n\n' + (res.message || ''));
         return { success: true };

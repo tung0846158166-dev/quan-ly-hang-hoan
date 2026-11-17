@@ -33,9 +33,22 @@ struct StatsView: View {
             } else if loading {
                 Section { ProgressView("Đang tính…") }
             } else {
-                Section("Hạn xử lý (đơn còn chờ nhận)") {
-                    deadlineRow("Đơn hoàn", returns)
-                    deadlineRow("Đơn hủy", cancels)
+                Section {
+                    VStack(spacing: 10) {
+                        HStack(spacing: 10) {
+                            StatTile(title: "Hoàn quá hạn", value: returns.overdue, icon: "exclamationmark.triangle.fill", color: .red)
+                            StatTile(title: "Hoàn <24h", value: returns.soon, icon: "clock.fill", color: .orange)
+                        }
+                        HStack(spacing: 10) {
+                            StatTile(title: "Hủy quá hạn", value: cancels.overdue, icon: "exclamationmark.triangle.fill", color: .red)
+                            StatTile(title: "Hủy <24h", value: cancels.soon, icon: "clock.fill", color: .orange)
+                        }
+                        HStack(spacing: 10) {
+                            StatTile(title: "Hoàn đã về kho", value: returns.received, icon: "checkmark.seal.fill", color: .green)
+                            StatTile(title: "Hoàn đang chờ", value: returns.pending, icon: "hourglass", color: Theme.accent)
+                        }
+                    }
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
                 group("Đơn hoàn", returns)
                 recvGroup("✅ Đơn hoàn đã về kho (theo ngày nhận)", returnsRecv)
@@ -80,8 +93,13 @@ struct StatsView: View {
                 HStack {
                     Text(label(b.start)).font(.subheadline.bold())
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(b.total) đơn").font(.subheadline)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(b.total) đơn").font(.subheadline.bold())
+                        GeometryReader { g in
+                            Capsule().fill(Theme.accent.opacity(0.85))
+                                .frame(width: max(6, g.size.width * CGFloat(b.total) / CGFloat(max(1, s.buckets.map { $0.total }.max() ?? 1))), height: 6)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }.frame(width: 120, height: 6)
                         Text(detail(b)).font(.caption).foregroundStyle(.secondary)
                     }
                 }

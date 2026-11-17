@@ -44,5 +44,6 @@ struct ContentView: View {
                 .tabItem { Label("Cài đặt", systemImage: "gearshape") }
                 .tag(4)
         }
+        .tint(Theme.accent)
     }
 }

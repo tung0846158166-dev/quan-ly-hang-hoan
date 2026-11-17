@@ -86,5 +86,6 @@ final class OrderStatsTests: XCTestCase {
         XCTAssertTrue(OrderStats.isReturn(row("a", "B", rd: "")), "đơn trong kho lưu trữ tính vào đơn hoàn")
         XCTAssertTrue(OrderStats.isCancel(row("c", "C", rd: "")))
         XCTAssertFalse(OrderStats.isReturn(row("c", "C", rd: "")))
+        XCTAssertTrue(OrderStats.isReturn(row("m", "D", rd: "", ty: "Đơn hủy")), "đơn loại Đơn hủy ở bảng chính vẫn tính ở bảng chính như máy tính")
     }
 }

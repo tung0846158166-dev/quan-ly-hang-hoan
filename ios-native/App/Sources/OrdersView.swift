@@ -74,15 +74,17 @@ struct OrdersView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
-                            Button("\(f.rawValue) (\(counts[f] ?? 0))") { filter = f }
-                                .buttonStyle(.borderedProminent).tint(filter == f ? .indigo : .gray).font(.footnote.bold())
+                            Chip(title: "\(f.rawValue) (\(counts[f] ?? 0))", selected: filter == f) { filter = f }
                         }
                     }.padding(.horizontal)
                 }
                 List(shown) { r in
-                    Button { selected = r } label: { row(r) }.buttonStyle(.plain)
+                    Button { selected = r } label: { row(r).card(padding: 10) }.buttonStyle(.plain)
+                        .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
                 .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_500_000_000) }
                 .overlay {
                     if !store.hasData {
@@ -93,6 +95,7 @@ struct OrdersView: View {
                     } else if shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
                 }
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .searchable(text: $query, prompt: "Tìm mã, sản phẩm, màu, size, ghi chú")
             .navigationTitle("Đơn hàng")
             .onAppear { refresh() }
@@ -162,7 +165,8 @@ struct OrdersView: View {
             if r.wl { Text("⭐").font(.caption) }
             if scanned.contains(r.c.uppercased()) { Text("✅ Đã quét").font(.caption2.bold()).foregroundColor(.green) }
             else if r.rv { Text("Đã nhận").font(.caption2.bold()).foregroundColor(.green) }
-            if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 5).background(Color.red.opacity(0.2)).cornerRadius(4) }
+            if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 2).background(Color.red.opacity(0.15)).foregroundColor(.red).clipShape(Capsule()) }
+            if !r.p.isEmpty { Text(r.p == "Shopee" ? "Shopee" : (r.p.hasPrefix("TikTok") ? "TikTok" : r.p)).font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 2).background((r.p == "Shopee" ? Color.orange : Color.primary).opacity(0.14)).foregroundColor(r.p == "Shopee" ? .orange : .primary).clipShape(Capsule()) }
         }
     }
 

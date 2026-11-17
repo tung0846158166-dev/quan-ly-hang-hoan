@@ -42,10 +42,7 @@ struct HistoryView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(filters, id: \.self) { f in
-                            Button(f.rawValue) { filter = (filter == f ? nil : f) }
-                                .buttonStyle(.borderedProminent)
-                                .tint(filter == f ? .indigo : .gray)
-                                .font(.footnote.bold())
+                            Chip(title: f.rawValue, selected: filter == f) { filter = (filter == f ? nil : f) }
                         }
                     }.padding(.horizontal)
                 }
@@ -65,12 +62,18 @@ struct HistoryView: View {
                     }.padding(.horizontal)
                 }
                 List {
-                    ForEach(shown) { it in row(it).contentShape(Rectangle()).onTapGesture { detail = it } }
+                    ForEach(shown) { it in
+                        row(it).card(padding: 10).contentShape(Rectangle()).onTapGesture { detail = it }
+                            .listRowSeparator(.hidden).listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
                         .onDelete { idx in idx.map { shown[$0] }.forEach(engine.delete) }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
                 .overlay { if shown.isEmpty { Text("Chưa có lịch sử").foregroundStyle(.secondary) } }
             }
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .searchable(text: $query, prompt: "Tìm mã")
             .navigationTitle("Lịch sử")
             .toolbar {
@@ -91,8 +94,25 @@ struct HistoryView: View {
 
     private var statsLine: some View {
         let s = engine.todayStats(kind: kind)
-        return Text("Hôm nay: \(s.total) mã · \(s.valid) hợp lệ · \(s.dup) trùng · \(s.missing) không có · \(s.pending) chờ PC")
-            .font(.caption.bold()).foregroundStyle(.secondary).padding(.horizontal)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Hôm nay: \(s.total) mã").font(.caption.bold()).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                miniStat("Hợp lệ", s.valid, .green)
+                miniStat("Trùng", s.dup, .orange)
+                miniStat("Không có", s.missing, .red)
+                miniStat("Chờ PC", s.pending, Theme.accent)
+            }
+        }.padding(.horizontal)
+    }
+
+    private func miniStat(_ title: String, _ value: Int, _ color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)").font(.system(size: 20, weight: .bold, design: .rounded)).foregroundColor(value > 0 ? color : .primary)
+            Text(title).font(.caption2.bold()).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 8)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func row(_ it: ScanItem) -> some View {

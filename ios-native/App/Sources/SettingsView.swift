@@ -31,9 +31,31 @@ struct SettingsView: View {
         ]
     }
 
+    private func statusTile(_ title: String, on: Bool, onText: String, offText: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.caption.bold()).foregroundColor(on ? .green : .orange)
+                Text(title).font(.caption.bold()).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 6) {
+                Circle().fill(on ? Color.green : Color.orange).frame(width: 9, height: 9)
+                Text(on ? onText : offText).font(.system(size: 17, weight: .bold, design: .rounded))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card()
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HStack(spacing: 10) {
+                        statusTile("Kênh đồng bộ", on: engine.channelUp, onText: "Đã nối", offText: "Mất kết nối", icon: "antenna.radiowaves.left.and.right")
+                        statusTile("Máy tính", on: engine.pcOnline, onText: "Đang online", offText: "Chờ phản hồi", icon: "desktopcomputer")
+                    }
+                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                }
                 Section("Mã phòng (giống mã trên PC)") {
                     TextField("SHP-2026", text: $roomText)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()

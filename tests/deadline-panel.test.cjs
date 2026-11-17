@@ -3,7 +3,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_
 function grab(name) { const m = src.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\r?\\n    \\}\\r?\\n')); assert.ok(m, name); return m[0]; }
 const code = 'const DEADLINE_DAYS = 3;\n' + ['formatDuration', 'computeDeadlineInfo', 'collectDeadlineItems'].map(grab).join('\n');
 function ctx(orders, cancelled) {
-  const c = { orders, cancelledOrders: cancelled, Date, getDeadlineStatus: o => o.st || 'none', parseFullDate: v => new Date(v) };
+  const c = { orders, cancelledOrders: cancelled, Date, getDeadlineStatus: o => o.st || 'none', getOrderAlertLevel: o => (o.st === 'overdue' ? 'overdue' : (o.st === 'upcoming' ? 'soon' : '')), parseFullDate: v => new Date(v) };
   vm.createContext(c); vm.runInContext(code, c); return c;
 }
 const ago = h => new Date(Date.now() - h * 3600000).toISOString();

@@ -446,7 +446,7 @@ final class SyncEngine: ObservableObject {
         let start = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
         let list = items.filter { $0.kind == kind && $0.time >= start }
         return (list.count, list.filter { $0.status == .success }.count, list.filter { $0.status == .duplicate }.count,
-                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, list.filter { !$0.isSettled }.count)
+                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, items.filter { $0.kind == kind && !$0.isSettled }.count)
     }
 
     func csv(kind: ScanKind) -> String {

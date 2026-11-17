@@ -30,9 +30,9 @@ public struct StatsResult: Equatable {
 }
 
 public enum OrderStats {
-    /// Đơn hủy: bảng đơn hủy (k = "c") và đơn loại "Đơn hủy". Đơn hoàn: bảng chính + kho lưu trữ, còn lại.
-    public static func isReturn(_ r: OrderRow) -> Bool { !r.isCancelled }
-    public static func isCancel(_ r: OrderRow) -> Bool { r.isCancelled }
+    /// Giống bảng thống kê trên máy tính: đơn hoàn = toàn bộ bảng chính + kho lưu trữ; đơn hủy = bảng đơn hủy.
+    public static func isReturn(_ r: OrderRow) -> Bool { r.k != "c" }
+    public static func isCancel(_ r: OrderRow) -> Bool { r.k == "c" }
 
     /// Đọc ngày dạng 31/12/2026, 31-12-2026 14:30, 2026-12-31 hoặc 2026/12/31 08:00:15.
     public static func parseDate(_ raw: String, calendar: Calendar = .current) -> Date? {

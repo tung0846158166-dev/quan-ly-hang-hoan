@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.18
+          name: QuanLyHangHoan-Windows-Installer-v1.9.19
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,10 +88,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.18
-          name: "Quản Lý Hàng Hoàn v1.9.18 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
+          tag_name: v1.9.19
+          name: "Quản Lý Hàng Hoàn v1.9.19 — Bảng thống kê đơn hoàn/hủy theo ngày, tuần, tháng; lọc ngày bảng đơn hủy"
           body: |
-            ### Bản sửa 1.9.18
+            ### Bản sửa 1.9.19
+
+            - Bố cục ứng dụng: menu ☰ trượt ra đè lên bảng (không thu hẹp bảng), bấm ra ngoài hoặc Esc tự đóng; ô tìm kiếm lên thanh trên; phần trên bảng còn 3 hàng một dòng; tiêu đề bảng một màu, hàng thấp hơn để thấy nhiều đơn hơn.
+            - Rà toàn bộ bộ đếm (67 phép kiểm tra trên app thật): mọi nơi dùng chung một cách tính Báo Đỏ/Báo Vàng (tab lọc, danh sách khi bấm tab, ô tổng quan, bảng Thông báo, cảnh báo nổi, bảng Theo dõi, thống kê, danh sách gửi điện thoại).
+            - Sửa: đơn Hư hỏng không còn bị báo quá hạn / lọt vào danh sách Báo Vàng/Đỏ; "Chưa về" ở thanh tổng không tính đơn Hư hỏng và ghi rõ đơn vị SP; số trên nút lọc bảng Theo dõi khớp số dòng.
+            - Sửa: điện thoại nay thấy đơn hủy quá hạn / sắp hạn giống bảng Thông báo PC; đơn có hạn sàn được tính giống nhau trên PC và điện thoại.
+            - Thống kê: đơn hoàn = toàn bộ bảng chính + kho lưu trữ, đơn hủy = bảng đơn hủy (PC và điện thoại giống nhau).
+            - Sửa lỗi danh sách khiếu nại đơn quá 72 giờ không mở được (lỗi biến).
+            - Giao diện mới: thanh tiêu đề dải màu, bảng dạng danh sách (hàng kẻ nhẹ, tô xen kẽ, tiêu đề cố định, rê chuột sáng hàng), nút và ô nhập bo tròn, cửa sổ bo góc có hiệu ứng, thanh cuộn mảnh. Chức năng giữ nguyên.
 
             - Bảng thống kê: chọn xem cả 2 sàn, riêng Shopee hoặc riêng TikTok Shop (cả trên máy tính và iPhone).
 

@@ -24,6 +24,7 @@ function makeCtx(extra = {}) {
     isOrderMatch: (o, kw) => JSON.stringify(o).toLowerCase().includes(String(kw).toLowerCase()),
     parseFullDate: s => { const m = String(s || '').match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : null; },
     getDeadlineStatus: o => o._s || 'normal',
+    getOrderAlertLevel: o => (o._s === 'overdue' ? 'overdue' : (o._s === 'upcoming' ? 'soon' : '')),
     addAppNotification: n => notifs.push(n),
     orders: [], archivedOrders: [], store, notifs,
   }, extra));

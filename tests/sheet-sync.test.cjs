@@ -11,7 +11,7 @@ function ctx(fetchText) {
   const c = {
     localStorage: { getItem: k => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } },
     crypto: { getRandomValues: a => { for (let i = 0; i < a.length; i++) a[i] = i; return a; } },
-    TextEncoder, Date, JSON, Math, String, Array, Uint8Array, console,
+    TextEncoder, Date, JSON, Math, String, Array, Uint8Array, console, setTimeout,
     window: { desktopDiskAPI: { fetchSheetText: async url => { c.urls.push(url); return fetchText(url); } } },
     document: { getElementById: () => null },
     activeImportBatch: null, urls: [], imports: [], alerts: [],
@@ -21,7 +21,8 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
+  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText', 'loadSheetSyncSigs', 'saveSheetSyncSigs', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
+  vm.runInContext("const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi'];", c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -197,4 +198,31 @@ test('Nạp lại dữ liệu không đổi không bị tính là "cập nhật"
   assert.ok(/JSON\.stringify\(mergedModes\) !== JSON\.stringify\(order\.priceModes/.test(fn));
   assert.ok(/JSON\.stringify\(mergedRaw\) !== JSON\.stringify\(order\.rawDetails/.test(fn));
   assert.ok(/JSON\.stringify\(order\.items \|\| \[\]\) !== itemsBefore/.test(fn));
+});
+
+test('Google Sheet 3 tab: lần sau chỉ nạp đơn mới / đổi dữ liệu; bấm Cập nhật ngay thì nạp lại toàn bộ', async () => {
+  let data = [
+    { 'Mã': 'C1', 'Mã đơn': 'O1', 'Loại': 'Trả hàng', 'Mã vận đơn': 'SPX1', 'Trạng thái về': 'Đang về', 'Hàng': 'A · Đen, L × 1', 'SL': '1', 'Ngày': '16/11/2026 10:00', 'Cập nhật': '16/11/2026 11:00' },
+    { 'Mã': 'C2', 'Mã đơn': 'O2', 'Loại': 'Trả hàng', 'Mã vận đơn': 'SPX2', 'Trạng thái về': 'Đang về', 'Hàng': 'B · Đen, L × 1', 'SL': '1', 'Ngày': '16/11/2026 10:00', 'Cập nhật': '16/11/2026 11:00' },
+  ];
+  const c = ctx(async () => ({ ok: true, text: JSON.stringify(data) }));
+  c.localStorage.removeItem = function (k) { delete this._s?.[k]; };
+  c.readWorkbookRowsFromBuffer = buf => JSON.parse(new TextDecoder().decode(buf));
+  const cfg = vm.runInContext('loadSheetSyncCfg()', c);
+  cfg.url = 'https://script.google.com/macros/s/abc/exec'; cfg.sheetTab = 'Hàng hoàn';
+  vm.runInContext('saveSheetSyncCfg', c)(cfg);
+  await vm.runInContext('runSheetSync(false)', c);
+  assert.strictEqual(c.imports[0].files[0].rows.length, 2);
+  data = data.map(r => Object.assign({}, r));
+  data[1]['Trạng thái về'] = 'Đã về shop'; data[1]['Cập nhật'] = '16/11/2026 12:00';
+  data.push({ 'Mã': 'C3', 'Mã đơn': 'O3', 'Loại': 'Trả hàng', 'Mã vận đơn': 'SPX3', 'Trạng thái về': 'Đang về', 'Hàng': 'C · Đen, L × 1', 'SL': '1', 'Ngày': '16/11/2026 10:00', 'Cập nhật': '16/11/2026 12:00' });
+  await vm.runInContext('runSheetSync(false)', c);
+  assert.deepStrictEqual(c.imports[1].files[0].rows.map(r => r['Mã đơn hàng']).join(','), 'O2,O3', 'chỉ đơn đổi + đơn mới');
+  assert.strictEqual(c.imports[1].files[0].rows[0]['Trạng thái Trả hàng/Hoàn tiền'], 'Đã về shop');
+  // sheet đổi ở chỗ không ảnh hưởng đơn nào -> không nạp
+  data = data.concat([]); data.push({ 'Mã đơn': '' });
+  const r3 = await vm.runInContext('runSheetSync(false)', c);
+  assert.strictEqual(r3.unchanged, true); assert.strictEqual(c.imports.length, 2);
+  await vm.runInContext('runSheetSync(true)', c);
+  assert.strictEqual(c.imports[2].files[0].rows.length, 3, 'bấm tay -> nạp lại toàn bộ');
 });

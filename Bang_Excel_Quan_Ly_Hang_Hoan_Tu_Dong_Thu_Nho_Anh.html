@@ -3600,7 +3600,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     };
 
+    // Bộ nhớ tra cứu lớn (vd đồng bộ Google Sheet 90 ngày: ~20.000 mã, >20MB) vượt hạn mức localStorage (~5-10MB).
+    // Khi đó lưu vào IndexedDB (không giới hạn thực tế) và chỉ để lại cờ trong localStorage.
+    const SHOPEE_DB_IDB_FLAG = SHOPEE_DB_KEY + '_in_idb';
+    const SHOPEE_DB_LOCAL_MAX = 1500000;   // ký tự JSON; lớn hơn thì dùng IndexedDB
+    let shopeeDbReady = Promise.resolve(true), shopeeDbSupersededByFile = false;
+    function shopeeDbIdb(mode, value) {
+      return openSafeStoreDb().then(db => {
+        if (!db) return mode === 'get' ? null : false;
+        return new Promise(resolve => {
+          try {
+            const tx = db.transaction(ORDERS_STORE_NAME, mode === 'get' ? 'readonly' : 'readwrite');
+            const store = tx.objectStore(ORDERS_STORE_NAME);
+            if (mode === 'get') { const req = store.get('shopee_order_db'); req.onsuccess = () => resolve(req.result ? req.result.data : null); req.onerror = () => resolve(null); return; }
+            store.put({ key: 'shopee_order_db', data: value, savedAt: new Date().toISOString() });
+            tx.oncomplete = () => resolve(true); tx.onerror = () => resolve(false); tx.onabort = () => resolve(false);
+          } catch (e) { resolve(mode === 'get' ? null : false); }
+        });
+      }).catch(() => (mode === 'get' ? null : false));
+    }
     function loadShopeeOrderDb() {
+      try {
+        if (localStorage.getItem(SHOPEE_DB_IDB_FLAG) === '1') {
+          shopeeOrderDb = {};
+          shopeeDbReady = shopeeDbIdb('get').then(data => {
+            // Nếu trong lúc chờ đã nạp bộ nhớ từ file dữ liệu máy tính thì file là nguồn chuẩn.
+            if (!shopeeDbSupersededByFile && data && typeof data === 'object') shopeeOrderDb = Object.assign(data, shopeeOrderDb);
+            try { updateShopeeDbBadge(); } catch (e) {}
+            return true;
+          });
+          return;
+        }
+      } catch (e) {}
       try {
         const saved = localStorage.getItem(SHOPEE_DB_KEY);
         if (saved !== null) {
@@ -3621,17 +3652,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       updateShopeeDbBadge();
     }
 
+    // Trả về true khi đã lưu vào localStorage; với bộ nhớ lớn trả về Promise<boolean> (lưu IndexedDB).
     function saveShopeeOrderDb(force = false) {
       if (activeImportBatch && !force) return true;
-      try {
-        localStorage.setItem(SHOPEE_DB_KEY, JSON.stringify(shopeeOrderDb));
-        markUnsavedToFile();
-      } catch (e) {
-        console.warn('Storage full for Shopee DB:', e);
-        return false;
+      let json = null;
+      // Nhiều mã (>4000) thì chắc chắn vượt hạn mức: khỏi chuyển cả bộ nhớ thành chuỗi (tốn vài giây với 50.000 đơn).
+      let small = true; { let n = 0; for (const k in shopeeOrderDb) { if (++n > 4000) { small = false; break; } } }
+      if (small) { try { json = JSON.stringify(shopeeOrderDb); } catch (e) { return false; } }
+      if (small && json.length <= SHOPEE_DB_LOCAL_MAX) {
+        try {
+          localStorage.setItem(SHOPEE_DB_KEY, json);
+          localStorage.removeItem(SHOPEE_DB_IDB_FLAG);
+          markUnsavedToFile(); updateShopeeDbBadge();
+          return true;
+        } catch (e) { console.warn('Storage full for Shopee DB, chuyển sang IndexedDB:', e); }
       }
-      updateShopeeDbBadge();
-      return true;
+      json = null;
+      const snapshotDb = shopeeOrderDb;
+      return shopeeDbIdb('put', snapshotDb).then(ok => {
+        if (!ok) { console.warn('Không lưu được bộ nhớ tra cứu vào IndexedDB'); return false; }
+        try { localStorage.setItem(SHOPEE_DB_IDB_FLAG, '1'); localStorage.removeItem(SHOPEE_DB_KEY); } catch (e) {}
+        markUnsavedToFile(); updateShopeeDbBadge();
+        return true;
+      });
     }
 
     function updateShopeeDbBadge() {
@@ -3785,14 +3828,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     function captureImportState() {
       if (typeof diskPersistDebounceTimer !== 'undefined' && diskPersistDebounceTimer) { clearTimeout(diskPersistDebounceTimer); diskPersistDebounceTimer = null; }
-      return { orders: JSON.parse(JSON.stringify(orders)), db: JSON.parse(JSON.stringify(shopeeOrderDb)), notifications: typeof appNotifications === 'undefined' ? null : JSON.parse(JSON.stringify(appNotifications)), unread: typeof unreadNotifCount === 'undefined' ? 0 : unreadNotifCount };
+      // structuredClone nhanh hơn JSON khứ hồi và giữ nguyên việc nhiều mã cùng trỏ 1 đơn trong bộ nhớ tra cứu
+      // (50.000 đơn: ~1 giây thay vì ~3 giây). Không có / lỗi thì dùng cách cũ.
+      const clone = v => { try { if (typeof structuredClone === 'function') return structuredClone(v); } catch (e) {} return JSON.parse(JSON.stringify(v)); };
+      return { orders: clone(orders), db: clone(shopeeOrderDb), notifications: typeof appNotifications === 'undefined' ? null : JSON.parse(JSON.stringify(appNotifications)), unread: typeof unreadNotifCount === 'undefined' ? 0 : unreadNotifCount };
     }
 
     async function rollbackImportState(snapshot) {
       orders = snapshot.orders; shopeeOrderDb = snapshot.db;
       if (snapshot.notifications && typeof appNotifications !== 'undefined') { appNotifications = snapshot.notifications; unreadNotifCount = snapshot.unread; if (typeof saveAppNotifications === 'function') saveAppNotifications(); }
       let dbRestored = false, diskRestored = false;
-      try { dbRestored = saveShopeeOrderDb(true) === true; } catch (e) {}
+      try { dbRestored = (await saveShopeeOrderDb(true)) === true; } catch (e) {}
       try { diskRestored = (await saveOrders(true, true))?.success === true; } catch (e) {}
       try { renderAll(); renderShopeeDbTable(); } catch (e) {}
       return dbRestored && diskRestored;
@@ -3800,7 +3846,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function commitImportState(snapshot) {
       try {
-        if (saveShopeeOrderDb(true) !== true) throw new Error('Không lưu được kho dữ liệu nhập.');
+        if ((await saveShopeeOrderDb(true)) !== true) throw new Error('Không lưu được kho dữ liệu nhập.');
         if ((await saveOrders(true, true))?.success !== true) throw new Error('Không lưu được danh sách đơn an toàn.');
         return true;
       } catch (error) {
@@ -4835,9 +4881,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       const normalize = value => removeVietnameseTones(String(value || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
       const identities = new Set(['orderid', 'madonhang', 'iddonhang', 'madon', 'trackingid', 'trackingnumber', 'mavandon', 'mavandontrahang', 'mvdtrahang', 'returnlogisticstrackingid', 'returntrackingid', 'returnorderid', 'returnid', 'masokhieunai', 'makhieunai']);
-      const products = new Set(['productname', 'product', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname', 'sellersku', 'masku', 'skuname', 'tenphanloai', 'variation', 'hang']);
+      const products = new Set(['productname', 'product', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname', 'sellersku', 'masku', 'skuname', 'tenphanloai', 'variation', 'hang', 'sanpham']);
       const quantities = new Set(['quantity', 'qty', 'soluong', 'returnquantity', 'soluonghoan', 'skuquantityofreturn', 'sl']);
-      const statuses = new Set(['orderstatus', 'returnstatus', 'trangthaidonhang', 'trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaihoan', 'trangthaive']);
+      const statuses = new Set(['orderstatus', 'returnstatus', 'trangthaidonhang', 'trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaihoan', 'trangthaive', 'trangthai']);
       let best = null;
       let hasCells = false;
       for (const name of workbook.SheetNames) {
@@ -4968,6 +5014,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     async function importParsedPlatformFiles(parsedFiles, forcedPlatform) {
       const prepared = preparePlatformImportGroups(parsedFiles);
       if (!prepared.groups.length) return { success: false, message: '⚠️ Không có dòng dữ liệu đơn hàng để nạp.' };
+      try { await shopeeDbReady; } catch (e) {}
       if (activeImportBatch) return { success: false, busy: true, message: '⚠️ Đang nạp dữ liệu. Vui lòng chờ hoàn tất.' };
       const snapshot = captureImportState();
       activeImportBatch = { messages: [] };
@@ -6545,9 +6592,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    function renderShopeeDbTable() {
+    function renderShopeeDbTable(force) {
       const tbody = document.getElementById('shopeeDbTableBody');
       if (!tbody) return;
+      // Cửa sổ đang đóng thì không dựng bảng (với hàng chục nghìn đơn mất vài giây); mở cửa sổ sẽ dựng lại.
+      const modal = document.getElementById('shopeeDbModal');
+      if (!force && modal && modal.classList.contains('hidden') && !document.getElementById('shopeeDbSearchInput')?.matches(':focus')) return;
       const kw = String(document.getElementById('shopeeDbSearchInput')?.value || '').trim().toLowerCase();
 
       const map = new Map();
@@ -6573,7 +6623,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
 
-      tbody.innerHTML = list.map((it, idx) => {
+      const SHOW_MAX = 1000;
+      const shown = list.length > SHOW_MAX ? list.slice(0, SHOW_MAX) : list;
+      tbody.innerHTML = shown.map((it, idx) => {
         const firstItem = it.items && it.items[0] ? it.items[0] : {};
         const plat = it.platform || 'Shopee';
         const platBadge = plat === 'TikTok Shop'
@@ -6601,7 +6653,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="text-right px-2 font-bold text-emerald-700">${formatMoney(it.price || 0)}</td>
           </tr>
         `;
-      }).join('');
+      }).join('') + (list.length > shown.length ? `<tr><td colspan="10" class="text-center py-3 text-slate-500 italic">Đang hiện ${shown.length} / ${list.length} đơn — gõ mã đơn / mã vận đơn vào ô tìm kiếm để lọc.</td></tr>` : '');
     }
 
     async function openShopeeDbModal(initialTab = null) {
@@ -6616,7 +6668,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } else {
         switchImportPlatformTab(currentImportPlatformTab || 'shopee');
       }
-      renderShopeeDbTable();
+      renderShopeeDbTable(true);
       updateShopeeDbBadge();
       document.getElementById('shopeeDbModal').classList.remove('hidden');
     }
@@ -9683,6 +9735,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (desktop && !state.localTimer) {
           state.localTimer = setTimeout(() => {
             state.localTimer = null;
+            // Danh sách lớn chắc chắn vượt hạn mức localStorage (ghi sẽ lỗi): bỏ qua bản sao phụ này, ổ cứng + IndexedDB
+            // đã giữ dữ liệu; khỏi tốn ~1 giây treo màn hình để chuyển 50.000 đơn thành chuỗi.
+            if (orders.length > 8000) return;
             try { writeLocalStorage(); } catch (err) { /* quota: IndexedDB and disk already hold the data */ }
           }, 5000);
           if (state.localTimer && state.localTimer.unref) state.localTimer.unref();
@@ -12804,13 +12859,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // Remove Vietnamese accents so typing "ao khoac" or "ÁO KHOÁC" or "áo khoác" all match!
+    // Gọi hàng triệu lần khi nạp nhiều đơn (tên cột, trạng thái, loại… lặp lại) -> nhớ kết quả.
     function removeVietnameseTones(str) {
-      return String(str || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/đ/g, 'd')
-        .replace(/Đ/g, 'D')
-        .toLowerCase();
+      const vnToneCache = removeVietnameseTones.cache || (removeVietnameseTones.cache = new Map());
+      const s = String(str || '');
+      if (s.length > 200) return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+      let r = vnToneCache.get(s);
+      if (r !== undefined) return r;
+      r = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+      if (vnToneCache.size > 200000) vnToneCache.clear();
+      vnToneCache.set(s, r);
+      return r;
     }
 
     let activeSuggestContext = null;
@@ -13725,8 +13784,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             try { localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(catalogItems)); } catch (e) {}
           }
           if (fileData.shopeeOrderDb && typeof fileData.shopeeOrderDb === 'object') {
-            shopeeOrderDb = fileData.shopeeOrderDb;
-            try { localStorage.setItem(SHOPEE_DB_KEY, JSON.stringify(shopeeOrderDb)); } catch (e) {}
+            shopeeOrderDb = fileData.shopeeOrderDb; shopeeDbSupersededByFile = true;
+            try { saveShopeeOrderDb(true); } catch (e) {}
             updateShopeeDbBadge();
           }
           if (fileData.accountantStock && typeof fileData.accountantStock === 'object') {
@@ -17104,7 +17163,112 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       return { rows: out, removed: rows.length - out.length };
     }
+    // ---- Ghép 3 tab (Hàng hoàn · Trả hàng · Huỷ · chi tiết) thành 1 đơn cho mỗi mã đơn hàng ----
+    // Mỗi tab -> danh sách "kiện": { orderId, claimId, track, type, parcelStatus, requestStatus, reason, buyerNote, returnDate,
+    //   deliveredAt, deadline, refund, items[], updatedAt, src }. Ô có ở nhiều tab: lấy giá trị MỚI NHẤT (theo cột "Cập nhật");
+    //   ô chỉ 1 tab có (vd mã vận đơn ở Hàng hoàn) thì giữ. Sản phẩm: ưu tiên tab có màu/size (Hàng hoàn > Trả hàng > Huỷ).
+    const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi'];   // mặc định: đơn chưa đóng gói, hàng vẫn ở kệ
+    // Danh sách "Loại" bỏ qua trong tab Huỷ (người dùng sửa được trong cửa sổ cài đặt, ngăn cách bằng ;)
+    function sheetSkipTypes(c) {
+      if (!c || typeof c.skipTypes !== 'string') return SHEET_SKIP_CANCEL_TYPES.slice();
+      return c.skipTypes.split(/[;\n]/).map(t => removeVietnameseTones(t.trim()).toLowerCase()).filter(Boolean);
+    }
+    function sheetTabKind(rows) {
+      const norm = k => removeVietnameseTones(String(k || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ks = new Set(Object.keys((rows && rows[0]) || {}).map(norm));
+      if (ks.has('hang') && ks.has('madon') && ks.has('trangthaive')) return 'hanghoan';
+      if (ks.has('matrahang') && ks.has('madon')) return 'trahang';
+      if (ks.has('madon') && ks.has('loai') && (ks.has('aihuy') || ks.has('hanhtrinh'))) return 'huy';
+      return '';
+    }
+    function sheetRowsToParcels(rows, kind, skipTypes) {
+      const skipList = Array.isArray(skipTypes) ? skipTypes : SHEET_SKIP_CANCEL_TYPES;
+      const norm = k => removeVietnameseTones(String(k || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const g = (r, ...names) => { for (const k of Object.keys(r)) if (names.includes(norm(k))) { const v = String(r[k] ?? '').trim(); if (v) return v; } return ''; };
+      const tms = v => { const d = parseFullDate(String(v || '')); return d && !isNaN(d.getTime()) ? d.getTime() : 0; };
+      const out = new Map(); let skipped = 0;
+      rows.forEach(r => {
+        const orderId = g(r, 'madon'); if (!orderId) return;
+        const loai = g(r, 'loai'); const loaiN = removeVietnameseTones(loai).toLowerCase();
+        if (kind === 'huy' && skipList.some(t => loaiN.includes(t))) { skipped++; return; }
+        let p = out.get(orderId);
+        if (!p) {
+          p = { orderId, src: kind, items: [], claimId: g(r, 'ma', 'matrahang'), track: kind === 'hanghoan' ? g(r, 'mavandon') : '',
+            type: '', parcelStatus: '', requestStatus: '', reason: g(r, 'lydo'), buyerNote: g(r, 'khachghi'), whoCancelled: g(r, 'aihuy'), journey: g(r, 'hanhtrinh'),
+            returnDate: g(r, 'ngay', 'ngayyeucau'), deliveredAt: g(r, 'veshopluc'), deadline: g(r, 'hankhieunai'), refund: g(r, 'tien', 'hoantien'),
+            updatedAt: tms(g(r, 'capnhat')) };
+          if (kind === 'hanghoan') { p.parcelStatus = g(r, 'trangthaive'); p.type = /bom|that bai|khong thanh cong/.test(loaiN) ? 'bom' : (/huy/.test(loaiN) ? 'cancel' : 'return'); }
+          else {
+            p.requestStatus = g(r, 'trangthai');
+            if (kind === 'trahang') p.type = 'return';
+            else p.type = /bom/.test(loaiN) ? 'bom' : (/tra hang|hoan tien/.test(loaiN) ? 'return' : 'cancel');
+            p.typeLabel = loai;
+          }
+          out.set(orderId, p);
+        }
+        if (kind === 'hanghoan') {
+          parseSheetItemsCell(g(r, 'hang'), g(r, 'sl')).forEach(it => p.items.push({ name: it.name, variation: it.variation, qty: it.qty }));
+        } else {
+          p.items.push({ name: g(r, 'tensanpham', 'sanpham'), variation: '', qty: parseInt(g(r, 'sl'), 10) || 1 });
+        }
+      });
+      return { parcels: Array.from(out.values()), skipped };
+    }
+    // Giữ đơn có ngày yêu cầu/huỷ trong N ngày gần nhất (N trống/0 = lấy hết). Đơn không có ngày thì giữ.
+    function filterSheetParcelsByDays(parcels, days, now) {
+      const n = parseInt(days, 10);
+      if (!n || n <= 0) return { parcels, dropped: 0 };
+      const cut = (now || Date.now()) - n * 86400000;
+      const kept = parcels.filter(p => { const d = parseFullDate(String(p.returnDate || '')); return !d || isNaN(d.getTime()) || d.getTime() >= cut; });
+      return { parcels: kept, dropped: parcels.length - kept.length };
+    }
+    function mergeSheetParcels(lists) {
+      const rank = { hanghoan: 3, trahang: 2, huy: 1 };
+      const by = new Map();
+      lists.forEach(list => list.forEach(p => { if (!by.has(p.orderId)) by.set(p.orderId, []); by.get(p.orderId).push(p); }));
+      const merged = [];
+      by.forEach(ps => {
+        // mới nhất trước; tab không có cột "Cập nhật" (Trả hàng, cập nhật mỗi sáng) xếp sau
+        const newest = ps.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        const pickF = f => { for (const p of newest) if (p[f]) return p[f]; return ''; };
+        const m = {};
+        ['claimId', 'track', 'parcelStatus', 'requestStatus', 'reason', 'buyerNote', 'whoCancelled', 'journey', 'returnDate', 'deliveredAt', 'deadline', 'refund', 'typeLabel'].forEach(f => { m[f] = pickF(f); });
+        m.orderId = ps[0].orderId;
+        // Loại: bom nếu bất kỳ tab nào nói bom; còn lại theo dòng mới nhất
+        m.type = ps.some(p => p.type === 'bom') ? 'bom' : (newest.find(p => p.type) || {}).type || 'return';
+        // Sản phẩm: lấy từ tab chi tiết nhất (có màu/size)
+        const itemSrc = ps.slice().sort((a, b) => (rank[b.src] || 0) - (rank[a.src] || 0)).find(p => p.items.some(it => it.name));
+        m.items = itemSrc ? itemSrc.items : [];
+        m.sources = Array.from(new Set(ps.map(p => p.src)));
+        merged.push(m);
+      });
+      return merged;
+    }
+    // Đơn đã ghép -> các dòng theo tên cột file Excel Shopee (bộ nạp sẵn có hiểu được)
+    function sheetParcelsToRows(parcels) {
+      const rows = [];
+      parcels.forEach(m => {
+        const base = { 'Mã đơn hàng': m.orderId, 'Mã vận đơn': m.track, 'Mã số khiếu nại': m.claimId,
+          'Lý do trả hàng/hoàn tiền': m.reason, 'Ghi chú của Người mua khi trả hàng': m.buyerNote, 'Thời gian yêu cầu': m.returnDate,
+          'Thời gian giao hàng thành công': m.deliveredAt, 'Người bán cần phản hồi trước': m.deadline, 'Tổng số tiền hoàn trả': m.refund };
+        const status = m.parcelStatus || m.requestStatus;   // trạng thái kiện (Đang về / Đã về shop) có ích cho kho hơn trạng thái yêu cầu
+        if (m.type === 'bom') { base['Lý do hủy'] = 'Giao hàng thất bại'; base['Trạng thái Trả hàng/Hoàn tiền'] = status; }
+        else if (m.type === 'cancel') { base['Trạng thái đơn hàng'] = (m.typeLabel ? m.typeLabel + ' · ' : '') + (status || 'Đã hủy'); }
+        else base['Trạng thái Trả hàng/Hoàn tiền'] = status;
+        const items = m.items.length ? m.items : [{ name: '', variation: '', qty: 1 }];
+        items.forEach((it, i) => rows.push(Object.assign({}, base, { 'Tên sản phẩm': it.name, 'Tên phân loại hàng': it.variation, 'Số lượng': String(it.qty || 1) },
+          i > 0 ? { 'Tổng số tiền hoàn trả': '' } : {})));
+      });
+      return rows;
+    }
     let sheetSyncRunning = false;
+    function loadSheetSyncSigs() {
+      try { const v = JSON.parse(localStorage.getItem(SHEET_SYNC_KEY + '_sig') || 'null'); return v && typeof v === 'object' ? v : null; } catch (e) { return null; }
+    }
+    function saveSheetSyncSigs(sigs) {
+      try { localStorage.setItem(SHEET_SYNC_KEY + '_sig', JSON.stringify(sigs)); }
+      catch (e) { try { localStorage.removeItem(SHEET_SYNC_KEY + '_sig'); } catch (e2) {} }   // không lưu được -> lần sau nạp toàn bộ (vẫn đúng)
+    }
     async function runSheetSync(manual) {
       const c = loadSheetSyncCfg();
       if (!c.url) { if (manual) alert('⚠️ Chưa dán địa chỉ Apps Script của Google Sheet.'); return { success: false }; }
@@ -17131,24 +17295,50 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         const hash = sheetSyncHash(texts.map(t => t.tab + '\u0001' + t.text).join('\u0002'));
         if (!manual && hash === c.lastHash) { finish(true, 'Sheet không thay đổi'); return { success: true, unchanged: true }; }
-        const files = [], skipped = [];
-        let oldRequests = 0;
+        const files = [], skipped = [], parcelLists = [];
+        let oldRequests = 0, skippedCancel = 0;
+        const breathe = () => new Promise(r => setTimeout(r, 0));   // nhả màn hình giữa các bước để app không đơ
         for (const t of texts) {
+          await breathe();
           let r = [];
           try { r = readWorkbookRowsFromBuffer(new TextEncoder().encode(t.text).buffer, true); } catch (e) { r = []; }
-          if (r.length) {
-            const kept = keepLatestRequestPerOrder(r);
-            if (kept.removed) oldRequests += kept.removed;
-            files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: normalizeSheetRows(kept.rows) });
-          } else skipped.push(t.tab || 'tab đầu tiên');
+          if (!r.length) { skipped.push(t.tab || 'tab đầu tiên'); continue; }
+          const kept = keepLatestRequestPerOrder(r);
+          if (kept.removed) oldRequests += kept.removed;
+          const kind = sheetTabKind(kept.rows);
+          if (kind) { const pr = sheetRowsToParcels(kept.rows, kind, sheetSkipTypes(c)); skippedCancel += pr.skipped; parcelLists.push(pr.parcels); }
+          else files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: kept.rows });
+        }
+        let mergedCount = 0, tooOld = 0, unchangedOrders = 0, newSigs = null;
+        if (parcelLists.length) {
+          await breathe();
+          const byDays = filterSheetParcelsByDays(mergeSheetParcels(parcelLists), c.maxDays);
+          let merged = byDays.parcels; tooOld = byDays.dropped;
+          mergedCount = merged.length;
+          // Chỉ nạp đơn MỚI hoặc có dữ liệu ĐỔI so với lần trước (Shopee cập nhật) -> lần 10 phút sau rất nhẹ
+          // dù sheet có hàng chục nghìn đơn. Bấm "Cập nhật ngay" thì nạp lại toàn bộ.
+          newSigs = {};
+          merged.forEach(m => { newSigs[m.orderId] = sheetSyncHash(JSON.stringify(m)); });
+          if (!manual) {
+            const oldSigs = loadSheetSyncSigs();
+            if (oldSigs) { const before = merged.length; merged = merged.filter(m => oldSigs[m.orderId] !== newSigs[m.orderId]); unchangedOrders = before - merged.length; }
+          }
+          if (merged.length) files.unshift({ name: 'Google Sheet', rows: sheetParcelsToRows(merged) });
+          else if (!files.length && unchangedOrders) {
+            const cfg0 = loadSheetSyncCfg(); cfg0.lastHash = hash; saveSheetSyncCfg(cfg0);
+            finish(true, mergedCount + ' đơn ghép từ ' + parcelLists.length + ' tab, không đơn nào đổi dữ liệu');
+            return { success: true, unchanged: true };
+          }
         }
         if (!files.length) throw new Error('Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
         const rows = files.reduce((a, f) => a.concat(f.rows), []);
+        await breathe();
         const res = await importParsedPlatformFiles(files, 'Shopee');
         if (!res.success) throw new Error(String(res.message || 'Không nạp được').replace(/^[^\wÀ-ỹ]+/, ''));
         const cfg = loadSheetSyncCfg(); cfg.lastHash = hash; saveSheetSyncCfg(cfg);
+        if (newSigs) saveSheetSyncSigs(newSigs);
         const summary = (res.messages || []).join(' | ').replace(/\s+/g, ' ').slice(0, 300);
-        finish(true, rows.length + ' dòng từ ' + files.length + ' tab' + (oldRequests ? ' (bỏ ' + oldRequests + ' dòng yêu cầu cũ / đã hủy của cùng đơn)' : '') + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
+        finish(true, (mergedCount ? mergedCount + ' đơn ghép từ ' + parcelLists.length + ' tab' + (unchangedOrders ? ' (' + (mergedCount - unchangedOrders) + ' đơn mới/đổi được nạp, ' + unchangedOrders + ' đơn không đổi)' : '') : rows.length + ' dòng') + (skippedCancel ? ', bỏ ' + skippedCancel + ' đơn huỷ thuộc loại bỏ qua' : '') + (tooOld ? ', bỏ ' + tooOld + ' đơn cũ hơn ' + c.maxDays + ' ngày' : '') + (oldRequests ? ', bỏ ' + oldRequests + ' dòng yêu cầu cũ / đã hủy của cùng đơn' : '') + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
         if (typeof addAuditLog === 'function') try { addAuditLog('🔗 GOOGLE SHEET', 'Tự cập nhật từ Google Sheet: ' + rows.length + ' dòng. ' + summary); } catch (e) {}
         if (manual) alert('✅ Đã cập nhật từ Google Sheet (' + rows.length + ' dòng).\n\n' + (res.message || ''));
         return { success: true };
@@ -17231,6 +17421,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('sheetSyncUrl').value = c.url || '';
       document.getElementById('sheetSyncSheetLink').value = c.sheetLink || '';
       document.getElementById('sheetSyncTab').value = c.sheetTab || '';
+      document.getElementById('sheetSyncSkip').value = typeof c.skipTypes === 'string' ? c.skipTypes : 'Huỷ trước chuẩn bị';
+      document.getElementById('sheetSyncDays').value = c.maxDays ? String(c.maxDays) : '';
       document.getElementById('sheetSyncEnabled').checked = !!c.enabled;
       document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
       document.getElementById('sheetSyncManifest').value = sheetSyncManifestText();
@@ -17257,6 +17449,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         return;
       }
       if (url !== c.url) c.lastHash = '';
+      const skip = String(document.getElementById('sheetSyncSkip').value || '').trim();
+      if (skip !== (typeof c.skipTypes === 'string' ? c.skipTypes : 'Huỷ trước chuẩn bị')) c.lastHash = '';   // đổi loại bỏ qua thì nạp lại
+      c.skipTypes = skip;
+      const days = Math.max(0, parseInt(document.getElementById('sheetSyncDays').value, 10) || 0);
+      if (days !== (c.maxDays || 0)) c.lastHash = '';
+      c.maxDays = days;
+      if (!c.lastHash) { try { localStorage.removeItem(SHEET_SYNC_KEY + '_sig'); } catch (e) {} }
       c.url = url; c.enabled = !!document.getElementById('sheetSyncEnabled').checked && !!url;
       saveSheetSyncCfg(c); renderSheetSyncStatus();
       if (runNow) runSheetSync(true);
@@ -20612,6 +20811,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div>
           <b class="text-xs">URL ứng dụng web</b>
           <input id="sheetSyncUrl" type="text" placeholder="https://script.google.com/macros/s/…/exec" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <b class="text-xs">Tab Huỷ: bỏ qua các loại</b>
+          <input id="sheetSyncSkip" type="text" placeholder="vd: Huỷ trước chuẩn bị; Chưa thanh toán; Chỉ hoàn tiền" title="Gõ đúng chữ ở cột Loại, nhiều loại ngăn cách bằng dấu ;" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <div class="text-[11px] mt-0.5 text-slate-500">Đơn thuộc các loại này không đưa vào app (hàng không quay về kho). Đơn đã nạp trước đó không bị xoá.</div>
+        </div>
+        <div>
+          <b class="text-xs">Chỉ lấy đơn trong số ngày gần nhất</b>
+          <input id="sheetSyncDays" type="number" min="0" placeholder="để trống = lấy hết (tab Huỷ có 90 ngày)" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <div class="text-[11px] mt-0.5 text-slate-500">Tính theo ngày yêu cầu / ngày huỷ. Đơn cũ đã xử lý ngoài app sẽ hiện "quá hạn" nếu đưa vào.</div>
         </div>
         <label class="flex items-center gap-2 text-sm font-bold"><input id="sheetSyncEnabled" type="checkbox" class="w-4 h-4" /> Tự cập nhật mỗi 10 phút</label>
         <div id="sheetSyncStatus" class="text-xs font-semibold text-slate-600"></div>

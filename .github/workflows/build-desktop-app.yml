@@ -89,9 +89,14 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v1.9.24
-          name: "Quản Lý Hàng Hoàn v1.9.24 — Google Sheet: đọc đúng tab Hàng hoàn (Mã, Mã đơn, Loại, Trạng thái về, Hàng, Lý do…)"
+          name: "Quản Lý Hàng Hoàn v1.9.24 — Google Sheet: ghép 3 tab Hàng hoàn · Trả hàng · Huỷ, chịu được 50.000 đơn"
           body: |
             ### Bản sửa 1.9.24
+
+            - Google Sheet: đọc cả 3 tab "Hàng hoàn", "Trả hàng", "Huỷ · chi tiết" và GHÉP thành 1 đơn cho mỗi mã đơn hàng: ô có ở nhiều tab lấy giá trị mới nhất (theo cột Cập nhật), ô chỉ một tab có (mã vận đơn, màu/size ở tab Hàng hoàn; ghi chú khách ở tab Trả hàng) được giữ; tab nào báo Bom thì đơn là Bom. Không còn đơn trùng.
+            - Tab Huỷ: bỏ qua loại "Huỷ trước chuẩn bị" (hàng chưa đóng gói). Có ô tự chọn thêm loại bỏ qua (vd Chưa thanh toán; Chỉ hoàn tiền) và ô "chỉ lấy đơn trong N ngày gần nhất".
+            - Các lần tự cập nhật sau chỉ nạp đơn mới hoặc đơn Shopee vừa đổi dữ liệu; bấm "Cập nhật ngay" thì nạp lại toàn bộ.
+            - Chịu tải 50.000 đơn: bộ nhớ tra cứu lớn được lưu vào IndexedDB (trước đây vượt hạn mức localStorage nên nạp nhiều đơn bị từ chối và phục hồi); nạp nhanh hơn ~3 lần; bảng bộ nhớ tra cứu chỉ dựng khi mở và hiện tối đa 1.000 dòng (có ô tìm).
 
             - Google Sheet: đọc đúng kiểu tab "Hàng hoàn" (Mã | Mã đơn | Loại | Mã vận đơn | Trạng thái về | Về shop lúc | Hạn khiếu nại | Hàng | SL | Tiền | Lý do | Ngày). Cột Hàng có nhiều sản phẩm ("TÊN · Màu, Size × SL; …") được tách đúng từng sản phẩm, màu, size, số lượng; Loại "Bom" thành Giao không thành công; Trạng thái về thành Trạng thái sàn; Lý do, Ngày, Tiền, Hạn khiếu nại vào đúng cột.
             - Đoạn mã Apps Script đọc sheet qua Google Sheets API (chỉ cần quyền XEM; bản cũ dùng SpreadsheetApp.openById bị Google đòi quyền sửa nên báo lỗi "Các quyền được chỉ định không đủ"). Tệp kê khai tự bật Google Sheets API.

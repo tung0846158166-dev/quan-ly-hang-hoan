@@ -93,7 +93,7 @@ jobs:
           body: |
             ### Bản sửa 1.9.23
 
-            - Mới: tự cập nhật đơn Shopee từ Google Sheet mỗi 10 phút (menu ☰ › 🔗 Google Sheet). Kết nối qua một dự án Apps Script RIÊNG (tạo tại script.google.com, chỉ đọc sheet, không đụng đoạn mã hay phần mềm khác đang dùng sheet), có mã bí mật riêng; sheet được nạp như file Excel Shopee: đơn đã có (bảng chính, kho lưu trữ, bảng đơn hủy) chỉ cập nhật, đơn chưa có thì thêm mới; sheet không đổi thì bỏ qua. Có trạng thái lần cập nhật gần nhất và nút cập nhật ngay.
+            - Mới: tự cập nhật đơn Shopee từ Google Sheet mỗi 10 phút (menu ☰ › 🔗 Google Sheet). Kết nối qua một dự án Apps Script RIÊNG (tạo tại script.google.com, chỉ đọc sheet, không đụng đoạn mã hay phần mềm khác đang dùng sheet), có mã bí mật riêng; chỉ đọc các tab được chọn (vd "Hàng hoàn; Trả hàng"); sheet được nạp như file Excel Shopee: đơn đã có (bảng chính, kho lưu trữ, bảng đơn hủy) chỉ cập nhật, đơn chưa có thì thêm mới; sheet không đổi thì bỏ qua. Có trạng thái lần cập nhật gần nhất và nút cập nhật ngay.
 
             ### Bản sửa 1.9.22
 

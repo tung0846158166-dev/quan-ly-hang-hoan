@@ -17039,19 +17039,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         saveSheetSyncCfg(cfg); renderSheetSyncStatus();
       };
       try {
-        const text = await fetchSheetSyncText(buildSheetSyncUrl(c));
-        const head = String(text || '').trim().slice(0, 200);
-        if (/^\{\s*"error"/.test(head)) { let m = head; try { m = JSON.parse(text).error; } catch (e) {} throw new Error(m); }
-        if (/^<!doctype html|^<html/i.test(head)) throw new Error('Google trả về trang web thay vì dữ liệu — kiểm tra lại bước "Triển khai" (Ai có quyền truy cập: Bất kỳ ai).');
-        const hash = sheetSyncHash(text);
+        const tabs = sheetSyncTabs(c);
+        const texts = [];
+        for (const tab of (tabs.length ? tabs : [''])) {
+          const text = await fetchSheetSyncText(buildSheetSyncUrl(c) + (tab ? '&tab=' + encodeURIComponent(tab) : ''));
+          const head = String(text || '').trim().slice(0, 200);
+          if (/^\{\s*"error"/.test(head)) { let m = head; try { m = JSON.parse(text).error; } catch (e) {} throw new Error((tab ? 'Tab "' + tab + '": ' : '') + m); }
+          if (/^<!doctype html|^<html/i.test(head)) throw new Error('Google trả về trang web thay vì dữ liệu — kiểm tra lại bước "Triển khai" (Ai có quyền truy cập: Bất kỳ ai).');
+          texts.push({ tab, text });
+        }
+        const hash = sheetSyncHash(texts.map(t => t.tab + '\u0001' + t.text).join('\u0002'));
         if (!manual && hash === c.lastHash) { finish(true, 'Sheet không thay đổi'); return { success: true, unchanged: true }; }
-        const rows = readWorkbookRowsFromBuffer(new TextEncoder().encode(text).buffer, true);
-        if (!rows.length) throw new Error('Sheet không có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
-        const res = await importParsedPlatformFiles([{ name: 'Google Sheet', rows }], 'Shopee');
+        const files = [], skipped = [];
+        for (const t of texts) {
+          let r = [];
+          try { r = readWorkbookRowsFromBuffer(new TextEncoder().encode(t.text).buffer, true); } catch (e) { r = []; }
+          if (r.length) files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: r }); else skipped.push(t.tab || 'tab đầu tiên');
+        }
+        if (!files.length) throw new Error('Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
+        const rows = files.reduce((a, f) => a.concat(f.rows), []);
+        const res = await importParsedPlatformFiles(files, 'Shopee');
         if (!res.success) throw new Error(String(res.message || 'Không nạp được').replace(/^[^\wÀ-ỹ]+/, ''));
         const cfg = loadSheetSyncCfg(); cfg.lastHash = hash; saveSheetSyncCfg(cfg);
         const summary = (res.messages || []).join(' | ').replace(/\s+/g, ' ').slice(0, 300);
-        finish(true, rows.length + ' dòng. ' + summary);
+        finish(true, rows.length + ' dòng từ ' + files.length + ' tab' + (skipped.length ? ' (bỏ qua tab không có cột đơn hàng: ' + skipped.join(', ') + ')' : '') + '. ' + summary);
         if (typeof addAuditLog === 'function') try { addAuditLog('🔗 GOOGLE SHEET', 'Tự cập nhật từ Google Sheet: ' + rows.length + ' dòng. ' + summary); } catch (e) {}
         if (manual) alert('✅ Đã cập nhật từ Google Sheet (' + rows.length + ' dòng).\n\n' + (res.message || ''));
         return { success: true };
@@ -17070,6 +17081,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (el) { el.textContent = txt; el.className = 'text-xs font-semibold ' + (c.lastAt && !c.lastOk ? 'text-rose-600' : 'text-slate-600'); }
       if (badge) badge.textContent = !c.url || !c.enabled ? 'tắt' : (c.lastAt && !c.lastOk ? 'lỗi' : 'bật');
     }
+    // Nhiều tab: ngăn cách bằng dấu ; hoặc xuống dòng. Trống = tab đầu tiên.
+    function sheetSyncTabs(c) {
+      return String((c && c.sheetTab) || '').split(/[;\n]/).map(t => t.trim()).filter(Boolean);
+    }
     function sheetIdFromLink(v) {
       const m = String(v || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/) || String(v || '').match(/^\s*([a-zA-Z0-9_-]{30,})\s*$/);
       return m ? m[1] : '';
@@ -17077,7 +17092,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function sheetSyncScriptText() {
       const c = loadSheetSyncCfg();
       const sid = String(c.sheetId || '').replace(/[^a-zA-Z0-9_-]/g, '');
-      const tab = String(c.sheetTab || '').replace(/\\/g, '').replace(/'/g, "\\'");
+      const tabs = sheetSyncTabs(c).map(t => "'" + t.replace(/\\/g, '').replace(/'/g, "\\'") + "'");
       return [
         "// Dự án Apps Script RIÊNG cho app Quản Lý Hàng Hoàn (tạo tại script.google.com > Dự án mới).",
         "// Chỉ ĐỌC sheet, không sửa sheet, không ảnh hưởng các phần mềm / đoạn mã khác đang dùng sheet.",
@@ -17085,14 +17100,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         "// Không có mã bí mật bên dưới thì không ai đọc được dữ liệu.",
         "const TOKEN = '" + c.token + "';",
         "const SHEET_ID = '" + sid + "'; // mã của Google Sheet (lấy từ link)",
-        "const SHEET_NAME = '" + tab + "'; // tên tab chứa đơn Shopee; để trống = tab đầu tiên",
+        "const SHEET_NAMES = [" + tabs.join(', ') + "]; // CHỈ các tab này được đọc; để trống [] = tab đầu tiên",
         "function doGet(e) {",
         "  if (!e || !e.parameter || e.parameter.token !== TOKEN) {",
         "    return ContentService.createTextOutput(JSON.stringify({ error: 'Sai mã bí mật' })).setMimeType(ContentService.MimeType.JSON);",
         "  }",
         "  const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();",
-        "  const sh = SHEET_NAME ? ss.getSheetByName(SHEET_NAME) : ss.getSheets()[0];",
-        "  if (!sh) return ContentService.createTextOutput(JSON.stringify({ error: 'Không thấy tab ' + SHEET_NAME })).setMimeType(ContentService.MimeType.JSON);",
+        "  const want = String(e.parameter.tab || '');",
+        "  if (SHEET_NAMES.length && want && SHEET_NAMES.indexOf(want) < 0) {",
+        "    return ContentService.createTextOutput(JSON.stringify({ error: 'Tab không nằm trong danh sách được phép: ' + want })).setMimeType(ContentService.MimeType.JSON);",
+        "  }",
+        "  const name = want || SHEET_NAMES[0] || '';",
+        "  const sh = name ? ss.getSheetByName(name) : ss.getSheets()[0];",
+        "  if (!sh) return ContentService.createTextOutput(JSON.stringify({ error: 'Không thấy tab ' + name })).setMimeType(ContentService.MimeType.JSON);",
         "  const values = sh.getDataRange().getDisplayValues();",
         "  const csv = values.map(r => r.map(v => { v = String(v); return /[\",\\n\\r]/.test(v) ? '\"' + v.replace(/\"/g, '\"\"') + '\"' : v; }).join(',')).join('\\r\\n');",
         "  return ContentService.createTextOutput(csv).setMimeType(ContentService.MimeType.CSV);",
@@ -20477,7 +20497,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="p-5 space-y-4 text-sm">
         <div class="text-xs text-slate-600">Mỗi 10 phút app đọc sheet như một file Excel Shopee nạp vào: đơn đã có (ở bảng chính, kho lưu trữ hay bảng đơn hủy) chỉ được cập nhật, đơn chưa có thì thêm mới. Sheet không đổi thì bỏ qua. Dòng tiêu đề cần có tên cột như file xuất từ Shopee (Mã đơn hàng, Mã vận đơn, Tên sản phẩm, Số lượng, Trạng thái…).</div>
         <ol class="list-decimal pl-5 space-y-1 text-xs text-slate-700">
-          <li>Dán <b>link Google Sheet</b> và tên tab chứa đơn vào 2 ô dưới — đoạn mã tự điền sẵn.</li>
+          <li>Dán <b>link Google Sheet</b> và <b>tên các tab cần lấy</b> (ngăn cách bằng dấu ;) vào 2 ô dưới — đoạn mã tự điền sẵn. Chỉ các tab này được đọc; các tab khác không bị đụng tới.</li>
           <li>Mở <b>script.google.com</b> → <b>Dự án mới</b> (dự án riêng, <b>không</b> mở từ trong sheet, không xóa hay sửa đoạn mã nào đang có) → dán đoạn mã bên dưới thay cho nội dung mặc định của dự án mới, bấm Lưu. Đoạn mã chỉ <b>đọc</b> sheet nên không ảnh hưởng các phần mềm khác đang dùng sheet.</li>
           <li><b>Khóa chỉ đọc (nên làm):</b> trong dự án bấm ⚙️ <b>Cài đặt dự án</b> → tích <b>Hiển thị tệp kê khai "appsscript.json" trong trình chỉnh sửa</b> → quay lại <b>Trình chỉnh sửa</b>, mở tệp <code>appsscript.json</code>, chọn hết và dán <b>tệp kê khai</b> bên dưới, Lưu. Khi đó Google chỉ cho đoạn mã quyền <b>xem</b> bảng tính: không thể ghi, sửa hay xóa gì trên sheet.</li>
           <li>Trong dự án mới đó bấm <b>Triển khai › Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b>, Thực thi với tư cách <b>Tôi</b>, Ai có quyền truy cập <b>Bất kỳ ai</b> → Triển khai, cấp quyền.</li>
@@ -20487,8 +20507,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <div class="col-span-2"><b class="text-xs">Link Google Sheet</b>
             <input id="sheetSyncSheetLink" oninput="onSheetSyncSourceInput()" type="text" placeholder="https://docs.google.com/spreadsheets/d/…" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
             <div id="sheetSyncLinkWarn" class="text-[11px] mt-0.5 text-slate-500"></div></div>
-          <div><b class="text-xs">Tên tab chứa đơn</b>
-            <input id="sheetSyncTab" oninput="onSheetSyncSourceInput()" type="text" placeholder="để trống = tab đầu" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+          <div><b class="text-xs">Các tab cần lấy</b>
+            <input id="sheetSyncTab" oninput="onSheetSyncSourceInput()" type="text" placeholder="vd: Hàng hoàn; Trả hàng" title="Gõ đúng tên tab, nhiều tab ngăn cách bằng dấu ;" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <div class="text-[11px] mt-0.5 text-slate-500">Đúng tên tab, ngăn cách bằng dấu ; — chỉ các tab này được đọc.</div></div>
         </div>
         <div>
           <div class="flex items-center justify-between mb-1"><b class="text-xs">Đoạn mã Apps Script</b><button type="button" id="btnCopySheetScript" onclick="copySheetSyncScript()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép đoạn mã</button></div>

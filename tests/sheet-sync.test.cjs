@@ -21,7 +21,7 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
+  for (const n of ['sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -65,7 +65,7 @@ test('Google Sheet: đoạn mã Apps Script hợp lệ và kiểm tra mã bí m�
   assert.strictEqual(id, '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789');
   const cfg = vm.runInContext('loadSheetSyncCfg()', c); cfg.sheetId = id; cfg.sheetTab = "Đơn hoàn"; vm.runInContext('saveSheetSyncCfg', c)(cfg);
   const code2 = vm.runInContext('sheetSyncScriptText()', c);
-  assert.ok(code2.includes("const SHEET_ID = '" + id + "'") && code2.includes("const SHEET_NAME = 'Đơn hoàn'"));
+  assert.ok(code2.includes("const SHEET_ID = '" + id + "'") && code2.includes("const SHEET_NAMES = ['Đơn hoàn']"));
   assert.doesNotThrow(() => new vm.Script(code2));
   // chạy thử doGet với ContentService/SpreadsheetApp giả
   const out = {};
@@ -74,6 +74,7 @@ test('Google Sheet: đoạn mã Apps Script hợp lệ và kiểm tra mã bí m�
   g.SpreadsheetApp.openById = () => g.SpreadsheetApp.getActiveSpreadsheet();
   vm.createContext(g); vm.runInContext(code, g);
   g.doGet({ parameter: { token: 'sai' } }); assert.strictEqual(out.m, 'json');
+  // đoạn mã không giới hạn tab (SHEET_NAMES = []) đọc tab đầu tiên
   g.doGet({ parameter: { token: tok } }); assert.strictEqual(out.m, 'csv');
   assert.strictEqual(out.t, 'Mã đơn hàng,Tên sản phẩm\r\nA1,"Áo, ""len"""');
 });
@@ -89,7 +90,7 @@ test('Google Sheet: đoạn mã chỉ đọc (không có lệnh ghi/xóa sheet) 
   const c = ctx(async () => ({ ok: true, text: '' }));
   const code = vm.runInContext('sheetSyncScriptText()', c);
   const calls = [...code.matchAll(/\.([a-zA-Z]+)\(/g)].map(x => x[1]);
-  const allowed = new Set(['createTextOutput', 'stringify', 'setMimeType', 'openById', 'getActiveSpreadsheet', 'getSheetByName', 'getSheets', 'getDataRange', 'getDisplayValues', 'map', 'test', 'replace', 'join']);
+  const allowed = new Set(['createTextOutput', 'stringify', 'setMimeType', 'openById', 'getActiveSpreadsheet', 'getSheetByName', 'getSheets', 'getDataRange', 'getDisplayValues', 'map', 'test', 'replace', 'join', 'indexOf']);
   assert.deepStrictEqual(calls.filter(x => !allowed.has(x)), [], 'chỉ dùng lệnh đọc');
   assert.ok(!/\.(set(Value|Values|Formula|Formulas|Note)|clear|delete|insert|append|remove|copyTo|moveTo|sort)\w*\(/.test(code));
   vm.runInContext(extract('sheetSyncManifestText'), c);
@@ -102,4 +103,27 @@ test('Google Sheet: app chỉ GỬI yêu cầu đọc (GET), không có đườn
   const fn = main.slice(main.indexOf('function fetchSheetText'), main.indexOf("ipcMain.handle('fetch-sheet-text'"));
   assert.ok(fn.includes("require('https').get("));
   assert.ok(!/method:\s*'(POST|PUT|DELETE|PATCH)'|\.request\(/.test(fn));
+});
+
+test('Google Sheet: chỉ đọc các tab đã chọn; tab không có cột đơn hàng thì bỏ qua, các tab còn lại vẫn nạp', async () => {
+  const fetched = [];
+  const c = ctx(async url => { const tab = decodeURIComponent((url.match(/[&?]tab=([^&]*)/) || [])[1] || ''); fetched.push(tab);
+    return { ok: true, text: tab === 'Hiệu quả mẫu' ? 'Tên SP\n' : 'Mã đơn hàng\n' + tab + '-1\n' + tab + '-2' }; });
+  c.readWorkbookRowsFromBuffer = buf => { const t = new TextDecoder().decode(buf); return t.startsWith('Mã đơn hàng') ? t.split('\n').slice(1).filter(Boolean).map(l => ({ 'Mã đơn hàng': l })) : []; };
+  const cfg = vm.runInContext('loadSheetSyncCfg()', c);
+  cfg.url = 'https://script.google.com/macros/s/abc/exec'; cfg.sheetTab = 'Hàng hoàn; Trả hàng;Hiệu quả mẫu';
+  vm.runInContext('saveSheetSyncCfg', c)(cfg);
+  assert.strictEqual((await vm.runInContext('runSheetSync(true)', c)).success, true);
+  assert.deepStrictEqual(fetched.join('|'), 'Hàng hoàn|Trả hàng|Hiệu quả mẫu');
+  assert.strictEqual(c.imports[0].files.length, 2);
+  assert.strictEqual(c.imports[0].files.map(f => f.name).join('|'), 'Google Sheet · Hàng hoàn|Google Sheet · Trả hàng');
+  assert.ok(/bỏ qua tab không có cột đơn hàng: Hiệu quả mẫu/.test(vm.runInContext('loadSheetSyncCfg().lastNote', c)));
+  // đoạn mã chặn tab ngoài danh sách
+  const code = vm.runInContext('sheetSyncScriptText()', c);
+  assert.ok(code.includes("const SHEET_NAMES = ['Hàng hoàn', 'Trả hàng', 'Hiệu quả mẫu']"));
+  const out = {}; const g = { ContentService: { MimeType: { JSON: 'json', CSV: 'csv' }, createTextOutput: t => ({ setMimeType: m => { out.t = t; out.m = m; return out; } }) },
+    SpreadsheetApp: { openById: () => g.ss, getActiveSpreadsheet: () => g.ss }, ss: { getSheetByName: n => ({ getDataRange: () => ({ getDisplayValues: () => [['Mã đơn hàng'], [n]] }) }), getSheets: () => [] } };
+  vm.createContext(g); vm.runInContext(code, g);
+  g.doGet({ parameter: { token: cfg.token, tab: 'Tiền về' } }); assert.strictEqual(out.m, 'json'); assert.ok(/không nằm trong danh sách/.test(out.t));
+  g.doGet({ parameter: { token: cfg.token, tab: 'Trả hàng' } }); assert.strictEqual(out.m, 'csv'); assert.strictEqual(out.t, 'Mã đơn hàng\r\nTrả hàng');
 });

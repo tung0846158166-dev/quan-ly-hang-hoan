@@ -84,3 +84,22 @@ test('Google Sheet: máy tính chỉ tải từ địa chỉ Google', () => {
   const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
   assert.ok(pre.includes('fetchSheetText'));
 });
+
+test('Google Sheet: đoạn mã chỉ đọc (không có lệnh ghi/xóa sheet) và tệp kê khai khóa quyền chỉ đọc', () => {
+  const c = ctx(async () => ({ ok: true, text: '' }));
+  const code = vm.runInContext('sheetSyncScriptText()', c);
+  const calls = [...code.matchAll(/\.([a-zA-Z]+)\(/g)].map(x => x[1]);
+  const allowed = new Set(['createTextOutput', 'stringify', 'setMimeType', 'openById', 'getActiveSpreadsheet', 'getSheetByName', 'getSheets', 'getDataRange', 'getDisplayValues', 'map', 'test', 'replace', 'join']);
+  assert.deepStrictEqual(calls.filter(x => !allowed.has(x)), [], 'chỉ dùng lệnh đọc');
+  assert.ok(!/\.(set(Value|Values|Formula|Formulas|Note)|clear|delete|insert|append|remove|copyTo|moveTo|sort)\w*\(/.test(code));
+  vm.runInContext(extract('sheetSyncManifestText'), c);
+  const man = JSON.parse(vm.runInContext('sheetSyncManifestText()', c));
+  assert.deepStrictEqual(man.oauthScopes, ['https://www.googleapis.com/auth/spreadsheets.readonly']);
+});
+
+test('Google Sheet: app chỉ GỬI yêu cầu đọc (GET), không có đường ghi ngược lên Google', () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  const fn = main.slice(main.indexOf('function fetchSheetText'), main.indexOf("ipcMain.handle('fetch-sheet-text'"));
+  assert.ok(fn.includes("require('https').get("));
+  assert.ok(!/method:\s*'(POST|PUT|DELETE|PATCH)'|\.request\(/.test(fn));
+});

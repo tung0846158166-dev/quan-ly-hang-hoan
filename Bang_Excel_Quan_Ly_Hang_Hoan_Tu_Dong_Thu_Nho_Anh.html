@@ -17099,6 +17099,22 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         "}"
       ].join('\n');
     }
+    // Tệp kê khai: giới hạn quyền ở mức CHỈ ĐỌC bảng tính — Google tự chặn mọi lệnh ghi/xóa, kể cả nếu đoạn mã bị sửa nhầm.
+    function sheetSyncManifestText() {
+      return JSON.stringify({
+        timeZone: 'Asia/Ho_Chi_Minh',
+        exceptionLogging: 'STACKDRIVER',
+        runtimeVersion: 'V8',
+        oauthScopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+        webapp: { executeAs: 'USER_DEPLOYING', access: 'ANYONE_ANONYMOUS' }
+      }, null, 2);
+    }
+    function copySheetSyncManifest() {
+      const ta = document.getElementById('sheetSyncManifest'); if (!ta) return;
+      const done = () => { const b = document.getElementById('btnCopySheetManifest'); if (b) { b.textContent = '✓ Đã chép'; setTimeout(() => { b.textContent = '📋 Chép tệp kê khai'; }, 2000); } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done, () => { ta.select(); document.execCommand('copy'); done(); });
+      else { ta.select(); document.execCommand('copy'); done(); }
+    }
     function openSheetSyncModal() {
       const m = document.getElementById('sheetSyncModal'); if (!m) return;
       const c = loadSheetSyncCfg();
@@ -17107,6 +17123,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       document.getElementById('sheetSyncTab').value = c.sheetTab || '';
       document.getElementById('sheetSyncEnabled').checked = !!c.enabled;
       document.getElementById('sheetSyncScript').value = sheetSyncScriptText();
+      document.getElementById('sheetSyncManifest').value = sheetSyncManifestText();
       renderSheetSyncStatus();
       m.classList.remove('hidden');
     }
@@ -20462,6 +20479,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <ol class="list-decimal pl-5 space-y-1 text-xs text-slate-700">
           <li>Dán <b>link Google Sheet</b> và tên tab chứa đơn vào 2 ô dưới — đoạn mã tự điền sẵn.</li>
           <li>Mở <b>script.google.com</b> → <b>Dự án mới</b> (dự án riêng, <b>không</b> mở từ trong sheet, không xóa hay sửa đoạn mã nào đang có) → dán đoạn mã bên dưới thay cho nội dung mặc định của dự án mới, bấm Lưu. Đoạn mã chỉ <b>đọc</b> sheet nên không ảnh hưởng các phần mềm khác đang dùng sheet.</li>
+          <li><b>Khóa chỉ đọc (nên làm):</b> trong dự án bấm ⚙️ <b>Cài đặt dự án</b> → tích <b>Hiển thị tệp kê khai "appsscript.json" trong trình chỉnh sửa</b> → quay lại <b>Trình chỉnh sửa</b>, mở tệp <code>appsscript.json</code>, chọn hết và dán <b>tệp kê khai</b> bên dưới, Lưu. Khi đó Google chỉ cho đoạn mã quyền <b>xem</b> bảng tính: không thể ghi, sửa hay xóa gì trên sheet.</li>
           <li>Trong dự án mới đó bấm <b>Triển khai › Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b>, Thực thi với tư cách <b>Tôi</b>, Ai có quyền truy cập <b>Bất kỳ ai</b> → Triển khai, cấp quyền.</li>
           <li>Chép <b>URL ứng dụng web</b> (dạng https://script.google.com/macros/s/…/exec) dán vào ô dưới, bật tự cập nhật và bấm <b>Lưu & cập nhật ngay</b>.</li>
         </ol>
@@ -20475,6 +20493,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div>
           <div class="flex items-center justify-between mb-1"><b class="text-xs">Đoạn mã Apps Script</b><button type="button" id="btnCopySheetScript" onclick="copySheetSyncScript()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép đoạn mã</button></div>
           <textarea id="sheetSyncScript" readonly rows="9" class="w-full font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-lg p-2"></textarea>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1"><b class="text-xs">Tệp kê khai appsscript.json (khóa chỉ đọc)</b><button type="button" id="btnCopySheetManifest" onclick="copySheetSyncManifest()" class="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép tệp kê khai</button></div>
+          <textarea id="sheetSyncManifest" readonly rows="5" class="w-full font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-lg p-2"></textarea>
         </div>
         <div>
           <b class="text-xs">URL ứng dụng web</b>

@@ -21,7 +21,7 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
+  for (const n of ['removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText']) vm.runInContext(extract(n), c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -126,4 +126,37 @@ test('Google Sheet: chỉ đọc các tab đã chọn; tab không có cột đơ
   vm.createContext(g); vm.runInContext(code, g);
   g.doGet({ parameter: { token: cfg.token, tab: 'Tiền về' } }); assert.strictEqual(out.m, 'json'); assert.ok(/không nằm trong danh sách/.test(out.t));
   g.doGet({ parameter: { token: cfg.token, tab: 'Trả hàng' } }); assert.strictEqual(out.m, 'csv'); assert.strictEqual(out.t, 'Mã đơn hàng\r\nTrả hàng');
+});
+
+test('Sheet "Hàng hoàn": đổi tên cột sang kiểu file Shopee, tách nhiều sản phẩm, Loại Bom -> Giao không thành công', () => {
+  const c = ctx(async () => ({ ok: true, text: '' }));
+  const rows = [
+    { 'Mã': '2611160DFQNR4Y9', 'Mã đơn': '2611110W9GXPE8', 'Loại': 'Trả hàng', 'Mã vận đơn': 'SPXVN06576167517B', 'Trạng thái về': 'Đang về', 'Về shop lúc': '', 'Hạn khiếu nại': '20/11/2026', 'Hàng': 'KUNTA · Xám Tiêu Đậm, XL × 3; PRETTY IN CAO SU · Đen, L × 1', 'SL': '3', 'Tiền': '670.020 ₫', 'Lý do': 'Đổi ý', 'Ngày': '16/11/2026 00:40', 'Cập nhật': '16/11/2026 03:31' },
+    { 'Mã': 'X2', 'Mã đơn': 'BOM1', 'Loại': 'Bom', 'Mã vận đơn': 'SPXVN0BOM1', 'Trạng thái về': 'Đang về', 'Hàng': 'ALTIC · Be, M', 'SL': '2', 'Tiền': '1 ₫', 'Lý do': '', 'Ngày': '15/11/2026', 'Cập nhật': '' },
+  ];
+  const out = JSON.parse(JSON.stringify(c.normalizeSheetRows(rows)));
+  assert.strictEqual(out.length, 3, '2 sản phẩm của gói đầu thành 2 dòng');
+  assert.strictEqual(out[0]['Mã đơn hàng'], '2611110W9GXPE8');
+  assert.strictEqual(out[0]['Mã vận đơn'], 'SPXVN06576167517B');
+  assert.strictEqual(out[0]['Mã số khiếu nại'], '2611160DFQNR4Y9');
+  assert.strictEqual(out[0]['Trạng thái Trả hàng/Hoàn tiền'], 'Đang về');
+  assert.strictEqual(out[0]['Lý do trả hàng/hoàn tiền'], 'Đổi ý');
+  assert.strictEqual(out[0]['Thời gian yêu cầu'], '16/11/2026 00:40');
+  assert.strictEqual(out[0]['Người bán cần phản hồi trước'], '20/11/2026');
+  assert.strictEqual(out[0]['Tên sản phẩm'] + '|' + out[0]['Tên phân loại hàng'] + '|' + out[0]['Số lượng'], 'KUNTA|Xám Tiêu Đậm, XL|3');
+  assert.strictEqual(out[1]['Tên sản phẩm'] + '|' + out[1]['Số lượng'], 'PRETTY IN CAO SU|1');
+  assert.strictEqual(out[0]['Tổng số tiền hoàn trả'], '670.020 ₫');
+  assert.strictEqual(out[1]['Tổng số tiền hoàn trả'], '', 'tiền chỉ tính 1 lần cho cả gói');
+  assert.ok(!('Cập nhật' in out[0]) && !('Hàng' in out[0]) && !('SL' in out[0]));
+  assert.strictEqual(out[2]['Lý do hủy'], 'Giao hàng thất bại', 'Bom -> Giao không thành công');
+  assert.strictEqual(out[2]['Số lượng'], '2', 'không có × thì lấy cột SL');
+  // file Excel Shopee thường không bị đổi
+  const shopee = [{ 'Mã đơn hàng': 'A', 'Tên sản phẩm': 'X', 'Số lượng': '1' }];
+  assert.strictEqual(c.normalizeSheetRows(shopee), shopee);
+});
+
+test('Tự cập nhật khi bảng đang khóa không bật hộp nhập mật khẩu', () => {
+  const html2 = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
+  const fn = html2.slice(html2.indexOf('async function requireUnlocked'), html2.indexOf('appPrompt', html2.indexOf('async function requireUnlocked')));
+  assert.ok(fn.includes('sheetSyncRunning'));
 });

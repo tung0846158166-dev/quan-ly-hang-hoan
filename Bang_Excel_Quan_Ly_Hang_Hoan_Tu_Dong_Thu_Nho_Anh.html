@@ -4833,9 +4833,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
       const normalize = value => removeVietnameseTones(String(value || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
       const identities = new Set(['orderid', 'madonhang', 'iddonhang', 'madon', 'trackingid', 'trackingnumber', 'mavandon', 'mavandontrahang', 'mvdtrahang', 'returnlogisticstrackingid', 'returntrackingid', 'returnorderid', 'returnid', 'masokhieunai', 'makhieunai']);
-      const products = new Set(['productname', 'product', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname', 'sellersku', 'masku', 'skuname', 'tenphanloai', 'variation']);
-      const quantities = new Set(['quantity', 'qty', 'soluong', 'returnquantity', 'soluonghoan', 'skuquantityofreturn']);
-      const statuses = new Set(['orderstatus', 'returnstatus', 'trangthaidonhang', 'trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaihoan']);
+      const products = new Set(['productname', 'product', 'tensanpham', 'tensanphamtrensan', 'tenhanghoa', 'itemname', 'sellersku', 'masku', 'skuname', 'tenphanloai', 'variation', 'hang']);
+      const quantities = new Set(['quantity', 'qty', 'soluong', 'returnquantity', 'soluonghoan', 'skuquantityofreturn', 'sl']);
+      const statuses = new Set(['orderstatus', 'returnstatus', 'trangthaidonhang', 'trangthaitrahang', 'trangthaitrahanghoantien', 'trangthaihoan', 'trangthaive']);
       let best = null;
       let hasCells = false;
       for (const name of workbook.SheetNames) {
@@ -7381,7 +7381,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let cellEditSaveTimer = null;
     let diskPersistDebounceTimer = null;
     let summaryRenderDebounceTimer = null;
-    const APP_VERSION_NUMBER = '1.9.23';
+    const APP_VERSION_NUMBER = '1.9.24';
 
     function handleSearchInputDebounced() {
       if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -8763,6 +8763,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     async function requireUnlocked(actionName = 'thao tác này') {
       if (!isLocked) return true;
+      if (typeof sheetSyncRunning !== 'undefined' && sheetSyncRunning) return true;   // tự cập nhật từ Google Sheet chạy nền, không bật hộp mật khẩu
       const entered = await appPrompt({
         title: 'Bảng Đang Khóa Bảo Vệ',
         subtitle: `Nhập mật khẩu Chủ Shop để mở khóa thực hiện [${actionName}]`,
@@ -13880,7 +13881,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     let selectedMobileServer = 'github';
     const MOBILE_SERVERS = {
-      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.23',
+      github: 'https://tung0846158166-dev.github.io/quan-ly-hang-hoan/mobile_scanner.html?v=1.9.24',
       short: 'https://is.gd/h8z8Va',
       htmlpreview: 'https://htmlpreview.github.io/?https://raw.githubusercontent.com/tung0846158166-dev/quan-ly-hang-hoan/main/mobile_scanner.html?v=179'
     };
@@ -17023,6 +17024,56 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!res.ok) throw new Error('Máy chủ Google trả mã ' + res.status);
       return await res.text();
     }
+    // v1.9.24: Sheet "Hàng hoàn" (Mã | Mã đơn | Loại | Mã vận đơn | Trạng thái về | Về shop lúc | Hạn khiếu nại | Hàng | SL | Tiền | Lý do | Ngày | Cập nhật)
+    // -> đổi sang tên cột như file Excel Shopee để bộ nạp hiểu đúng; cột "Hàng" (nhiều SP: "TÊN · Màu, Size × SL; …") tách thành từng dòng sản phẩm.
+    function parseSheetItemsCell(text, totalQty) {
+      const parts = String(text || '').split(/\s*;\s*/).map(t => t.trim()).filter(Boolean);
+      const items = parts.map(p => {
+        let qty = 0, body = p;
+        const mq = body.match(/\s*[×xX\*]\s*(\d+)\s*$/);
+        if (mq) { qty = parseInt(mq[1], 10) || 0; body = body.slice(0, mq.index).trim(); }
+        const dot = body.search(/\s+[·•]\s+/);
+        const name = dot >= 0 ? body.slice(0, dot).trim() : body;
+        const variation = dot >= 0 ? body.slice(dot).replace(/^\s+[·•]\s+/, '').trim() : '';
+        return { name, variation, qty };
+      });
+      if (items.length === 1 && !items[0].qty) items[0].qty = parseInt(String(totalQty || '').replace(/[^\d]/g, ''), 10) || 1;
+      items.forEach(it => { if (!it.qty) it.qty = 1; });
+      return items;
+    }
+    function normalizeSheetRows(rows) {
+      if (!Array.isArray(rows) || !rows.length) return rows;
+      const norm = k => removeVietnameseTones(String(k || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const keys = Object.keys(rows[0] || {});
+      const byNorm = {}; keys.forEach(k => { byNorm[norm(k)] = k; });
+      // chỉ áp dụng cho kiểu sheet này (có cột "Hàng" và "Mã đơn", không có cột Tên sản phẩm của file Shopee)
+      if (!byNorm.hang || !byNorm.madon || byNorm.tensanpham) return rows;
+      const rename = { ma: 'Mã số khiếu nại', madon: 'Mã đơn hàng', mavandon: 'Mã vận đơn', trangthaive: 'Trạng thái Trả hàng/Hoàn tiền',
+        veshopluc: 'Thời gian hoàn trả hàng thành công', hankhieunai: 'Người bán cần phản hồi trước', tien: 'Tổng số tiền hoàn trả',
+        lydo: 'Lý do trả hàng/hoàn tiền', ngay: 'Thời gian yêu cầu' };
+      const drop = new Set(['hang', 'sl', 'loai', 'capnhat']);
+      const out = [];
+      rows.forEach(row => {
+        const base = {};
+        Object.keys(row).forEach(k => {
+          if (k.startsWith('__')) { base[k] = row[k]; return; }
+          const n = norm(k);
+          if (drop.has(n)) return;
+          base[rename[n] || k] = row[k];
+        });
+        // Loại: Bom / giao thất bại -> Giao không thành công; Hủy -> Đơn hủy; còn lại (Trả hàng) -> Trả hàng/Hoàn tiền
+        const loai = removeVietnameseTones(String(byNorm.loai ? row[byNorm.loai] : '')).toLowerCase();
+        if (/bom|giao (hang )?that bai|giao khong thanh cong|that bai/.test(loai)) base['Lý do hủy'] = 'Giao hàng thất bại';
+        else if (/huy/.test(loai)) base['Trạng thái đơn hàng'] = 'Đã hủy';
+        const items = parseSheetItemsCell(row[byNorm.hang], byNorm.sl ? row[byNorm.sl] : '');
+        (items.length ? items : [{ name: '', variation: '', qty: 1 }]).forEach((it, i) => {
+          const r = Object.assign({}, base, { 'Tên sản phẩm': it.name, 'Tên phân loại hàng': it.variation, 'Số lượng': String(it.qty) });
+          if (i > 0) r['Tổng số tiền hoàn trả'] = '';   // tiền tính 1 lần cho cả gói
+          out.push(r);
+        });
+      });
+      return out;
+    }
     let sheetSyncRunning = false;
     async function runSheetSync(manual) {
       const c = loadSheetSyncCfg();
@@ -17054,7 +17105,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         for (const t of texts) {
           let r = [];
           try { r = readWorkbookRowsFromBuffer(new TextEncoder().encode(t.text).buffer, true); } catch (e) { r = []; }
-          if (r.length) files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: r }); else skipped.push(t.tab || 'tab đầu tiên');
+          if (r.length) files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: normalizeSheetRows(r) }); else skipped.push(t.tab || 'tab đầu tiên');
         }
         if (!files.length) throw new Error('Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).');
         const rows = files.reduce((a, f) => a.concat(f.rows), []);

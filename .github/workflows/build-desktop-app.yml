@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.23
+          name: QuanLyHangHoan-Windows-Installer-v1.9.24
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.23
-          name: "Quản Lý Hàng Hoàn v1.9.23 — Tự cập nhật đơn Shopee từ Google Sheet (10 phút/lần)"
+          tag_name: v1.9.24
+          name: "Quản Lý Hàng Hoàn v1.9.24 — Google Sheet: đọc đúng tab Hàng hoàn (Mã, Mã đơn, Loại, Trạng thái về, Hàng, Lý do…)"
           body: |
+            ### Bản sửa 1.9.24
+
+            - Google Sheet: đọc đúng kiểu tab "Hàng hoàn" (Mã | Mã đơn | Loại | Mã vận đơn | Trạng thái về | Về shop lúc | Hạn khiếu nại | Hàng | SL | Tiền | Lý do | Ngày). Cột Hàng có nhiều sản phẩm ("TÊN · Màu, Size × SL; …") được tách đúng từng sản phẩm, màu, size, số lượng; Loại "Bom" thành Giao không thành công; Trạng thái về thành Trạng thái sàn; Lý do, Ngày, Tiền, Hạn khiếu nại vào đúng cột.
+            - Tự cập nhật từ Google Sheet vẫn chạy khi bảng đang khóa (không bật hộp mật khẩu mỗi 10 phút).
+
             ### Bản sửa 1.9.23
 
             - Mới: tự cập nhật đơn Shopee từ Google Sheet mỗi 10 phút (menu ☰ › 🔗 Google Sheet). Kết nối qua một dự án Apps Script RIÊNG (tạo tại script.google.com, chỉ đọc sheet, không đụng đoạn mã hay phần mềm khác đang dùng sheet), có mã bí mật riêng; chỉ đọc các tab được chọn (vd "Hàng hoàn; Trả hàng"); sheet được nạp như file Excel Shopee: đơn đã có (bảng chính, kho lưu trữ, bảng đơn hủy) chỉ cập nhật, đơn chưa có thì thêm mới; sheet không đổi thì bỏ qua. Có trạng thái lần cập nhật gần nhất và nút cập nhật ngay.

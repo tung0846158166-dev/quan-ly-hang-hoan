@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.36
+          name: QuanLyHangHoan-Windows-Installer-v1.9.37
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.36
-          name: "Quản Lý Hàng Hoàn v1.9.36 — Dòng mới có mã vận đơn thay dòng cũ cùng mã đơn"
+          tag_name: v1.9.37
+          name: "Quản Lý Hàng Hoàn v1.9.37 — Gộp dòng trùng mã đơn (kiểm tra trên dữ liệu thật)"
           body: |
+            ### Bản sửa 1.9.37
+
+            - Gộp dòng trùng mã đơn ở Bảng chính sau mỗi lần đồng bộ Sheet / tự nạp file TikTok và trong Dọn Đơn Trùng. Chạy trên dữ liệu thật (2.896 đơn): 423 mã đơn có nhiều dòng còn 22 (là các kiện / yêu cầu khác nhau), gỡ 427 dòng, không gỡ dòng nào đã nhận; Báo Đỏ 1.209 còn 957.
+            - Dòng giữ nhận trạng thái sàn mới nhất của Sheet; dữ liệu kho của dòng gỡ được chuyển sang dòng giữ.
+
             ### Bản sửa 1.9.36
 
             - Cùng mã đơn có dòng mới (đã có mã vận đơn, vd Đã về shop) và dòng cũ (chưa có mã vận đơn, vd Chờ bạn xác nhận hàng trả về): sau mỗi lần đồng bộ app giữ dòng khớp Google Sheet (ưu tiên dòng có mã vận đơn), gỡ dòng cũ. Dữ liệu kho của dòng cũ (đã nhận, ngày nhận, ảnh, ghi chú, theo dõi) được chuyển sang dòng giữ. Hai kiện có mã vận đơn khác nhau vẫn giữ cả hai.

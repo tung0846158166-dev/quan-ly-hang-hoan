@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.38
+          name: QuanLyHangHoan-Windows-Installer-v1.9.39
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,8 +88,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.38
-          name: "Quản Lý Hàng Hoàn v1.9.38 — Quét nhãn trả hàng có mã phiếu: nhận đúng đơn thật"
+          tag_name: v1.9.39
+          name: "Quản Lý Hàng Hoàn v1.9.39 — Điện thoại tra được đơn theo mã vận đơn hoàn"
           body: |
             ### Bản sửa 1.9.38
 

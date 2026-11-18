@@ -14393,9 +14393,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // v1.9.7: đồng bộ 2 chiều theo dõi + ghi chú. Mỗi lần danh sách theo dõi/lý do theo dõi đổi, PC gửi bản mới sang iPhone.
     let phoneWatchSig = null, phoneWatchTimer = null, phoneSnapTimer = null;
     // v1.9.8: sửa/xóa đơn trên PC → gửi lại danh sách đầy đủ sang iPhone (chỉ khi iPhone mới hoạt động gần đây).
+    // v1.9.33: đang quét liên tục thì hoãn gửi cả danh sách (mỗi lần ~100+ mảnh, iPhone phải ghép, giải nén, vẽ lại -> nóng máy).
+    // iPhone đã tự ghi Hàng đã trả ngay khi quét; danh sách đầy đủ gửi khi ngừng quét 45 giây, chậm nhất 3 phút một lần.
+    let phoneSnapFirstPendingAt = 0;
     function schedulePhoneSnapshotSync(attempt = 0) {
       if (phoneSnapTimer) clearTimeout(phoneSnapTimer);
+      const now = Date.now();
+      if (!phoneSnapFirstPendingAt) phoneSnapFirstPendingAt = now;
+      const sinceScan = now - (window.__lastPhoneScanAt || 0);
+      let delay = 8000;
+      if (sinceScan < 45000) delay = Math.max(8000, 45000 - sinceScan);
+      delay = Math.min(delay, Math.max(8000, phoneSnapFirstPendingAt + 180000 - now));
       phoneSnapTimer = setTimeout(async () => {
+        phoneSnapFirstPendingAt = 0;
         try {
           if (Date.now() - (window.__lastPhoneActivity || 0) > 30 * 60 * 1000) return;
           const ok = await broadcastOrdersSnapshot(false);
@@ -15765,6 +15775,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     function handleIncomingPhoneBarcode(rawCode, requestId = '', photoDataUrl = '', clientRoom = '', capture = {}, labelInfo = null) {
+      try { window.__lastPhoneScanAt = Date.now(); } catch (e) {}
       const cleanCode = extractCleanTrackingCode(rawCode);
       if (!cleanCode) return Promise.resolve({ success: false });
       capture = { ...capture, requestId, room: clientRoom };

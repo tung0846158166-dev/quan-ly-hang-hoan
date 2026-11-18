@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.32
+          name: QuanLyHangHoan-Windows-Installer-v1.9.33
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.32
-          name: "Quản Lý Hàng Hoàn v1.9.32 — Gỡ dòng yêu cầu trả hàng cũ bị trùng mã đơn"
+          tag_name: v1.9.33
+          name: "Quản Lý Hàng Hoàn v1.9.33 — Đỡ nóng iPhone khi quét lâu"
           body: |
+            ### Bản sửa 1.9.33 (dùng cùng app iPhone 0.10.31)
+
+            - Đang quét liên tục thì máy tính hoãn gửi cả danh sách đơn sang iPhone (gửi khi ngừng quét 45 giây, chậm nhất 3 phút một lần) để iPhone không phải ghép, giải nén, vẽ lại liên tục.
+            - iPhone 0.10.31: camera 24 hình/giây, 15 giây không thấy mã thì 15 hình/giây, 30 giây không quét thì tự nghỉ (chạm để quét tiếp); máy nóng thì giảm còn 12 hình/giây, quá nóng thì tạm dừng. Bỏ đổ bóng quanh khung camera, bớt vẽ lại màn hình khi đang nhận danh sách. Thêm nút Dán cạnh nút Đèn / Zoom để dán mã đã chép ở ứng dụng khác.
+
             ### Bản sửa 1.9.32
 
             - Khách huỷ yêu cầu trả hàng rồi tạo yêu cầu mới cho cùng đơn: Google Sheet chỉ còn yêu cầu mới, dòng của yêu cầu cũ ở Bảng chính không được cập nhật nữa nên bị trùng mã đơn. Sau mỗi lần đồng bộ app tự gỡ dòng yêu cầu cũ (chỉ khi chưa nhận, không có mã vận đơn riêng, ảnh, ghi chú, theo dõi hay ô khóa). Nút Dọn Đơn Trùng cũng dọn được các dòng này. Có lưu bản sao.

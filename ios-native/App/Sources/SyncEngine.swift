@@ -93,6 +93,13 @@ final class SyncEngine: ObservableObject {
     var channelUp: Bool { sseConnected || mqttConnected }
     var pendingCount: Int { items.filter { !$0.isSettled }.count }
     var pcOnline: Bool { pcLastSeen.map { Date().timeIntervalSince($0) < 120 } ?? false }
+    /// Ghi nhận máy tính còn online. Chỉ cập nhật tối đa 5 giây một lần: mỗi mảnh danh sách đều gọi hàm này,
+    /// cập nhật liên tục làm mọi màn hình (cả màn Quét có camera) vẽ lại hàng trăm lần mỗi lần đồng bộ -> nóng máy, giật.
+    private func markPcSeen() {
+        let now = Date()
+        if let t = pcLastSeen, now.timeIntervalSince(t) < 5 { return }
+        pcLastSeen = now
+    }
 
     func photoURL(_ item: ScanItem) -> URL? { item.photoFile.map { photosDir.appendingPathComponent($0) } }
 
@@ -229,20 +236,20 @@ final class SyncEngine: ObservableObject {
     private func dispatch(_ msg: PcMessage) {
         switch msg {
         case .hello, .heartbeat:
-            pcLastSeen = Date()
+            markPcSeen()
         case .snapshotChunk(let ch):
-            pcLastSeen = Date()
+            markPcSeen()
             chunkCounter += 1
             snapshotLastChunkAt = Date()
             if Date().timeIntervalSince(chunkPublishedAt) > 0.5 { chunkPublishedAt = Date(); snapshotChunksSeen = chunkCounter }
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
         case .watchSync(let t, let items):
-            pcLastSeen = Date()
+            markPcSeen()
             if isDuplicate("w|\(t)") { return }
             snapshot.applyWatchSync(items)
         case .ack(let ack) where ["note", "edit", "delete"].contains(ack.ackStage ?? ""):
-            pcLastSeen = Date()
+            markPcSeen()
             if isDuplicate("n|\(ack.requestId)|\(ack.outcome)") { return }
             // PC đã trả lời (thành công hay từ chối) thì thôi gửi lại.
             pendingNotes[ack.requestId] = nil
@@ -252,13 +259,13 @@ final class SyncEngine: ObservableObject {
             if !ok { requestSnapshot() }   // lấy lại bản đúng từ PC nếu PC từ chối
 
         case .ack(let ack) where ack.ackStage == "push":
-            pcLastSeen = Date()
+            markPcSeen()
             if isDuplicate("p|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(ack.extra ?? "")") { return }
             let ok = ack.outcome == "success" || ack.outcome == "duplicate"
             if ok { for i in items.indices where items[i].kind == .newOrder && items[i].code == ack.code { items[i].pushed = true } ; persist() }
             banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "Đã đẩy ra bảng chính" : "Chưa đẩy được"), color: ok ? .green : .red)
         case .ack(let ack):
-            pcLastSeen = Date()
+            markPcSeen()
             let saved = ack.photoSaved == true ? "1" : "0"
             let stage = ack.ackStage ?? ""
             let cap = ack.captureId ?? ""

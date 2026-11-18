@@ -74,9 +74,12 @@ final class SnapshotStore: ObservableObject {
         var index: [String: OrderRow] = [:]
         index.reserveCapacity(rows.count * 2)
         for r in rows {
+            // Mã chính trước, rồi mã đơn và các mã khác (mã vận đơn hoàn trên kiện, mã yêu cầu trả hàng) — mã chính của đơn khác không bị đè.
             let kc = r.c.uppercased()
             if index[kc] == nil { index[kc] = r }
-            if !r.o.isEmpty { let ko = r.o.uppercased(); if index[ko] == nil { index[ko] = r } }
+        }
+        for r in rows {
+            for k in r.lookupCodes.dropFirst() where index[k] == nil { index[k] = r }
         }
         return index
     }
@@ -93,7 +96,7 @@ final class SnapshotStore: ObservableObject {
         let waiting = unconfirmedReturnCodes()
         if !waiting.isEmpty {
             var touched = false
-            for i in rows.indices where rows[i].pd && waiting.contains(rows[i].c.uppercased()) {
+            for i in rows.indices where rows[i].pd && rows[i].lookupCodes.contains(where: { waiting.contains($0) }) {
                 rows[i].st = "Hàng đã trả"; rows[i].rv = true; rows[i].pd = false; touched = true
             }
             if touched { index = Self.buildIndex(rows) }

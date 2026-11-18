@@ -14498,6 +14498,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (x.ty) row.ty = x.ty;
         if (o.recvDate) row.rcd = String(o.recvDate).slice(0, 24);   // ngày giờ nhận tại kho (cho thống kê hàng đã về kho trên iPhone)
         if (o.platformStatus) row.ps = String(o.platformStatus).slice(0, 60);   // cột Trạng thái sàn (vd "Huỷ sau chuẩn bị · Đã huỷ")
+        // v1.9.39: các mã khác của đơn (mã vận đơn hoàn / giao, mã yêu cầu trả hàng) để iPhone tra được khi quét mã trên kiện hoàn.
+        try {
+          const up = v => String(v || '').trim().toUpperCase();
+          const own = new Set([up(row.c), up(row.o)]);
+          const extra = [];
+          [...getOrderTrackingCodes(o), o.returnTrack, o.forwardTrack, o.altTrack, getReturnParcelId(o), ...(Array.isArray(o.scanAliases) ? o.scanAliases : [])]
+            .map(v => extractCleanTrackingCode(v) || '').forEach(v => { if (v && !own.has(v)) { own.add(v); extra.push(v); } });
+          if (extra.length) row.x = extra.slice(0, 6).join(' ');
+        } catch (e) {}
         if (x.pre) row.pre = 1;
         if (x.lv !== undefined) row.lv = x.lv;
         if (!x.pd) row.pd = 0;

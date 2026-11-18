@@ -24,6 +24,12 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=72h), 1 = Báo Vàng (>=48h), 0 = an toàn; -1 = PC cũ không gửi
     public var ci: String = ""      // id đơn trong bảng đơn hủy trên PC (để đánh dấu đã nhận từ điện thoại); PC cũ không gửi
     public var ps: String = ""      // cột Trạng thái sàn trên PC (vd "Huỷ sau chuẩn bị · Đã huỷ"); PC cũ không gửi
+    public var x: String = ""       // các mã khác của đơn, cách nhau dấu cách (mã vận đơn hoàn/giao, mã yêu cầu trả hàng); PC cũ không gửi
+
+    /// Mọi mã tra được đơn này: mã chính, mã đơn và các mã khác.
+    public var lookupCodes: [String] {
+        ([c, o] + x.split(separator: " ").map(String.init)).map { $0.uppercased() }.filter { !$0.isEmpty }
+    }
 
     public var id: String { k + "|" + c }
     /// Thuộc nhóm đơn hủy: nằm trong bảng đơn hủy, hoặc ở bảng chính nhưng loại đơn là "Đơn hủy".
@@ -102,7 +108,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps, x }
 private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, inbox }
 private enum InboxKeys: String, CodingKey { case id, c, o, p, n, t, u, dup }
 
@@ -114,7 +120,7 @@ extension OrderRow {
                   due: c.flexInt(.due), st: c.flexString(.st),
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
                   wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1),
-                  ci: c.flexString(.ci), ps: c.flexString(.ps))
+                  ci: c.flexString(.ci), ps: c.flexString(.ps), x: c.flexString(.x))
     }
 }
 

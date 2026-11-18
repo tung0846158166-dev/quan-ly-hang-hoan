@@ -24,7 +24,7 @@ struct OrdersView: View {
 
     private func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
         if q.isEmpty { return true }
-        for f in [r.c, r.o, r.n, r.co, r.sz, r.wr, r.nt] {
+        for f in [r.c, r.o, r.x, r.n, r.co, r.sz, r.wr, r.nt] {
             if f.localizedCaseInsensitiveContains(q) { return true }
             if !qc.isEmpty && f.localizedCaseInsensitiveContains(qc) { return true }
         }

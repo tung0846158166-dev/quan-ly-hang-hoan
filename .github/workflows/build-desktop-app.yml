@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.31
+          name: QuanLyHangHoan-Windows-Installer-v1.9.32
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.31
-          name: "Quản Lý Hàng Hoàn v1.9.31 — Gửi lại danh sách cho iPhone chắc chắn hơn sau khi đẩy đơn / đánh dấu đơn hủy"
+          tag_name: v1.9.32
+          name: "Quản Lý Hàng Hoàn v1.9.32 — Gỡ dòng yêu cầu trả hàng cũ bị trùng mã đơn"
           body: |
+            ### Bản sửa 1.9.32
+
+            - Khách huỷ yêu cầu trả hàng rồi tạo yêu cầu mới cho cùng đơn: Google Sheet chỉ còn yêu cầu mới, dòng của yêu cầu cũ ở Bảng chính không được cập nhật nữa nên bị trùng mã đơn. Sau mỗi lần đồng bộ app tự gỡ dòng yêu cầu cũ (chỉ khi chưa nhận, không có mã vận đơn riêng, ảnh, ghi chú, theo dõi hay ô khóa). Nút Dọn Đơn Trùng cũng dọn được các dòng này. Có lưu bản sao.
+
             ### Bản sửa 1.9.31 (dùng cùng app iPhone 0.10.29)
 
             - Sau khi iPhone đẩy đơn mới / đánh dấu đơn hủy, nếu máy tính đang gửi dở danh sách thì hẹn gửi lại thay vì bỏ qua.

@@ -4060,24 +4060,64 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // -> lúc đó chưa nối được; đến khi bản ở kho lưu trữ có mã đơn thật thì 2 bản trùng nhau.
     // Chỉ gỡ đơn Bảng chính CHƯA NHẬN và chưa có dữ liệu kho (ảnh, ngày nhận, ghi chú, theo dõi, ô khóa); thông tin sàn của nó
     // được bổ sung vào bản ở Kho lưu trữ / Bảng đơn hủy trước khi gỡ. Có lưu bản sao để khôi phục.
+    // v1.9.32: yêu cầu trả hàng mới nhất của mỗi đơn trên Google Sheet (mã đơn -> mã yêu cầu). Khách huỷ yêu cầu cũ rồi tạo
+    // yêu cầu mới thì sheet chỉ còn yêu cầu mới; dòng của yêu cầu cũ ở Bảng chính không bao giờ được cập nhật nữa -> trùng.
+    const SHEET_CLAIMS_KEY = 'sheet_sync_latest_claims_v1';
+    let sheetLatestClaims = null;
+    function saveSheetLatestClaims(map) {
+      sheetLatestClaims = map;
+      try { localStorage.setItem(SHEET_CLAIMS_KEY, JSON.stringify(map)); } catch (e) {}
+    }
+    function getSheetLatestClaims() {
+      if (sheetLatestClaims) return sheetLatestClaims;
+      try { const v = JSON.parse(localStorage.getItem(SHEET_CLAIMS_KEY) || 'null'); if (v && typeof v === 'object') sheetLatestClaims = v; } catch (e) {}
+      return sheetLatestClaims;
+    }
+    const hasWarehouseData = o => isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim();
+    // Dòng Bảng chính của yêu cầu cũ: cùng mã đơn với dòng của yêu cầu mới nhất, khác mã yêu cầu, không có mã vận đơn riêng,
+    // chưa nhận và chưa có dữ liệu kho.
+    function findStaleClaimDuplicates() {
+      const latest = getSheetLatestClaims();
+      if (!latest || !Array.isArray(orders)) return [];
+      const up = v => String(v || '').trim().toUpperCase();
+      const byOrder = new Map();
+      orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k) return; if (!byOrder.has(k)) byOrder.set(k, []); byOrder.get(k).push(i); });
+      const out = [];
+      byOrder.forEach((idxs, k) => {
+        if (idxs.length < 2) return;
+        const want = up(latest[k]);
+        if (!want || !idxs.some(i => getReturnParcelId(orders[i]) === want)) return;
+        idxs.forEach(i => {
+          const o = orders[i], id = getReturnParcelId(o);
+          if (!id || id === want) return;
+          if (extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '')) return;   // có kiện riêng
+          if (hasWarehouseData(o)) return;
+          out.push(i);
+        });
+      });
+      return out;
+    }
+
     function autoRemoveShadowDuplicates() {
       if (isLocked || !Array.isArray(orders) || !orders.length) return 0;
-      const hasOther = (Array.isArray(archivedOrders) && archivedOrders.length) || (Array.isArray(cancelledOrders) && cancelledOrders.length);
-      if (!hasOther) return 0;
       const index = buildOtherTablesIndex();
-      const drop = [];
-      orders.forEach((o, i) => {
-        if (!o || isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim()) return;
+      const shadow = new Set();
+      const hasOther = (Array.isArray(archivedOrders) && archivedOrders.length) || (Array.isArray(cancelledOrders) && cancelledOrders.length);
+      if (hasOther) orders.forEach((o, i) => {
+        if (!o || hasWarehouseData(o)) return;
         if (!findInOtherTables(index, o)) return;
-        try { if (hasLockedCellsInOrder(i)) return; } catch (e) { return; }
-        drop.push(i);
+        shadow.add(i);
       });
+      let stale = [];
+      try { stale = findStaleClaimDuplicates(); } catch (e) {}
+      const drop = Array.from(new Set([...shadow, ...stale])).sort((a, b) => a - b)
+        .filter(i => { try { return !hasLockedCellsInOrder(i); } catch (e) { return false; } });
       if (!drop.length) return 0;
       const backup = [];
       for (let k = drop.length - 1; k >= 0; k--) {
         const i = drop[k];
         const o = orders[i];
-        try { enrichOtherTableEntry(o); } catch (e) {}
+        if (shadow.has(i)) { try { enrichOtherTableEntry(o); } catch (e) {} }
         backup.push(o);
         orders.splice(i, 1);
         try { shiftCellLocksAfterOrderDelete(i); shiftCellEditHistoryAfterOrderDelete(i); } catch (e) {}
@@ -4091,7 +4131,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try { saveCancelledOrders(); } catch (e) {}
       saveOrders();
       try { renderAll(false); } catch (e) {}
-      addAuditLog('🧹 TỰ GỠ ĐƠN TRÙNG', `Gỡ ${drop.length} đơn chưa nhận ở Bảng chính vì đơn đó đã có ở Kho lưu trữ / Bảng đơn hủy: ` + backup.slice(0, 20).map(o => o.orderId || o.track).join(', '));
+      addAuditLog('🧹 TỰ GỠ ĐƠN TRÙNG', `Gỡ ${drop.length} đơn chưa nhận ở Bảng chính (trùng Kho lưu trữ / Bảng đơn hủy, hoặc là yêu cầu trả hàng cũ đã được thay bằng yêu cầu mới trên Sheet): ` + backup.slice(0, 20).map(o => o.orderId || o.track).join(', '));
       return drop.length;
     }
 
@@ -4099,9 +4139,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const index = buildOtherTablesIndex();
       const dups = [];
       orders.forEach((o, i) => { const where = findInOtherTables(index, o); if (where) dups.push({ i, where }); });
-      const arc = dups.filter(d => d.where === 'archive').length, can = dups.length - arc;
-      if (!dups.length) { appAlert('Không có đơn nào ở Bảng chính bị trùng với Kho lưu trữ hoặc Bảng đơn hủy.', 'Dọn Đơn Trùng'); return; }
-      const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính trùng với bảng khác (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy).\n\nXóa bản trùng khỏi Bảng chính, giữ bản ở Kho lưu trữ / Bảng đơn hủy? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng Giữa Các Bảng');
+      let staleIdx = [];
+      try { staleIdx = findStaleClaimDuplicates(); } catch (e) {}
+      const inDups = new Set(dups.map(d => d.i));
+      staleIdx.forEach(i => { if (!inDups.has(i)) dups.push({ i, where: 'stale' }); });
+      dups.sort((a, b) => a.i - b.i);
+      const arc = dups.filter(d => d.where === 'archive').length, stl = dups.filter(d => d.where === 'stale').length, can = dups.length - arc - stl;
+      if (!dups.length) { appAlert('Không có đơn nào ở Bảng chính bị trùng với Kho lưu trữ, Bảng đơn hủy, hay là yêu cầu trả hàng cũ của cùng đơn.', 'Dọn Đơn Trùng'); return; }
+      const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính bị trùng (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy, ${stl} là yêu cầu trả hàng cũ của cùng mã đơn đã có yêu cầu mới trên Sheet).\n\nXóa các bản trùng / cũ khỏi Bảng chính? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng');
       if (!ok) return;
       let removed = 0, kept = 0;
       const backup = [];
@@ -17501,7 +17546,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let mergedCount = 0, tooOld = 0, unchangedOrders = 0, newSigs = null;
         if (parcelLists.length) {
           await breathe();
-          const byDays = filterSheetParcelsByDays(mergeSheetParcels(parcelLists), c.maxDays);
+          const mergedAll = mergeSheetParcels(parcelLists);
+          { const claims = {}; mergedAll.forEach(m => { if (m.orderId && m.claimId) claims[String(m.orderId).trim().toUpperCase()] = String(m.claimId).trim().toUpperCase(); }); saveSheetLatestClaims(claims); }
+          const byDays = filterSheetParcelsByDays(mergedAll, c.maxDays);
           let merged = byDays.parcels; tooOld = byDays.dropped;
           mergedCount = merged.length;
           // Chỉ nạp đơn MỚI hoặc có dữ liệu ĐỔI so với lần trước (Shopee cập nhật) -> lần 10 phút sau rất nhẹ

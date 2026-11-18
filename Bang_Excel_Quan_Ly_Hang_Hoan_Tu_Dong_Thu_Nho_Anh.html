@@ -5099,6 +5099,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     // Nạp các bảng đã đọc (từ file Excel hoặc Google Sheet): cập nhật đơn đã có, không tạo trùng; lỗi thì phục hồi nguyên trạng.
+    // Cột chỉ có trong file xuất từ TikTok Seller Center (đơn hoàn / đơn hủy).
+    const TIKTOK_FILE_KEYS = ['returnorderid', 'returnlogisticstrackingid', 'returnreason', 'cancelationreturntype', 'skuquantityofreturn', 'cancelreason', 'rtstime', 'ordersubstatus'];
+    function isTikTokExportRows(rows) {
+      const keys = new Set();
+      (rows || []).slice(0, 5).forEach(r => Object.keys(r || {}).forEach(k => keys.add(removeVietnameseTones(k).toLowerCase().replace(/[^a-z0-9]/g, ''))));
+      return TIKTOK_FILE_KEYS.some(k => keys.has(k));
+    }
+
     async function importParsedPlatformFiles(parsedFiles, forcedPlatform) {
       const prepared = preparePlatformImportGroups(parsedFiles);
       if (!prepared.groups.length) return { success: false, message: '⚠️ Không có dòng dữ liệu đơn hàng để nạp.' };
@@ -5109,7 +5117,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try {
         for (const rows of prepared.groups) {
           const sampleKeys = Object.keys(rows[0] || {}).map(key => removeVietnameseTones(key).toLowerCase().replace(/[^a-z0-9]/g, ''));
-          const isTikTokFile = sampleKeys.some(key => ['returnorderid', 'returnlogisticstrackingid', 'returnreason', 'cancelationreturntype', 'skuquantityofreturn', 'cancelreason', 'rtstime', 'ordersubstatus'].includes(key));
+          const isTikTokFile = sampleKeys.some(key => ['returnorderid', 'returnlogisticstrackingid', 'returnreason', 'cancelationreturntype', 'skuquantityofreturn', 'cancelreason', 'rtstime', 'ordersubstatus'].includes(key));   // giữ khớp với TIKTOK_FILE_KEYS
           let result;
           if (forcedPlatform === 'TikTok Shop') result = await ingestTikTokOnlyRecords(rows);
           else if (forcedPlatform === 'Shopee') result = await ingestShopeeOnlyRecords(rows);
@@ -8906,6 +8914,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     async function requireUnlocked(actionName = 'thao tác này') {
       if (!isLocked) return true;
       if (typeof sheetSyncRunning !== 'undefined' && sheetSyncRunning) return true;   // tự cập nhật từ Google Sheet chạy nền, không bật hộp mật khẩu
+      if (typeof folderWatchRunning !== 'undefined' && folderWatchRunning) return true;   // tự nạp file TikTok từ thư mục chạy nền
       const entered = await appPrompt({
         title: 'Bảng Đang Khóa Bảo Vệ',
         subtitle: `Nhập mật khẩu Chủ Shop để mở khóa thực hiện [${actionName}]`,
@@ -17222,8 +17231,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       sheetBtn.innerHTML = '<span>🔗 Google Sheet (Shopee)</span><span id="sbSheetSyncDot">tắt</span>';
       sheetBtn.addEventListener('click', () => openSheetSyncModal());
       side.querySelector('#sbTools').appendChild(sheetBtn);
+      const folderBtn = document.createElement('button');
+      folderBtn.type = 'button'; folderBtn.id = 'btnFolderWatch';
+      folderBtn.innerHTML = '<span>📂 Tự nạp file TikTok</span><span id="sbFolderWatchDot">tắt</span>';
+      folderBtn.addEventListener('click', () => openFolderWatchModal());
+      side.querySelector('#sbTools').appendChild(folderBtn);
       move(['kpiStrip'], side.querySelector('#sbKpi'));
       try { renderSheetSyncStatus(); } catch (e) {}
+      try { renderFolderWatchStatus(); } catch (e) {}
       // chọn một mục thì đóng menu rồi mới mở bảng
       side.addEventListener('click', e => { if (e.target.closest('button')) setAppDrawer(false); });
       document.addEventListener('keydown', e => { if (e.key === 'Escape') setAppDrawer(false); });
@@ -17719,6 +17734,157 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     if (typeof setTimeout === 'function' && typeof setInterval === 'function' && typeof document !== 'undefined') {
       setTimeout(() => { const c = loadSheetSyncCfg(); if (c.enabled && c.url) runSheetSync(false); }, 45 * 1000);
       setInterval(() => { const c = loadSheetSyncCfg(); if (c.enabled && c.url) runSheetSync(false); }, SHEET_SYNC_INTERVAL_MS);
+    }
+
+    // ---- v1.9.34: TỰ NẠP FILE TIKTOK TỪ THƯ MỤC ----
+    // Người dùng tự tải file đơn hoàn / đơn hủy từ TikTok Seller Center vào một thư mục; app kiểm tra thư mục mỗi 15 giây,
+    // file TikTok MỚI (đã tải xong: dung lượng không đổi giữa 2 lần kiểm tra) được nạp như bấm "Nạp File TikTok".
+    // File không phải của TikTok, file đã nạp, file có sẵn trước khi bật thì bỏ qua. Không xoá / sửa file nào trong thư mục.
+    const FOLDER_WATCH_KEY = 'tiktok_folder_watch_v1';
+    const FOLDER_WATCH_INTERVAL_MS = 15 * 1000;
+    let folderWatchRunning = false, folderWatchTimer = null;
+    const folderWatchPendingSize = new Map();
+    function loadFolderWatchCfg() {
+      let c = {};
+      try { c = JSON.parse(localStorage.getItem(FOLDER_WATCH_KEY) || '{}') || {}; } catch (e) { c = {}; }
+      if (!c.seen || typeof c.seen !== 'object') c.seen = {};
+      return c;
+    }
+    function saveFolderWatchCfg(c) {
+      // giữ tối đa 3000 file đã xử lý gần nhất
+      const keys = Object.keys(c.seen || {});
+      if (keys.length > 3000) { const keep = keys.sort((a, b) => (c.seen[b] || 0) - (c.seen[a] || 0)).slice(0, 3000); const s = {}; keep.forEach(k => { s[k] = c.seen[k]; }); c.seen = s; }
+      try { localStorage.setItem(FOLDER_WATCH_KEY, JSON.stringify(c)); } catch (e) {}
+    }
+    const folderFileKey = f => `${f.name}|${f.size}|${Math.round(f.mtimeMs)}`;
+    function renderFolderWatchStatus() {
+      const c = loadFolderWatchCfg();
+      const dot = document.getElementById('sbFolderWatchDot');
+      if (dot) { dot.textContent = c.enabled && c.dir ? 'bật' : 'tắt'; dot.style.color = c.enabled && c.dir ? '#16a34a' : ''; }
+      const st = document.getElementById('folderWatchStatus');
+      if (st) st.innerHTML = c.lastNote ? `${c.lastOk === false ? '❌' : '✅'} ${escapeAttr(c.lastNote)}` : '<span class="text-slate-400">Chưa nạp file nào.</span>';
+    }
+    async function applyFolderWatchDir(c) {
+      const api = window.desktopDiskAPI;
+      if (!api || !api.setWatchFolder) return { success: false, error: 'Chỉ dùng được trong app máy tính.' };
+      return api.setWatchFolder(c.enabled ? c.dir : '');
+    }
+    function finishFolderNote(ok, note) {
+      const c = loadFolderWatchCfg();
+      c.lastOk = ok; c.lastNote = new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) + ': ' + note;
+      saveFolderWatchCfg(c); renderFolderWatchStatus();
+    }
+    // includeExisting: true = nạp cả file TikTok đang có sẵn trong thư mục (bấm tay); false = chỉ file mới.
+    async function runFolderWatch(includeExisting = false) {
+      const api = window.desktopDiskAPI;
+      if (folderWatchRunning || !api || !api.listWatchFolder) return;
+      const c = loadFolderWatchCfg();
+      if (!c.enabled || !c.dir) return;
+      if (activeImportBatch || (typeof sheetSyncRunning !== 'undefined' && sheetSyncRunning)) return;   // đang nạp dữ liệu khác: lần sau
+      folderWatchRunning = true;
+      try {
+        const set = await api.setWatchFolder(c.dir);
+        if (!set || !set.success) { finishFolderNote(false, (set && set.error) || 'Không mở được thư mục'); return; }
+        const list = await api.listWatchFolder();
+        if (!list || !list.success) { finishFolderNote(false, (list && list.error) || 'Không đọc được thư mục'); return; }
+        const fresh = [];
+        for (const f of list.files) {
+          const key = folderFileKey(f);
+          if (c.seen[key]) continue;
+          // file có sẵn trước khi bật tự nạp: bỏ qua (trừ khi bấm "Nạp các file đang có")
+          if (!includeExisting && c.since && f.mtimeMs < c.since) { c.seen[key] = Date.now(); continue; }
+          // chờ tải xong: dung lượng phải giữ nguyên qua 2 lần kiểm tra và file đã cũ hơn 3 giây
+          const prev = folderWatchPendingSize.get(f.name);
+          folderWatchPendingSize.set(f.name, f.size);
+          if (!includeExisting && (prev !== f.size || Date.now() - f.mtimeMs < 3000)) continue;
+          fresh.push(f);
+        }
+        if (!fresh.length) { saveFolderWatchCfg(c); return; }
+        const parsed = [], skipped = [], failed = [];
+        for (const f of fresh) {
+          const key = folderFileKey(f);
+          try {
+            const r = await api.readWatchFile(f.name);
+            if (!r || !r.success) throw new Error((r && r.error) || 'không đọc được');
+            const u8 = r.data instanceof Uint8Array ? r.data : new Uint8Array(r.data);
+            const rows = readWorkbookRowsFromBuffer(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength), /\.csv$/i.test(f.name));
+            if (!rows.length || !isTikTokExportRows(rows)) { skipped.push(f.name); c.seen[key] = Date.now(); continue; }
+            parsed.push({ file: f, key, rows });
+          } catch (e) { failed.push(f.name + ' (' + (e.message || e) + ')'); c.seen[key] = Date.now(); }
+          folderWatchPendingSize.delete(f.name);
+        }
+        saveFolderWatchCfg(c);
+        if (!parsed.length) {
+          if (failed.length) finishFolderNote(false, 'Không đọc được: ' + failed.join(', '));
+          return;
+        }
+        const res = await importParsedPlatformFiles(parsed.map(p => ({ name: p.file.name, rows: p.rows })), 'TikTok Shop');
+        if (res && res.busy) return;   // đang nạp dữ liệu khác: chưa đánh dấu, lần sau nạp lại
+        const c2 = loadFolderWatchCfg();
+        parsed.forEach(p => { c2.seen[p.key] = Date.now(); });
+        saveFolderWatchCfg(c2);
+        const names = parsed.map(p => p.file.name).join(', ');
+        if (res && res.success) {
+          const summary = String(res.message || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 3).join(' · ');
+          finishFolderNote(true, `Đã nạp ${parsed.length} file TikTok (${names})` + (summary ? ' — ' + summary : ''));
+          try { showAppToast(`📂 Đã tự nạp ${parsed.length} file TikTok: ${names}`, 'success', 6000); } catch (e) {}
+          try { addAuditLog('📂 TỰ NẠP FILE TIKTOK', `Nạp ${names}`); } catch (e) {}
+        } else {
+          finishFolderNote(false, `Không nạp được ${names}: ` + String((res && res.message) || 'lỗi không rõ').replace(/^❌\s*/, ''));
+          try { showAppToast(`❌ Không nạp được file TikTok ${names}`, 'error', 8000); } catch (e) {}
+        }
+      } catch (e) {
+        finishFolderNote(false, 'Lỗi: ' + (e.message || e));
+      } finally { folderWatchRunning = false; }
+    }
+    function startFolderWatchTimer() {
+      if (folderWatchTimer) clearInterval(folderWatchTimer);
+      folderWatchTimer = null;
+      const c = loadFolderWatchCfg();
+      if (c.enabled && c.dir) folderWatchTimer = setInterval(() => runFolderWatch(false), FOLDER_WATCH_INTERVAL_MS);
+    }
+    function openFolderWatchModal() {
+      const m = document.getElementById('folderWatchModal'); if (!m) return;
+      const c = loadFolderWatchCfg();
+      document.getElementById('folderWatchDir').value = c.dir || '';
+      document.getElementById('folderWatchEnabled').checked = !!c.enabled;
+      const desk = !!(window.desktopDiskAPI && window.desktopDiskAPI.listWatchFolder);
+      document.getElementById('folderWatchDesktopOnly').classList.toggle('hidden', desk);
+      renderFolderWatchStatus();
+      m.classList.remove('hidden');
+    }
+    function closeFolderWatchModal() { const m = document.getElementById('folderWatchModal'); if (m) m.classList.add('hidden'); }
+    async function pickFolderWatchDir() {
+      const api = window.desktopDiskAPI;
+      if (!api || !api.chooseWatchFolder) { alert('Chỉ chọn được thư mục trong app máy tính.'); return; }
+      const r = await api.chooseWatchFolder();
+      if (r && r.success && r.path) document.getElementById('folderWatchDir').value = r.path;
+    }
+    async function saveFolderWatchFromModal(loadExisting) {
+      const c = loadFolderWatchCfg();
+      const dir = String(document.getElementById('folderWatchDir').value || '').trim().replace(/^"+|"+$/g, '');
+      const enabled = document.getElementById('folderWatchEnabled').checked;
+      if (enabled && !dir) { alert('⚠️ Dán đường dẫn thư mục hoặc bấm "Chọn thư mục" trước.'); return; }
+      const api = window.desktopDiskAPI;
+      if (enabled) {
+        if (!api || !api.setWatchFolder) { alert('Tự nạp file chỉ chạy trong app máy tính.'); return; }
+        const chk = await api.setWatchFolder(dir);
+        if (!chk || !chk.success) { alert('❌ ' + ((chk && chk.error) || 'Không mở được thư mục')); return; }
+      }
+      // đổi thư mục hoặc mới bật: chỉ nạp file tải về từ bây giờ
+      if (dir !== c.dir || (enabled && !c.enabled)) c.since = Date.now();
+      c.dir = dir; c.enabled = enabled;
+      saveFolderWatchCfg(c);
+      folderWatchPendingSize.clear();
+      startFolderWatchTimer();
+      renderFolderWatchStatus();
+      if (enabled && loadExisting) {
+        if (!(await appConfirm('Nạp tất cả file TikTok đang có trong thư mục (file đã nạp trước đó được bỏ qua)?', 'Nạp file TikTok'))) return;
+        await runFolderWatch(true);
+      } else if (enabled) showAppToast('📂 Đã bật tự nạp file TikTok. File tải về thư mục này từ bây giờ sẽ được nạp tự động.', 'success', 6000);
+    }
+    if (typeof setTimeout === 'function' && typeof document !== 'undefined') {
+      setTimeout(() => { try { startFolderWatchTimer(); renderFolderWatchStatus(); } catch (e) {} }, 20 * 1000);
     }
 
     // ---- Dải số liệu tổng quan trên bảng chính (v1.9.19) ----
@@ -21077,6 +21243,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="flex gap-2 justify-end">
           <button type="button" onclick="saveSheetSyncFromModal(false)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Lưu</button>
           <button type="button" onclick="saveSheetSyncFromModal(true)" class="px-3 py-2 bg-[#ee4d2d] hover:bg-orange-700 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu & cập nhật ngay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="folderWatchModal" onclick="closeFolderWatchModal()" class="fixed inset-0 bg-slate-950/70 z-50 hidden flex items-center justify-center p-3 backdrop-blur-xs">
+    <div onclick="event.stopPropagation()" class="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] overflow-auto">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h2 class="font-black text-base">📂 Tự nạp file TikTok từ thư mục</h2>
+        <button type="button" onclick="closeFolderWatchModal()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">✕ Đóng</button>
+      </div>
+      <div class="p-5 space-y-4 text-sm">
+        <div id="folderWatchDesktopOnly" class="hidden p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">Tính năng này chỉ chạy trong app trên máy tính.</div>
+        <div class="text-xs text-slate-600">Bạn tải file đơn hoàn / đơn hủy từ <b>TikTok Seller Center</b> vào thư mục dưới đây như bình thường. App kiểm tra thư mục <b>mỗi 15 giây</b>; file TikTok <b>mới</b> tải xong sẽ được nạp tự động như bấm "Nạp File TikTok". File không phải của TikTok, file đã nạp và file có sẵn trước khi bật được bỏ qua. App <b>không xoá, không sửa</b> file nào trong thư mục.</div>
+        <div>
+          <b class="text-xs">Thư mục</b>
+          <div class="flex gap-2 mt-1">
+            <input id="folderWatchDir" type="text" placeholder="vd: C:\Users\Ten\Downloads  (dán đường dẫn hoặc bấm Chọn thư mục)" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
+            <button type="button" onclick="pickFolderWatchDir()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap">📁 Chọn thư mục</button>
+          </div>
+          <div class="text-[11px] mt-0.5 text-slate-500">Mẹo: trong File Explorer, mở thư mục rồi bấm vào thanh địa chỉ, chép đường dẫn và dán vào đây.</div>
+        </div>
+        <label class="flex items-center gap-2 text-sm font-bold"><input id="folderWatchEnabled" type="checkbox" class="w-4 h-4" /> Tự nạp file TikTok mới trong thư mục này</label>
+        <div id="folderWatchStatus" class="text-xs p-2 rounded-lg bg-slate-50 border border-slate-200"></div>
+        <div class="flex flex-wrap gap-2 justify-end">
+          <button type="button" onclick="saveFolderWatchFromModal(true)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Lưu & nạp các file TikTok đang có</button>
+          <button type="button" onclick="saveFolderWatchFromModal(false)" class="px-3 py-2 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu</button>
         </div>
       </div>
     </div>

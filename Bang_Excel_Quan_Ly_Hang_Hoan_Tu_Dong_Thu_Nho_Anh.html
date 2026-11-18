@@ -4076,61 +4076,123 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const hasWarehouseData = o => isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim();
     // Dòng Bảng chính của yêu cầu cũ: cùng mã đơn với dòng của yêu cầu mới nhất, khác mã yêu cầu, không có mã vận đơn riêng,
     // chưa nhận và chưa có dữ liệu kho.
-    // v1.9.36: Sheet ghép 3 tab thành MỘT đơn cho mỗi mã đơn. Bảng chính có nhiều dòng cùng mã đơn thì giữ dòng khớp Sheet:
-    //   1) dòng có đúng mã vận đơn Sheet đang có (dữ liệu mới nhất, vd tab Hàng hoàn đã có mã vận đơn),
-    //   2) nếu không: dòng cùng mã yêu cầu và/hoặc cùng trạng thái sàn,
-    //   3) nếu không: dòng duy nhất có mã vận đơn.
-    // Các dòng còn lại (không có mã vận đơn, hoặc trùng mã vận đơn với dòng giữ) bị gỡ; dòng có mã vận đơn KHÁC là kiện riêng, giữ.
-    // Dữ liệu kho của dòng bị gỡ (đã nhận, ngày nhận, ảnh, ghi chú, theo dõi) được chuyển sang dòng giữ trước khi gỡ.
-    const staleKeeperOf = new Map();   // dòng bị gỡ -> dòng giữ (tham chiếu đối tượng, không đổi khi xoá dòng)
+    // v1.9.37: GỘP DÒNG TRÙNG MÃ ĐƠN Ở BẢNG CHÍNH (kiểm tra trên dữ liệu thật: 423 mã đơn có nhiều dòng).
+    // Nguyên tắc: một mã đơn chỉ còn một dòng cho mỗi kiện hàng thật. Dòng bị gỡ luôn được chuyển dữ liệu kho
+    // (đã nhận, ngày nhận, ảnh, ghi chú, theo dõi) sang dòng giữ; dòng có ô khóa thì không đụng.
+    //  A. Đơn có trên Google Sheet (Shopee): Sheet là dữ liệu mới nhất, mỗi mã đơn một kiện.
+    //     - Dòng giữ: dòng có đúng mã vận đơn Sheet đang có; nếu Sheet chưa có mã vận đơn thì dòng duy nhất có mã vận đơn
+    //       của cùng yêu cầu (hoặc không ghi mã yêu cầu, vd đơn huỷ nạp từ file); nếu không có thì dòng do Sheet tạo.
+    //       Dòng giữ nhận trạng thái sàn / mã yêu cầu mới nhất từ dòng của Sheet.
+    //     - Dòng của yêu cầu cũ (mã yêu cầu khác Sheet) chưa nhận: gỡ. Đã nhận: giữ (kiện thật đã về).
+    //  B. Mọi sàn: dòng y hệt (cùng mã vận đơn / cùng không có, cùng mã yêu cầu): gỡ bản thừa.
+    //     Yêu cầu khách đã huỷ / đã đóng mà đơn còn dòng khác đang xử lý: gỡ dòng đã huỷ (chưa nhận).
+    //     Cùng mã vận đơn, khác mã yêu cầu (TikTok trả nhiều sản phẩm chung một kiện): gộp sản phẩm vào một dòng.
+    const dupPlanOf = new Map();   // dòng bị gỡ -> { keep, copyPlatform, mergeItems, why }
+    const isClosedRequest = o => {
+      const t = removeVietnameseTones(String(o && o.platformStatus || '')).toLowerCase();
+      return /khach (da )?huy( yeu cau)?$|khach da huy yeu cau|yeu cau cua nguoi mua da huy|^da dong$|huy yeu cau/.test(t.trim());
+    };
     function findStaleClaimDuplicates() {
-      staleKeeperOf.clear();
-      const latest = getSheetLatestClaims();
-      if (!latest || !Array.isArray(orders)) return [];
+      dupPlanOf.clear();
+      if (!Array.isArray(orders)) return [];
+      const latest = getSheetLatestClaims() || {};
       const up = v => String(v || '').trim().toUpperCase();
       const norm = v => removeVietnameseTones(String(v || '')).toLowerCase().replace(/\s+/g, ' ').trim();
+      const ownTrack = o => extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '');
+      const cid = o => { const c = getReturnParcelId(o); return c && c !== up(o.orderId) ? c : ''; };   // mã yêu cầu thật (không tính mã đơn)
+      const recv = o => isOrderReceived(o);
       const byOrder = new Map();
       orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k) return; if (!byOrder.has(k)) byOrder.set(k, []); byOrder.get(k).push(i); });
-      const out = [];
+      const plan = (i, keep, extra) => { if (i === keep || dupPlanOf.has(orders[i])) return; dupPlanOf.set(orders[i], Object.assign({ keep: orders[keep] }, extra)); };
       byOrder.forEach((idxs, k) => {
         if (idxs.length < 2) return;
         const want = latest[k];
-        if (!want) return;
-        const wantClaim = up(typeof want === 'string' ? want : want.c);
-        const wantStatus = norm(typeof want === 'string' ? '' : want.s);
-        const wantTrack = extractCleanTrackingCode(typeof want === 'string' ? '' : (want.t || ''));
-        const ownTrack = i => extractCleanTrackingCode(orders[i].returnTrack || orders[i].track || orders[i].forwardTrack || orders[i].altTrack || '');
-        const claimOk = i => wantClaim && getReturnParcelId(orders[i]) === wantClaim;
-        const statusOk = i => wantStatus && norm(orders[i].platformStatus) === wantStatus;
-        const tracked = idxs.filter(i => ownTrack(i));
-        let keeper = wantTrack ? idxs.find(i => ownTrack(i) === wantTrack) : undefined;
-        if (keeper === undefined) {
-          const pool = idxs;
-          keeper = pool.find(i => claimOk(i) && statusOk(i)) ?? pool.find(claimOk) ?? pool.find(statusOk);
+        if (want && typeof want === 'object') {
+          // ---- A. có trên Sheet ----
+          const wantClaim = up(want.c), wantStatus = norm(want.s), wantTrack = extractCleanTrackingCode(want.t || '');
+          const sheetRow = idxs.find(i => wantClaim && cid(orders[i]) === wantClaim && norm(orders[i].platformStatus) === wantStatus)
+            ?? idxs.find(i => !ownTrack(orders[i]) && wantStatus && norm(orders[i].platformStatus) === wantStatus)
+            ?? idxs.find(i => wantClaim && cid(orders[i]) === wantClaim);
+          const sameReq = i => !cid(orders[i]) || !wantClaim || cid(orders[i]) === wantClaim;
+          let keep = wantTrack ? idxs.find(i => ownTrack(orders[i]) === wantTrack) : undefined;
+          if (keep === undefined) {
+            const tracked = idxs.filter(i => ownTrack(orders[i]) && sameReq(i) && !isClosedRequest(orders[i]));
+            const distinct = new Set(tracked.map(i => ownTrack(orders[i])));
+            if (distinct.size === 1) keep = tracked[0];
+          }
+          if (keep === undefined) keep = sheetRow;
+          if (keep === undefined) return;
+          const keepTrack = ownTrack(orders[keep]);
+          idxs.forEach(i => {
+            if (i === keep) return;
+            const o = orders[i], t = ownTrack(o);
+            if (t && t !== keepTrack) {
+              // kiện khác: chỉ gỡ khi là yêu cầu cũ / đã huỷ và chưa nhận
+              if (!recv(o) && (isClosedRequest(o) || (wantClaim && cid(o) && cid(o) !== wantClaim))) plan(i, keep, { why: 'yêu cầu cũ' });
+              // cùng yêu cầu nhưng mã vận đơn cũ (Sheet đã đổi sang mã vận đơn của dòng giữ): gỡ nếu chưa nhận
+              else if (!recv(o) && wantTrack && keepTrack === wantTrack && sameReq(i)) plan(i, keep, { why: 'mã vận đơn cũ' });
+              return;
+            }
+            if (!t && recv(o) && wantClaim && cid(o) && cid(o) !== wantClaim) return;   // yêu cầu cũ nhưng đã nhận: giữ
+            plan(i, keep, { copyPlatform: i === sheetRow, why: 'cùng kiện' });
+          });
+          return;
         }
-        if (keeper === undefined && tracked.length === 1) keeper = tracked[0];
-        if (keeper === undefined) return;   // không biết dòng nào đúng: để người dùng tự xem
-        const keepTrack = ownTrack(keeper);
-        idxs.forEach(i => {
-          if (i === keeper) return;
-          const t = ownTrack(i);
-          if (t && t !== keepTrack) return;   // kiện riêng
-          staleKeeperOf.set(orders[i], orders[keeper]);
-          out.push(i);
+        // ---- B. mọi sàn / không có trên Sheet ----
+        const list = idxs.slice();
+        // B1. y hệt nhau
+        const seen = new Map();
+        list.forEach(i => {
+          const o = orders[i];
+          const key = ownTrack(o) + '|' + cid(o);
+          if (seen.has(key)) plan(i, seen.get(key), { why: 'trùng y hệt' }); else seen.set(key, i);
         });
+        const alive = list.filter(i => !dupPlanOf.has(orders[i]));
+        // B2. cùng mã vận đơn, khác mã yêu cầu: một kiện -> gộp sản phẩm
+        const byTrack = new Map();
+        alive.forEach(i => { const t = ownTrack(orders[i]); if (!t) return; if (!byTrack.has(t)) byTrack.set(t, []); byTrack.get(t).push(i); });
+        byTrack.forEach(arr => { if (arr.length < 2) return; const keep = arr.find(i => recv(orders[i])) ?? arr[0]; arr.forEach(i => plan(i, keep, { mergeItems: true, why: 'chung kiện' })); });
+        const alive2 = alive.filter(i => !dupPlanOf.has(orders[i]));
+        // B3. yêu cầu đã huỷ / đóng trong khi còn dòng khác đang xử lý
+        const open = alive2.filter(i => !isClosedRequest(orders[i]));
+        if (open.length && open.length < alive2.length) {
+          const keep = open.find(i => recv(orders[i])) ?? open[0];
+          alive2.forEach(i => { if (isClosedRequest(orders[i]) && !recv(orders[i]) && !(ownTrack(orders[i]) && orders[i].recvDate)) plan(i, keep, { why: 'yêu cầu đã huỷ' }); });
+        }
       });
+      const out = [];
+      orders.forEach((o, i) => { if (dupPlanOf.has(o)) out.push(i); });
       return out;
     }
-    // Chuyển dữ liệu kho của dòng sắp gỡ sang dòng giữ (chỉ bổ sung, không ghi đè dữ liệu dòng giữ đã có).
-    function mergeWarehouseIntoKeeper(src, dst) {
+    // Số mã đơn đang có nhiều dòng ở Bảng chính (để người dùng và app cùng đối chiếu).
+    function countMainDuplicateOrderIds() {
+      const seen = new Map();
+      (orders || []).forEach(o => { const k = String(o && o.orderId || '').trim().toUpperCase(); if (k) seen.set(k, (seen.get(k) || 0) + 1); });
+      let groups = 0, extra = 0;
+      seen.forEach(n => { if (n > 1) { groups++; extra += n - 1; } });
+      return { groups, extra };
+    }
+    // Chuyển dữ liệu từ dòng sắp gỡ sang dòng giữ.
+    function mergeWarehouseIntoKeeper(src, dst, opts = {}) {
       if (!src || !dst || src === dst) return;
-      const isDefault = st => !st || st === 'Chưa trả';
-      if (isDefault(dst.status) && !isDefault(src.status)) dst.status = src.status;
+      if (isOrderReceived(src) && !isOrderReceived(dst)) dst.status = src.status;   // chỉ chuyển trạng thái ĐÃ NHẬN
       if (!dst.recvDate && src.recvDate) dst.recvDate = src.recvDate;
       if (!dst.photo && !dst.photoId && (src.photo || src.photoId)) { dst.photo = src.photo; dst.photoId = src.photoId; }
       const sn = String(src.myNote || '').trim();
       if (sn && !String(dst.myNote || '').includes(sn)) dst.myNote = (String(dst.myNote || '').trim() ? dst.myNote + ' · ' : '') + sn;
       if (src.isWatchlist && !dst.isWatchlist) { dst.isWatchlist = true; if (src.watchlistReason && !dst.watchlistReason) dst.watchlistReason = src.watchlistReason; }
+      if (opts.copyPlatform) {
+        // dòng do Google Sheet tạo là dữ liệu mới nhất: trạng thái sàn, mã yêu cầu, hạn, lý do
+        if (src.platformStatus) dst.platformStatus = src.platformStatus;
+        const sc = src.rawDetails && src.rawDetails.claimId;
+        if (sc) { dst.rawDetails = Object.assign({}, dst.rawDetails || {}, { claimId: sc }); }
+        ['deadline', 'returnReason', 'buyerNote'].forEach(f => { if (src[f] && !dst[f]) dst[f] = src[f]; });
+      }
+      if (opts.mergeItems && Array.isArray(src.items)) {
+        dst.items = Array.isArray(dst.items) ? dst.items : [];
+        const has = it => dst.items.some(x => String(x.product || '') === String(it.product || '') && String(x.color || '') === String(it.color || '') && String(x.size || '') === String(it.size || ''));
+        src.items.forEach(it => { if (it && (it.product || it.sku) && !has(it)) dst.items.push(Object.assign({}, it)); });
+      }
     }
 
     function autoRemoveShadowDuplicates() {
@@ -4153,7 +4215,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const i = drop[k];
         const o = orders[i];
         if (shadow.has(i)) { try { enrichOtherTableEntry(o); } catch (e) {} }
-        else if (staleKeeperOf.has(o)) { try { mergeWarehouseIntoKeeper(o, staleKeeperOf.get(o)); } catch (e) {} }
+        else if (dupPlanOf.has(o)) { try { const pl = dupPlanOf.get(o); mergeWarehouseIntoKeeper(o, pl.keep, pl); } catch (e) {} }
         backup.push(o);
         orders.splice(i, 1);
         try { shiftCellLocksAfterOrderDelete(i); shiftCellEditHistoryAfterOrderDelete(i); } catch (e) {}
@@ -4181,7 +4243,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       staleIdx.forEach(i => { if (!inDups.has(i)) dups.push({ i, where: 'stale' }); });
       dups.sort((a, b) => a.i - b.i);
       const arc = dups.filter(d => d.where === 'archive').length, stl = dups.filter(d => d.where === 'stale').length, can = dups.length - arc - stl;
-      if (!dups.length) { appAlert('Không có đơn nào ở Bảng chính bị trùng với Kho lưu trữ, Bảng đơn hủy, hay là yêu cầu trả hàng cũ của cùng đơn.', 'Dọn Đơn Trùng'); return; }
+      if (!dups.length) {
+        const left = countMainDuplicateOrderIds();
+        appAlert('Không còn dòng trùng nào app tự gộp được.' + (left.groups ? `\n\nBảng chính còn ${left.groups} mã đơn có nhiều dòng: đó là các kiện / yêu cầu khác nhau của cùng đơn (vd 2 mã vận đơn khác nhau, hoặc TikTok tách 2 yêu cầu trả hàng), app giữ để bạn tự xem.` : ''), 'Dọn Đơn Trùng');
+        return;
+      }
       const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính bị trùng (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy, ${stl} là yêu cầu trả hàng cũ của cùng mã đơn đã có yêu cầu mới trên Sheet).\n\nXóa các bản trùng / cũ khỏi Bảng chính? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng');
       if (!ok) return;
       let removed = 0, kept = 0;
@@ -4189,7 +4255,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       for (let k = dups.length - 1; k >= 0; k--) {
         const { i } = dups[k];
         if (isLocked || hasLockedCellsInOrder(i)) { kept++; continue; }
-        if (dups[k].where === 'stale' && staleKeeperOf.has(orders[i])) { try { mergeWarehouseIntoKeeper(orders[i], staleKeeperOf.get(orders[i])); } catch (e) {} }
+        if (dups[k].where === 'stale' && dupPlanOf.has(orders[i])) { try { const pl = dupPlanOf.get(orders[i]); mergeWarehouseIntoKeeper(orders[i], pl.keep, pl); } catch (e) {} }
         backup.push(orders[i]);
         orders.splice(i, 1);
         shiftCellLocksAfterOrderDelete(i);
@@ -4200,7 +4266,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       addAuditLog('🧹 DỌN ĐƠN TRÙNG', `Đã xóa ${removed} đơn trùng khỏi Bảng chính (giữ ${kept} đơn đang khóa)`);
       saveOrders();
       renderAll();
-      showAppToast(`🧹 Đã dọn ${removed} đơn trùng khỏi Bảng chính${kept ? `, giữ lại ${kept} đơn đang khóa` : ''}.`, 'success', 6000);
+      const left = countMainDuplicateOrderIds();
+      showAppToast(`🧹 Đã dọn ${removed} đơn trùng khỏi Bảng chính${kept ? `, giữ lại ${kept} đơn đang khóa` : ''}. Còn ${left.groups} mã đơn có nhiều dòng (kiện / yêu cầu khác nhau).`, 'success', 8000);
     }
 
     function findExistingReturnParcelIndex(orderData) {
@@ -17891,6 +17958,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           finishFolderNote(true, `Đã nạp ${parsed.length} file TikTok (${names})` + (summary ? ' — ' + summary : ''));
           try { showAppToast(`📂 Đã tự nạp ${parsed.length} file TikTok: ${names}`, 'success', 6000); } catch (e) {}
           try { addAuditLog('📂 TỰ NẠP FILE TIKTOK', `Nạp ${names}`); } catch (e) {}
+          try { const n = autoRemoveShadowDuplicates(); if (n) finishFolderNote(true, `Đã nạp ${parsed.length} file TikTok (${names}), gộp ${n} dòng trùng mã đơn`); } catch (e) {}
         } else {
           finishFolderNote(false, `Không nạp được ${names}: ` + String((res && res.message) || 'lỗi không rõ').replace(/^❌\s*/, ''));
           try { showAppToast(`❌ Không nạp được file TikTok ${names}`, 'error', 8000); } catch (e) {}

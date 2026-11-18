@@ -431,6 +431,48 @@ ipcMain.handle('fetch-sheet-text', async (event, url) => {
   catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+// v1.9.34: tự nạp file TikTok từ một thư mục người dùng chọn. Chỉ liệt kê / đọc file .xlsx .xls .csv nằm NGAY trong
+// thư mục đã chọn (không đọc thư mục con, không đọc file ngoài thư mục đó).
+let watchDir = '';
+const WATCH_EXT = /\.(xlsx|xls|csv)$/i;
+ipcMain.handle('choose-watch-folder', async () => {
+  try {
+    const r = await dialog.showOpenDialog({ title: 'Chọn thư mục chứa file TikTok tải về', properties: ['openDirectory'] });
+    if (r.canceled || !r.filePaths || !r.filePaths[0]) return { success: false, canceled: true };
+    return { success: true, path: r.filePaths[0] };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('set-watch-folder', async (event, dir) => {
+  const d = String(dir || '').trim();
+  if (!d) { watchDir = ''; return { success: true }; }
+  try {
+    const p = path.resolve(d);
+    if (!fs.existsSync(p) || !fs.statSync(p).isDirectory()) return { success: false, error: 'Không tìm thấy thư mục: ' + d };
+    watchDir = p;
+    return { success: true, path: p };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('list-watch-folder', async () => {
+  if (!watchDir) return { success: false, error: 'Chưa chọn thư mục' };
+  try {
+    const files = [];
+    for (const name of fs.readdirSync(watchDir)) {
+      if (!WATCH_EXT.test(name) || name.startsWith('~$')) continue;
+      let st; try { st = fs.statSync(path.join(watchDir, name)); } catch (e) { continue; }
+      if (!st.isFile() || st.size === 0 || st.size > 60 * 1024 * 1024) continue;
+      files.push({ name, size: st.size, mtimeMs: st.mtimeMs });
+    }
+    return { success: true, files };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('read-watch-file', async (event, name) => {
+  if (!watchDir) return { success: false, error: 'Chưa chọn thư mục' };
+  const base = path.basename(String(name || ''));
+  if (!base || base !== String(name) || !WATCH_EXT.test(base)) return { success: false, error: 'Tên file không hợp lệ' };
+  try { return { success: true, data: fs.readFileSync(path.join(watchDir, base)) }; }
+  catch (e) { return { success: false, error: e.message }; }
+});
+
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });

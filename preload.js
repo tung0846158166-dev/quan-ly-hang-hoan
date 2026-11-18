@@ -15,5 +15,9 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   auxSave: (key, value) => ipcRenderer.invoke('aux-save', key, value),
   runAutoBackup: () => ipcRenderer.invoke('run-auto-backup'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
-  fetchSheetText: (url) => ipcRenderer.invoke('fetch-sheet-text', url)
+  fetchSheetText: (url) => ipcRenderer.invoke('fetch-sheet-text', url),
+  chooseWatchFolder: () => ipcRenderer.invoke('choose-watch-folder'),
+  setWatchFolder: (dir) => ipcRenderer.invoke('set-watch-folder', dir),
+  listWatchFolder: () => ipcRenderer.invoke('list-watch-folder'),
+  readWatchFile: (name) => ipcRenderer.invoke('read-watch-file', name)
 });

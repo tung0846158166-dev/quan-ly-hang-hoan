@@ -13,8 +13,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var restReason: String?
 
     // ---- Chống nóng máy ----
-    // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 30 giây không thấy mã nào thì 15 hình/giây;
-    // 3 phút không thấy mã thì tạm dừng camera. Máy nóng (thermalState .serious) thì 12 hình/giây, quá nóng (.critical) thì dừng.
+    // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 15 giây không thấy mã nào thì 15 hình/giây;
+    // 30 giây không thấy mã thì tạm dừng camera. Máy nóng (thermalState .serious) thì 12 hình/giây, quá nóng (.critical) thì dừng.
     private let activeFPS: Int32 = 24, idleFPS: Int32 = 15, hotFPS: Int32 = 12
     private var currentFPS: Int32 = 0
     private var lastCodeAt = Date()
@@ -53,13 +53,13 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             stop(); return
         }
         let idle = Date().timeIntervalSince(lastCodeAt)
-        let restAfter = UserDefaults.standard.object(forKey: "cameraRestAfterSec") as? Double ?? 180
+        let restAfter = UserDefaults.standard.object(forKey: "cameraRestAfterSec") as? Double ?? 30
         if restAfter > 0, idle > restAfter {
-            restReason = "Camera tạm nghỉ vì \(Int(restAfter / 60)) phút không quét mã (đỡ nóng máy, đỡ tốn pin). Chạm để quét tiếp."
+            restReason = "Camera tạm nghỉ vì \(Int(restAfter)) giây không quét mã (đỡ nóng máy, đỡ tốn pin). Chạm để quét tiếp."
             stop(); return
         }
         if thermal == .serious { setFPS(hotFPS) }
-        else if idle > 30 { setFPS(idleFPS) }
+        else if idle > 15 { setFPS(idleFPS) }
         else { setFPS(activeFPS) }
     }
 
@@ -77,7 +77,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         restReason = nil
         lastCodeAt = Date()
         idleTimer?.invalidate()
-        idleTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.applyThermalAndIdle() }
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.applyThermalAndIdle() }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: begin()
         case .notDetermined:
@@ -202,7 +202,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             }
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 30
+                let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
                 self.lastCodeAt = Date()
                 if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
                 self.onCode?(s)

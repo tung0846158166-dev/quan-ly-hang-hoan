@@ -14272,6 +14272,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         };
         if (x.ty) row.ty = x.ty;
         if (o.recvDate) row.rcd = String(o.recvDate).slice(0, 24);   // ngày giờ nhận tại kho (cho thống kê hàng đã về kho trên iPhone)
+        if (o.platformStatus) row.ps = String(o.platformStatus).slice(0, 60);   // cột Trạng thái sàn (vd "Huỷ sau chuẩn bị · Đã huỷ")
         if (x.pre) row.pre = 1;
         if (x.lv !== undefined) row.lv = x.lv;
         if (!x.pd) row.pd = 0;

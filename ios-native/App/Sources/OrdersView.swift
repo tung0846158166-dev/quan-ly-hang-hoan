@@ -140,17 +140,23 @@ struct OrdersView: View {
     /// Lối vào Bảng đơn mới (Hộp Đơn Mới trên PC) và Bảng đơn hủy: tích chọn để đẩy ra / đánh dấu đã nhận.
     private var tables: some View {
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
-        return HStack(spacing: 8) {
+        let afterPrepPending = store.rows.filter { $0.k == "m" && $0.pd && $0.isCancelAfterPrep }.count
+        return HStack(spacing: 6) {
             NavigationLink { InboxView() } label: {
-                Label("Đơn mới (\(store.inbox.count))", systemImage: "tray.and.arrow.down.fill")
-                    .font(.subheadline.bold()).frame(maxWidth: .infinity)
+                VStack(spacing: 1) { Text("📥 Đơn mới").font(.caption.bold()); Text("\(store.inbox.count)").font(.subheadline.bold()) }
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered).tint(store.inbox.isEmpty ? .gray : .blue)
             NavigationLink { CancelledTableView() } label: {
-                Label("Đơn hủy · chưa nhận \(cancelledPending)", systemImage: "xmark.bin.fill")
-                    .font(.subheadline.bold()).frame(maxWidth: .infinity)
+                VStack(spacing: 1) { Text("🚫 Đơn hủy").font(.caption.bold()); Text("chưa nhận \(cancelledPending)").font(.caption2.bold()) }
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered).tint(cancelledPending == 0 ? .gray : .red)
+            NavigationLink { CancelAfterPrepView() } label: {
+                VStack(spacing: 1) { Text("📦 Hủy sau CB").font(.caption.bold()); Text("chưa nhận \(afterPrepPending)").font(.caption2.bold()) }
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered).tint(afterPrepPending == 0 ? .gray : .purple)
         }
         .padding(.horizontal)
     }
@@ -282,6 +288,7 @@ struct DetailView: View {
                 Section("Mã") {
                     LabeledContent("Mã vận đơn", value: live.c)
                     if !live.o.isEmpty { LabeledContent("Mã đơn hàng", value: live.o) }
+                    if !live.ps.isEmpty { LabeledContent("Trạng thái sàn", value: live.ps) }
                     Button("Sao chép mã vận đơn") { UIPasteboard.general.string = live.c }
                     if !live.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = live.o } }
                 }

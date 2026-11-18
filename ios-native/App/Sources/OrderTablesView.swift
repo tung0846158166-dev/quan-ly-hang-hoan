@@ -205,3 +205,121 @@ struct CancelledTableView: View {
         .contentShape(Rectangle())
     }
 }
+
+/// Bảng "Hủy sau chuẩn bị": đơn ở bảng chính có cột Trạng thái sàn ghi "Huỷ sau chuẩn bị" (shop đã đóng gói rồi đơn mới bị huỷ,
+/// hàng đang quay về hoặc vẫn nằm ở kho). Tích chọn để đánh dấu Hàng đã trả / Không cần nhận; chạm giữ để xem chi tiết.
+struct CancelAfterPrepView: View {
+    @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var store: SnapshotStore
+    private enum Show: String, CaseIterable { case pending = "Chưa nhận", received = "Đã nhận", all = "Tất cả" }
+    @State private var show: Show = .pending
+    @State private var picked: Set<String> = []
+    @State private var detail: OrderRow?
+
+    private var all: [OrderRow] { store.rows.filter { $0.k == "m" && $0.isCancelAfterPrep } }
+    private var list: [OrderRow] {
+        switch show {
+        case .pending: return all.filter { $0.pd }
+        case .received: return all.filter { $0.rv }
+        case .all: return all
+        }
+    }
+    private var allPicked: Bool { !list.isEmpty && list.allSatisfy { picked.contains($0.id) } }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Picker("", selection: $show) {
+                ForEach(Show.allCases, id: \.self) { s in Text("\(s.rawValue) (\(count(s)))").tag(s) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            List {
+                if list.isEmpty {
+                    Text(store.rows.contains { !$0.ps.isEmpty } ? "Không có đơn Hủy sau chuẩn bị" : "Máy tính chưa gửi cột Trạng thái sàn — cập nhật máy tính lên bản mới rồi kéo xuống để tải lại")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(list) { r in
+                    Button { toggle(r.id) } label: { line(r) }
+                        .buttonStyle(.plain)
+                        .contextMenu { Button("Xem chi tiết") { detail = r } }
+                }
+            }
+            .listStyle(.plain)
+        }
+        .navigationTitle("Hủy sau chuẩn bị (\(all.count))")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(allPicked ? "Bỏ chọn" : "Chọn hết") {
+                    if allPicked { picked.subtract(list.map { $0.id }) } else { picked.formUnion(list.map { $0.id }) }
+                }
+                .disabled(list.isEmpty)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 10) {
+                Button { apply("Hàng đã trả") } label: { Text("✅ Đã nhận (\(picked.count))").bold().frame(maxWidth: .infinity) }
+                    .buttonStyle(.borderedProminent).tint(.green)
+                    .disabled(picked.isEmpty)
+                Button { apply("Không cần nhận") } label: { Text("Không cần nhận").bold().frame(maxWidth: .infinity) }
+                    .buttonStyle(.bordered)
+                    .disabled(picked.isEmpty)
+            }
+            .padding(.horizontal).padding(.vertical, 8)
+            .background(.bar)
+        }
+        .sheet(item: $detail) { DetailView(row: $0) }
+        .onChange(of: show) { _ in picked = [] }
+        .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+    }
+
+    private func count(_ s: Show) -> Int {
+        switch s {
+        case .pending: return all.filter { $0.pd }.count
+        case .received: return all.filter { $0.rv }.count
+        case .all: return all.count
+        }
+    }
+
+    private func toggle(_ id: String) {
+        if picked.contains(id) { picked.remove(id) } else { picked.insert(id) }
+    }
+
+    private func apply(_ status: String) {
+        let rows = all.filter { picked.contains($0.id) }
+        engine.sendOrderEdits(rows, fields: ["st": status])
+        picked = []
+    }
+
+    private func line(_ r: OrderRow) -> some View {
+        let on = picked.contains(r.id)
+        let now = Int(Date().timeIntervalSince1970 * 1000)
+        let level = r.pd ? r.alertLevel(now: now) : .unknown
+        return HStack(spacing: 10) {
+            Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                .font(.title2)
+                .foregroundColor(on ? Color.accentColor : Color.secondary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(r.o.isEmpty ? r.c : r.o).font(.system(.body, design: .monospaced).bold())
+                if !r.o.isEmpty && r.c.uppercased() != r.o.uppercased() {
+                    Text("Vận đơn: \(r.c)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                Text(r.ps).font(.caption.bold()).foregroundColor(.purple)
+                let sub = [r.rd, r.n].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+            }
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(r.rv ? "Đã nhận" : (r.pd ? "Chưa nhận" : r.st))
+                    .font(.caption.bold())
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background((r.rv ? Color.green : (r.pd ? Color.orange : Color.gray)).opacity(0.18), in: Capsule())
+                    .foregroundColor(r.rv ? .green : (r.pd ? .orange : .gray))
+                if level == .overdue { Text("Quá hạn").font(.caption2.bold()).foregroundColor(.red) }
+                else if level == .soon { Text("Sắp hạn").font(.caption2.bold()).foregroundColor(.orange) }
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+}

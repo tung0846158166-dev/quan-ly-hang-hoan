@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.29
+          name: QuanLyHangHoan-Windows-Installer-v1.9.30
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.29
-          name: "Quản Lý Hàng Hoàn v1.9.29 — Dán nhiều mã vào ô tìm kiếm: liệt kê mã nào có, mã nào không"
+          tag_name: v1.9.30
+          name: "Quản Lý Hàng Hoàn v1.9.30 — iPhone: bảng đơn Hủy sau chuẩn bị"
           body: |
+            ### Bản sửa 1.9.30 (dùng cùng app iPhone 0.10.28)
+
+            - Gửi cột Trạng thái sàn sang iPhone. iPhone có bảng "Hủy sau chuẩn bị": các đơn ở Bảng chính có Trạng thái sàn ghi Huỷ sau chuẩn bị, lọc Chưa nhận / Đã nhận / Tất cả, tích chọn để đánh dấu Hàng đã trả hoặc Không cần nhận. Chi tiết đơn trên iPhone hiện thêm Trạng thái sàn.
+
             ### Bản sửa 1.9.29
 
             - Dán một loạt mã đơn / mã vận đơn vào ô TÌM (cách nhau bằng dấu cách, xuống dòng, dấu phẩy): app tìm từng mã và liệt kê mã đó ở Bảng chính (số dòng, trạng thái), Kho lưu trữ, Bảng đơn hủy, Hộp đơn mới hay không có; có nút chép các mã không có và nút chỉ hiện các đơn có ở Bảng chính. Chữ thừa như "(2 dòng sản phẩm)" tự bỏ qua.

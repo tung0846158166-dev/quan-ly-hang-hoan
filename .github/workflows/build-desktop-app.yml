@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.34
+          name: QuanLyHangHoan-Windows-Installer-v1.9.35
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.34
-          name: "Quản Lý Hàng Hoàn v1.9.34 — Tự nạp file TikTok từ thư mục"
+          tag_name: v1.9.35
+          name: "Quản Lý Hàng Hoàn v1.9.35 — Dọn hết dòng trùng mã đơn; dán mã vận đơn tự ghi Đã nhận"
           body: |
+            ### Bản sửa 1.9.35
+
+            - Nhiều dòng cùng mã đơn (không có mã vận đơn riêng) ở Bảng chính: giữ dòng khớp Google Sheet (cùng mã yêu cầu hoặc cùng trạng thái sàn), gỡ các dòng còn lại chưa nhận và chưa có dữ liệu kho. Trước đây sót trường hợp 2 dòng cùng mã yêu cầu hoặc dòng cũ không có mã yêu cầu.
+            - Dán mã vận đơn của một lượt quét trong Hộp Đơn Mới vào ô Mã vận đơn của đơn đã có: đơn được ghi Hàng đã trả và bảng vẽ lại ngay (trước đây hộp được gỡ nhưng bảng vẫn hiện Chưa nhận).
+
             ### Bản sửa 1.9.34
 
             - Menu ☰ › 📂 Tự nạp file TikTok: dán đường dẫn (hoặc chọn) thư mục bạn tải file từ TikTok Seller Center. App kiểm tra mỗi 15 giây, file TikTok mới tải xong được nạp tự động như bấm Nạp File TikTok. File không phải của TikTok, file đã nạp, file có sẵn trước khi bật được bỏ qua; app không xoá / sửa file nào. Có nút nạp các file TikTok đang có trong thư mục.

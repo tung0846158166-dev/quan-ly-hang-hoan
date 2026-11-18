@@ -80,3 +80,37 @@ test('TikTok: dòng y hệt gỡ; yêu cầu khách đã huỷ gỡ; chung một
            T({ orderId: '587069719787111618', track: '854171825802', platformStatus: 'Đang vận chuyển về', rawDetails: { claimId: 'B' } })]);
   assert.strictEqual(r.orders.length, 2);
 });
+
+test('Đơn tạm "Chưa rõ sản phẩm" có mã là MÃ YÊU CẦU trả hàng của đơn thật: gộp vào đơn thật, ghi Hàng đã trả + mã vận đơn vừa quét', () => {
+  const c = { String, Array, Set, Map, Object, JSON, RegExp, Math, Date, WeakMap, console };
+  vm.createContext(c);
+  ['removeVietnameseTones', 'extractCleanTrackingCode', 'getReturnParcelId', 'isOrderReceived', 'getOrderTrackingCodes', 'isScanPlaceholder', 'findPlaceholderTargets', 'mergePlaceholderIntoOrder'].forEach(n => vm.runInContext(extract(n), c));
+  const real = { orderId: '26102054X4PVRC', track: 'SPXVN06229297911A', trackingCodes: ['SPXVN06229297911A'], status: 'Chưa trả', platformStatus: 'Đã đồng ý', rawDetails: { claimId: '2611060KRRWN0U0' }, items: [{ product: 'Áo Polo', qty: 1 }] };
+  const ph = { orderId: '2611060KRRWN0U0', track: 'SPXVN06654167505B', status: 'Hàng đã trả', recvDate: '18/11/2026 14:13:00', note: 'Hàng đã về (điện thoại quét lúc 18/11/2026 14:13:00) nhưng chưa có đơn trong file sàn', items: [{ product: 'Chưa rõ sản phẩm (hàng đã về, chưa có đơn)', qty: 1 }] };
+  const lonely = { orderId: 'SPXVN06769320671B', track: 'SPXVN06769320671B', status: 'Hàng đã trả', items: [{ product: 'Chưa rõ sản phẩm (hàng đã về, chưa có đơn)', qty: 1 }] };
+  c.orders = [ph, real, lonely];
+  const plan = vm.runInContext('findPlaceholderTargets()', c);
+  assert.strictEqual(plan.size, 1);
+  assert.strictEqual(plan.get(ph), real);
+  c.mergePlaceholderIntoOrder(ph, real);
+  assert.strictEqual(real.status, 'Hàng đã trả');
+  assert.strictEqual(real.recvDate, '18/11/2026 14:13:00');
+  assert.strictEqual(real.returnTrack, 'SPXVN06654167505B');
+  assert.ok(real.trackingCodes.includes('SPXVN06654167505B'));
+});
+
+test('Hộp Đơn Mới: ô mã đơn là MÃ TRẢ HÀNG của đơn có sẵn -> đẩy ra thì ghi vào đơn đó, không tạo dòng mới', () => {
+  const c = { String, Array, Set, Map, Object, JSON, RegExp, Math, Date, Number, Boolean, console };
+  vm.createContext(c);
+  ['extractCleanTrackingCode', 'getReturnParcelId', 'isOrderReceived', 'getOrderTrackingCodes', 'getPhoneOrderMatches', 'isScanPlaceholder', 'mergePlaceholderIntoOrder', 'convertInboxItemToOrder', 'mergeInboxItemIntoMain']
+    .forEach(n => vm.runInContext(extract(n), c));
+  c.getNowDateTimeString = () => '18/11/2026 14:13:00'; c.formatScanTime = () => '18/11/2026 14:13:00'; c.autoDetectPlatformFromCode = () => 'Shopee';
+  c.orders = [S({ orderId: '26102054X4PVRC', track: 'SPXVN06229297911A', rawDetails: { claimId: '2611060KRRWN0U0' } })];
+  const real = c.mergeInboxItemIntoMain({ track: 'SPXVN06654167505B', orderId: '2611060KRRWN0U0', fromUnmatchedScan: true, scanTime: 1, time: '18/11/2026 14:13:00', product: 'Chưa rõ sản phẩm (hàng đã về, chưa có đơn)' });
+  assert.ok(real);
+  assert.strictEqual(c.orders.length, 1);
+  assert.strictEqual(real.status, 'Hàng đã trả');
+  assert.strictEqual(real.returnTrack, 'SPXVN06654167505B');
+  // không khớp đơn nào -> không ghi gì
+  assert.strictEqual(c.mergeInboxItemIntoMain({ track: 'SPXVN0999999999X', orderId: 'SPXVN0999999999X' }), null);
+});

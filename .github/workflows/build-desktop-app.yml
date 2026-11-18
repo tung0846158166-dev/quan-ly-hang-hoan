@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.37
+          name: QuanLyHangHoan-Windows-Installer-v1.9.38
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.37
-          name: "Quản Lý Hàng Hoàn v1.9.37 — Gộp dòng trùng mã đơn (kiểm tra trên dữ liệu thật)"
+          tag_name: v1.9.38
+          name: "Quản Lý Hàng Hoàn v1.9.38 — Quét nhãn trả hàng có mã phiếu: nhận đúng đơn thật"
           body: |
+            ### Bản sửa 1.9.38
+
+            - Quét mã vận đơn trả hàng mới (khác mã vận đơn cũ của đơn) mà phiếu đọc được mã phiếu trả hàng / mã đơn khớp đúng 1 đơn: gắn mã vừa quét vào đơn đó và ghi Hàng đã trả, không tạo đơn tạm.
+            - Đơn tạm "Chưa rõ sản phẩm (hàng đã về, chưa có đơn)" có mã là mã phiếu trả hàng / mã đơn / mã vận đơn của đúng 1 đơn thật: tự gộp vào đơn thật (Hàng đã trả, ngày nhận, ảnh, mã vận đơn vừa quét) sau mỗi lần đồng bộ và trong Dọn Đơn Trùng.
+
             ### Bản sửa 1.9.37
 
             - Gộp dòng trùng mã đơn ở Bảng chính sau mỗi lần đồng bộ Sheet / tự nạp file TikTok và trong Dọn Đơn Trùng. Chạy trên dữ liệu thật (2.896 đơn): 423 mã đơn có nhiều dòng còn 22 (là các kiện / yêu cầu khác nhau), gỡ 427 dòng, không gỡ dòng nào đã nhận; Báo Đỏ 1.209 còn 957.

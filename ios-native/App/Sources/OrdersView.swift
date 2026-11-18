@@ -208,6 +208,8 @@ struct OrdersView: View {
 /// Quét QR / mã vạch để điền vào ô tìm kiếm.
 struct ScanSearchSheet: View {
     let onCode: (String) -> Void
+    var title: String = "Quét để tìm đơn"
+    var hint: String = "Đưa mã vạch hoặc QR vào khung để tìm đơn"
     @StateObject private var camera = CameraController()
     @Environment(\.dismiss) private var dismiss
     @State private var done = false
@@ -222,7 +224,7 @@ struct ScanSearchSheet: View {
                 .frame(height: 345).background(Color.black)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.indigo, lineWidth: 2))
-                Text("Đưa mã vạch hoặc QR vào khung để tìm đơn").font(.footnote).foregroundStyle(.secondary)
+                Text(hint).font(.footnote).foregroundStyle(.secondary)
                 Button { camera.setTorch(!camera.torchOn) } label: {
                     Label("Đèn", systemImage: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                 }.buttonStyle(.borderedProminent).tint(.indigo)
@@ -230,7 +232,7 @@ struct ScanSearchSheet: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("Quét để tìm đơn")
+            .navigationTitle(title)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
             .onAppear {
                 camera.onCode = { raw in

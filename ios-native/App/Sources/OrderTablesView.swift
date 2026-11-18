@@ -7,11 +7,43 @@ struct InboxView: View {
     @EnvironmentObject var store: SnapshotStore
     @State private var picked: Set<String> = []
     @State private var confirmAll = false
+    @State private var manual = ""
+    @State private var showScanner = false
 
     private var allPicked: Bool { !store.inbox.isEmpty && picked.count == store.inbox.count }
 
+    /// Tạo đơn mới ngay tại đây (nhập mã tay hoặc quét), giống chế độ "Đơn mới" ở màn Quét: đơn vào Hộp Đơn Mới trên máy tính.
+    private var addBar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                TextField("Nhập mã tay để tạo đơn mới", text: $manual)
+                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.send)
+                    .onSubmit(sendManual)
+                Button { showScanner = true } label: { Image(systemName: "barcode.viewfinder").font(.title3) }
+                    .buttonStyle(.bordered)
+                Button("Tạo", action: sendManual)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(manual.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            Text("Mã nhập hoặc quét ở đây được gửi sang Hộp Đơn Mới trên máy tính (giống chế độ Đơn mới ở màn Quét).")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private func sendManual() {
+        let v = manual.trimmingCharacters(in: .whitespaces)
+        guard !v.isEmpty else { return }
+        if engine.submit(raw: v, kind: .newOrder, photo: nil, useSnapshot: false) { manual = "" }
+    }
+
     var body: some View {
         List {
+            Section {
+                addBar
+                if let b = engine.banner { BannerStrip(banner: b) }
+            }
             if store.inbox.isEmpty {
                 Text(store.hasData ? "Bảng đơn mới đang trống" : "Chưa nhận dữ liệu từ máy tính")
                     .foregroundStyle(.secondary)
@@ -55,6 +87,10 @@ struct InboxView: View {
         }
         .onChange(of: store.inbox) { list in picked = picked.intersection(Set(list.map { $0.id })) }
         .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+        .sheet(isPresented: $showScanner) {
+            ScanSearchSheet(onCode: { code in _ = engine.submit(raw: code, kind: .newOrder, photo: nil, useSnapshot: false) },
+                            title: "Quét để tạo đơn mới", hint: "Đưa mã vận đơn vào khung để tạo đơn mới")
+        }
     }
 
     private func toggle(_ id: String) {
@@ -117,6 +153,7 @@ struct CancelledTableView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
+            if let b = engine.banner { BannerStrip(banner: b).padding(.horizontal) }
             List {
                 if list.isEmpty { Text("Không có đơn hủy").foregroundStyle(.secondary) }
                 ForEach(list) { r in
@@ -233,6 +270,7 @@ struct CancelAfterPrepView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
+            if let b = engine.banner { BannerStrip(banner: b).padding(.horizontal) }
             List {
                 if list.isEmpty {
                     Text(store.rows.contains { !$0.ps.isEmpty } ? "Không có đơn Hủy sau chuẩn bị" : "Máy tính chưa gửi cột Trạng thái sàn — cập nhật máy tính lên bản mới rồi kéo xuống để tải lại")
@@ -321,5 +359,33 @@ struct CancelAfterPrepView: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+    }
+}
+
+
+/// Dòng báo kết quả gửi lệnh (đã gửi, máy tính đã làm xong, lỗi…) cho các bảng ngoài màn Quét.
+/// Chỉ hiện các thông báo mới (trong 6 giây sau khi đổi), không hiện lại thông báo cũ từ màn Quét.
+struct BannerStrip: View {
+    let banner: Banner
+    @State private var visible = false
+    @State private var shown: Banner?
+    var body: some View {
+        Group { if visible { strip } }
+            .onAppear { shown = banner }
+            .onChange(of: banner) { b in
+                guard b != shown else { return }
+                shown = b; visible = true
+                Task { try? await Task.sleep(nanoseconds: 6_000_000_000); if shown == b { visible = false } }
+            }
+    }
+    private var strip: some View {
+        HStack(spacing: 6) {
+            Text(banner.text).font(.caption.bold())
+            if !banner.code.isEmpty { Text(banner.code).font(.caption.monospaced().bold()) }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(banner.color.opacity(0.9)).foregroundColor(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

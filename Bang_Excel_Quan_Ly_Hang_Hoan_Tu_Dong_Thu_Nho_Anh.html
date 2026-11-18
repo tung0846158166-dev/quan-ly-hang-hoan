@@ -4076,22 +4076,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const hasWarehouseData = o => isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim();
     // Dòng Bảng chính của yêu cầu cũ: cùng mã đơn với dòng của yêu cầu mới nhất, khác mã yêu cầu, không có mã vận đơn riêng,
     // chưa nhận và chưa có dữ liệu kho.
+    // v1.9.35: Sheet chỉ có MỘT dòng cho mỗi mã đơn. Bảng chính có nhiều dòng cùng mã đơn (không có mã vận đơn riêng) thì
+    // giữ dòng khớp Sheet (cùng mã yêu cầu, hoặc cùng trạng thái sàn), gỡ các dòng còn lại nếu chưa nhận và chưa có dữ liệu kho.
+    // (Trước đây chỉ gỡ khi dòng cũ có mã yêu cầu KHÁC; dòng cũ không có / trùng mã yêu cầu thì sót.)
     function findStaleClaimDuplicates() {
       const latest = getSheetLatestClaims();
       if (!latest || !Array.isArray(orders)) return [];
       const up = v => String(v || '').trim().toUpperCase();
+      const norm = v => removeVietnameseTones(String(v || '')).toLowerCase().replace(/\s+/g, ' ').trim();
       const byOrder = new Map();
       orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k) return; if (!byOrder.has(k)) byOrder.set(k, []); byOrder.get(k).push(i); });
       const out = [];
       byOrder.forEach((idxs, k) => {
         if (idxs.length < 2) return;
-        const want = up(latest[k]);
-        if (!want || !idxs.some(i => getReturnParcelId(orders[i]) === want)) return;
-        idxs.forEach(i => {
-          const o = orders[i], id = getReturnParcelId(o);
-          if (!id || id === want) return;
-          if (extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '')) return;   // có kiện riêng
-          if (hasWarehouseData(o)) return;
+        const want = latest[k];
+        if (!want) return;
+        const wantClaim = up(typeof want === 'string' ? want : want.c);
+        const wantStatus = norm(typeof want === 'string' ? '' : want.s);
+        const ownTrack = o => !!extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '');
+        const cands = idxs.filter(i => !ownTrack(orders[i]));   // dòng có mã vận đơn riêng là kiện riêng: không đụng
+        if (cands.length < 2) return;
+        const claimOk = i => wantClaim && getReturnParcelId(orders[i]) === wantClaim;
+        const statusOk = i => wantStatus && norm(orders[i].platformStatus) === wantStatus;
+        const keeper = cands.find(i => claimOk(i) && statusOk(i)) ?? cands.find(claimOk) ?? cands.find(statusOk);
+        if (keeper === undefined) return;   // không biết dòng nào đúng: để người dùng tự xem
+        cands.forEach(i => {
+          if (i === keeper || hasWarehouseData(orders[i])) return;
           out.push(i);
         });
       });
@@ -14701,6 +14711,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
     }
     let lastUnmatchedReconcileAt = 0;
+    let renderWhenIdleTimer = null;
+    function renderWhenNotTyping(tries = 0) {
+      if (renderWhenIdleTimer) clearTimeout(renderWhenIdleTimer);
+      renderWhenIdleTimer = setTimeout(() => {
+        const a = document.activeElement;
+        const typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest && a.closest('#tableBody');
+        if (typing && tries < 40) { renderWhenNotTyping(tries + 1); return; }   // tối đa ~20 giây
+        try { renderAll(false); recalcTotalsAndSummary(); } catch (e) {}
+      }, 500);
+    }
     function inboxHasScanItems() {
       try { return Array.isArray(newOrdersInbox) && newOrdersInbox.some(it => it && it.fromUnmatchedScan); } catch (e) { return false; }
     }
@@ -14749,6 +14769,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else keep.push(e);   // chưa có đơn, hoặc có nhiều đơn trùng mã: giữ lại để kiểm tra
       }
       if (changed) { unmatchedPhoneScans = keep; persistUnmatchedScans(); }
+      if (applied || inboxChanged) {
+        // Đổi trạng thái xong phải vẽ lại bảng (vd vừa dán mã vận đơn vào ô: trước đây hộp đơn mới được gỡ nhưng bảng
+        // vẫn hiện Chưa nhận). Chờ người dùng rời ô đang gõ để không mất con trỏ.
+        try { renderWhenNotTyping(); } catch (x) {}
+      }
       if (applied) {
         try { addAppNotification({ type: 'phone_scan', title: '📱 Tự khớp lượt quét trước', detail: `Đã tự chuyển ${applied} đơn sang [🟢 Hàng đã trả] vì điện thoại đã quét trước khi đơn có trên máy tính.`, code: '', orderIdx: null }); } catch (x) {}
         try { showAppToast(`Đã tự khớp ${applied} đơn đã quét trước đó`, 'success'); } catch (x) {}
@@ -17573,7 +17598,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (parcelLists.length) {
           await breathe();
           const mergedAll = mergeSheetParcels(parcelLists);
-          { const claims = {}; mergedAll.forEach(m => { if (m.orderId && m.claimId) claims[String(m.orderId).trim().toUpperCase()] = String(m.claimId).trim().toUpperCase(); }); saveSheetLatestClaims(claims); }
+          {
+            // mã đơn -> { c: mã yêu cầu, s: trạng thái sàn đúng như sẽ ghi vào cột Trạng thái sàn }
+            const claims = {};
+            mergedAll.forEach(m => {
+              if (!m.orderId) return;
+              const st = m.parcelStatus || m.requestStatus;
+              const s = m.type === 'cancel' ? (m.typeLabel ? m.typeLabel + ' · ' : '') + (st || 'Đã hủy') : st;
+              claims[String(m.orderId).trim().toUpperCase()] = { c: String(m.claimId || '').trim().toUpperCase(), s: s || '' };
+            });
+            saveSheetLatestClaims(claims);
+          }
           const byDays = filterSheetParcelsByDays(mergedAll, c.maxDays);
           let merged = byDays.parcels; tooOld = byDays.dropped;
           mergedCount = merged.length;

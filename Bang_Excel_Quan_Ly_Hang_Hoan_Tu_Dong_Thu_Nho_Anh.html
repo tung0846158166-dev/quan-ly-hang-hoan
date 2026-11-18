@@ -15021,7 +15021,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (data.type === 'inbox_push_many') {
         const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
         const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
-        const resend = () => setTimeout(() => { try { broadcastOrdersSnapshot(true); } catch (e) {} }, 1200);
+        const resend = () => setTimeout(async () => { try { if (!(await broadcastOrdersSnapshot(true))) schedulePhoneSnapshotSync(); } catch (e) {} }, 1200);   // đang gửi dở thì hẹn gửi lại
         const picked = (newOrdersInbox || []).filter(it => it && ids.has(String(it.id)));
         if (!picked.length) { reply('Các đơn đã chọn không còn trong Hộp Đơn Mới (có thể đã được đẩy ra)', 'duplicate'); resend(); return { success: true }; }
         if (isLocked) { reply('Bảng chính đang khóa trên máy tính, mở khóa rồi đẩy lại', 'locked'); return { success: false }; }
@@ -15047,7 +15047,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
         const want = data.received !== false;
         const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
-        const resend = () => setTimeout(() => { try { broadcastOrdersSnapshot(true); } catch (e) {} }, 1200);
+        const resend = () => setTimeout(async () => { try { if (!(await broadcastOrdersSnapshot(true))) schedulePhoneSnapshotSync(); } catch (e) {} }, 1200);   // đang gửi dở thì hẹn gửi lại
         const list = (cancelledOrders || []).filter(o => o && ids.has(String(o.id)) && !!o.received !== want);
         if (!list.length) { reply('Các đơn hủy đã chọn đã ở trạng thái này rồi', 'duplicate'); resend(); return { success: true }; }
         const before = list.map(o => ({ o, received: o.received, recvDate: o.recvDate }));

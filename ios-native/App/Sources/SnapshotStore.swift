@@ -87,6 +87,7 @@ final class SnapshotStore: ObservableObject {
     private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
         rows = p.rows
         stats = p.stats
+        inbox = p.inbox   // Hộp Đơn Mới: thiếu dòng này thì chỉ thấy sau khi tắt mở lại app (đọc từ file)
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = built
         let waiting = unconfirmedReturnCodes()

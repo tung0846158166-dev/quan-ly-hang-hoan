@@ -414,6 +414,21 @@ final class SyncEngine: ObservableObject {
         banner = Banner(code: row.c, text: "ĐÃ GỬI SỬA ĐƠN, CHỜ PC", color: .orange)
     }
 
+    /// Sửa cùng lúc nhiều đơn (vd đánh dấu đã nhận các đơn Huỷ sau chuẩn bị). Mỗi đơn 1 mã yêu cầu riêng.
+    func sendOrderEdits(_ rows: [OrderRow], fields: [String: Any]) {
+        guard !rows.isEmpty else { return }
+        let base = nowMs()
+        for (i, row) in rows.enumerated() {
+            let rid = "edit-\(base)-\(i)"
+            let body = SyncProtocol.orderEdit(code: row.c, orderId: row.o, fields: fields, room: room, requestId: rid)
+            pendingNotes[rid] = body
+            broadcast(body, title: "Shopee Edit", room: room)
+            snapshot.applyLocalEdit(rowId: row.id, fields: fields)
+        }
+        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        banner = Banner(code: "\(rows.count) đơn", text: "ĐÃ GỬI SỬA ĐƠN, CHỜ PC", color: .orange)
+    }
+
     func sendOrderDelete(_ row: OrderRow) {
         let rid = "del-\(nowMs())"
         let body = SyncProtocol.orderDelete(code: row.c, orderId: row.o, room: room, requestId: rid)

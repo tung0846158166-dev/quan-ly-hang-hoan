@@ -34,6 +34,13 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(again.rows[0].ci, "cxl_1")
     }
 
+    func testPlatformStatusCancelAfterPrep() throws {
+        let json = #"{"time":1,"count":3,"rows":[{"k":"m","c":"A1","ps":"Huỷ sau chuẩn bị · Đã huỷ"},{"k":"m","c":"A2","ps":"HỦY SAU CHUẨN BỊ"},{"k":"m","c":"A3","ps":"Đã đồng ý"}]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows.map { $0.isCancelAfterPrep }, [true, true, false])
+        XCTAssertEqual(p.rows[0].ps, "Huỷ sau chuẩn bị · Đã huỷ")
+    }
+
     func testInboxPushManyAndCancelReceiveMessages() throws {
         let a = SyncProtocol.inboxPushMany(ids: ["inbox_1", "inbox_2"], room: "R", requestId: "q1")
         let ja = try JSONSerialization.jsonObject(with: Data(a.utf8)) as! [String: Any]

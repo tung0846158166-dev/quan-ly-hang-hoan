@@ -23,6 +23,7 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var rcd: String = ""     // ngày giờ nhận tại kho (khi đã nhận)
     public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=72h), 1 = Báo Vàng (>=48h), 0 = an toàn; -1 = PC cũ không gửi
     public var ci: String = ""      // id đơn trong bảng đơn hủy trên PC (để đánh dấu đã nhận từ điện thoại); PC cũ không gửi
+    public var ps: String = ""      // cột Trạng thái sàn trên PC (vd "Huỷ sau chuẩn bị · Đã huỷ"); PC cũ không gửi
 
     public var id: String { k + "|" + c }
     /// Thuộc nhóm đơn hủy: nằm trong bảng đơn hủy, hoặc ở bảng chính nhưng loại đơn là "Đơn hủy".
@@ -36,6 +37,15 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
 }
 
 /// Một đơn trong Hộp Đơn Mới trên PC (chờ đẩy ra bảng chính).
+extension OrderRow {
+    /// Đơn "Huỷ sau chuẩn bị": shop đã đóng gói rồi đơn mới bị huỷ (theo cột Trạng thái sàn).
+    public var isCancelAfterPrep: Bool {
+        let t = ps.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d").lowercased()
+        return t.contains("huy sau chuan bi")
+    }
+}
+
 public struct InboxRow: Codable, Identifiable, Equatable, Hashable {
     public var id: String     // id trên PC
     public var c: String      // mã vận đơn
@@ -92,7 +102,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps }
 private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, inbox }
 private enum InboxKeys: String, CodingKey { case id, c, o, p, n, t, u, dup }
 
@@ -104,7 +114,7 @@ extension OrderRow {
                   due: c.flexInt(.due), st: c.flexString(.st),
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
                   wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1),
-                  ci: c.flexString(.ci))
+                  ci: c.flexString(.ci), ps: c.flexString(.ps))
     }
 }
 

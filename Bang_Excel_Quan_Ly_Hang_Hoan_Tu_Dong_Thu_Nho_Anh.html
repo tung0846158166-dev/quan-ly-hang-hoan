@@ -4054,6 +4054,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function isInboxItemDuplicate(it) {
       return Boolean(it && locateExistingAnywhere(it.track || it.code || '', it.orderId));
     }
+    // v1.9.38: đơn trong Hộp Đơn Mới trùng đúng 1 đơn ở Bảng chính (theo mã vận đơn, mã đơn hoặc MÃ TRẢ HÀNG ghi nhầm vào ô mã đơn):
+    // chuyển lượt quét (mã vận đơn hoàn, đã nhận, ngày nhận, ảnh) sang đơn đó thay vì bỏ đi.
+    function mergeInboxItemIntoMain(it) {
+      if (!it || typeof getPhoneOrderMatches !== 'function') return null;
+      const codes = [it.track || it.code || '', it.orderId || ''].map(v => extractCleanTrackingCode(v) || '').filter(Boolean);
+      for (const c of codes) {
+        const m = getPhoneOrderMatches(c).filter(x => !isScanPlaceholder(x.order));
+        if (m.length === 1) { mergePlaceholderIntoOrder(convertInboxItemToOrder(it), m[0].order); return m[0].order; }
+        if (m.length > 1) return null;
+      }
+      return null;
+    }
+    function mergeInboxDuplicates(list) {
+      let n = 0;
+      (list || []).forEach(it => { try { if (mergeInboxItemIntoMain(it)) n++; } catch (e) {} });
+      return n;
+    }
 
     // v1.9.28: tự gỡ "đơn bóng" ở Bảng chính. Ví dụ: hàng về kho được quét khi chưa có đơn (mã đơn tạm = mã vận đơn),
     // đã sang Kho lưu trữ; sau đó Google Sheet (tab Huỷ không có mã vận đơn) tạo đơn theo mã đơn thật ở Bảng chính
@@ -15259,8 +15276,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!picked.length) { reply('Các đơn đã chọn không còn trong Hộp Đơn Mới (có thể đã được đẩy ra)', 'duplicate'); resend(); return { success: true }; }
         if (isLocked) { reply('Bảng chính đang khóa trên máy tính, mở khóa rồi đẩy lại', 'locked'); return { success: false }; }
         const dups = picked.filter(it => { try { return isInboxItemDuplicate(it); } catch (e) { return false; } });
-        const fresh = picked.filter(it => !dups.includes(it)).map(it => convertInboxItemToOrder(it));
         const prevOrders = orders.slice(), prevInbox = newOrdersInbox.slice();
+        mergeInboxDuplicates(dups);
+        const fresh = picked.filter(it => !dups.includes(it)).map(it => convertInboxItemToOrder(it));
         if (fresh.length) orders.unshift(...fresh);
         newOrdersInbox = newOrdersInbox.filter(it => !(it && ids.has(String(it.id))));
         const sv = saveNewOrdersInbox();
@@ -16542,8 +16560,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (idx === -1) return;
       const item = newOrdersInbox[idx];
       if (isInboxItemDuplicate(item)) {
+        const merged = mergeInboxItemIntoMain(item);
         newOrdersInbox.splice(idx, 1);
         saveNewOrdersInbox();
+        if (merged) { saveOrders(); renderAll(true); recalcTotalsAndSummary(); showAppToast(`✅ ${item.track || item.orderId} là của đơn ${merged.orderId} đã có ở Bảng chính: đã ghi nhận vào đơn đó.`, 'success', 6000); return; }
         showAppToast(`⚠️ Đơn ${item.track || item.orderId} đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại (đã gỡ khỏi Hộp Đơn Mới).`, 'warning', 6000);
         return;
       }
@@ -16577,6 +16597,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const selectedIds = new Set(selectedItems.map(it => it.id));
       const dupSelected = selectedItems.filter(isInboxItemDuplicate);
+      if (mergeInboxDuplicates(dupSelected)) { saveOrders(); renderAll(true); }
       const newOrderObjects = selectedItems.filter(it => !dupSelected.includes(it)).map(it => convertInboxItemToOrder(it));
       if (dupSelected.length) showAppToast(`⚠️ ${dupSelected.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
       if (!newOrderObjects.length) { newOrdersInbox = (newOrdersInbox || []).filter(it => !selectedIds.has(it.id)); saveNewOrdersInbox(); return; }
@@ -16610,6 +16631,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!confirm(`Bạn có chắc muốn nhập TOÀN BỘ ${count} đơn mới ra ngoài Bảng chính không?`)) return;
 
       const dupAll = newOrdersInbox.filter(isInboxItemDuplicate);
+      mergeInboxDuplicates(dupAll);
       const newOrderObjects = newOrdersInbox.filter(it => !dupAll.includes(it)).map(it => convertInboxItemToOrder(it));
       if (dupAll.length) showAppToast(`⚠️ ${dupAll.length} đơn đã có ở Bảng chính / Kho lưu trữ / Bảng đơn hủy nên không tạo lại.`, 'warning', 6000);
       orders.unshift(...newOrderObjects);

@@ -98,3 +98,19 @@ test('Đơn tạm "Chưa rõ sản phẩm" có mã là MÃ YÊU CẦU trả hàn
   assert.strictEqual(real.returnTrack, 'SPXVN06654167505B');
   assert.ok(real.trackingCodes.includes('SPXVN06654167505B'));
 });
+
+test('Hộp Đơn Mới: ô mã đơn là MÃ TRẢ HÀNG của đơn có sẵn -> đẩy ra thì ghi vào đơn đó, không tạo dòng mới', () => {
+  const c = { String, Array, Set, Map, Object, JSON, RegExp, Math, Date, Number, Boolean, console };
+  vm.createContext(c);
+  ['extractCleanTrackingCode', 'getReturnParcelId', 'isOrderReceived', 'getOrderTrackingCodes', 'getPhoneOrderMatches', 'isScanPlaceholder', 'mergePlaceholderIntoOrder', 'convertInboxItemToOrder', 'mergeInboxItemIntoMain']
+    .forEach(n => vm.runInContext(extract(n), c));
+  c.getNowDateTimeString = () => '18/11/2026 14:13:00'; c.formatScanTime = () => '18/11/2026 14:13:00'; c.autoDetectPlatformFromCode = () => 'Shopee';
+  c.orders = [S({ orderId: '26102054X4PVRC', track: 'SPXVN06229297911A', rawDetails: { claimId: '2611060KRRWN0U0' } })];
+  const real = c.mergeInboxItemIntoMain({ track: 'SPXVN06654167505B', orderId: '2611060KRRWN0U0', fromUnmatchedScan: true, scanTime: 1, time: '18/11/2026 14:13:00', product: 'Chưa rõ sản phẩm (hàng đã về, chưa có đơn)' });
+  assert.ok(real);
+  assert.strictEqual(c.orders.length, 1);
+  assert.strictEqual(real.status, 'Hàng đã trả');
+  assert.strictEqual(real.returnTrack, 'SPXVN06654167505B');
+  // không khớp đơn nào -> không ghi gì
+  assert.strictEqual(c.mergeInboxItemIntoMain({ track: 'SPXVN0999999999X', orderId: 'SPXVN0999999999X' }), null);
+});

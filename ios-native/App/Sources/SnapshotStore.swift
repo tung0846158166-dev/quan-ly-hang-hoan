@@ -22,6 +22,13 @@ final class SnapshotStore: ObservableObject {
     @Published var dismissed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissedAlerts") ?? [])
 
     private let assembler = SnapshotAssembler()
+    private let deltaAssembler = SnapshotAssembler()
+    /// Danh sách đầy đủ gần nhất PC gửi (bản gốc để áp các gói "phần thay đổi").
+    private var baseRows: [OrderRow] = []
+    private var baseSid = ""
+    private var lastDeltaSeq = 0
+    /// Gói thay đổi không khớp bản gốc trên điện thoại: xin PC gửi lại danh sách đầy đủ.
+    var onNeedFull: () -> Void = {}
     /// Giải mã, dựng chỉ mục và ghi file chạy ở luồng nền để không làm đứng giao diện khi đang đồng bộ.
     private let work = DispatchQueue(label: "snapshot.work", qos: .userInitiated)
     private var progressReceived = 0
@@ -30,10 +37,14 @@ final class SnapshotStore: ObservableObject {
     private var lastInfoAt = Date.distantPast
     private var index: [String: OrderRow] = [:]
     private var fileURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("snapshot.json") }
+    private var baseURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("snapshot_base.json") }
 
     init() {
         if let data = try? Data(contentsOf: fileURL), let p = try? JSONDecoder().decode(SnapshotPayload.self, from: data) {
             set(p, save: false)
+        }
+        if let data = try? Data(contentsOf: baseURL), let b = try? JSONDecoder().decode(SnapshotPayload.self, from: data) {
+            baseRows = b.rows; baseSid = b.sid
         }
     }
 
@@ -43,14 +54,17 @@ final class SnapshotStore: ObservableObject {
 
     func ingest(_ chunk: SnapshotChunk) {
         let asm = assembler
-        let url = fileURL
+        let url = fileURL, burl = baseURL
         work.async { [weak self] in
             let p = asm.add(chunk)
             let received = asm.partsReceived, total = asm.partsTotal, error = asm.lastError
             var built: [String: OrderRow]? = nil
             if let p = p {
                 built = Self.buildIndex(p.rows)
-                if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) }
+                if let data = try? JSONEncoder().encode(p) {
+                    try? data.write(to: url, options: .atomic)
+                    try? data.write(to: burl, options: .atomic)
+                }
             }
             Task { @MainActor [weak self] in
                 self?.finishIngest(payload: p, index: built, received: received, total: total, error: error)
@@ -66,7 +80,33 @@ final class SnapshotStore: ObservableObject {
             lastInfoAt = now
             assembleInfo = error.map { "Lỗi giải mã: \($0)" } ?? "Đã ghép \(received)/\(total) mảnh"
         }
-        if let p = payload, let idx = built { apply(p, index: idx) }
+        if let p = payload, let idx = built {
+            baseRows = p.rows; baseSid = p.sid; lastDeltaSeq = 0
+            apply(p, index: idx)
+        }
+    }
+
+    /// Gói "phần thay đổi" từ PC: áp lên bản gốc (nhỏ, vài mảnh) thay vì chờ cả danh sách ~100 mảnh.
+    func ingestDelta(_ chunk: SnapshotChunk) {
+        let asm = deltaAssembler
+        let base = baseRows, sid = baseSid
+        let url = fileURL
+        work.async { [weak self] in
+            guard let d = asm.addDelta(chunk) else { return }
+            guard !sid.isEmpty, d.base == sid else {
+                Task { @MainActor [weak self] in self?.onNeedFull() }
+                return
+            }
+            let rows = d.apply(to: base)
+            let p = SnapshotPayload(time: d.time, count: rows.count, rows: rows, stats: d.stats, inbox: d.inbox, sid: sid)
+            let built = Self.buildIndex(rows)
+            Task { @MainActor [weak self] in
+                guard let self = self, self.baseSid == sid, d.seq > self.lastDeltaSeq else { return }
+                self.lastDeltaSeq = d.seq
+                self.apply(p, index: built)
+                self.work.async { if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) } }
+            }
+        }
     }
 
     /// Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.

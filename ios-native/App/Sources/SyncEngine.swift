@@ -105,6 +105,7 @@ final class SyncEngine: ObservableObject {
 
     // MARK: vòng đời
     func start() {
+        snapshot.onNeedFull = { [weak self] in self?.requestFullIfNeeded() }
         snapshot.unconfirmedReturnCodes = { [weak self] in
             Set((self?.items ?? []).filter { $0.kind == .returnScan && !$0.scanConfirmed }.map { $0.code.uppercased() })
         }
@@ -244,6 +245,10 @@ final class SyncEngine: ObservableObject {
             if Date().timeIntervalSince(chunkPublishedAt) > 0.5 { chunkPublishedAt = Date(); snapshotChunksSeen = chunkCounter }
             if isDuplicate("s|\(ch.snapshotId)|\(ch.idx)") { return }
             snapshot.ingest(ch)
+        case .snapshotDelta(let ch):
+            markPcSeen()
+            if isDuplicate("d|\(ch.snapshotId)|\(ch.idx)") { return }
+            snapshot.ingestDelta(ch)
         case .watchSync(let t, let items):
             markPcSeen()
             if isDuplicate("w|\(t)") { return }
@@ -448,6 +453,15 @@ final class SyncEngine: ObservableObject {
 
     private func resendPendingNotes() {
         for b in pendingNotes.values { broadcast(b, title: "Shopee Note", room: room) }
+    }
+
+    /// Gói thay đổi không khớp bản gốc: xin danh sách đầy đủ, nhưng không quá 1 lần mỗi 45 giây và không khi đang ghép dở.
+    private var lastFullRequestAt = Date.distantPast
+    private func requestFullIfNeeded() {
+        if snapshot.incomplete { return }
+        if Date().timeIntervalSince(lastFullRequestAt) < 45 { return }
+        lastFullRequestAt = Date()
+        requestSnapshot()
     }
 
     func requestSnapshot() {

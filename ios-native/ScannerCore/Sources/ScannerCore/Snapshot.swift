@@ -75,9 +75,11 @@ public struct SnapshotPayload: Codable, Equatable {
     public var stats: [String: Int] = [:]
     /// Hộp Đơn Mới trên PC (PC cũ không gửi thì rỗng).
     public var inbox: [InboxRow] = []
+    /// Mã của lần gửi danh sách đầy đủ (PC dùng làm bản gốc cho các gói "phần thay đổi"); PC cũ không gửi.
+    public var sid: String = ""
 
-    public init(time: Int, count: Int, rows: [OrderRow], stats: [String: Int] = [:], inbox: [InboxRow] = []) {
-        self.time = time; self.count = count; self.rows = rows; self.stats = stats; self.inbox = inbox
+    public init(time: Int, count: Int, rows: [OrderRow], stats: [String: Int] = [:], inbox: [InboxRow] = [], sid: String = "") {
+        self.time = time; self.count = count; self.rows = rows; self.stats = stats; self.inbox = inbox; self.sid = sid
     }
 }
 
@@ -109,7 +111,7 @@ private extension KeyedDecodingContainer {
 }
 
 private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps, x }
-private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, inbox }
+private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, inbox, sid }
 private enum InboxKeys: String, CodingKey { case id, c, o, p, n, t, u, dup }
 
 extension OrderRow {
@@ -139,13 +141,88 @@ extension SnapshotPayload {
         let stats = (try? c.decode([String: Int].self, forKey: .stats)) ?? [:]
         // Đơn nào trong hộp lỗi thì bỏ đơn đó, không bỏ cả danh sách.
         let inbox = ((try? c.decode([FailableInbox].self, forKey: .inbox)) ?? []).compactMap { $0.row }.filter { !$0.id.isEmpty }
-        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows, stats: stats, inbox: inbox)
+        self.init(time: c.flexInt(.time), count: c.flexInt(.count, default: rows.count), rows: rows, stats: stats, inbox: inbox, sid: c.flexString(.sid))
     }
 }
 
 private struct FailableInbox: Decodable {
     let row: InboxRow?
     init(from decoder: Decoder) throws { row = try? InboxRow(from: decoder) }
+}
+
+/// Gói "phần thay đổi" PC gửi sau một danh sách đầy đủ: các dòng thêm/đổi và khóa các dòng đã bỏ, tính so với bản gốc `base`.
+/// Mỗi gói là tổng thay đổi kể từ bản gốc (không cộng dồn giữa các gói), nên rớt một gói không làm sai, gói sau sửa lại.
+public struct SnapshotDelta: Decodable, Equatable {
+    public var time: Int
+    public var base: String
+    public var seq: Int
+    public var count: Int
+    public var up: [DeltaRow]
+    public var rm: [String]
+    public var stats: [String: Int]
+    public var inbox: [InboxRow]
+
+    public init(time: Int, base: String, seq: Int, count: Int = 0, up: [DeltaRow], rm: [String], stats: [String: Int] = [:], inbox: [InboxRow] = []) {
+        self.time = time; self.base = base; self.seq = seq; self.count = count; self.up = up; self.rm = rm; self.stats = stats; self.inbox = inbox
+    }
+
+    private enum Keys: String, CodingKey { case time, base, seq, count, up, rm, stats, inbox }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        let up = try c.decode([DeltaRow].self, forKey: .up)
+        let rm = (try? c.decode([String].self, forKey: .rm)) ?? []
+        let stats = (try? c.decode([String: Int].self, forKey: .stats)) ?? [:]
+        let inbox = ((try? c.decode([FailableInbox].self, forKey: .inbox)) ?? []).compactMap { $0.row }.filter { !$0.id.isEmpty }
+        self.init(time: c.flexInt(.time), base: c.flexString(.base), seq: c.flexInt(.seq), count: c.flexInt(.count), up: up, rm: rm, stats: stats, inbox: inbox)
+    }
+
+    /// Khóa từng dòng, giống hệt PC (phoneRowKeys): k|c|o|ci, khóa trùng đánh số #2, #3 theo thứ tự.
+    public static func keys(_ rows: [OrderRow]) -> [String] {
+        var seen: [String: Int] = [:]
+        return rows.map { r in
+            let b = [r.k, r.c, r.o, r.ci].joined(separator: "|")
+            let n = (seen[b] ?? 0) + 1
+            seen[b] = n
+            return n > 1 ? b + "#\(n)" : b
+        }
+    }
+
+    /// Áp gói thay đổi lên bản gốc; xếp lại như PC: đơn đang chờ lên trước, hạn gần trước.
+    public func apply(to base: [OrderRow]) -> [OrderRow] {
+        let removed = Set(rm)
+        var replace: [String: OrderRow] = [:]
+        for u in up where !u.key.isEmpty { replace[u.key] = u.row }
+        var out: [(Int, OrderRow)] = []
+        out.reserveCapacity(base.count + up.count)
+        var used = Set<String>()
+        for (i, (k, r)) in zip(Self.keys(base), base).enumerated() {
+            if removed.contains(k) { continue }
+            if let n = replace[k] { out.append((i, n)); used.insert(k) } else { out.append((i, r)) }
+        }
+        var next = base.count
+        for u in up where !u.key.isEmpty && !used.contains(u.key) && !removed.contains(u.key) {
+            used.insert(u.key); out.append((next, u.row)); next += 1
+        }
+        return out.sorted { a, b in
+            let pa = a.1.pd ? 0 : 1, pb = b.1.pd ? 0 : 1
+            if pa != pb { return pa < pb }
+            let da = a.1.due > 0 ? a.1.due : Int.max, db = b.1.due > 0 ? b.1.due : Int.max
+            if da != db { return da < db }
+            return a.0 < b.0
+        }.map { $0.1 }
+    }
+}
+
+/// Một dòng trong gói thay đổi: khóa `_k` cùng các trường của dòng.
+public struct DeltaRow: Decodable, Equatable {
+    public var key: String
+    public var row: OrderRow
+    public init(key: String, row: OrderRow) { self.key = key; self.row = row }
+    private enum K: String, CodingKey { case _k }
+    public init(from decoder: Decoder) throws {
+        row = try OrderRow(from: decoder)
+        key = (try? decoder.container(keyedBy: K.self).decode(String.self, forKey: ._k)) ?? ""
+    }
 }
 
 public struct SnapshotChunk: Equatable {
@@ -157,11 +234,12 @@ public struct SnapshotChunk: Equatable {
 
 public enum SnapshotError: Error { case badBase64, badCompression, badJSON }
 
-/// Ghép các mảnh snapshot_chunk thành danh sách đơn.
+/// Ghép các mảnh snapshot_chunk (hoặc snapshot_delta) thành dữ liệu.
+/// Giữ song song 2 lần gửi gần nhất: lần gửi mới chen vào không làm bỏ lần đang ghép dở (trước đây PC gửi liên tục thì có thể không bao giờ ghép xong).
 public final class SnapshotAssembler {
-    private var currentId = ""
-    private var parts: [Int: String] = [:]
-    private var total = 0
+    private var parts: [String: [Int: String]] = [:]
+    private var totals: [String: Int] = [:]
+    private var lastDone = ""
     /// Để chẩn đoán: số mảnh đã nhận / tổng của lần gửi gần nhất, và lỗi ghép/giải mã nếu có.
     public private(set) var partsReceived = 0
     public private(set) var partsTotal = 0
@@ -169,26 +247,59 @@ public final class SnapshotAssembler {
 
     public init() {}
 
-    /// Trả về payload khi đủ mảnh; mảnh của lần gửi cũ hơn bị bỏ.
+    /// Trả về payload khi đủ mảnh; lần gửi cũ hơn lần đã ghép xong bị bỏ.
     public func add(_ c: SnapshotChunk) -> SnapshotPayload? {
-        guard c.total > 0, c.idx >= 0, c.idx < c.total else { return nil }
-        if c.snapshotId != currentId {
-            if !currentId.isEmpty && c.snapshotId < currentId { return nil }
-            currentId = c.snapshotId; parts = [:]; total = c.total
-        }
-        parts[c.idx] = c.chunk
-        partsReceived = parts.count; partsTotal = total
-        guard parts.count == total else { return nil }
-        let b64 = (0..<total).compactMap { parts[$0] }.joined()
-        parts = [:]
+        guard let b64 = addRaw(c) else { return nil }
         do {
             let p = try Self.decode(base64: b64)
             lastError = nil
             return p
         } catch {
-            lastError = Self.describeFailure(error, base64: b64, total: total)
+            lastError = Self.describeFailure(error, base64: b64, total: c.total)
             return nil
         }
+    }
+
+    public func addDelta(_ c: SnapshotChunk) -> SnapshotDelta? {
+        guard let b64 = addRaw(c) else { return nil }
+        do {
+            let d = try JSONDecoder().decode(SnapshotDelta.self, from: try Self.inflate(base64: b64))
+            lastError = nil
+            return d
+        } catch {
+            lastError = Self.describeFailure(error, base64: b64, total: c.total)
+            return nil
+        }
+    }
+
+    /// Ghép mảnh; trả về chuỗi base64 đầy đủ khi đủ mảnh.
+    public func addRaw(_ c: SnapshotChunk) -> String? {
+        guard c.total > 0, c.idx >= 0, c.idx < c.total else { return nil }
+        let id = c.snapshotId
+        if !lastDone.isEmpty && Self.older(id, than: lastDone) { return nil }
+        if id == lastDone { return nil }
+        if parts[id] == nil {
+            parts[id] = [:]; totals[id] = c.total
+            // chỉ giữ 2 lần gửi mới nhất
+            let ids = parts.keys.sorted { Self.older($0, than: $1) }
+            for old in ids.dropLast(2) { parts[old] = nil; totals[old] = nil }
+        }
+        guard parts[id] != nil, let total = totals[id] else { return nil }
+        parts[id]?[c.idx] = c.chunk
+        let got = parts[id]?.count ?? 0
+        partsReceived = got; partsTotal = total
+        guard got == total, let p = parts[id] else { return nil }
+        let b64 = (0..<total).compactMap { p[$0] }.joined()
+        lastDone = id
+        // bỏ luôn các lần gửi cũ hơn lần vừa xong
+        for k in parts.keys where k == id || Self.older(k, than: id) { parts[k] = nil; totals[k] = nil }
+        return b64
+    }
+
+    /// So thời điểm trong mã "snap_<ms>" / "delta_<ms>" (so chuỗi sai khi số chữ số khác nhau).
+    static func older(_ a: String, than b: String) -> Bool {
+        let na = Int(a.split(separator: "_").last ?? "") ?? 0, nb = Int(b.split(separator: "_").last ?? "") ?? 0
+        return na != nb ? na < nb : a < b
     }
 
     /// Mô tả lỗi kèm kích thước và đầu dữ liệu để biết hỏng ở bước nào (base64, giải nén hay JSON).
@@ -200,9 +311,14 @@ public final class SnapshotAssembler {
         return s + ")"
     }
 
-    public static func decode(base64: String) throws -> SnapshotPayload {
+    static func inflate(base64: String) throws -> Data {
         guard let data = Data(base64Encoded: base64) else { throw SnapshotError.badBase64 }
         guard let raw = try? (data as NSData).decompressed(using: .zlib) as Data else { throw SnapshotError.badCompression }
+        return raw
+    }
+
+    public static func decode(base64: String) throws -> SnapshotPayload {
+        let raw = try inflate(base64: base64)
         guard let p = try? JSONDecoder().decode(SnapshotPayload.self, from: raw) else { throw SnapshotError.badJSON }
         return p
     }

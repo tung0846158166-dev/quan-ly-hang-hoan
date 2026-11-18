@@ -23,6 +23,7 @@ public enum PcMessage: Equatable {
     case ack(PcAck)
     case manifest([String])
     case snapshotChunk(SnapshotChunk)
+    case snapshotDelta(SnapshotChunk)
     case watchSync(time: Int, items: [WatchItem])
     case other
 }
@@ -154,6 +155,10 @@ public enum SyncProtocol {
             guard let sid = d["snapshotId"] as? String, let idx = d["idx"] as? Int, let total = d["total"] as? Int,
                   let chunk = d["chunk"] as? String else { return .other }
             return .snapshotChunk(SnapshotChunk(snapshotId: sid, idx: idx, total: total, chunk: chunk))
+        case "snapshot_delta":
+            guard let did = d["deltaId"] as? String, let idx = d["idx"] as? Int, let total = d["total"] as? Int,
+                  let chunk = d["chunk"] as? String else { return .other }
+            return .snapshotDelta(SnapshotChunk(snapshotId: did, idx: idx, total: total, chunk: chunk))
         case "pc_ack":
             guard let rid = d["requestId"] as? String, let code = d["code"] as? String,
                   let outcome = d["outcome"] as? String else { return .other }

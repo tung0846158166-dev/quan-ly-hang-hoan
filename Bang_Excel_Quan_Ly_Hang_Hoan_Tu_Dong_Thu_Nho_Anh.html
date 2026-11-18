@@ -14581,26 +14581,105 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
     // v1.9.7: đồng bộ 2 chiều theo dõi + ghi chú. Mỗi lần danh sách theo dõi/lý do theo dõi đổi, PC gửi bản mới sang iPhone.
     let phoneWatchSig = null, phoneWatchTimer = null, phoneSnapTimer = null;
-    // v1.9.8: sửa/xóa đơn trên PC → gửi lại danh sách đầy đủ sang iPhone (chỉ khi iPhone mới hoạt động gần đây).
-    // v1.9.33: đang quét liên tục thì hoãn gửi cả danh sách (mỗi lần ~100+ mảnh, iPhone phải ghép, giải nén, vẽ lại -> nóng máy).
-    // iPhone đã tự ghi Hàng đã trả ngay khi quét; danh sách đầy đủ gửi khi ngừng quét 45 giây, chậm nhất 3 phút một lần.
+    // v1.9.40: mỗi lần lưu chỉ gửi PHẦN THAY ĐỔI so với danh sách đầy đủ gần nhất (thường 1 gói thay vì ~120 gói), kể cả lúc đang quét,
+    // để đơn mới sang iPhone trong vài giây và tin xác nhận quét không phải xếp hàng sau hàng trăm gói.
+    // Danh sách đầy đủ chỉ gửi khi: iPhone xin, chưa có bản gốc, phần thay đổi quá lớn (khi đó đợi ngừng quét 15 giây, chậm nhất 1 phút), hoặc 10 phút một lần.
     let phoneSnapFirstPendingAt = 0;
-    function schedulePhoneSnapshotSync(attempt = 0) {
+    const PHONE_DELTA_MAX_ROWS = 400;
+    const PHONE_FULL_QUIET_MS = 15000, PHONE_FULL_MAX_WAIT_MS = 60000;
+    let phoneBase = null;            // { sid, map: Map(khóa dòng -> JSON dòng) } của danh sách đầy đủ gửi gần nhất
+    let phoneDeltaSeq = 0, phoneDeltaTimer = null, phoneDeltaLastAt = 0, phoneDeltaLastSig = '', phoneDeltaNtfyAt = 0, phoneDeltaBusy = false;
+    function phoneRowKeys(rows) {
+      // Giống hệt cách iPhone tính (SnapshotDelta.keys): k|c|o|ci, dòng trùng khóa đánh số #2, #3 theo thứ tự.
+      const seen = new Map();
+      return rows.map(r => {
+        const b = [r.k || '', r.c || '', r.o || '', r.ci || ''].join('|');
+        const n = (seen.get(b) || 0) + 1; seen.set(b, n);
+        return n > 1 ? b + '#' + n : b;
+      });
+    }
+    function schedulePhoneSnapshotSync() {
+      if (phoneDeltaTimer) return;   // đã hẹn: lần gửi đó sẽ lấy dữ liệu mới nhất
+      const wait = Math.max(1500, 3000 - (Date.now() - phoneDeltaLastAt));
+      phoneDeltaTimer = setTimeout(async () => {
+        phoneDeltaTimer = null;
+        try {
+          if (Date.now() - (window.__lastPhoneActivity || 0) > 30 * 60 * 1000) return;
+          await sendPhoneDelta();
+        } catch (e) {}
+      }, wait);
+    }
+    function schedulePhoneFullSnapshot(attempt = 0) {
       if (phoneSnapTimer) clearTimeout(phoneSnapTimer);
       const now = Date.now();
       if (!phoneSnapFirstPendingAt) phoneSnapFirstPendingAt = now;
       const sinceScan = now - (window.__lastPhoneScanAt || 0);
-      let delay = 8000;
-      if (sinceScan < 45000) delay = Math.max(8000, 45000 - sinceScan);
-      delay = Math.min(delay, Math.max(8000, phoneSnapFirstPendingAt + 180000 - now));
+      let delay = sinceScan < PHONE_FULL_QUIET_MS ? PHONE_FULL_QUIET_MS - sinceScan : 1000;
+      delay = Math.max(1000, Math.min(delay, phoneSnapFirstPendingAt + PHONE_FULL_MAX_WAIT_MS - now));
       phoneSnapTimer = setTimeout(async () => {
-        phoneSnapFirstPendingAt = 0;
+        phoneSnapTimer = null;
         try {
-          if (Date.now() - (window.__lastPhoneActivity || 0) > 30 * 60 * 1000) return;
           const ok = await broadcastOrdersSnapshot(false);
-          if (!ok && attempt < 4) schedulePhoneSnapshotSync(attempt + 1);
+          if (ok) phoneSnapFirstPendingAt = 0;
+          else if (attempt < 4) schedulePhoneFullSnapshot(attempt + 1);
+          else phoneSnapFirstPendingAt = 0;
         } catch (e) {}
-      }, 8000);
+      }, delay);
+    }
+    function buildPhoneDelta(rows, inbox, stats) {
+      if (!phoneBase) return null;
+      const keys = phoneRowKeys(rows);
+      const up = [], seen = new Set();
+      rows.forEach((r, i) => {
+        const k = keys[i]; seen.add(k);
+        if (phoneBase.map.get(k) !== JSON.stringify(r)) up.push(Object.assign({ _k: k }, r));
+      });
+      const rm = [];
+      phoneBase.map.forEach((_, k) => { if (!seen.has(k)) rm.push(k); });
+      return { base: phoneBase.sid, up, rm, inbox, stats, count: rows.length };
+    }
+    function publishPhoneMqtt(m) {
+      const room = phoneRoomId || 'SHP-2026';
+      const topic = 'agy_shopee_return_scanner_2026/' + room;
+      if (mqttClient && mqttClient.connected) { try { mqttClient.publish(topic, m); } catch (e) {} }
+      (typeof extraMqttClients !== 'undefined' ? extraMqttClients : []).forEach(c => { if (c.connected) { try { c.publish(topic, m); } catch (e) {} } });
+    }
+    async function sendPhoneDelta() {
+      if (phoneDeltaBusy || phoneSnapshotBusy) { schedulePhoneSnapshotSync(); return false; }
+      if (!phoneBase) { schedulePhoneFullSnapshot(); return false; }
+      phoneDeltaBusy = true;
+      try {
+        const rows = buildPhoneSnapshotRows();
+        let inbox = []; try { inbox = buildPhoneInboxRows(); } catch (e) {}
+        const d = buildPhoneDelta(rows, inbox, buildPhoneSnapshotStats(rows.length));
+        if (!d) return false;
+        if (d.up.length + d.rm.length > PHONE_DELTA_MAX_ROWS) { schedulePhoneFullSnapshot(); return false; }
+        const sig = JSON.stringify([d.base, d.up, d.rm, d.inbox, d.stats]);
+        const now = Date.now();
+        const ntfyDue = now - phoneDeltaNtfyAt > 30000;
+        if (sig === phoneDeltaLastSig && !ntfyDue) return true;   // không có gì mới
+        if (sig !== phoneDeltaLastSig) phoneDeltaSeq++;
+        phoneDeltaLastSig = sig;
+        const room = phoneRoomId || 'SHP-2026';
+        const b64 = await deflateRawBase64(JSON.stringify({ time: now, base: d.base, seq: phoneDeltaSeq, count: d.count, up: d.up, rm: d.rm, stats: d.stats, inbox: d.inbox }));
+        const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
+        const deltaId = 'delta_' + now;
+        const msgs = [];
+        for (let i = 0; i < total; i++) msgs.push(JSON.stringify({ type: 'snapshot_delta', room, deltaId, idx: i, total, chunk: b64.slice(i * CHUNK, (i + 1) * CHUNK), time: now + i }));
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        for (let pass = 0; pass < 2; pass++) { for (const m of msgs) { publishPhoneMqtt(m); await sleep(40); } if (pass === 0) await sleep(300); }
+        phoneDeltaLastAt = Date.now();
+        // ntfy (cho iPhone không vào được MQTT): tối đa 30 giây một lần và chỉ khi gói nhỏ, để dành lượt ntfy cho tin xác nhận quét.
+        if (ntfyDue && total <= 3) {
+          phoneDeltaNtfyAt = now;
+          const topic = getNtfyTopic();
+          (async () => { for (const m of msgs) { try { const r = await fetch('https://ntfy.sh/' + topic + '?title=Shopee%20Delta', { method: 'POST', body: m }); if (!r.ok) break; } catch (e) { break; } } })();
+        }
+        return true;
+      } catch (e) {
+        console.warn('Gửi phần thay đổi sang điện thoại lỗi:', e);
+        return false;
+      } finally { phoneDeltaBusy = false; }
     }
     function buildPhoneWatchList() {
       return (Array.isArray(orders) ? orders : []).filter(o => o && o.isWatchlist).map(o => ({
@@ -14630,7 +14709,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
     }
 
-    async function broadcastOrdersSnapshot(force) {
+    async function broadcastOrdersSnapshot(force, opts = {}) {
       if (phoneSnapshotBusy) return false;
       if (!force && Date.now() - lastPhoneSnapshotAt < 20000) return false;
       phoneSnapshotBusy = true;
@@ -14638,9 +14717,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const room = phoneRoomId || 'SHP-2026';
         const rows = buildPhoneSnapshotRows();
         let inbox = []; try { inbox = buildPhoneInboxRows(); } catch (e) {}
-        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), count: rows.length, stats: buildPhoneSnapshotStats(rows.length), rows, inbox }));
-        const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
         const snapshotId = 'snap_' + Date.now();
+        const b64 = await deflateRawBase64(JSON.stringify({ time: Date.now(), sid: snapshotId, count: rows.length, stats: buildPhoneSnapshotStats(rows.length), rows, inbox }));
+        const CHUNK = 2400, total = Math.max(1, Math.ceil(b64.length / CHUNK));
         const topic = getNtfyTopic();
         const mqttTopic = 'agy_shopee_return_scanner_2026/' + room;
         const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -14656,8 +14735,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (pass === 0) await sleep(600);
         }
         lastPhoneSnapshotAt = Date.now();
+        // Bản gốc cho các lần gửi phần thay đổi sau đó.
+        try { const keys = phoneRowKeys(rows); const map = new Map(); rows.forEach((r, i) => map.set(keys[i], JSON.stringify(r))); phoneBase = { sid: snapshotId, map }; phoneDeltaSeq = 0; phoneDeltaLastSig = ''; } catch (e) {}
         // ntfy chạy nền, không chặn: mạng chặn/chậm ntfy.sh (treo hoặc lỗi) cũng không làm chậm phần gửi MQTT.
-        (async () => {
+        // v1.9.40: chỉ gửi danh sách đầy đủ qua ntfy khi iPhone xin hoặc lần gửi định kỳ (ntfy.sh giới hạn ~60 tin rồi 1 tin / 5-10 giây;
+        // gửi 100+ mảnh mỗi lần làm hết lượt và tin xác nhận quét bị từ chối).
+        if (force || opts.ntfy) (async () => {
           let fails = 0;
           for (const m of msgs) {
             if (fails >= 2) break;
@@ -14678,7 +14761,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } finally { phoneSnapshotBusy = false; }
     }
     // Định kỳ 10 phút gửi lại nếu điện thoại còn hoạt động trong 30 phút gần đây.
-    setInterval(() => { if (Date.now() - (window.__lastPhoneActivity || 0) < 30 * 60 * 1000) broadcastOrdersSnapshot(false); }, 10 * 60 * 1000);
+    setInterval(() => {
+      if (Date.now() - (window.__lastPhoneActivity || 0) >= 30 * 60 * 1000) return;
+      // đang quét thì để lần sau (phần thay đổi vẫn gửi liên tục)
+      if (Date.now() - (window.__lastPhoneScanAt || 0) < PHONE_FULL_QUIET_MS) { schedulePhoneFullSnapshot(); return; }
+      broadcastOrdersSnapshot(false, { ntfy: true });
+    }, 10 * 60 * 1000);
 
     // v1.6.5: Cloud Message Deduplication (Ngăn chặn re-process tin nhắn cũ từ 12h trước)
     const PROCESSED_CLOUD_MSG_KEY = 'shopee_processed_cloud_msg_ids_v2';
@@ -15280,7 +15368,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (data.type === 'inbox_push_many') {
         const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
         const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
-        const resend = () => setTimeout(async () => { try { if (!(await broadcastOrdersSnapshot(true))) schedulePhoneSnapshotSync(); } catch (e) {} }, 1200);   // đang gửi dở thì hẹn gửi lại
+        const resend = () => setTimeout(async () => { try { if (!(await sendPhoneDelta())) schedulePhoneSnapshotSync(); } catch (e) {} }, 300);   // đang gửi dở thì hẹn gửi lại
         const picked = (newOrdersInbox || []).filter(it => it && ids.has(String(it.id)));
         if (!picked.length) { reply('Các đơn đã chọn không còn trong Hộp Đơn Mới (có thể đã được đẩy ra)', 'duplicate'); resend(); return { success: true }; }
         if (isLocked) { reply('Bảng chính đang khóa trên máy tính, mở khóa rồi đẩy lại', 'locked'); return { success: false }; }
@@ -15307,7 +15395,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(v => String(v)));
         const want = data.received !== false;
         const reply = (msg, outcome) => sendAckToPhone(0, '', msg, outcome, false, data.requestId || '', data.room || '', { ackStage: 'edit' });
-        const resend = () => setTimeout(async () => { try { if (!(await broadcastOrdersSnapshot(true))) schedulePhoneSnapshotSync(); } catch (e) {} }, 1200);   // đang gửi dở thì hẹn gửi lại
+        const resend = () => setTimeout(async () => { try { if (!(await sendPhoneDelta())) schedulePhoneSnapshotSync(); } catch (e) {} }, 300);   // đang gửi dở thì hẹn gửi lại
         const list = (cancelledOrders || []).filter(o => o && ids.has(String(o.id)) && !!o.received !== want);
         if (!list.length) { reply('Các đơn hủy đã chọn đã ở trạng thái này rồi', 'duplicate'); resend(); return { success: true }; }
         const before = list.map(o => ({ o, received: o.received, recvDate: o.recvDate }));
@@ -15409,7 +15497,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         appendPhoneLiveLog('📱 Điện thoại vừa kết nối thành công vào bảng!');
         sendAckToPhone(0, '', 'ĐÃ KẾT NỐI VỚI MÁY TÍNH', 'success', false, '', data.room || '');
         setTimeout(() => broadcastManifestToPhone(), 120);
-        setTimeout(() => broadcastOrdersSnapshot(false), 900);
+        setTimeout(() => { if (phoneBase) schedulePhoneSnapshotSync(); else schedulePhoneFullSnapshot(); }, 900);
       } else if (data.type === 'barcode' && data.code) {
         return handleIncomingPhoneBarcode(String(data.code).trim(), data.requestId || '', data.photo || '', data.room || '', data);
       } else if (data.type === 'smart_label') {

@@ -190,3 +190,40 @@ final class ExtraCodesTests: XCTestCase {
         XCTAssertEqual(back.rows, p.rows)
     }
 }
+
+
+final class DeltaSyncTests: XCTestCase {
+    // Dữ liệu do chính hàm của PC (buildPhoneSnapshotRows / buildPhoneDelta) tạo ra: O1 nhận, xoá O3, thêm O5, O2 thêm mã hoàn, O4 có 2 dòng trùng.
+    let baseJSON = ##"{"time":1,"sid":"snap_100","count":5,"rows":[{"k":"m","c":"T4","o":"O4","p":"Shopee","n":"Áo O4","co":"","sz":"","q":1,"rd":"16/11/2026 10:00","due":1795057200000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","lv":1},{"k":"m","c":"T4","o":"O4","p":"Shopee","n":"Áo O4","co":"","sz":"","q":1,"rd":"16/11/2026 10:00","due":1795057200000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","lv":1},{"k":"m","c":"T1","o":"O1","p":"Shopee","n":"Áo O1","co":"","sz":"","q":1,"rd":"17/11/2026 10:00","due":1795143600000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","lv":0},{"k":"m","c":"T2","o":"O2","p":"Shopee","n":"Áo O2","co":"","sz":"","q":1,"rd":"18/11/2026 10:00","due":1795230000000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","lv":0},{"k":"m","c":"T3","o":"O3","p":"Shopee","n":"Áo O3","co":"","sz":"","q":1,"rd":"","due":0,"st":"Hàng đã trả","ty":"Trả hàng/Hoàn tiền","lv":0,"pd":0,"rv":1}]}"##
+    let deltaJSON = ##"{"time":2,"base":"snap_100","seq":1,"count":5,"up":[{"_k":"m|T2|O2|","k":"m","c":"T2","o":"O2","p":"Shopee","n":"Áo O2","co":"","sz":"","q":1,"rd":"18/11/2026 10:00","due":1795230000000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","x":"R2","lv":0},{"_k":"m|T5|O5|","k":"m","c":"T5","o":"O5","p":"Shopee","n":"Áo O5","co":"","sz":"","q":1,"rd":"19/11/2026 09:00","due":1795312800000,"st":"Chưa trả","ty":"Trả hàng/Hoàn tiền","lv":0},{"_k":"m|T1|O1|","k":"m","c":"T1","o":"O1","p":"Shopee","n":"Áo O1","co":"","sz":"","q":1,"rd":"17/11/2026 10:00","due":0,"st":"Hàng đã trả","ty":"Trả hàng/Hoàn tiền","rcd":"19/11/2026 02:00:00","lv":0,"pd":0,"rv":1}],"rm":["m|T3|O3|"],"stats":{"m_total":5},"inbox":[]}"##
+
+    func testDeltaFromPcAppliesToSameRows() throws {
+        let base = try JSONDecoder().decode(SnapshotPayload.self, from: Data(baseJSON.utf8))
+        XCTAssertEqual(base.sid, "snap_100")
+        XCTAssertEqual(SnapshotDelta.keys(base.rows), ["m|T4|O4|", "m|T4|O4|#2", "m|T1|O1|", "m|T2|O2|", "m|T3|O3|"])
+        let d = try JSONDecoder().decode(SnapshotDelta.self, from: Data(deltaJSON.utf8))
+        XCTAssertEqual(d.base, "snap_100"); XCTAssertEqual(d.seq, 1)
+        let rows = d.apply(to: base.rows)
+        XCTAssertEqual(rows.map { "\($0.c)/\($0.o)/\($0.rv ? 1 : 0)/\($0.x)" }, ["T4/O4/0/", "T4/O4/0/", "T2/O2/0/R2", "T5/O5/0/", "T1/O1/1/"])
+    }
+
+    func testAssemblerKeepsInProgressWhenNewerStarts() {
+        let a = SnapshotAssembler()
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_9", idx: 0, total: 2, chunk: "AA")))
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_10", idx: 0, total: 2, chunk: "BB")))
+        XCTAssertEqual(a.addRaw(SnapshotChunk(snapshotId: "snap_9", idx: 1, total: 2, chunk: "CC")), "AACC")
+        XCTAssertEqual(a.addRaw(SnapshotChunk(snapshotId: "snap_10", idx: 1, total: 2, chunk: "DD")), "BBDD")
+        // lần cũ hơn lần đã xong thì bỏ
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_8", idx: 0, total: 1, chunk: "EE")))
+    }
+
+    func testOlderComparesNumbers() {
+        XCTAssertTrue(SnapshotAssembler.older("snap_999", than: "snap_1000"))
+        XCTAssertFalse(SnapshotAssembler.older("delta_1000", than: "delta_999"))
+    }
+
+    func testProtocolParsesDelta() {
+        let m = #"{"type":"snapshot_delta","room":"R","deltaId":"delta_5","idx":0,"total":1,"chunk":"x"}"#
+        XCTAssertEqual(SyncProtocol.parseMessage(m, room: "R"), .snapshotDelta(SnapshotChunk(snapshotId: "delta_5", idx: 0, total: 1, chunk: "x")))
+    }
+}

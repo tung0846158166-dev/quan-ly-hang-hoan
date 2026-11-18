@@ -4164,6 +4164,47 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       orders.forEach((o, i) => { if (dupPlanOf.has(o)) out.push(i); });
       return out;
     }
+    // v1.9.38: đơn tạm "Chưa rõ sản phẩm (hàng đã về, chưa có đơn)" tạo từ lượt quét chưa khớp. Nếu một mã của nó
+    // (mã đơn, mã vận đơn) chính là MÃ YÊU CẦU TRẢ HÀNG / mã đơn / mã vận đơn của một đơn thật khác (vd quét nhãn trả hàng
+    // Shopee: mã phiếu 2611060KRRWN0U0 thuộc đơn 26102054X4PVRC) thì gộp vào đơn thật: đơn thật ghi Hàng đã trả, ngày nhận,
+    // ảnh, thêm mã vận đơn vừa quét; gỡ đơn tạm.
+    function isScanPlaceholder(o) {
+      const p = String((o && o.items && o.items[0] && o.items[0].product) || '');
+      return /^Chưa rõ sản phẩm/.test(p) || /^Hàng đã về \(điện thoại quét/.test(String(o && o.note || ''));
+    }
+    function findPlaceholderTargets() {
+      const up = v => String(v || '').trim().toUpperCase();
+      const byCode = new Map();
+      const add = (k, o) => { if (!k) return; if (!byCode.has(k)) byCode.set(k, new Set()); byCode.get(k).add(o); };
+      orders.forEach(o => {
+        if (!o || isScanPlaceholder(o)) return;
+        add(up(o.orderId), o);
+        const c = getReturnParcelId(o); if (c) add(c, o);
+        getOrderTrackingCodes(o).forEach(t => add(t, o));
+      });
+      const plan = new Map();
+      orders.forEach(o => {
+        if (!o || !isScanPlaceholder(o)) return;
+        const codes = new Set([up(o.orderId), ...getOrderTrackingCodes(o)].filter(Boolean));
+        const hits = new Set();
+        codes.forEach(c => (byCode.get(c) || []).forEach(x => hits.add(x)));
+        if (hits.size === 1) plan.set(o, Array.from(hits)[0]);   // đúng 1 đơn thật: gộp; nhiều đơn: để người dùng xem
+      });
+      return plan;
+    }
+    function mergePlaceholderIntoOrder(ph, real) {
+      const scanned = getOrderTrackingCodes(ph).find(t => !getOrderTrackingCodes(real).includes(t));
+      if (scanned) {
+        if (!real.returnTrack) real.returnTrack = scanned;
+        real.trackingCodes = Array.from(new Set([...(Array.isArray(real.trackingCodes) ? real.trackingCodes : []), scanned]));
+      }
+      if (isOrderReceived(ph) && !isOrderReceived(real)) real.status = ph.status;
+      if (!real.recvDate && ph.recvDate) real.recvDate = ph.recvDate;
+      if (!real.photo && !real.photoId && (ph.photo || ph.photoId)) { real.photo = ph.photo; real.photoId = ph.photoId; }
+      const sn = String(ph.myNote || '').trim();
+      if (sn && !String(real.myNote || '').includes(sn)) real.myNote = (String(real.myNote || '').trim() ? real.myNote + ' · ' : '') + sn;
+    }
+
     // Số mã đơn đang có nhiều dòng ở Bảng chính (để người dùng và app cùng đối chiếu).
     function countMainDuplicateOrderIds() {
       const seen = new Map();
@@ -4207,14 +4248,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       let stale = [];
       try { stale = findStaleClaimDuplicates(); } catch (e) {}
-      const drop = Array.from(new Set([...shadow, ...stale])).sort((a, b) => a - b)
+      let phPlan = new Map();
+      try { phPlan = findPlaceholderTargets(); } catch (e) {}
+      const phIdx = [];
+      orders.forEach((o, i) => { if (phPlan.has(o)) phIdx.push(i); });
+      const drop = Array.from(new Set([...shadow, ...stale, ...phIdx])).sort((a, b) => a - b)
         .filter(i => { try { return !hasLockedCellsInOrder(i); } catch (e) { return false; } });
       if (!drop.length) return 0;
       const backup = [];
       for (let k = drop.length - 1; k >= 0; k--) {
         const i = drop[k];
         const o = orders[i];
-        if (shadow.has(i)) { try { enrichOtherTableEntry(o); } catch (e) {} }
+        if (phPlan.has(o)) { try { mergePlaceholderIntoOrder(o, phPlan.get(o)); } catch (e) {} }
+        else if (shadow.has(i)) { try { enrichOtherTableEntry(o); } catch (e) {} }
         else if (dupPlanOf.has(o)) { try { const pl = dupPlanOf.get(o); mergeWarehouseIntoKeeper(o, pl.keep, pl); } catch (e) {} }
         backup.push(o);
         orders.splice(i, 1);
@@ -4241,21 +4287,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try { staleIdx = findStaleClaimDuplicates(); } catch (e) {}
       const inDups = new Set(dups.map(d => d.i));
       staleIdx.forEach(i => { if (!inDups.has(i)) dups.push({ i, where: 'stale' }); });
+      let phPlan = new Map();
+      try { phPlan = findPlaceholderTargets(); } catch (e) {}
+      orders.forEach((o, i) => { if (phPlan.has(o)) { const d = dups.find(x => x.i === i); if (d) d.where = 'placeholder'; else dups.push({ i, where: 'placeholder' }); } });
       dups.sort((a, b) => a.i - b.i);
-      const arc = dups.filter(d => d.where === 'archive').length, stl = dups.filter(d => d.where === 'stale').length, can = dups.length - arc - stl;
+      const arc = dups.filter(d => d.where === 'archive').length, stl = dups.filter(d => d.where === 'stale').length, phc = dups.filter(d => d.where === 'placeholder').length, can = dups.length - arc - stl - phc;
       if (!dups.length) {
         const left = countMainDuplicateOrderIds();
         appAlert('Không còn dòng trùng nào app tự gộp được.' + (left.groups ? `\n\nBảng chính còn ${left.groups} mã đơn có nhiều dòng: đó là các kiện / yêu cầu khác nhau của cùng đơn (vd 2 mã vận đơn khác nhau, hoặc TikTok tách 2 yêu cầu trả hàng), app giữ để bạn tự xem.` : ''), 'Dọn Đơn Trùng');
         return;
       }
-      const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính bị trùng (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy, ${stl} là yêu cầu trả hàng cũ của cùng mã đơn đã có yêu cầu mới trên Sheet).\n\nXóa các bản trùng / cũ khỏi Bảng chính? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng');
+      const ok = await appConfirm(`Có ${dups.length} đơn ở Bảng chính bị trùng (${arc} trùng Kho lưu trữ, ${can} trùng Bảng đơn hủy, ${stl} là dòng cũ / trùng của cùng mã đơn, ${phc} đơn tạm "Chưa rõ sản phẩm" đã tìm ra đơn thật).\n\nXóa các bản trùng / cũ khỏi Bảng chính? (Đơn đang khóa sẽ được giữ lại; có lưu bản sao để khôi phục.)`, 'Dọn Đơn Trùng');
       if (!ok) return;
       let removed = 0, kept = 0;
       const backup = [];
       for (let k = dups.length - 1; k >= 0; k--) {
         const { i } = dups[k];
         if (isLocked || hasLockedCellsInOrder(i)) { kept++; continue; }
-        if (dups[k].where === 'stale' && dupPlanOf.has(orders[i])) { try { const pl = dupPlanOf.get(orders[i]); mergeWarehouseIntoKeeper(orders[i], pl.keep, pl); } catch (e) {} }
+        if (dups[k].where === 'placeholder' && phPlan.has(orders[i])) { try { mergePlaceholderIntoOrder(orders[i], phPlan.get(orders[i])); } catch (e) {} }
+        else if (dups[k].where === 'stale' && dupPlanOf.has(orders[i])) { try { const pl = dupPlanOf.get(orders[i]); mergeWarehouseIntoKeeper(orders[i], pl.keep, pl); } catch (e) {} }
         backup.push(orders[i]);
         orders.splice(i, 1);
         shiftCellLocksAfterOrderDelete(i);
@@ -15938,6 +15988,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (staged && staged.code !== cleanCode) return { success: false };
         if (!staged) {
           staged = { code: cleanCode, receipt: null, records: [], effects: [] };
+          // Mã vừa quét chưa có đơn nhưng phiếu đọc được mã khác (mã đơn / mã yêu cầu trả hàng) khớp đúng 1 đơn:
+          // gắn mã vừa quét vào đơn đó để nhận ngay, không tạo đơn tạm.
+          try {
+            const lid = labelInfo && extractCleanTrackingCode(labelInfo.orderId || '');
+            if (lid && lid !== cleanCode && phoneOrderMatches(cleanCode).length === 0) {
+              const m = phoneOrderMatches(lid);
+              if (m.length === 1) {
+                const real = m[0].order;
+                if (!real.returnTrack) real.returnTrack = cleanCode;
+                real.trackingCodes = Array.from(new Set([...(Array.isArray(real.trackingCodes) ? real.trackingCodes : []), cleanCode]));
+              }
+            }
+          } catch (e) {}
           if (labelInfo?.enrichOnly) {
             const matches = phoneOrderMatches(cleanCode);
             if (matches.length === 1) {

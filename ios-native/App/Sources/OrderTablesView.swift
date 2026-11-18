@@ -219,7 +219,7 @@ struct CancelAfterPrepView: View {
     private var all: [OrderRow] { store.rows.filter { $0.k == "m" && $0.isCancelAfterPrep } }
     private var list: [OrderRow] {
         switch show {
-        case .pending: return all.filter { $0.pd }
+        case .pending: return all.filter { !$0.rv }
         case .received: return all.filter { $0.rv }
         case .all: return all
         }
@@ -275,7 +275,7 @@ struct CancelAfterPrepView: View {
 
     private func count(_ s: Show) -> Int {
         switch s {
-        case .pending: return all.filter { $0.pd }.count
+        case .pending: return all.filter { !$0.rv }.count
         case .received: return all.filter { $0.rv }.count
         case .all: return all.count
         }
@@ -310,7 +310,7 @@ struct CancelAfterPrepView: View {
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 3) {
-                Text(r.rv ? "Đã nhận" : (r.pd ? "Chưa nhận" : r.st))
+                Text(r.rv ? "Đã nhận" : (r.pd ? "Chưa nhận" : (r.st.isEmpty ? "Chưa nhận" : r.st)))
                     .font(.caption.bold())
                     .padding(.horizontal, 8).padding(.vertical, 3)
                     .background((r.rv ? Color.green : (r.pd ? Color.orange : Color.gray)).opacity(0.18), in: Capsule())

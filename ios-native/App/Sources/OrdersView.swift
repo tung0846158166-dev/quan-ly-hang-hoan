@@ -140,7 +140,7 @@ struct OrdersView: View {
     /// Lối vào Bảng đơn mới (Hộp Đơn Mới trên PC) và Bảng đơn hủy: tích chọn để đẩy ra / đánh dấu đã nhận.
     private var tables: some View {
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
-        let afterPrepPending = store.rows.filter { $0.k == "m" && $0.pd && $0.isCancelAfterPrep }.count
+        let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
         return HStack(spacing: 6) {
             NavigationLink { InboxView() } label: {
                 VStack(spacing: 1) { Text("📥 Đơn mới").font(.caption.bold()); Text("\(store.inbox.count)").font(.subheadline.bold()) }

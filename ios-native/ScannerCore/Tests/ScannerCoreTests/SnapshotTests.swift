@@ -178,3 +178,15 @@ final class StatsFieldTests: XCTestCase {
         XCTAssertTrue(b.stats.isEmpty)
     }
 }
+
+final class ExtraCodesTests: XCTestCase {
+    func testExtraCodesDecodeAndLookup() throws {
+        let json = #"{"time":1,"rows":[{"k":"m","c":"SPXVN06229297911A","o":"26102054X4PVRC","x":"SPXVN06654167505B 2611060KRRWN0U0"},{"k":"m","c":"B2"}]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows[0].lookupCodes, ["SPXVN06229297911A", "26102054X4PVRC", "SPXVN06654167505B", "2611060KRRWN0U0"])
+        XCTAssertEqual(p.rows[1].x, "")
+        XCTAssertEqual(p.rows[1].lookupCodes, ["B2"])
+        let back = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
+        XCTAssertEqual(back.rows, p.rows)
+    }
+}

@@ -4076,10 +4076,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const hasWarehouseData = o => isOrderReceived(o) || o.recvDate || o.photo || o.photoId || o.isWatchlist || String(o.myNote || '').trim();
     // Dòng Bảng chính của yêu cầu cũ: cùng mã đơn với dòng của yêu cầu mới nhất, khác mã yêu cầu, không có mã vận đơn riêng,
     // chưa nhận và chưa có dữ liệu kho.
-    // v1.9.35: Sheet chỉ có MỘT dòng cho mỗi mã đơn. Bảng chính có nhiều dòng cùng mã đơn (không có mã vận đơn riêng) thì
-    // giữ dòng khớp Sheet (cùng mã yêu cầu, hoặc cùng trạng thái sàn), gỡ các dòng còn lại nếu chưa nhận và chưa có dữ liệu kho.
-    // (Trước đây chỉ gỡ khi dòng cũ có mã yêu cầu KHÁC; dòng cũ không có / trùng mã yêu cầu thì sót.)
+    // v1.9.36: Sheet ghép 3 tab thành MỘT đơn cho mỗi mã đơn. Bảng chính có nhiều dòng cùng mã đơn thì giữ dòng khớp Sheet:
+    //   1) dòng có đúng mã vận đơn Sheet đang có (dữ liệu mới nhất, vd tab Hàng hoàn đã có mã vận đơn),
+    //   2) nếu không: dòng cùng mã yêu cầu và/hoặc cùng trạng thái sàn,
+    //   3) nếu không: dòng duy nhất có mã vận đơn.
+    // Các dòng còn lại (không có mã vận đơn, hoặc trùng mã vận đơn với dòng giữ) bị gỡ; dòng có mã vận đơn KHÁC là kiện riêng, giữ.
+    // Dữ liệu kho của dòng bị gỡ (đã nhận, ngày nhận, ảnh, ghi chú, theo dõi) được chuyển sang dòng giữ trước khi gỡ.
+    const staleKeeperOf = new Map();   // dòng bị gỡ -> dòng giữ (tham chiếu đối tượng, không đổi khi xoá dòng)
     function findStaleClaimDuplicates() {
+      staleKeeperOf.clear();
       const latest = getSheetLatestClaims();
       if (!latest || !Array.isArray(orders)) return [];
       const up = v => String(v || '').trim().toUpperCase();
@@ -4093,19 +4098,39 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!want) return;
         const wantClaim = up(typeof want === 'string' ? want : want.c);
         const wantStatus = norm(typeof want === 'string' ? '' : want.s);
-        const ownTrack = o => !!extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '');
-        const cands = idxs.filter(i => !ownTrack(orders[i]));   // dòng có mã vận đơn riêng là kiện riêng: không đụng
-        if (cands.length < 2) return;
+        const wantTrack = extractCleanTrackingCode(typeof want === 'string' ? '' : (want.t || ''));
+        const ownTrack = i => extractCleanTrackingCode(orders[i].returnTrack || orders[i].track || orders[i].forwardTrack || orders[i].altTrack || '');
         const claimOk = i => wantClaim && getReturnParcelId(orders[i]) === wantClaim;
         const statusOk = i => wantStatus && norm(orders[i].platformStatus) === wantStatus;
-        const keeper = cands.find(i => claimOk(i) && statusOk(i)) ?? cands.find(claimOk) ?? cands.find(statusOk);
+        const tracked = idxs.filter(i => ownTrack(i));
+        let keeper = wantTrack ? idxs.find(i => ownTrack(i) === wantTrack) : undefined;
+        if (keeper === undefined) {
+          const pool = idxs;
+          keeper = pool.find(i => claimOk(i) && statusOk(i)) ?? pool.find(claimOk) ?? pool.find(statusOk);
+        }
+        if (keeper === undefined && tracked.length === 1) keeper = tracked[0];
         if (keeper === undefined) return;   // không biết dòng nào đúng: để người dùng tự xem
-        cands.forEach(i => {
-          if (i === keeper || hasWarehouseData(orders[i])) return;
+        const keepTrack = ownTrack(keeper);
+        idxs.forEach(i => {
+          if (i === keeper) return;
+          const t = ownTrack(i);
+          if (t && t !== keepTrack) return;   // kiện riêng
+          staleKeeperOf.set(orders[i], orders[keeper]);
           out.push(i);
         });
       });
       return out;
+    }
+    // Chuyển dữ liệu kho của dòng sắp gỡ sang dòng giữ (chỉ bổ sung, không ghi đè dữ liệu dòng giữ đã có).
+    function mergeWarehouseIntoKeeper(src, dst) {
+      if (!src || !dst || src === dst) return;
+      const isDefault = st => !st || st === 'Chưa trả';
+      if (isDefault(dst.status) && !isDefault(src.status)) dst.status = src.status;
+      if (!dst.recvDate && src.recvDate) dst.recvDate = src.recvDate;
+      if (!dst.photo && !dst.photoId && (src.photo || src.photoId)) { dst.photo = src.photo; dst.photoId = src.photoId; }
+      const sn = String(src.myNote || '').trim();
+      if (sn && !String(dst.myNote || '').includes(sn)) dst.myNote = (String(dst.myNote || '').trim() ? dst.myNote + ' · ' : '') + sn;
+      if (src.isWatchlist && !dst.isWatchlist) { dst.isWatchlist = true; if (src.watchlistReason && !dst.watchlistReason) dst.watchlistReason = src.watchlistReason; }
     }
 
     function autoRemoveShadowDuplicates() {
@@ -4128,6 +4153,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const i = drop[k];
         const o = orders[i];
         if (shadow.has(i)) { try { enrichOtherTableEntry(o); } catch (e) {} }
+        else if (staleKeeperOf.has(o)) { try { mergeWarehouseIntoKeeper(o, staleKeeperOf.get(o)); } catch (e) {} }
         backup.push(o);
         orders.splice(i, 1);
         try { shiftCellLocksAfterOrderDelete(i); shiftCellEditHistoryAfterOrderDelete(i); } catch (e) {}
@@ -4163,6 +4189,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       for (let k = dups.length - 1; k >= 0; k--) {
         const { i } = dups[k];
         if (isLocked || hasLockedCellsInOrder(i)) { kept++; continue; }
+        if (dups[k].where === 'stale' && staleKeeperOf.has(orders[i])) { try { mergeWarehouseIntoKeeper(orders[i], staleKeeperOf.get(orders[i])); } catch (e) {} }
         backup.push(orders[i]);
         orders.splice(i, 1);
         shiftCellLocksAfterOrderDelete(i);
@@ -17605,7 +17632,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               if (!m.orderId) return;
               const st = m.parcelStatus || m.requestStatus;
               const s = m.type === 'cancel' ? (m.typeLabel ? m.typeLabel + ' · ' : '') + (st || 'Đã hủy') : st;
-              claims[String(m.orderId).trim().toUpperCase()] = { c: String(m.claimId || '').trim().toUpperCase(), s: s || '' };
+              claims[String(m.orderId).trim().toUpperCase()] = { c: String(m.claimId || '').trim().toUpperCase(), s: s || '', t: String(m.track || '').trim() };
             });
             saveSheetLatestClaims(claims);
           }

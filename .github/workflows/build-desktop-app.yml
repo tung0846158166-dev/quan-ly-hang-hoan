@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.30
+          name: QuanLyHangHoan-Windows-Installer-v1.9.31
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.30
-          name: "Quản Lý Hàng Hoàn v1.9.30 — iPhone: bảng đơn Hủy sau chuẩn bị"
+          tag_name: v1.9.31
+          name: "Quản Lý Hàng Hoàn v1.9.31 — Gửi lại danh sách cho iPhone chắc chắn hơn sau khi đẩy đơn / đánh dấu đơn hủy"
           body: |
+            ### Bản sửa 1.9.31 (dùng cùng app iPhone 0.10.29)
+
+            - Sau khi iPhone đẩy đơn mới / đánh dấu đơn hủy, nếu máy tính đang gửi dở danh sách thì hẹn gửi lại thay vì bỏ qua.
+            - iPhone 0.10.29: Bảng đơn mới cập nhật ngay mỗi khi máy tính gửi danh sách (bản trước chỉ thấy sau khi tắt mở lại app).
+
             ### Bản sửa 1.9.30 (dùng cùng app iPhone 0.10.28)
 
             - Gửi cột Trạng thái sàn sang iPhone. iPhone có bảng "Hủy sau chuẩn bị": các đơn ở Bảng chính có Trạng thái sàn ghi Huỷ sau chuẩn bị, lọc Chưa nhận / Đã nhận / Tất cả, tích chọn để đánh dấu Hàng đã trả hoặc Không cần nhận. Chi tiết đơn trên iPhone hiện thêm Trạng thái sàn.

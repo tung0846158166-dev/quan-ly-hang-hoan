@@ -46,6 +46,18 @@ struct ScanView: View {
                     Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.").font(.footnote).multilineTextAlignment(.center)
                 }
                 .padding().background(.ultraThinMaterial).cornerRadius(12)
+            } else if let why = camera.restReason, !camera.running {
+                Button { camera.start() } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "pause.circle.fill").font(.system(size: 44))
+                        Text(why).font(.footnote.bold()).multilineTextAlignment(.center)
+                        Text("Chạm để quét tiếp").font(.caption.bold()).padding(.horizontal, 12).padding(.vertical, 5)
+                            .background(Color.white.opacity(0.2), in: Capsule())
+                    }
+                    .foregroundColor(.white).padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.75))
+                }
+                .buttonStyle(.plain)
             } else {
                 ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
             }
@@ -54,7 +66,7 @@ struct ScanView: View {
         .background(Color.black)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.modeColor(engine.mode), lineWidth: 3))
-        .shadow(color: Theme.modeColor(engine.mode).opacity(0.35), radius: 10, x: 0, y: 3)
+        // Không đổ bóng quanh khung camera: bóng quanh hình đang chạy phải vẽ lại mọi khung hình -> nóng máy.
     }
 
     /// Vài lần quét gần nhất của chế độ đang chọn; chạm vào để xem chi tiết và ảnh.
@@ -136,7 +148,7 @@ struct ScanView: View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
                 Button { camera.running ? camera.stop() : camera.start() } label: {
-                    Label(camera.running ? "Dừng camera" : "Bật camera", systemImage: camera.running ? "pause.fill" : "play.fill")
+                    Label(camera.running ? "Dừng" : "Bật", systemImage: camera.running ? "pause.fill" : "play.fill")
                 }
                 Button { camera.setTorch(!camera.torchOn) } label: {
                     Label("Đèn", systemImage: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
@@ -144,6 +156,19 @@ struct ScanView: View {
                 Button { zoom = zoom >= 2 ? 1 : 2; camera.setZoom(zoom) } label: {
                     Label(zoom >= 2 ? "2x" : "1x", systemImage: "plus.magnifyingglass")
                 }
+                // Dán mã đã chép ở ứng dụng khác và gửi luôn (dán nhiều mã cách nhau bằng dấu cách / xuống dòng cũng được).
+                // Nút dán của hệ thống: không hiện hộp hỏi "Cho phép dán?" mỗi lần.
+                PasteButton(payloadType: String.self) { texts in
+                    let codes = PasteCodes.split(texts.joined(separator: "\n"))
+                    DispatchQueue.main.async {
+                        if codes.isEmpty {
+                            engine.banner = Banner(code: "", text: "KHÔNG THẤY MÃ TRONG NỘI DUNG ĐÃ CHÉP", color: .orange)
+                        } else {
+                            codes.forEach { engine.submitManual($0) }
+                        }
+                    }
+                }
+                .labelStyle(.titleAndIcon)
             }
             .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Theme.accent).font(.footnote.bold())
             HStack {
@@ -186,5 +211,19 @@ struct ScanGuide: Shape {
             p.addLine(to: CGPoint(x: pt.x, y: pt.y + dy * l))
         }
         return p
+    }
+}
+
+
+/// Tách các mã từ nội dung đã chép (bỏ chữ thừa, mã ngắn hơn 6 ký tự, mã trùng).
+enum PasteCodes {
+    static func split(_ text: String) -> [String] {
+        var seen = Set<String>(), out: [String] = []
+        for tok in text.components(separatedBy: CharacterSet(charactersIn: " \t\r\n,;|")) {
+            let c = TrackingCode.clean(tok)
+            guard c.count >= 6, c.contains(where: { $0.isNumber }), !seen.contains(c) else { continue }
+            seen.insert(c); out.append(c)
+        }
+        return out
     }
 }

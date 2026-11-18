@@ -9,6 +9,59 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var torchOn = false
     @Published var running = false
     @Published var denied = false
+    /// Camera tự nghỉ (lâu không quét được mã, hoặc máy quá nóng); chạm để quét tiếp.
+    @Published var restReason: String?
+
+    // ---- Chống nóng máy ----
+    // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 30 giây không thấy mã nào thì 15 hình/giây;
+    // 3 phút không thấy mã thì tạm dừng camera. Máy nóng (thermalState .serious) thì 12 hình/giây, quá nóng (.critical) thì dừng.
+    private let activeFPS: Int32 = 24, idleFPS: Int32 = 15, hotFPS: Int32 = 12
+    private var currentFPS: Int32 = 0
+    private var lastCodeAt = Date()
+    private var idleTimer: Timer?
+    private var thermalObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        thermalObserver = NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.applyThermalAndIdle()
+        }
+    }
+    deinit {
+        if let o = thermalObserver { NotificationCenter.default.removeObserver(o) }
+        idleTimer?.invalidate()
+    }
+
+    private func setFPS(_ fps: Int32) {
+        queue.async {
+            guard let dev = self.device, fps != self.currentFPS else { return }
+            let ok = dev.activeFormat.videoSupportedFrameRateRanges.contains { Double(fps) >= $0.minFrameRate && Double(fps) <= $0.maxFrameRate }
+            guard ok, (try? dev.lockForConfiguration()) != nil else { return }
+            dev.activeVideoMinFrameDuration = CMTime(value: 1, timescale: fps)
+            dev.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: fps)
+            dev.unlockForConfiguration()
+            self.currentFPS = fps
+        }
+    }
+
+    /// Gọi định kỳ và khi nhiệt độ máy đổi: chọn số hình/giây hoặc cho camera nghỉ.
+    private func applyThermalAndIdle() {
+        guard running else { return }
+        let thermal = ProcessInfo.processInfo.thermalState
+        if thermal == .critical {
+            restReason = "Máy đang quá nóng nên camera tạm nghỉ. Để máy nguội một chút rồi chạm để quét tiếp."
+            stop(); return
+        }
+        let idle = Date().timeIntervalSince(lastCodeAt)
+        let restAfter = UserDefaults.standard.object(forKey: "cameraRestAfterSec") as? Double ?? 180
+        if restAfter > 0, idle > restAfter {
+            restReason = "Camera tạm nghỉ vì \(Int(restAfter / 60)) phút không quét mã (đỡ nóng máy, đỡ tốn pin). Chạm để quét tiếp."
+            stop(); return
+        }
+        if thermal == .serious { setFPS(hotFPS) }
+        else if idle > 30 { setFPS(idleFPS) }
+        else { setFPS(activeFPS) }
+    }
 
     private let queue = DispatchQueue(label: "camera.session")
     private let frameLock = NSLock()
@@ -21,6 +74,10 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     private let metaQueue = DispatchQueue(label: "camera.meta", qos: .userInteractive)
 
     func start() {
+        restReason = nil
+        lastCodeAt = Date()
+        idleTimer?.invalidate()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in self?.applyThermalAndIdle() }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized: begin()
         case .notDetermined:
@@ -36,11 +93,16 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         queue.async {
             if !self.configured { self.configure() }
             if !self.session.isRunning { self.session.startRunning() }
-            DispatchQueue.main.async { self.running = self.session.isRunning }
+            DispatchQueue.main.async {
+                self.running = self.session.isRunning
+                self.currentFPS = 0
+                self.applyThermalAndIdle()
+            }
         }
     }
 
     func stop() {
+        idleTimer?.invalidate(); idleTimer = nil
         queue.async {
             if self.session.isRunning { self.session.stopRunning() }
             DispatchQueue.main.async { self.running = false; self.torchOn = false }
@@ -138,7 +200,13 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                 guard (weakCandidate?.hits ?? 0) >= 4 else { continue }
                 weakCandidate = nil
             }
-            DispatchQueue.main.async { [weak self] in self?.onCode?(s) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 30
+                self.lastCodeAt = Date()
+                if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
+                self.onCode?(s)
+            }
             return
         }
     }

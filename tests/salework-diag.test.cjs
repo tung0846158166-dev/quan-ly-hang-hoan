@@ -55,3 +55,25 @@ test('yêu cầu theo dõi vận đơn / đăng nhập không bị gắn nhãn "
   assert.ok(!/\[nền\] GET a\.vn\/order\/tracking/.test(r) && !/\[nền\] GET a\.vn\/auth\/login/.test(r));
   assert.ok(/\[nền\] GET a\.vn\/chat\/notification\/count/.test(r));
 });
+
+test('start/stop: dùng đúng các lệnh Electron, chỉ nhận https, dọn khi đóng', async () => {
+  const calls = []; let closedCb = null, destroyed = false;
+  class FakeWin {
+    constructor(opts) { calls.push(['new', opts.webPreferences]); this.webContents = {
+      setWindowOpenHandler: f => calls.push(['openHandler', f({ url: 'https://x.vn/p' }).action]), loadURL: u => calls.push(['load', u]), getURL: () => 'https://x.vn/p', executeJavaScript: async () => [],
+      debugger: { attach: v => calls.push(['attach', v]), detach: () => calls.push(['detach']), sendCommand: async m => { calls.push(['cmd', m]); return {}; }, on: () => {} } }; }
+    on(ev, cb) { if (ev === 'closed') closedCb = cb; } isDestroyed() { return destroyed; } focus() {} close() { destroyed = true; closedCb && closedCb(); }
+  }
+  const d = new SaleworkDiag({ BrowserWindow: FakeWin });
+  await assert.rejects(() => d.start('http://x.vn'), /https/);
+  await assert.rejects(() => d.start('not a url'));
+  await d.start('https://x.vn/login');
+  const wp = calls.find(c => c[0] === 'new')[1];
+  assert.strictEqual(wp.partition, 'persist:salework-diag'); assert.strictEqual(wp.nodeIntegration, false); assert.strictEqual(wp.contextIsolation, true); assert.strictEqual(wp.sandbox, true);
+  assert.deepStrictEqual(calls.filter(c => c[0] === 'openHandler')[0], ['openHandler', 'deny']);
+  assert.ok(calls.some(c => c[0] === 'cmd' && c[1] === 'Network.enable') && calls.some(c => c[0] === 'load' && c[1] === 'https://x.vn/login'));
+  assert.strictEqual(d.status().running, true);
+  d.stop();
+  assert.strictEqual(d.status().running, false); assert.ok(calls.some(c => c[0] === 'detach'));
+  assert.strictEqual(d.timer, null);
+});

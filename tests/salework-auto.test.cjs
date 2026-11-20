@@ -70,7 +70,7 @@ function dl(ses, xlsx, state = 'completed') {
 }
 function mk(script, xlsx) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const f = fakeElectron(script, xlsx);
-  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1, actWait: 20, keepOnError: 0 });
+  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1, actWait: 20, clickRetry: 20, keepOnError: 0 });
   fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
   return { a, calls: f.calls, dir };
 }
@@ -248,4 +248,31 @@ test('chế độ xem + lỗi: cửa sổ được giữ lại để người d�
   const r = await a.run(); assert.equal(r.success, false);
   assert.equal(a.curWin.isDestroyed(), false);
   await new Promise(res => setTimeout(res, 120)); assert.equal(a.curWin.isDestroyed(), true);
+});
+
+test('nút đổi chữ / vẽ lại giữa lúc chờ: bấm lại thành công sau vài lần thử', async () => {
+  let fails = 0;
+  const f = mk((act, arg, ses) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'click' && arg.text === 'Bắt Đầu Xuất') { if (fails < 2) { fails++; return { ok: false, error: 'không thấy "Bắt Đầu Xuất"' }; } dl(ses, sampleXlsx()); }
+    return { ok: true };
+  });
+  f.a.opts.clickRetry = 3000; f.a.opts.downloadTimeout = 5000;
+  const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r)); assert.equal(fails, 2);
+});
+test('bấm không được hẳn: báo kèm chữ đang thấy trên trang', async () => {
+  const f = mk((act, arg) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'click' && arg.text === 'Bắt Đầu Xuất') return { ok: false, error: 'không thấy "Bắt Đầu Xuất"' };
+    if (act === 'texts') return { ok: true, texts: ['Đang xuất 364 đơn'] };
+    return { ok: true };
+  });
+  const r = await f.a.run();
+  assert.equal(r.success, false); assert.equal(r.step, 'bấm Bắt Đầu Xuất'); assert.match(r.error, /Đang xuất 364 đơn/);
+});
+test('Theo bộ lọc / Bắt Đầu Xuất tìm theo đầu chữ (nút có thể kèm số đơn)', async () => {
+  const f = mk(okScript(sampleXlsx()));
+  await f.a.run();
+  const modes = f.calls.filter(c => c[0] === 'click' && /Theo bộ lọc|Bắt Đầu Xuất/.test(c[1].text)).map(c => c[1].mode);
+  assert.deepEqual(modes, ['prefix', 'prefix']);
 });

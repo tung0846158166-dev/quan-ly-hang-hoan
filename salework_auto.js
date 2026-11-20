@@ -125,7 +125,7 @@ class SaleworkAuto {
   constructor(electron, cfgDir, opts) {
     this.electron = electron;
     this.cfgFile = path.join(cfgDir, 'salework_auto.json');
-    this.opts = Object.assign({ pageTimeout: 45000, stepPause: 2500, downloadTimeout: 120000, watchPause: 2500, actWait: 8000, keepOnError: 120000 }, opts || {});
+    this.opts = Object.assign({ pageTimeout: 45000, stepPause: 2500, downloadTimeout: 120000, watchPause: 2500, actWait: 8000, clickRetry: 6000, keepOnError: 120000 }, opts || {});
     this.abort = false;
     this.curWin = null;
     this.loginWin = null;
@@ -202,8 +202,18 @@ class SaleworkAuto {
       await sleep(this.opts.watchPause);
       if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
     }
-    const r = await this._exec(win, 'click', arg);
-    if (!r.ok) throw new Error(r.error);
+    // Sau khi chờ, giao diện có thể đã vẽ lại (vd nút đổi chữ / đổi chỗ): tìm lại và bấm, thử lại vài lần trước khi báo lỗi
+    let r = await this._exec(win, 'click', arg);
+    const t1 = Date.now();
+    while (!r.ok && Date.now() - t1 < this.opts.clickRetry) {
+      if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
+      await sleep(400); r = await this._exec(win, 'click', arg);
+    }
+    if (!r.ok) {
+      let more = '';
+      try { const tx = await this._exec(win, 'texts'); if (tx && tx.texts) more = ' — trên trang đang thấy: [' + tx.texts.join(' | ') + ']'; } catch (e) {}
+      throw new Error(r.error + more);
+    }
     return r;
   }
   async _waitFor(win, pred, timeout, label) {
@@ -281,11 +291,11 @@ class SaleworkAuto {
       await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);
       await sleep(this.opts.stepPause);
       step = 'chọn "Theo bộ lọc"';
-      await this._act(win, { text: 'Theo bộ lọc', inDialog: true }, 'chọn "Theo bộ lọc"', watch);
+      await this._act(win, { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true }, 'chọn "Theo bộ lọc"', watch);
       await sleep(600);
       step = 'bấm Bắt Đầu Xuất';
       arm();
-      await this._act(win, { text: 'Bắt Đầu Xuất', inDialog: true }, 'bấm "Bắt Đầu Xuất"', watch);
+      await this._act(win, { text: 'Bắt Đầu Xuất', mode: 'prefix', inDialog: true }, 'bấm "Bắt Đầu Xuất"', watch);
       step = 'chờ file tải về';
       const f = await got;
       step = 'đọc file';

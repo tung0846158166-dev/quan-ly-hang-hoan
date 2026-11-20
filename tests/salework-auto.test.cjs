@@ -57,8 +57,8 @@ test('trang: mã chạy trong trang là biểu thức hợp lệ và có chặn 
 function fakeElectron(script, xlsx, opts = {}) {
   const calls = [];
   class Win extends EventEmitter {
-    constructor(o) { super(); this.o = o; this.destroyed = false; const ses = new EventEmitter(); this.webContents = { session: ses, getURL: () => 'https://x.example/orders', executeJavaScript: async code => { const m = /\)\("(\w+)",(.*)\)$/s.exec(code); const a = m[1], arg = JSON.parse(m[2]); calls.push([a, arg]); return script(a, arg, ses); } }; }
-    loadURL() { return Promise.resolve(); } isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; } focus() {} close() { this.destroyed = true; this.emit('closed'); }
+    constructor(o) { super(); this.o = o; this.destroyed = false; const ses = new EventEmitter(); this.webContents = { setWindowOpenHandler: h => { this.openHandler = h; }, loadedUrls: [], session: ses, getURL: () => 'https://x.example/orders', executeJavaScript: async code => { const m = /\)\("(\w+)",(.*)\)$/s.exec(code); const a = m[1], arg = JSON.parse(m[2]); calls.push([a, arg]); return script(a, arg, ses); } }; }
+    loadURL(u) { (this.webContents.loadedUrls = this.webContents.loadedUrls || []).push(u); return Promise.resolve(); } isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; } focus() {} close() { this.destroyed = true; this.emit('closed'); }
   }
   return { electron: { BrowserWindow: Win, session: { fromPartition: () => ({ clearStorageData: async () => {} }) } }, calls };
 }
@@ -117,4 +117,19 @@ test('lưu trang: từ chối địa chỉ đăng nhập', () => {
   assert.equal(a.saveCurrentPage().success, false);
   a.loginWin.webContents.getURL = () => 'https://app.salework.net/return-orders'; assert.equal(a.saveCurrentPage().success, true);
   assert.equal(a.status().url, 'https://app.salework.net/return-orders');
+});
+
+test('cửa sổ con (Salework Kho…) được mở trong chính cửa sổ đăng nhập, không tách cửa sổ mới', () => {
+  const f = fakeElectron(() => ({})); const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const a = new SaleworkAuto(f.electron, dir);
+  a.openLogin('https://salework.net');
+  const w = a.loginWin; const r = w.openHandler({ url: 'https://kho.salework.net/orders' });
+  assert.equal(r.action, 'deny'); assert.ok(w.webContents.loadedUrls.includes('https://kho.salework.net/orders'));
+  assert.equal(w.openHandler({ url: 'http://evil.example' }).action, 'deny');
+  assert.ok(!w.webContents.loadedUrls.includes('http://evil.example'));
+});
+test('dán link mới khi cửa sổ đã mở: chuyển sang link mới', () => {
+  const f = fakeElectron(() => ({})); const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const a = new SaleworkAuto(f.electron, dir);
+  a.openLogin('https://salework.net'); const w = a.loginWin;
+  a.openLogin('https://app.salework.net/staff-login?x=1');
+  assert.ok(w.webContents.loadedUrls.includes('https://app.salework.net/staff-login?x=1'));
 });

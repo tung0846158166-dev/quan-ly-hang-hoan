@@ -72,6 +72,16 @@ function pageScript(action, arg) {
   return '(' + code.toString() + ')(' + JSON.stringify(action) + ',' + JSON.stringify(arg === undefined ? null : arg) + ')';
 }
 
+/** Salework hay mở app con (Kho, Chat…) bằng cửa sổ mới. Giữ tất cả trong MỘT cửa sổ để địa chỉ lưu / bấm nút luôn ở đúng cửa sổ. */
+function keepSingleWindow(win) {
+  try {
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https:\/\//i.test(String(url || ''))) { try { win.loadURL(url).catch(() => {}); } catch (e) {} }
+      return { action: 'deny' };
+    });
+  } catch (e) {}
+}
+
 class SaleworkAuto {
   /** electron: module electron (hoặc bản giả khi test). cfgDir: thư mục lưu địa chỉ trang. */
   constructor(electron, cfgDir, opts) {
@@ -88,11 +98,16 @@ class SaleworkAuto {
   /** Cửa sổ HIỆN: người dùng tự đăng nhập Salework và mở trang Đơn hoàn (kênh Tiktok). Bấm "Lưu" -> nhớ địa chỉ trang hiện tại. */
   openLogin(startUrl) {
     const { BrowserWindow } = this.electron;
-    if (this.loginWin && !this.loginWin.isDestroyed()) { this.loginWin.focus(); return { success: true }; }
-    const url = String(startUrl || this._cfg().url || 'https://salework.net');
+    const url = String(startUrl || this._cfg().url || 'https://salework.net').trim();
     if (!/^https:\/\//i.test(url)) return { success: false, error: 'Địa chỉ phải bắt đầu bằng https://' };
+    if (this.loginWin && !this.loginWin.isDestroyed()) {
+      // đã mở sẵn: nếu người dùng dán link mới thì chuyển sang link đó
+      if (startUrl && String(startUrl).trim() && this.loginWin.webContents.getURL() !== url) this.loginWin.loadURL(url).catch(() => {});
+      this.loginWin.focus(); return { success: true };
+    }
     const win = new BrowserWindow({ width: 1280, height: 860, title: 'Salework — đăng nhập rồi mở trang Đơn hoàn', webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true } });
     this.loginWin = win;
+    keepSingleWindow(win);
     win.on('closed', () => { this.loginWin = null; });
     win.loadURL(url).catch(() => {});
     return { success: true };
@@ -134,6 +149,7 @@ class SaleworkAuto {
     const note = (ok, msg) => { const c = this._cfg(); c.lastOk = ok; c.lastNote = new Date().toISOString() + ' ' + msg; this._save(c); };
     try {
       win = new BrowserWindow({ show: false, width: 1366, height: 900, webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
+      keepSingleWindow(win);
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-auto-'));
       // bắt file tải về — chỉ bắt đầu đếm giờ khi đã bấm sẵn sàng (arm), không tính thời gian tải trang
       let got = null;

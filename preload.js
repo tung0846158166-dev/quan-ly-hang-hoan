@@ -27,5 +27,7 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   saleworkAutoLogin: (url) => ipcRenderer.invoke('salework-auto-login', url),
   saleworkAutoSave: () => ipcRenderer.invoke('salework-auto-save'),
   saleworkAutoForget: () => ipcRenderer.invoke('salework-auto-forget'),
+  saleworkAutoWatch: (on) => ipcRenderer.invoke('salework-auto-watch', on),
+  saleworkAutoStop: () => ipcRenderer.invoke('salework-auto-stop'),
   saleworkAutoRun: () => ipcRenderer.invoke('salework-auto-run')
 });

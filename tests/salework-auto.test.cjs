@@ -70,12 +70,13 @@ function dl(ses, xlsx, state = 'completed') {
 }
 function mk(script, xlsx) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const f = fakeElectron(script, xlsx);
-  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600 });
+  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1 });
   fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
   return { a, calls: f.calls, dir };
 }
 const okScript = xlsx => (a, arg, ses) => {
   if (a === 'state') return { hasExport: true, hasPassword: false, channelTiktok: true, hasTab: true };
+  if (a === 'mark' || a === 'banner') return { ok: true };
   if (a === 'click') { if (arg.text === 'Bắt Đầu Xuất') dl(ses, xlsx); return { ok: true }; }
 };
 
@@ -132,4 +133,50 @@ test('dán link mới khi cửa sổ đã mở: chuyển sang link mới', () =>
   a.openLogin('https://salework.net'); const w = a.loginWin;
   a.openLogin('https://app.salework.net/staff-login?x=1');
   assert.ok(w.webContents.loadedUrls.includes('https://app.salework.net/staff-login?x=1'));
+});
+
+test('chế độ xem: viền đỏ (mark) trước MỖI lần bấm, theo đúng thứ tự', async () => {
+  const { a, calls } = mk(okScript(sampleXlsx()));
+  const r = await a.run(); assert.equal(r.success, true, JSON.stringify(r));
+  const seq = calls.filter(c => c[0] === 'mark' || c[0] === 'click').map(c => c[0] + ':' + c[1].text);
+  assert.deepEqual(seq, ['mark:Đang chờ hoàn', 'click:Đang chờ hoàn', 'mark:Xuất excel', 'click:Xuất excel', 'mark:Theo bộ lọc', 'click:Theo bộ lọc', 'mark:Bắt Đầu Xuất', 'click:Bắt Đầu Xuất']);
+});
+test('tắt chế độ xem: không viền, cửa sổ ẩn', async () => {
+  const { a, calls, dir } = mk(okScript(sampleXlsx()));
+  a.setWatch(false); assert.equal(a.status().watch, false);
+  const r = await a.run(); assert.equal(r.success, true);
+  assert.ok(!calls.some(c => c[0] === 'mark'));
+});
+test('Dừng giữa chừng: không bấm thêm gì, báo đã dừng', async () => {
+  let aKeep;
+  const f = mk((act, arg, ses) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'mark' && arg.text === 'Xuất excel') aKeep.stop();   // người dùng bấm Dừng đúng lúc app sắp bấm Xuất excel
+    return { ok: true };
+  });
+  aKeep = f.a;
+  const r = await f.a.run();
+  assert.equal(r.success, false); assert.match(r.error, /dừng/i);
+  const clicks = f.calls.filter(c => c[0] === 'click').map(c => c[1].text);
+  assert.deepEqual(clicks, ['Đang chờ hoàn']);
+  assert.equal(f.a.status().running, false);
+});
+test('đóng cửa sổ khi đang chạy = dừng ngay', async () => {
+  const f = mk((act, arg) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'mark' && arg.text === 'Xuất excel') f.a.curWin.emit('closed');
+    return { ok: true };
+  });
+  const r = await f.a.run();
+  assert.equal(r.success, false);
+  assert.ok(!f.calls.some(c => c[0] === 'click' && c[1].text === 'Xuất excel'));
+});
+test('lỗi không thấy nút: báo kèm trang đang ở và các nút nhìn thấy', async () => {
+  const f = mk(act => act === 'state' ? { hasExport: false, hasPassword: false, path: 'kho.example/orders/#', title: 'Salework Kho', buttons: ['Bán hàng', 'Đơn hoàn'] } : { ok: true });
+  const r = await f.a.run();
+  assert.equal(r.success, false); assert.match(r.error, /kho\.example\/orders\/#/); assert.match(r.error, /Bán hàng \| Đơn hoàn/);
+});
+
+test('trang: so khớp chữ không phụ thuộc kiểu gõ dấu (NFC/NFD)', () => {
+  assert.match(pageScript('state'), /normalize\('NFC'\)/);
 });

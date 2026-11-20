@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, Notification } =
 const path = require('path');
 const fs = require('fs');
 const { createAuxStore } = require(path.join(__dirname, 'disk_aux'));
+const { SaleworkDiag } = require(path.join(__dirname, 'salework_diag'));
 
 let mainWindow = null;
 let tray = null;
@@ -471,6 +472,28 @@ ipcMain.handle('read-watch-file', async (event, name) => {
   if (!base || base !== String(name) || !WATCH_EXT.test(base)) return { success: false, error: 'Tên file không hợp lệ' };
   try { return { success: true, data: fs.readFileSync(path.join(watchDir, base)) }; }
   catch (e) { return { success: false, error: e.message }; }
+});
+
+// Chẩn đoán Salework: chỉ quan sát một cửa sổ Salework do người dùng tự thao tác (xem salework_diag.js).
+let saleworkDiag = null;
+ipcMain.handle('salework-diag-start', async (event, url) => {
+  try {
+    if (!saleworkDiag) saleworkDiag = new SaleworkDiag(require('electron'));
+    await saleworkDiag.start(String(url || '').trim());
+    return { success: true };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('salework-diag-report', async () => {
+  if (!saleworkDiag) return { success: true, running: false, text: '', endpoints: 0, pages: 0 };
+  const st = saleworkDiag.status();
+  return { success: true, running: st.running, endpoints: st.endpoints, pages: st.pages, text: saleworkDiag.report() };
+});
+ipcMain.handle('salework-diag-stop', async (event, clear) => {
+  try {
+    if (saleworkDiag) saleworkDiag.stop();
+    if (clear) { const { session } = require('electron'); await session.fromPartition('persist:salework-diag').clearStorageData(); }
+    return { success: true };
+  } catch (e) { return { success: false, error: e.message }; }
 });
 
 ipcMain.handle('get-app-version', () => {

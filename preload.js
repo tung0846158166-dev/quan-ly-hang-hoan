@@ -19,5 +19,8 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   chooseWatchFolder: () => ipcRenderer.invoke('choose-watch-folder'),
   setWatchFolder: (dir) => ipcRenderer.invoke('set-watch-folder', dir),
   listWatchFolder: () => ipcRenderer.invoke('list-watch-folder'),
-  readWatchFile: (name) => ipcRenderer.invoke('read-watch-file', name)
+  readWatchFile: (name) => ipcRenderer.invoke('read-watch-file', name),
+  saleworkDiagStart: (url) => ipcRenderer.invoke('salework-diag-start', url),
+  saleworkDiagReport: () => ipcRenderer.invoke('salework-diag-report'),
+  saleworkDiagStop: (clear) => ipcRenderer.invoke('salework-diag-stop', clear)
 });

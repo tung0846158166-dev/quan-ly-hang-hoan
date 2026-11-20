@@ -60,11 +60,10 @@ function pageScript(action, arg) {
     }
     function locate(a) {
       if (FORBID.test(a.text)) return { error: 'từ chối bấm nút có chữ "cập nhật"' };
+      // Chữ "Theo bộ lọc" / "Bắt Đầu Xuất" chỉ có trong cửa sổ xuất: ưu tiên tìm trong cửa sổ nếu nhận ra, không thì tìm cả trang.
       let within = a.inDialog ? dialogRoot() : null;
-      // giao diện lạ không khai báo cửa sổ: chấp nhận khi chữ "Bắt Đầu Xuất" đang hiện trên trang (chỉ có trong cửa sổ xuất)
-      if (a.inDialog && !within && find('bắt đầu xuất', 'exact').length) within = document;
-      if (a.inDialog && !within) return { error: 'chưa thấy cửa sổ xuất' };
-      const c = find(a.text, a.mode || 'exact', within);
+      let c = find(a.text, a.mode || 'exact', within);
+      if (!c.length && within) c = find(a.text, a.mode || 'exact', null);
       if (!c.length) return { error: 'không thấy "' + a.text + '"' };
       if (FORBID.test(c[0].textContent)) return { error: 'phần tử khớp có chữ "cập nhật", bỏ qua' };
       return { el: c[0], count: c.length };
@@ -74,6 +73,16 @@ function pageScript(action, arg) {
       if (L.error) return { ok: false, error: L.error };
       click(L.el);
       return { ok: true, count: L.count };
+    }
+    if (action === 'exists') { const L = locate(arg); return L.error ? { ok: false, error: L.error } : { ok: true }; }
+    if (action === 'texts') {   // chữ đang nhìn thấy (ngắn) để chẩn đoán — không có giá trị dữ liệu dài
+      const seen = []; const set = new Set();
+      Array.from(document.querySelectorAll('button,a,label,span,div,p,li,h1,h2,h3,h4')).filter(visible).forEach(el => {
+        if (el.children.length && Array.from(el.children).some(c => norm(c.textContent))) return;
+        const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (t && t.length <= 40 && !/\d{6,}/.test(t) && !set.has(t)) { set.add(t); seen.push(t); }
+      });
+      return { ok: true, texts: seen.slice(0, 60) };
     }
     if (action === 'mark') {   // chế độ xem: viền đỏ quanh nút sắp bấm (chưa bấm)
       const L = locate(arg);
@@ -116,7 +125,7 @@ class SaleworkAuto {
   constructor(electron, cfgDir, opts) {
     this.electron = electron;
     this.cfgFile = path.join(cfgDir, 'salework_auto.json');
-    this.opts = Object.assign({ pageTimeout: 45000, stepPause: 2500, downloadTimeout: 120000, watchPause: 2500 }, opts || {});
+    this.opts = Object.assign({ pageTimeout: 45000, stepPause: 2500, downloadTimeout: 120000, watchPause: 2500, actWait: 8000, keepOnError: 120000 }, opts || {});
     this.abort = false;
     this.curWin = null;
     this.loginWin = null;
@@ -172,8 +181,20 @@ class SaleworkAuto {
     return ' — trang đang ở: ' + (st.path || '?') + ', tiêu đề "' + String(st.title || '').slice(0, 60) + '", thấy các nút: [' + (st.buttons || []).join(' | ') + ']';
   }
   /** Thao tác có kiểm soát: ở chế độ xem thì viền đỏ + chờ vài giây (để người dùng kịp dừng) rồi mới bấm. */
-  async _act(win, arg, label, watch) {
+  async _act(win, arg, label, watch, wait) {
     if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
+    // đợi phần tử xuất hiện (cửa sổ xuất có thể hiện chậm) trước khi kết luận là không thấy
+    const limit = wait === undefined ? this.opts.actWait : wait;
+    const t0 = Date.now(); let ex = await this._exec(win, 'exists', arg);
+    while (!ex.ok && Date.now() - t0 < limit) {
+      if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
+      await sleep(400); ex = await this._exec(win, 'exists', arg);
+    }
+    if (!ex.ok) {
+      let more = '';
+      try { const tx = await this._exec(win, 'texts'); if (tx && tx.texts) more = ' — trên trang đang thấy: [' + tx.texts.join(' | ') + ']'; } catch (e) {}
+      throw new Error(ex.error + more);
+    }
     if (watch) {
       try { await this._exec(win, 'banner', { text: '🤖 App đang: ' + label + ' — đóng cửa sổ này hoặc bấm "Dừng" trong app để DỪNG NGAY' }); } catch (e) {}
       const m = await this._exec(win, 'mark', arg);
@@ -200,15 +221,16 @@ class SaleworkAuto {
     if (this.running) return { success: false, step: 'busy', error: 'Đang chạy lượt trước.' };
     const cfg = this._cfg();
     if (!cfg.url) return { success: false, step: 'config', error: 'Chưa cài đặt: bấm "Đăng nhập Salework" và lưu trang Đơn hoàn.' };
+    try { if (this.curWin && !this.curWin.isDestroyed()) this.curWin.destroy(); } catch (e) {}
     this.running = true; this.abort = false;
     const watch = cfg.watch !== false;
     const { BrowserWindow } = this.electron;
-    let win = null, tmp = null, step = 'mở trang';
+    let win = null, tmp = null, step = 'mở trang', keep = false;
     const note = (ok, msg) => { const c = this._cfg(); c.lastOk = ok; c.lastNote = new Date().toISOString() + ' ' + msg; this._save(c); };
     try {
       win = new BrowserWindow({ show: watch, width: 1366, height: 900, title: 'Salework — app đang thao tác (đóng cửa sổ này để dừng)', webPreferences: { partition: PARTITION, contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false } });
       this.curWin = win;
-      win.on('closed', () => { this.abort = true; });   // người dùng đóng cửa sổ = dừng ngay
+      win.on('closed', () => { if (this.curWin === win) this.abort = true; });   // người dùng đóng cửa sổ = dừng ngay
       keepSingleWindow(win);
       tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sw-auto-'));
       // bắt file tải về — chỉ bắt đầu đếm giờ khi đã bấm sẵn sàng (arm), không tính thời gian tải trang
@@ -238,7 +260,7 @@ class SaleworkAuto {
         // Kiểm tra, đối soát › Đơn hoàn (chỉ bấm menu điều hướng).
         step = 'vào Đơn hoàn bằng menu';
         let direct = true;
-        try { await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch); } catch (e1) {
+        try { await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch, 1200); } catch (e1) {
           if (this.abort) throw e1; direct = false;   // menu chưa mở: mở nhóm rồi bấm
         }
         if (!direct) {
@@ -274,10 +296,16 @@ class SaleworkAuto {
       let msg = (e && e.message) || String(e);
       if (this.abort && !/dừng/i.test(msg)) msg = 'Đã dừng (cửa sổ bị đóng) — ' + msg;
       note(false, 'Lỗi ở bước "' + step + '": ' + msg);
+      if (watch && !this.abort && win && !win.isDestroyed() && this.opts.keepOnError > 0) {
+        // chế độ xem: giữ cửa sổ lại để người dùng nhìn thấy trang đang ở đâu (tự đóng sau ít phút)
+        keep = true;
+        try { win.webContents.executeJavaScript(pageScript('banner', { text: '⚠️ App dừng ở bước "' + step + '" — bạn có thể xem trang này, rồi đóng cửa sổ' }), true).catch(() => {}); } catch (e2) {}
+        const w = win; const tm = setTimeout(() => { try { if (!w.isDestroyed()) w.destroy(); } catch (e3) {} }, this.opts.keepOnError); tm.unref && tm.unref();
+      }
       return { success: false, step, error: msg, relogin: !!(e && e.relogin) };
     } finally {
-      this.running = false; this.curWin = null;
-      try { if (win && !win.isDestroyed()) win.destroy(); } catch (e) {}
+      this.running = false; if (!keep) this.curWin = null;
+      try { if (win && !win.isDestroyed() && !keep) win.destroy(); } catch (e) {}
       try { if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) {}
     }
   }

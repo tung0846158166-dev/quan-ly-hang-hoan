@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.45
+          name: QuanLyHangHoan-Windows-Installer-v1.9.46
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.45
-          name: "Quản Lý Hàng Hoàn v1.9.45 — Salework tự động: tự vào Đơn hoàn bằng menu khi trang trống"
+          tag_name: v1.9.46
+          name: "Quản Lý Hàng Hoàn v1.9.46 — Salework tự động: đợi cửa sổ xuất, giữ cửa sổ khi lỗi"
           body: |
+            ### Bản 1.9.46
+
+            - 🤖 Salework tự động: sau khi bấm Xuất excel app đợi cửa sổ xuất hiện (tới 8 giây) và tìm "Theo bộ lọc" / "Bắt Đầu Xuất" trên cả trang; báo lỗi kèm các chữ đang thấy trên trang. Ở chế độ xem, khi lỗi app GIỮ cửa sổ Salework lại (có dòng đỏ báo bước lỗi, tự đóng sau 2 phút) để bạn nhìn thấy.
+
             ### Bản 1.9.45
 
             - 🤖 Salework tự động: mở trang đã lưu mà chỉ thấy menu bên trái, phần Đơn hoàn trống (lỗi thật của người dùng) thì app tự đi menu Kiểm tra, đối soát › Đơn hoàn như bạn vẫn làm rồi chạy tiếp.

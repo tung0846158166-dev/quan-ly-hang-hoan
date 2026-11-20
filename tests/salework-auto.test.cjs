@@ -181,11 +181,12 @@ test('trang: so khớp chữ không phụ thuộc kiểu gõ dấu (NFC/NFD)', (
   assert.match(pageScript('state'), /normalize\('NFC'\)/);
 });
 
-test('trang trống phần Đơn hoàn: đi bằng menu Kiểm tra, đối soát › Đơn hoàn rồi chạy tiếp', async () => {
-  let inOrders = false;
+test('trang trống phần Đơn hoàn: menu chưa mở -> mở Kiểm tra, đối soát rồi vào Đơn hoàn, chạy tiếp', async () => {
+  let inOrders = false, groupOpen = false;
   const f = mk((act, arg, ses) => {
     if (act === 'state') return inOrders ? { hasExport: true, channelTiktok: true } : { hasExport: false, hasPassword: false, path: 'stock.x/returnorder', title: 'Kho', buttons: ['Bán hàng'] };
-    if (act === 'click') { if (arg.text === 'Đơn hoàn') inOrders = true; if (arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx()); }
+    if (act === 'mark' && arg.text === 'Đơn hoàn' && !groupOpen) return { ok: false, error: 'không thấy "Đơn hoàn"' };
+    if (act === 'click') { if (arg.text === 'Kiểm tra, đối soát') groupOpen = true; if (arg.text === 'Đơn hoàn') inOrders = true; if (arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx()); }
     return { ok: true };
   });
   const r = await f.a.run();
@@ -193,8 +194,27 @@ test('trang trống phần Đơn hoàn: đi bằng menu Kiểm tra, đối soát
   const clicks = f.calls.filter(c => c[0] === 'click').map(c => c[1].text);
   assert.deepEqual(clicks, ['Kiểm tra, đối soát', 'Đơn hoàn', 'Đang chờ hoàn', 'Xuất excel', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
 });
+test('trang trống nhưng menu đã mở sẵn: bấm thẳng Đơn hoàn, không đóng nhóm menu', async () => {
+  let inOrders = false;
+  const f = mk((act, arg, ses) => {
+    if (act === 'state') return inOrders ? { hasExport: true, channelTiktok: true } : { hasExport: false, path: 'p', title: 't', buttons: [] };
+    if (act === 'click') { if (arg.text === 'Đơn hoàn') inOrders = true; if (arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx()); }
+    return { ok: true };
+  });
+  const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r));
+  assert.ok(!f.calls.some(c => c[0] === 'click' && c[1].text === 'Kiểm tra, đối soát'));
+});
 test('đi bằng menu vẫn không có nút Xuất excel: báo lỗi kèm trang và nút', async () => {
   const f = mk(act => act === 'state' ? { hasExport: false, path: 'stock.x/returnorder', title: 'Kho', buttons: ['Bán hàng'] } : { ok: true });
   const r = await f.a.run();
   assert.equal(r.success, false); assert.match(r.error, /bằng menu/); assert.match(r.error, /stock\.x\/returnorder/);
+});
+test('trang: bỏ chữ biểu tượng ở đầu HOẶC cuối khi so khớp nút (không bỏ cả hai)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'salework_auto.js'), 'utf8');
+  const line = /const variants = (x => \[.*?\]);/.exec(src)[1];
+  const variants = eval(line);
+  assert.ok(variants('file_upload xuất excel').includes('xuất excel'));
+  assert.ok(variants('xuất excel file_upload').includes('xuất excel'));
+  assert.ok(!variants('file_upload xuất excel').includes('xuất'));   // lỗi cũ: bỏ luôn chữ "excel"
+  assert.ok(variants('xuất excel').includes('xuất excel'));
 });

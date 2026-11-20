@@ -23,7 +23,9 @@ function pageScript(action, arg) {
       const t = norm(text);
       const root = within || document;
       const all = Array.from(root.querySelectorAll(SEL)).filter(el => visible(el));
-      const hit = all.filter(el => { const x = norm(el.textContent); return mode === 'prefix' ? x.startsWith(t) : x === t; });
+      // Một số nút có biểu tượng dạng chữ (vd "file_upload Xuất excel"): bỏ chữ biểu tượng ở đầu / cuối khi so khớp
+      const variants = x => [x, x.replace(/^[a-z_]{3,}\s+(?=\S)/, ''), x.replace(/(?<=\S)\s+[a-z_]{3,}$/, '')];   // bỏ chữ biểu tượng ở đầu HOẶC cuối (không bỏ cả hai)
+      const hit = all.filter(el => variants(norm(el.textContent)).some(v => mode === 'prefix' ? v.startsWith(t) : v === t));
       // lấy phần tử sâu nhất (không có con nào cũng khớp), ưu tiên phần tử ngắn nhất
       const leaf = hit.filter(el => !hit.some(o => o !== el && el.contains(o)));
       leaf.sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
@@ -58,7 +60,9 @@ function pageScript(action, arg) {
     }
     function locate(a) {
       if (FORBID.test(a.text)) return { error: 'từ chối bấm nút có chữ "cập nhật"' };
-      const within = a.inDialog ? dialogRoot() : null;
+      let within = a.inDialog ? dialogRoot() : null;
+      // giao diện lạ không khai báo cửa sổ: chấp nhận khi chữ "Bắt Đầu Xuất" đang hiện trên trang (chỉ có trong cửa sổ xuất)
+      if (a.inDialog && !within && find('bắt đầu xuất', 'exact').length) within = document;
       if (a.inDialog && !within) return { error: 'chưa thấy cửa sổ xuất' };
       const c = find(a.text, a.mode || 'exact', within);
       if (!c.length) return { error: 'không thấy "' + a.text + '"' };
@@ -233,9 +237,15 @@ class SaleworkAuto {
         // Trang đã nạp khung (menu bên trái) nhưng phần Đơn hoàn trống: đi bằng menu như người dùng vẫn làm
         // Kiểm tra, đối soát › Đơn hoàn (chỉ bấm menu điều hướng).
         step = 'vào Đơn hoàn bằng menu';
-        try { await this._act(win, { text: 'Kiểm tra, đối soát' }, 'mở menu "Kiểm tra, đối soát"', watch); } catch (e1) { /* có thể đã mở sẵn */ }
-        await sleep(this.opts.stepPause);
-        await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch);
+        let direct = true;
+        try { await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch); } catch (e1) {
+          if (this.abort) throw e1; direct = false;   // menu chưa mở: mở nhóm rồi bấm
+        }
+        if (!direct) {
+          await this._act(win, { text: 'Kiểm tra, đối soát' }, 'mở menu "Kiểm tra, đối soát"', watch);
+          await sleep(this.opts.stepPause);
+          await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch);
+        }
         st = await this._waitFor(win, s => s.hasExport || s.hasPassword, this.opts.pageTimeout, 'Đã vào Đơn hoàn bằng menu nhưng vẫn không thấy nút "Xuất excel" sau ' + Math.round(this.opts.pageTimeout / 1000) + 's');
       }
       if (st.hasPassword && !st.hasExport) { const e = new Error('Salework yêu cầu đăng nhập lại.'); e.relogin = true; throw e; }

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.41
+          name: QuanLyHangHoan-Windows-Installer-v1.9.42
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.41
-          name: "Quản Lý Hàng Hoàn v1.9.41 — Nút chẩn đoán Salework (chỉ quan sát)"
+          tag_name: v1.9.42
+          name: "Quản Lý Hàng Hoàn v1.9.42 — Salework tự động lấy đơn Đang chờ hoàn (chạy thử bằng tay)"
           body: |
+            ### Bản 1.9.42
+
+            - Menu ☰ › 🤖 Salework tự động (đang chờ hoàn): đăng nhập Salework một lần, lưu trang Đơn hoàn, bấm Lấy ngay — app mở cửa sổ ẩn, vào tab Đang chờ hoàn, bấm Xuất excel › Theo bộ lọc › Bắt Đầu Xuất rồi nạp file vào bảng. Không đụng TikTok, không bấm Cập nhật đơn hoàn, bỏ tên / SĐT / địa chỉ khách. Bản này chỉ chạy bằng tay (chưa tự chạy theo giờ).
+
             ### Bản sửa 1.9.38
 
             - Quét mã vận đơn trả hàng mới (khác mã vận đơn cũ của đơn) mà phiếu đọc được mã phiếu trả hàng / mã đơn khớp đúng 1 đơn: gắn mã vừa quét vào đơn đó và ghi Hàng đã trả, không tạo đơn tạm.

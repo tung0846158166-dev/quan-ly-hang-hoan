@@ -22,5 +22,10 @@ contextBridge.exposeInMainWorld('desktopDiskAPI', {
   readWatchFile: (name) => ipcRenderer.invoke('read-watch-file', name),
   saleworkDiagStart: (url) => ipcRenderer.invoke('salework-diag-start', url),
   saleworkDiagReport: () => ipcRenderer.invoke('salework-diag-report'),
-  saleworkDiagStop: (clear) => ipcRenderer.invoke('salework-diag-stop', clear)
+  saleworkDiagStop: (clear) => ipcRenderer.invoke('salework-diag-stop', clear),
+  saleworkAutoStatus: () => ipcRenderer.invoke('salework-auto-status'),
+  saleworkAutoLogin: (url) => ipcRenderer.invoke('salework-auto-login', url),
+  saleworkAutoSave: () => ipcRenderer.invoke('salework-auto-save'),
+  saleworkAutoForget: () => ipcRenderer.invoke('salework-auto-forget'),
+  saleworkAutoRun: () => ipcRenderer.invoke('salework-auto-run')
 });

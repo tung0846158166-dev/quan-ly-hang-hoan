@@ -1,6 +1,6 @@
 {
   "name": "quan-ly-hang-hoan",
-  "version": "1.9.41",
+  "version": "1.9.42",
   "description": "Phan mem Quan Ly va Doi Soat Hang Hoan Shopee - TikTok Shop",
   "main": "main.js",
   "author": "Shop Owner",
@@ -26,6 +26,8 @@
       "preload.js",
       "disk_aux.js",
       "salework_diag.js",
+      "salework_auto.js",
+      "salework_xlsx.js",
       "Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html",
       "mobile_scanner.html",
       "app_icon.ico",

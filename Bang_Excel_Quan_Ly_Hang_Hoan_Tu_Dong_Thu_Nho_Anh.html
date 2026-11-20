@@ -17542,6 +17542,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       swBtn.innerHTML = '<span>🔎 Chẩn đoán Salework</span><span></span>';
       swBtn.addEventListener('click', () => openSaleworkDiag());
       side.querySelector('#sbTools').appendChild(swBtn);
+      const swAutoBtn = document.createElement('button');
+      swAutoBtn.type = 'button'; swAutoBtn.id = 'btnSaleworkAuto';
+      swAutoBtn.innerHTML = '<span>🤖 Salework tự động (đang chờ hoàn)</span><span></span>';
+      swAutoBtn.addEventListener('click', () => openSaleworkAuto());
+      side.querySelector('#sbTools').appendChild(swAutoBtn);
       move(['kpiStrip'], side.querySelector('#sbKpi'));
       try { renderSheetSyncStatus(); } catch (e) {}
       try { renderFolderWatchStatus(); } catch (e) {}
@@ -18159,6 +18164,89 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       folderWatchTimer = null;
       const c = loadFolderWatchCfg();
       if (c.enabled && c.dir) folderWatchTimer = setInterval(() => runFolderWatch(false), FOLDER_WATCH_INTERVAL_MS);
+    }
+    // v1.9.42: Salework "Đang chờ hoàn" là trạng thái mới nhất của đơn. Đơn đã có ở Bảng chính dưới dạng dòng "chờ" CHƯA có mã vận đơn nào
+    // (vd Chờ khách gửi hàng từ Sheet) mà Salework giờ đã có dòng mang mã vận đơn của cùng mã đơn -> dòng cũ chỉ là bản cũ của cùng yêu cầu:
+    // chuyển dữ liệu kho (đã nhận, ngày nhận, ảnh, ghi chú, theo dõi) sang dòng mới rồi gỡ dòng cũ. Nhiều kiện khác nhau thì để nguyên (không đoán).
+    function supersedeStaleRowsFromSalework(orderIdSet) {
+      if (isLocked || !Array.isArray(orders) || !orderIdSet || !orderIdSet.size) return { merged: 0, ambiguous: 0 };
+      const up = v => String(v || '').trim().toUpperCase();
+      const own = o => extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '');
+      const by = new Map();
+      orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k || !orderIdSet.has(k)) return; if (!by.has(k)) by.set(k, []); by.get(k).push(i); });
+      const drop = []; let ambiguous = 0;
+      by.forEach(idxs => {
+        const tracked = idxs.filter(i => own(orders[i]));
+        const bare = idxs.filter(i => !own(orders[i]) && !isScanPlaceholder(orders[i]));
+        if (!tracked.length || !bare.length) return;
+        if (new Set(tracked.map(i => own(orders[i]))).size !== 1) { ambiguous++; return; }
+        const keep = tracked.find(i => isOrderReceived(orders[i])) ?? tracked[0];
+        bare.forEach(i => { try { if (hasLockedCellsInOrder(i)) return; } catch (e) { return; } drop.push({ i, keep }); });
+      });
+      if (!drop.length) return { merged: 0, ambiguous };
+      drop.sort((a, b) => b.i - a.i);
+      const keepers = drop.map(d => orders[d.keep]);
+      const backup = [];
+      drop.forEach((d, n) => {
+        const o = orders[d.i];
+        try { mergeWarehouseIntoKeeper(o, keepers[n], { copyPlatform: false }); } catch (e) {}
+        backup.push(o);
+        orders.splice(d.i, 1);
+        try { shiftCellLocksAfterOrderDelete(d.i); shiftCellEditHistoryAfterOrderDelete(d.i); } catch (e) {}
+      });
+      try {
+        const key = 'auto_shadow_removed_backup';
+        const old = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem(key, JSON.stringify(old.concat(backup.map(order => ({ at: Date.now(), order }))).slice(-500)));
+      } catch (e) {}
+      saveOrders();
+      try { addAuditLog('🤖 SALEWORK CẬP NHẬT ĐƠN', 'Gộp ' + backup.length + ' dòng chờ cũ (chưa có mã vận đơn) vào dòng mới của Salework'); } catch (e) {}
+      return { merged: backup.length, ambiguous };
+    }
+    // v1.9.42: Salework tự động — chỉ tab "Đang chờ hoàn" (xem salework_auto.js). Hiện chạy tay bằng nút "Lấy ngay".
+    function swAutoMsg(t, bad) { const e = document.getElementById('swAutoMsg'); if (e) { e.textContent = t; e.className = 'text-xs p-2 rounded-lg border ' + (bad ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200'); } }
+    async function refreshSaleworkAuto() {
+      const api = window.desktopDiskAPI; if (!api || !api.saleworkAutoStatus) return;
+      const s = await api.saleworkAutoStatus(); if (!s || !s.success) return;
+      document.getElementById('swAutoStatus').textContent = (s.configured ? '✅ Đã lưu trang Đơn hoàn. ' : '⚪ Chưa cài đặt. ') + (s.lastNote ? 'Lần gần nhất: ' + (s.lastOk ? '✅ ' : '❌ ') + s.lastNote.replace(/^\S+\s/, '') : '');
+    }
+    function openSaleworkAuto() {
+      const m = document.getElementById('saleworkAutoModal'); if (!m) return;
+      const desk = !!(window.desktopDiskAPI && window.desktopDiskAPI.saleworkAutoRun);
+      document.getElementById('swAutoDesktopOnly').classList.toggle('hidden', desk);
+      m.classList.remove('hidden'); if (desk) refreshSaleworkAuto();
+    }
+    function closeSaleworkAuto() { const m = document.getElementById('saleworkAutoModal'); if (m) m.classList.add('hidden'); }
+    async function saleworkAutoLogin() {
+      const r = await window.desktopDiskAPI.saleworkAutoLogin(document.getElementById('swAutoUrl').value);
+      swAutoMsg(r && r.success ? 'Đã mở cửa sổ Salework: đăng nhập, mở trang Đơn hoàn, chọn kênh Tiktok, rồi bấm "Lưu trang này".' : 'Không mở được: ' + ((r && r.error) || ''), !(r && r.success));
+    }
+    async function saleworkAutoSave() {
+      const r = await window.desktopDiskAPI.saleworkAutoSave();
+      swAutoMsg(r && r.success ? 'Đã lưu trang Đơn hoàn. Bấm "Lấy ngay" để thử.' : ((r && r.error) || 'Không lưu được'), !(r && r.success)); refreshSaleworkAuto();
+    }
+    async function saleworkAutoForget() {
+      await window.desktopDiskAPI.saleworkAutoForget(); swAutoMsg('Đã xoá trang đã lưu và đăng nhập Salework của app.'); refreshSaleworkAuto();
+    }
+    let saleworkAutoBusy = false;
+    async function saleworkAutoRunNow() {
+      const api = window.desktopDiskAPI; if (!api || !api.saleworkAutoRun || saleworkAutoBusy) return;
+      if (activeImportBatch) { swAutoMsg('Đang nạp dữ liệu khác, thử lại sau.', true); return; }
+      saleworkAutoBusy = true; swAutoMsg('⏳ Đang lấy dữ liệu từ Salework (cửa sổ ẩn)…');
+      try {
+        const r = await api.saleworkAutoRun();
+        if (!r || !r.success) { swAutoMsg('❌ Lỗi ở bước "' + ((r && r.step) || '?') + '": ' + ((r && r.error) || 'không rõ') + (r && r.relogin ? ' — bấm "Đăng nhập Salework" để đăng nhập lại.' : ''), true); return; }
+        const res = await importParsedPlatformFiles([{ name: r.fileName || 'salework_dang_cho_hoan.xlsx', rows: r.rows }], 'TikTok Shop');
+        if (res && res.success) {
+          let sup = { merged: 0, ambiguous: 0 }, dup = 0;
+          try { sup = supersedeStaleRowsFromSalework(new Set(r.rows.map(x => String(x['Mã đơn hàng'] || '').trim().toUpperCase()).filter(Boolean))); } catch (e) {}
+          try { dup = autoRemoveShadowDuplicates() || 0; } catch (e) {}
+          try { renderAll(false); } catch (e) {}
+          swAutoMsg('✅ Đã lấy ' + r.count + ' dòng từ Salework và nạp vào bảng' + (sup.merged ? ', cập nhật ' + sup.merged + ' dòng chờ cũ' : '') + (dup ? ', gộp ' + dup + ' dòng trùng' : '') + (sup.ambiguous ? '. ' + sup.ambiguous + ' đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem' : '') + '.');
+          try { showAppToast('🤖 Đã nạp ' + r.count + ' dòng đang chờ hoàn từ Salework', 'success', 6000); } catch (e) {}
+          try { addAuditLog('🤖 SALEWORK TỰ ĐỘNG', 'Nạp ' + r.count + ' dòng đang chờ hoàn'); } catch (e) {}
+        } else swAutoMsg('❌ Lấy được file nhưng chưa nạp: ' + String((res && res.message) || 'lỗi không rõ').replace(/^❌\s*/, ''), true);
+      } finally { saleworkAutoBusy = false; refreshSaleworkAuto(); }
     }
     // v1.9.41: chẩn đoán Salework — chỉ quan sát cửa sổ do người dùng tự thao tác (xem salework_diag.js).
     function openSaleworkDiag() {
@@ -21623,6 +21711,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <button type="button" onclick="saveFolderWatchFromModal(true)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Lưu & nạp các file TikTok đang có</button>
           <button type="button" onclick="saveFolderWatchFromModal(false)" class="px-3 py-2 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="saleworkAutoModal" class="fixed inset-0 bg-slate-950/70 z-50 hidden flex items-center justify-center p-3 backdrop-blur-xs">
+    <div class="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-xl max-h-[94vh] overflow-auto">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h2 class="font-black text-base">🤖 Salework tự động — Đang chờ hoàn (TikTok)</h2>
+        <button type="button" onclick="closeSaleworkAuto()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">✕ Đóng</button>
+      </div>
+      <div class="p-5 space-y-3 text-sm">
+        <div id="swAutoDesktopOnly" class="hidden p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">Tính năng này chỉ chạy trong app trên máy tính.</div>
+        <div class="text-xs text-slate-600">App mở một cửa sổ <b>ẩn</b> trên Salework (đã đăng nhập sẵn), vào tab <b>Đang chờ hoàn</b>, bấm <b>Xuất excel → Theo bộ lọc → Bắt Đầu Xuất</b> giống bạn làm tay, rồi nạp file vào bảng. App <b>không đụng TikTok</b>, <b>không bấm "Cập nhật đơn hoàn"</b>, và <b>bỏ tên / SĐT / địa chỉ khách</b> trước khi nạp.</div>
+        <ol class="text-xs text-slate-700 list-decimal pl-5 space-y-1">
+          <li>Bấm <b>Đăng nhập Salework</b> → tự đăng nhập, mở trang Đơn hoàn, chọn kênh Tiktok.</li>
+          <li>Bấm <b>Lưu trang này</b>.</li>
+          <li>Bấm <b>Lấy ngay</b> để chạy thử một lượt.</li>
+        </ol>
+        <input id="swAutoUrl" type="text" value="https://salework.net" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
+        <div class="flex flex-wrap gap-2">
+          <button type="button" onclick="saleworkAutoLogin()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold cursor-pointer">🌐 Đăng nhập Salework</button>
+          <button type="button" onclick="saleworkAutoSave()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">💾 Lưu trang này</button>
+          <button type="button" onclick="saleworkAutoRunNow()" class="px-3 py-2 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">▶️ Lấy ngay</button>
+          <button type="button" onclick="saleworkAutoForget()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">🗑 Quên đăng nhập</button>
+        </div>
+        <div id="swAutoStatus" class="text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">…</div>
+        <div id="swAutoMsg" class="text-xs p-2 rounded-lg border bg-slate-50 border-slate-200">Chưa chạy.</div>
       </div>
     </div>
   </div>

@@ -46,3 +46,12 @@ test('báo cáo: không chứa dữ liệu, gắn nhãn yêu cầu không phải
   for (const secret of ['ABCDEF', 'SPXVN06654167505B', 'Tran Thi B']) assert.ok(!r.includes(secret), secret);
   assert.ok(r.includes('access_token'), 'chỉ có TÊN tham số');
 });
+
+test('yêu cầu theo dõi vận đơn / đăng nhập không bị gắn nhãn "nền"', async () => {
+  const d = new SaleworkDiag({});
+  for (const [id, u] of [['1', 'https://a.vn/order/tracking/list'], ['2', 'https://a.vn/auth/login'], ['3', 'https://a.vn/chat/notification/count']])
+    await d._onCdp('Network.requestWillBeSent', { requestId: id, type: 'XHR', request: { url: u, method: 'GET' } });
+  const r = d.report();
+  assert.ok(!/\[nền\] GET a\.vn\/order\/tracking/.test(r) && !/\[nền\] GET a\.vn\/auth\/login/.test(r));
+  assert.ok(/\[nền\] GET a\.vn\/chat\/notification\/count/.test(r));
+});

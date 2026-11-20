@@ -54,7 +54,7 @@ function maxArrayLen(v, depth = 0) {
 }
 
 const SKIP_TYPES = new Set(['Image', 'Font', 'Stylesheet', 'Media', 'Script', 'Ping', 'Manifest', 'Other', 'TextTrack', 'WebSocket', 'EventSource']);
-const CHAT_HINT = /(chat|message|conversation|notif|socket|presence|ping|heartbeat|analytics|track|log)/i;
+const CHAT_HINT = /(chat|message|conversation|notif|socket|presence|heartbeat|keepalive)/i;
 
 class SaleworkDiag {
   constructor(electron, opts = {}) {

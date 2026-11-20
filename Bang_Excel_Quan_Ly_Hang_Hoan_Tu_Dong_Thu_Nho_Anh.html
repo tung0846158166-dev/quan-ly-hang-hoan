@@ -17537,6 +17537,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       folderBtn.innerHTML = '<span>📂 Tự nạp file TikTok</span><span id="sbFolderWatchDot">tắt</span>';
       folderBtn.addEventListener('click', () => openFolderWatchModal());
       side.querySelector('#sbTools').appendChild(folderBtn);
+      const swBtn = document.createElement('button');
+      swBtn.type = 'button'; swBtn.id = 'btnSaleworkDiag';
+      swBtn.innerHTML = '<span>🔎 Chẩn đoán Salework</span><span></span>';
+      swBtn.addEventListener('click', () => openSaleworkDiag());
+      side.querySelector('#sbTools').appendChild(swBtn);
       move(['kpiStrip'], side.querySelector('#sbKpi'));
       try { renderSheetSyncStatus(); } catch (e) {}
       try { renderFolderWatchStatus(); } catch (e) {}
@@ -18154,6 +18159,41 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       folderWatchTimer = null;
       const c = loadFolderWatchCfg();
       if (c.enabled && c.dir) folderWatchTimer = setInterval(() => runFolderWatch(false), FOLDER_WATCH_INTERVAL_MS);
+    }
+    // v1.9.41: chẩn đoán Salework — chỉ quan sát cửa sổ do người dùng tự thao tác (xem salework_diag.js).
+    function openSaleworkDiag() {
+      const m = document.getElementById('saleworkDiagModal'); if (!m) return;
+      const desk = !!(window.desktopDiskAPI && window.desktopDiskAPI.saleworkDiagStart);
+      document.getElementById('swDiagDesktopOnly').classList.toggle('hidden', desk);
+      m.classList.remove('hidden');
+      if (desk) refreshSaleworkDiag(false);
+    }
+    function closeSaleworkDiag() { const m = document.getElementById('saleworkDiagModal'); if (m) m.classList.add('hidden'); }
+    async function startSaleworkDiag() {
+      const api = window.desktopDiskAPI; if (!api || !api.saleworkDiagStart) return;
+      const r = await api.saleworkDiagStart(document.getElementById('swDiagUrl').value);
+      if (!r || !r.success) { showAppToast('Không mở được: ' + ((r && r.error) || ''), 'error', 5000); return; }
+      refreshSaleworkDiag(false);
+    }
+    async function refreshSaleworkDiag(withText) {
+      const api = window.desktopDiskAPI; if (!api || !api.saleworkDiagReport) return;
+      const r = await api.saleworkDiagReport();
+      const st = document.getElementById('swDiagStatus'); if (!st || !r) return;
+      st.textContent = (r.running ? '🟢 Đang quan sát — ' : '⚪ Cửa sổ đã đóng — ') + r.pages + ' trang có bảng, ' + r.endpoints + ' loại yêu cầu dữ liệu đã thấy.';
+      if (withText) document.getElementById('swDiagReport').value = r.text || '';
+    }
+    async function copySaleworkDiag() {
+      await refreshSaleworkDiag(true);
+      const t = document.getElementById('swDiagReport').value;
+      try { await navigator.clipboard.writeText(t); showAppToast('Đã chép báo cáo (chỉ có tên trường, tên cột).', 'success', 3500); }
+      catch (e) { const ta = document.getElementById('swDiagReport'); ta.select(); document.execCommand('copy'); }
+    }
+    async function stopSaleworkDiag(clear) {
+      const api = window.desktopDiskAPI; if (!api || !api.saleworkDiagStop) return;
+      await refreshSaleworkDiag(true);
+      await api.saleworkDiagStop(!!clear);
+      await refreshSaleworkDiag(false);
+      showAppToast(clear ? 'Đã đóng cửa sổ và xoá đăng nhập Salework của chẩn đoán.' : 'Đã đóng cửa sổ.', 'success', 3500);
     }
     function openFolderWatchModal() {
       const m = document.getElementById('folderWatchModal'); if (!m) return;
@@ -21582,6 +21622,30 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <div class="flex flex-wrap gap-2 justify-end">
           <button type="button" onclick="saveFolderWatchFromModal(true)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Lưu & nạp các file TikTok đang có</button>
           <button type="button" onclick="saveFolderWatchFromModal(false)" class="px-3 py-2 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">Lưu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="saleworkDiagModal" class="fixed inset-0 bg-slate-950/70 z-50 hidden flex items-center justify-center p-3 backdrop-blur-xs">
+    <div class="bg-white text-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] overflow-auto">
+      <div class="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h2 class="font-black text-base">🔎 Chẩn đoán Salework (chỉ quan sát)</h2>
+        <button type="button" onclick="closeSaleworkDiag()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">✕ Đóng</button>
+      </div>
+      <div class="p-5 space-y-3 text-sm">
+        <div id="swDiagDesktopOnly" class="hidden p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs font-bold text-amber-800">Tính năng này chỉ chạy trong app trên máy tính.</div>
+        <div class="text-xs text-slate-600">Bấm <b>Mở Salework</b>, <b>tự đăng nhập</b> rồi mở các trang bạn vẫn dùng hằng ngày (đơn hoàn, đơn huỷ của TikTok), mỗi trang đợi vài giây. App <b>không bấm, không gửi, không sửa gì</b>; chỉ ghi lại <b>tên trang, tên trường và tên cột</b>. Không ghi mật khẩu, token, mã đơn hay nội dung đơn. Cửa sổ này dùng phiên đăng nhập riêng, không dùng chung với phần còn lại của app.</div>
+        <div class="flex gap-2">
+          <input id="swDiagUrl" type="text" value="https://salework.net" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
+          <button type="button" onclick="startSaleworkDiag()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap">🌐 Mở Salework</button>
+        </div>
+        <div id="swDiagStatus" class="text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">Chưa mở.</div>
+        <textarea id="swDiagReport" readonly rows="14" class="w-full border border-slate-300 rounded-lg p-2 text-[11px] font-mono" placeholder="Báo cáo hiện ở đây sau khi bấm Tạo báo cáo."></textarea>
+        <div class="flex flex-wrap gap-2 justify-end">
+          <button type="button" onclick="stopSaleworkDiag(true)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Đóng cửa sổ &amp; xoá đăng nhập</button>
+          <button type="button" onclick="refreshSaleworkDiag(true)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold cursor-pointer">Tạo báo cáo</button>
+          <button type="button" onclick="copySaleworkDiag()" class="px-3 py-2 bg-black hover:bg-slate-800 text-white rounded-lg text-xs font-bold cursor-pointer">📋 Chép báo cáo</button>
         </div>
       </div>
     </div>

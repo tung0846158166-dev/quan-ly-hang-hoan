@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.47
+          name: QuanLyHangHoan-Windows-Installer-v1.9.48
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.47
-          name: "Quản Lý Hàng Hoàn v1.9.47 — Salework tự động: bấm lại nút Bắt Đầu Xuất khi giao diện đổi"
+          tag_name: v1.9.48
+          name: "Quản Lý Hàng Hoàn v1.9.48 — Salework tự động: rê chuột thật vào Xuất excel"
           body: |
+            ### Bản 1.9.48
+
+            - 🤖 Salework tự động: menu "Xuất excel" của Salework mở khi RÊ CHUỘT vào nút (không phải bấm). App nay dùng chuột thật: rê vào Xuất excel, rồi di chuột bấm "Theo bộ lọc" và "Bắt Đầu Xuất". Trước khi bấm bằng chuột, app kiểm tra điểm bấm rơi đúng vào nút và không phải chữ "cập nhật", bị che thì dừng. Rê chuột chưa mở menu thì mới thử bấm nút.
+
             ### Bản 1.9.47
 
             - 🤖 Salework tự động: sau khi chọn "Theo bộ lọc", nút "Bắt Đầu Xuất" có thể đổi chữ hoặc được vẽ lại trong lúc app chờ (lỗi thật của người dùng: không thấy "Bắt Đầu Xuất"). App nay tìm theo đầu chữ, tìm lại và thử bấm lại tới 6 giây, và báo kèm các chữ đang thấy nếu vẫn không được.

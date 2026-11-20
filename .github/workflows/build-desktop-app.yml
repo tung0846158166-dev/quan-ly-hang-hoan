@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.44
+          name: QuanLyHangHoan-Windows-Installer-v1.9.45
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.44
-          name: "Quản Lý Hàng Hoàn v1.9.44 — Salework tự động: xem app thao tác, nút Dừng, báo lỗi rõ hơn"
+          tag_name: v1.9.45
+          name: "Quản Lý Hàng Hoàn v1.9.45 — Salework tự động: tự vào Đơn hoàn bằng menu khi trang trống"
           body: |
+            ### Bản 1.9.45
+
+            - 🤖 Salework tự động: mở trang đã lưu mà chỉ thấy menu bên trái, phần Đơn hoàn trống (lỗi thật của người dùng) thì app tự đi menu Kiểm tra, đối soát › Đơn hoàn như bạn vẫn làm rồi chạy tiếp.
+
             ### Bản 1.9.44
 
             - 🤖 Salework tự động: chế độ xem (mặc định BẬT) — cửa sổ Salework hiện ra, nút sắp bấm có viền đỏ và chờ vài giây rồi mới bấm; có nút ⛔ Dừng trong app, đóng cửa sổ cũng dừng ngay. Báo lỗi kèm trang đang ở và các nút nhìn thấy; hiện địa chỉ trang đã lưu.

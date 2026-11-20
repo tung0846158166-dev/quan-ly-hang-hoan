@@ -180,3 +180,21 @@ test('lỗi không thấy nút: báo kèm trang đang ở và các nút nhìn th
 test('trang: so khớp chữ không phụ thuộc kiểu gõ dấu (NFC/NFD)', () => {
   assert.match(pageScript('state'), /normalize\('NFC'\)/);
 });
+
+test('trang trống phần Đơn hoàn: đi bằng menu Kiểm tra, đối soát › Đơn hoàn rồi chạy tiếp', async () => {
+  let inOrders = false;
+  const f = mk((act, arg, ses) => {
+    if (act === 'state') return inOrders ? { hasExport: true, channelTiktok: true } : { hasExport: false, hasPassword: false, path: 'stock.x/returnorder', title: 'Kho', buttons: ['Bán hàng'] };
+    if (act === 'click') { if (arg.text === 'Đơn hoàn') inOrders = true; if (arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx()); }
+    return { ok: true };
+  });
+  const r = await f.a.run();
+  assert.equal(r.success, true, JSON.stringify(r));
+  const clicks = f.calls.filter(c => c[0] === 'click').map(c => c[1].text);
+  assert.deepEqual(clicks, ['Kiểm tra, đối soát', 'Đơn hoàn', 'Đang chờ hoàn', 'Xuất excel', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
+});
+test('đi bằng menu vẫn không có nút Xuất excel: báo lỗi kèm trang và nút', async () => {
+  const f = mk(act => act === 'state' ? { hasExport: false, path: 'stock.x/returnorder', title: 'Kho', buttons: ['Bán hàng'] } : { ok: true });
+  const r = await f.a.run();
+  assert.equal(r.success, false); assert.match(r.error, /bằng menu/); assert.match(r.error, /stock\.x\/returnorder/);
+});

@@ -225,7 +225,19 @@ class SaleworkAuto {
       };
       step = 'mở trang';
       win.loadURL(cfg.url).catch(() => {});
-      const st = await this._waitFor(win, s => s.hasExport || s.hasPassword, this.opts.pageTimeout, 'Trang Salework không hiện nút "Xuất excel" sau ' + Math.round(this.opts.pageTimeout / 1000) + 's');
+      let st = null;
+      try {
+        st = await this._waitFor(win, s => s.hasExport || s.hasPassword, Math.min(this.opts.pageTimeout, 25000), 'Trang Salework không hiện nút "Xuất excel" sau ' + Math.round(Math.min(this.opts.pageTimeout, 25000) / 1000) + 's');
+      } catch (e0) {
+        if (this.abort || !/Xuất excel/.test(String(e0.message))) throw e0;
+        // Trang đã nạp khung (menu bên trái) nhưng phần Đơn hoàn trống: đi bằng menu như người dùng vẫn làm
+        // Kiểm tra, đối soát › Đơn hoàn (chỉ bấm menu điều hướng).
+        step = 'vào Đơn hoàn bằng menu';
+        try { await this._act(win, { text: 'Kiểm tra, đối soát' }, 'mở menu "Kiểm tra, đối soát"', watch); } catch (e1) { /* có thể đã mở sẵn */ }
+        await sleep(this.opts.stepPause);
+        await this._act(win, { text: 'Đơn hoàn' }, 'vào "Đơn hoàn"', watch);
+        st = await this._waitFor(win, s => s.hasExport || s.hasPassword, this.opts.pageTimeout, 'Đã vào Đơn hoàn bằng menu nhưng vẫn không thấy nút "Xuất excel" sau ' + Math.round(this.opts.pageTimeout / 1000) + 's');
+      }
       if (st.hasPassword && !st.hasExport) { const e = new Error('Salework yêu cầu đăng nhập lại.'); e.relogin = true; throw e; }
       step = 'chọn tab Đang chờ hoàn';
       await this._act(win, { text: 'Đang chờ hoàn', mode: 'prefix' }, 'chọn tab "Đang chờ hoàn"', watch);

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.43
+          name: QuanLyHangHoan-Windows-Installer-v1.9.44
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.43
-          name: "Quản Lý Hàng Hoàn v1.9.43 — Salework tự động: giữ một cửa sổ, đổi link đăng nhập"
+          tag_name: v1.9.44
+          name: "Quản Lý Hàng Hoàn v1.9.44 — Salework tự động: xem app thao tác, nút Dừng, báo lỗi rõ hơn"
           body: |
+            ### Bản 1.9.44
+
+            - 🤖 Salework tự động: chế độ xem (mặc định BẬT) — cửa sổ Salework hiện ra, nút sắp bấm có viền đỏ và chờ vài giây rồi mới bấm; có nút ⛔ Dừng trong app, đóng cửa sổ cũng dừng ngay. Báo lỗi kèm trang đang ở và các nút nhìn thấy; hiện địa chỉ trang đã lưu.
+
             ### Bản 1.9.43
 
             - 🤖 Salework tự động: Salework mở app Kho / Chat ở cửa sổ mới làm app lưu nhầm trang — nay mọi thứ mở trong MỘT cửa sổ. Dán link đăng nhập nhân viên rồi bấm Đăng nhập Salework khi cửa sổ đang mở sẽ chuyển sang link đó.

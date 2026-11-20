@@ -504,6 +504,8 @@ ipcMain.handle('salework-auto-status', async () => { try { return Object.assign(
 ipcMain.handle('salework-auto-login', async (event, url) => { try { return getSaleworkAuto().openLogin(url); } catch (e) { return { success: false, error: e.message }; } });
 ipcMain.handle('salework-auto-save', async () => { try { const r = getSaleworkAuto().saveCurrentPage(); if (r.success) getSaleworkAuto().closeLogin(); return r; } catch (e) { return { success: false, error: e.message }; } });
 ipcMain.handle('salework-auto-forget', async () => { try { return await getSaleworkAuto().forget(); } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-watch', async (event, on) => { try { return getSaleworkAuto().setWatch(on); } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-stop', async () => { try { return getSaleworkAuto().stop(); } catch (e) { return { success: false, error: e.message }; } });
 ipcMain.handle('salework-auto-run', async () => { try { return await getSaleworkAuto().run(); } catch (e) { return { success: false, step: 'lỗi', error: e.message }; } });
 
 ipcMain.handle('get-app-version', () => {

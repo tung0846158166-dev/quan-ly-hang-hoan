@@ -70,13 +70,13 @@ function dl(ses, xlsx, state = 'completed') {
 }
 function mk(script, xlsx) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const f = fakeElectron(script, xlsx);
-  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1 });
+  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1, actWait: 20, keepOnError: 0 });
   fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
   return { a, calls: f.calls, dir };
 }
 const okScript = xlsx => (a, arg, ses) => {
   if (a === 'state') return { hasExport: true, hasPassword: false, channelTiktok: true, hasTab: true };
-  if (a === 'mark' || a === 'banner') return { ok: true };
+  if (a === 'mark' || a === 'banner' || a === 'exists') return { ok: true };
   if (a === 'click') { if (arg.text === 'Bắt Đầu Xuất') dl(ses, xlsx); return { ok: true }; }
 };
 
@@ -185,7 +185,7 @@ test('trang trống phần Đơn hoàn: menu chưa mở -> mở Kiểm tra, đ�
   let inOrders = false, groupOpen = false;
   const f = mk((act, arg, ses) => {
     if (act === 'state') return inOrders ? { hasExport: true, channelTiktok: true } : { hasExport: false, hasPassword: false, path: 'stock.x/returnorder', title: 'Kho', buttons: ['Bán hàng'] };
-    if (act === 'mark' && arg.text === 'Đơn hoàn' && !groupOpen) return { ok: false, error: 'không thấy "Đơn hoàn"' };
+    if ((act === 'mark' || act === 'exists') && arg.text === 'Đơn hoàn' && !groupOpen) return { ok: false, error: 'không thấy "Đơn hoàn"' };
     if (act === 'click') { if (arg.text === 'Kiểm tra, đối soát') groupOpen = true; if (arg.text === 'Đơn hoàn') inOrders = true; if (arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx()); }
     return { ok: true };
   });
@@ -217,4 +217,35 @@ test('trang: bỏ chữ biểu tượng ở đầu HOẶC cuối khi so khớp n
   assert.ok(variants('xuất excel file_upload').includes('xuất excel'));
   assert.ok(!variants('file_upload xuất excel').includes('xuất'));   // lỗi cũ: bỏ luôn chữ "excel"
   assert.ok(variants('xuất excel').includes('xuất excel'));
+});
+
+test('cửa sổ xuất hiện chậm: app đợi (thăm dò) rồi mới bấm', async () => {
+  let polls = 0;
+  const f = mk((act, arg, ses) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'exists' && arg.text === 'Theo bộ lọc') { polls++; return polls < 3 ? { ok: false, error: 'không thấy "Theo bộ lọc"' } : { ok: true }; }
+    if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(ses, sampleXlsx());
+    return { ok: true };
+  });
+  f.a.opts.actWait = 3000;
+  const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r)); assert.ok(polls >= 3);
+});
+test('không thấy nút: báo kèm chữ đang thấy trên trang (để chẩn đoán)', async () => {
+  const f = mk((act, arg) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'exists' && arg.text === 'Theo bộ lọc') return { ok: false, error: 'không thấy "Theo bộ lọc"' };
+    if (act === 'texts') return { ok: true, texts: ['Xuất excel', 'Tất cả các đơn', 'Bắt đầu'] };
+    return { ok: true };
+  });
+  const r = await f.a.run();
+  assert.equal(r.success, false); assert.equal(r.step, 'chọn "Theo bộ lọc"'); assert.match(r.error, /Tất cả các đơn/);
+});
+test('chế độ xem + lỗi: cửa sổ được giữ lại để người dùng xem (không bị huỷ ngay)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-'));
+  const f = fakeElectron((act) => act === 'state' ? { hasExport: false, path: 'p', title: 't', buttons: [] } : { ok: true });
+  const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 100, stepPause: 1, watchPause: 1, actWait: 10, keepOnError: 50 });
+  fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
+  const r = await a.run(); assert.equal(r.success, false);
+  assert.equal(a.curWin.isDestroyed(), false);
+  await new Promise(res => setTimeout(res, 120)); assert.equal(a.curWin.isDestroyed(), true);
 });

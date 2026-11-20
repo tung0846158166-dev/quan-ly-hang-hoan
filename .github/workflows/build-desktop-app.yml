@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.42
+          name: QuanLyHangHoan-Windows-Installer-v1.9.43
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.42
-          name: "Quản Lý Hàng Hoàn v1.9.42 — Salework tự động lấy đơn Đang chờ hoàn (chạy thử bằng tay)"
+          tag_name: v1.9.43
+          name: "Quản Lý Hàng Hoàn v1.9.43 — Salework tự động: giữ một cửa sổ, đổi link đăng nhập"
           body: |
+            ### Bản 1.9.43
+
+            - 🤖 Salework tự động: Salework mở app Kho / Chat ở cửa sổ mới làm app lưu nhầm trang — nay mọi thứ mở trong MỘT cửa sổ. Dán link đăng nhập nhân viên rồi bấm Đăng nhập Salework khi cửa sổ đang mở sẽ chuyển sang link đó.
+
             ### Bản 1.9.42
 
             - Menu ☰ › 🤖 Salework tự động (đang chờ hoàn): đăng nhập Salework một lần, lưu trang Đơn hoàn, bấm Lấy ngay — app mở cửa sổ ẩn, vào tab Đang chờ hoàn, bấm Xuất excel › Theo bộ lọc › Bắt Đầu Xuất rồi nạp file vào bảng. Không đụng TikTok, không bấm Cập nhật đơn hoàn, bỏ tên / SĐT / địa chỉ khách. Bản này chỉ chạy bằng tay (chưa tự chạy theo giờ).

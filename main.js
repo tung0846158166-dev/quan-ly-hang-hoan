@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { createAuxStore } = require(path.join(__dirname, 'disk_aux'));
 const { SaleworkDiag } = require(path.join(__dirname, 'salework_diag'));
+const { SaleworkAuto } = require(path.join(__dirname, 'salework_auto'));
 
 let mainWindow = null;
 let tray = null;
@@ -495,6 +496,15 @@ ipcMain.handle('salework-diag-stop', async (event, clear) => {
     return { success: true };
   } catch (e) { return { success: false, error: e.message }; }
 });
+
+// Salework tự động (chỉ tab "Đang chờ hoàn", xem salework_auto.js): cửa sổ ẩn tự bấm Xuất excel rồi đọc file.
+let saleworkAuto = null;
+function getSaleworkAuto() { if (!saleworkAuto) saleworkAuto = new SaleworkAuto(require('electron'), getDataDir()); return saleworkAuto; }
+ipcMain.handle('salework-auto-status', async () => { try { return Object.assign({ success: true }, getSaleworkAuto().status()); } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-login', async (event, url) => { try { return getSaleworkAuto().openLogin(url); } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-save', async () => { try { const r = getSaleworkAuto().saveCurrentPage(); if (r.success) getSaleworkAuto().closeLogin(); return r; } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-forget', async () => { try { return await getSaleworkAuto().forget(); } catch (e) { return { success: false, error: e.message }; } });
+ipcMain.handle('salework-auto-run', async () => { try { return await getSaleworkAuto().run(); } catch (e) { return { success: false, step: 'lỗi', error: e.message }; } });
 
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();

@@ -10,7 +10,7 @@ function ctx() {
   const c = { String, Array, Object, Set, Map, Date, Math, JSON, parseInt, isNaN };
   vm.createContext(c);
   vm.runInContext("const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi'];", c);
-  for (const n of ['parseFullDate', 'removeVietnameseTones', 'parseSheetItemsCell', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
+  for (const n of ['parseFullDate', 'removeVietnameseTones', 'parseSheetItemsCell', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'shopeeClaimDeadline', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
   return c;
 }
 const HH = (o) => Object.assign({ 'Mã': 'CL1', 'Mã đơn': 'O1', 'Loại': 'Trả hàng', 'Mã vận đơn': 'SPXVN001', 'Trạng thái về': 'Đang về', 'Về shop lúc': '', 'Hạn khiếu nại': '', 'Hàng': 'KUNTA · Xám, XL × 1; PLAIN · Đen, L × 2', 'SL': '3', 'Tiền': '100.000 ₫', 'Lý do': 'Đổi ý', 'Ngày': '16/11/2026 00:40', 'Cập nhật': '16/11/2026 03:31' }, o);

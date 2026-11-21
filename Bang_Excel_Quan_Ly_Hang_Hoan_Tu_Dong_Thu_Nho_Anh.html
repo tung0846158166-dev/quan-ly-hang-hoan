@@ -5514,7 +5514,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           'missing parts or accessories': 'Thiếu hàng / phụ kiện',
           'package damaged': 'Bưu kiện hư hỏng',
           'suspected counterfeit': 'Nghi ngờ hàng giả',
-          'delayed delivery': 'Giao hàng chậm trễ'
+          'delayed delivery': 'Giao hàng chậm trễ',
+          'wrong product sent': 'Shop gửi sai sản phẩm',
+          'received the wrong item': 'Shop gửi sai sản phẩm',
+          'received wrong item': 'Shop gửi sai sản phẩm'
         };
         const key = String(en).toLowerCase().trim();
         return map[key] || en;
@@ -5714,6 +5717,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         let rawPlatStatus = '';
         if (isTikTokReturnRefundFile) {
           rawPlatStatus = translateTikTokReturnStatus(rawStatusText, rawSubStatusText);
+        } else if (saleworkReturnTrackKey) {
+          // File Salework: cột "Lý do hoàn" là LÝ DO của khách (đã dịch vào Ghi chú), không phải trạng thái kiện.
+          // Trạng thái kiện suy ra từ mã trả hàng: khách đã gửi (có mã trả hàng) = Đang về, chưa có = Chờ khách gửi hàng.
+          rawPlatStatus = String(row[saleworkReturnTrackKey] || '').trim() ? 'Đang về' : 'Chờ khách gửi hàng';
         } else if (rawCancelReason) {
           rawPlatStatus = rawCancelReason;
         } else {
@@ -17868,13 +17875,36 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       return merged;
     }
+    // Shopee cho khiếu nại 2 ngày kể từ lúc hàng về shop; shop chỉ lấy MỐC 1 NGÀY (24h) tính từ "Về shop lúc" để xử lý sớm. Chỉ dùng cho Shopee (Google Sheet).
+    // Không có "Về shop lúc" thì giữ nguyên hạn của Sheet.
+    function shopeeClaimDeadline(deliveredAt) {
+      const d = deliveredAt ? parseFullDate(String(deliveredAt)) : null;
+      if (!d || isNaN(d.getTime())) return '';
+      const e = new Date(d.getTime() + 24 * 3600000), p = n => String(n).padStart(2, '0');
+      return p(e.getDate()) + '/' + p(e.getMonth() + 1) + '/' + e.getFullYear() + ' ' + p(e.getHours()) + ':' + p(e.getMinutes());
+    }
+    // Dòng Shopee đã có trong bảng: đổi hạn sang mốc 24h, nhưng chỉ khi hạn đang trống hoặc còn đúng giá trị gốc của Sheet (chưa bị sửa tay) và ô không khoá.
+    function applyShopeeClaimDeadlines(parcels) {
+      if (!Array.isArray(parcels) || !Array.isArray(orders)) return 0;
+      const map = new Map();
+      parcels.forEach(m => { const nd = shopeeClaimDeadline(m.deliveredAt); if (m.orderId && nd) map.set(String(m.orderId).trim().toUpperCase(), { nd, old: String(m.deadline || '').trim() }); });
+      let n = 0;
+      orders.forEach((o, i) => {
+        const e = o && map.get(String(o.orderId || '').trim().toUpperCase()); if (!e) return;
+        try { if (getOrderPlatform(o) !== 'Shopee') return; if (cellLocks && cellLocks[i + ':deadline']) return; } catch (x) { return; }
+        const cur = String(o.deadline || '').trim();
+        if (cur === e.nd || (cur && cur !== e.old)) return;
+        o.deadline = e.nd; n++;
+      });
+      return n;
+    }
     // Đơn đã ghép -> các dòng theo tên cột file Excel Shopee (bộ nạp sẵn có hiểu được)
     function sheetParcelsToRows(parcels) {
       const rows = [];
       parcels.forEach(m => {
         const base = { 'Mã đơn hàng': m.orderId, 'Mã vận đơn': m.track, 'Mã số khiếu nại': m.claimId,
           'Lý do trả hàng/hoàn tiền': m.reason, 'Ghi chú của Người mua khi trả hàng': m.buyerNote, 'Thời gian yêu cầu': m.returnDate,
-          'Thời gian giao hàng thành công': m.deliveredAt, 'Người bán cần phản hồi trước': m.deadline, 'Tổng số tiền hoàn trả': m.refund };
+          'Thời gian giao hàng thành công': m.deliveredAt, 'Người bán cần phản hồi trước': shopeeClaimDeadline(m.deliveredAt) || m.deadline, 'Tổng số tiền hoàn trả': m.refund };
         const status = m.parcelStatus || m.requestStatus;   // trạng thái kiện (Đang về / Đã về shop) có ích cho kho hơn trạng thái yêu cầu
         if (m.type === 'bom') { base['Lý do hủy'] = 'Giao hàng thất bại'; base['Trạng thái Trả hàng/Hoàn tiền'] = status; }
         else if (m.type === 'cancel') { base['Trạng thái đơn hàng'] = (m.typeLabel ? m.typeLabel + ' · ' : '') + (status || 'Đã hủy'); }
@@ -17934,10 +17964,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (kind) { const pr = sheetRowsToParcels(kept.rows, kind, sheetSkipTypes(c)); skippedCancel += pr.skipped; parcelLists.push(pr.parcels); }
           else files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: kept.rows });
         }
-        let mergedCount = 0, tooOld = 0, unchangedOrders = 0, newSigs = null, sheetTypeLabels = null;
+        let mergedCount = 0, tooOld = 0, unchangedOrders = 0, newSigs = null, sheetTypeLabels = null, deadlineParcels = null;
         if (parcelLists.length) {
           await breathe();
           const mergedAll = mergeSheetParcels(parcelLists);
+          deadlineParcels = mergedAll;
           {
             // mã đơn -> { c: mã yêu cầu, s: trạng thái sàn đúng như sẽ ghi vào cột Trạng thái sàn }
             const claims = {};
@@ -17973,7 +18004,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         await breathe();
         const res = await importParsedPlatformFiles(files, 'Shopee');
         if (!res.success) throw new Error(String(res.message || 'Không nạp được').replace(/^[^\wÀ-ỹ]+/, ''));
-        try { if (applySheetTypeLabels(sheetTypeLabels)) { saveOrders(); renderAll(false); } } catch (e) {}
+        try { const a1 = applySheetTypeLabels(sheetTypeLabels), a2 = applyShopeeClaimDeadlines(deadlineParcels); if (a1 || a2) { saveOrders(); renderAll(false); } } catch (e) {}
         const cfg = loadSheetSyncCfg(); cfg.lastHash = hash; saveSheetSyncCfg(cfg);
         if (newSigs) saveSheetSyncSigs(newSigs);
         const summary = (res.messages || []).join(' | ').replace(/\s+/g, ' ').slice(0, 300);

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.51
+          name: QuanLyHangHoan-Windows-Installer-v1.9.52
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.51
-          name: "Quản Lý Hàng Hoàn v1.9.51 — Bộ lọc Loại (theo sàn) và Trạng thái kiện"
+          tag_name: v1.9.52
+          name: "Quản Lý Hàng Hoàn v1.9.52 — Trạng thái kiện TikTok đúng nghĩa, hạn khiếu nại Shopee tính từ lúc về shop"
           body: |
+            ### Bản 1.9.52
+
+            - 🔧 TikTok (file Salework): cột "Trạng thái kiện" không còn hiện lý do hoàn tiếng Anh (Change of mind, Ordered wrong size...). Nay hiện tình trạng kiện: có mã trả hàng = "Đang về", chưa có = "Chờ khách gửi hàng". Lý do hoàn vẫn nằm ở ô Ghi chú, đã dịch sang tiếng Việt (thêm "Wrong product sent" = Shop gửi sai sản phẩm). Đơn cũ tự sửa ở lần "Lấy ngay" kế tiếp.
+            - ⏰ Shopee (Google Sheet): Hạn cần xử lý = "Về shop lúc" + 1 ngày (Shopee cho khiếu nại 2 ngày, shop lấy mốc 24h để xử lý sớm). Không có "Về shop lúc" thì giữ hạn của Sheet. Đơn Shopee đã có trong bảng tự đổi sang mốc mới ở lần đồng bộ Sheet kế tiếp, trừ ô bạn đã sửa tay hoặc đang khoá. Chỉ áp dụng cho Shopee.
+
             ### Bản 1.9.51
 
             - 🔎 Bộ lọc nâng cao có thêm 2 ô: "Loại (theo sàn)" (đúng chữ Loại của Google Sheet) và "Trạng thái kiện" (Chờ khách gửi hàng, Đang về, Đã về shop...). Danh sách tự lấy từ dữ liệu hiện có, kèm số đơn; tính vào huy hiệu số bộ lọc đang bật và được xoá khi bỏ lọc.

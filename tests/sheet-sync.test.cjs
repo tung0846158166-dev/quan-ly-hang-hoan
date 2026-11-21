@@ -21,7 +21,7 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText', 'loadSheetSyncSigs', 'saveSheetSyncSigs', 'saveSheetLatestClaims', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
+  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText', 'loadSheetSyncSigs', 'saveSheetSyncSigs', 'saveSheetLatestClaims', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'shopeeClaimDeadline', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
   vm.runInContext("const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi']; const SHEET_CLAIMS_KEY = 'claims'; let sheetLatestClaims = null;", c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;

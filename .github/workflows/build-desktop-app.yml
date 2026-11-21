@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.55
+          name: QuanLyHangHoan-Windows-Installer-v1.9.56
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.55
+          tag_name: v1.9.56
           name: "Quản Lý Hàng Hoàn v1.9.55 — Sửa kho lưu trữ bị ghi đè bản cũ, báo rõ lý do khi không dời được đơn"
           body: |
+            ### Bản 1.9.56
+
+            - 🛡 Sửa lỗi nghiêm trọng gây mất đơn đã dời vào Kho Lưu Trữ: khi kho lớn hơn bộ nhớ trình duyệt (~5 MB), bản mới chỉ nằm trên ổ cứng; mỗi lần mở lại app, bản cũ trong bộ nhớ trình duyệt bị ghi đè ngược lên ổ cứng (sau ~4 giây), làm các đơn vừa dời biến mất. Nay bản trên ổ cứng được ưu tiên khi nó mới hơn và không bị ghi đè. Áp dụng cho Kho Lưu Trữ và cơ sở dữ liệu đơn.
+
             ### Bản 1.9.55
 
             - 📦 Kho lưu trữ: sửa lỗi bản ghi ra ổ cứng có thể bị ghi đè lại bằng bản cũ (localStorage) ngay sau khi mở app, làm đơn vừa dời vào kho biến mất khi mở lại. Nay khi kho chỉ có bản mới trên ổ cứng thì không bị ghi đè.

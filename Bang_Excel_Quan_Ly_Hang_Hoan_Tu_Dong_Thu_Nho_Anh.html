@@ -3004,12 +3004,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (typeof diskVal !== 'string' || isEmptyValue(diskVal)) continue;
           let current = null;
           try { current = localStorage.getItem(key); } catch (e) {}
-          if (isEmptyValue(current)) { try { rawSet.call(localStorage, key, diskVal); window.__auxRestored = (window.__auxRestored || []).concat(key); } catch (e) { console.warn('Không khôi phục được ' + key, e); } }
+          const markDiskOnly = () => { window.__auxDiskOnly = Object.assign(window.__auxDiskOnly || {}, { [key]: true }); };
+          // Khóa dữ liệu lớn (kho lưu trữ, CSDL đơn) có thể vượt 5MB của localStorage: khi đó BẢN MỚI chỉ nằm trên ổ cứng,
+          // còn localStorage giữ bản cũ. Bản ổ cứng phải thắng, không được để bản cũ ghi đè lại ổ cứng.
+          const bigKey = key === 'shopee_archived_orders_v1' || key === 'shopee_excel_order_db_v1';
+          const diskNewer = bigKey && !isEmptyValue(current) && current !== diskVal && diskVal.length > String(current).length;
+          if (isEmptyValue(current) || diskNewer) {
+            try { rawSet.call(localStorage, key, diskVal); window.__auxRestored = (window.__auxRestored || []).concat(key); }
+            catch (e) { console.warn('Không đưa được ' + key + ' vào localStorage (quá lớn), dùng bản trên ổ cứng:', e); markDiskOnly(); }
+          }
         }
       } catch (e) { console.warn('Không đọc được dữ liệu phụ từ ổ cứng:', e); return; }
       Storage.prototype.setItem = function (k, v) {
         if (this === localStorage && keys.has(k)) {
-          try { rawSet.call(this, k, v); } catch (err) { schedule(k, String(v)); throw err; }
+          try { rawSet.call(this, k, v); } catch (err) { window.__auxDiskOnly = Object.assign(window.__auxDiskOnly || {}, { [k]: true }); schedule(k, String(v)); throw err; }
+          if (window.__auxDiskOnly) delete window.__auxDiskOnly[k];
           schedule(k);
           return;
         }

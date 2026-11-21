@@ -11110,6 +11110,29 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       else fallback();
     }
 
+    // Sao chép nhanh: text + câu thông báo tự đặt (được gọi từ nhiều chỗ: Bảng theo dõi, chi tiết đơn, biên bản...).
+    function copyTextToClipboard(text, message) {
+      const val = String(text == null ? '' : text);
+      if (!val || val === '-') return Promise.resolve(false);
+      const done = () => { if (typeof showAppToast === 'function') showAppToast(`📋 ${message || ('Đã sao chép: ' + val)}`, 'success', 1800); return true; };
+      const fallback = () => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = val; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) return done();
+        } catch (e) {}
+        if (typeof showAppToast === 'function') showAppToast('❌ Không sao chép được, hãy bôi đen và bấm Ctrl+C.', 'error', 2500);
+        return false;
+      };
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(val).then(done, fallback);
+      }
+      return Promise.resolve(fallback());
+    }
+
     function handleCellClick(e, cellKey, labelName, textVal, orderIdx, fieldName, targetWrapper) {
       if (e.target && e.target.classList && e.target.classList.contains('cell-edit-input')) return;
       if (cellLocks && cellLocks[cellKey]) {

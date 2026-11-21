@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.58
+          name: QuanLyHangHoan-Windows-Installer-v1.9.59
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.58
+          tag_name: v1.9.59
           name: "Quản Lý Hàng Hoàn v1.9.55 — Sửa kho lưu trữ bị ghi đè bản cũ, báo rõ lý do khi không dời được đơn"
           body: |
+            ### Bản 1.9.59
+
+            - 📋 Bảng Theo Dõi Đơn Hàng Đặc Biệt: bấm vào Mã Đơn Hàng (hoặc Mã Vận Đơn) là sao chép ngay vào clipboard và báo nhỏ ở góc màn hình. Nguyên nhân trước đây bấm không chép được: hàm sao chép dùng ở 15 chỗ (Bảng theo dõi, chi tiết đơn, biên bản giao nhận...) chưa được định nghĩa, nay đã có nên các nút sao chép khác cũng hoạt động.
+
             ### Bản 1.9.58
 
             - ✨ Mở app không còn hiện giao diện thô/cũ một lúc rồi mới nhảy sang giao diện đầy đủ: app hiện màn chờ "Đang mở ứng dụng…" và chỉ hiện giao diện khi kiểu dáng và bảng dữ liệu đã sẵn sàng (có chốt an toàn tối đa 10 giây).

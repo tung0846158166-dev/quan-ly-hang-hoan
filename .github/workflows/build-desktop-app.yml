@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.53
+          name: QuanLyHangHoan-Windows-Installer-v1.9.54
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.53
-          name: "Quản Lý Hàng Hoàn v1.9.53 — Bảng gọn hơn (chấm màu sàn, ngày gửi chỉ ngày), sửa kho lưu trữ không nhận đơn"
+          tag_name: v1.9.54
+          name: "Quản Lý Hàng Hoàn v1.9.54 — Bảng chi tiết vừa màn hình, tự ẩn khi bấm ra ngoài, cột Nhận Tại Kho đứng trước cột tiền"
           body: |
+            ### Bản 1.9.54
+
+            - 📋 Cột "Nhận Tại Kho" chuyển lên đứng trước cột "Tổng Giá Trị" để không bị che phải kéo ngang. Cột "Sản Phẩm & Phân Loại" nhỏ lại thêm.
+            - 👁 Bảng "Chi tiết" khi mở nay vừa đúng chiều rộng màn hình (không phải kéo ngang) và đứng yên khi kéo bảng. Bấm ra ngoài bất kỳ chỗ nào ngoài bảng chi tiết thì bảng tự ẩn; bấm trong bảng, trong hộp thoại đang mở hoặc nút "Chi tiết" của đơn khác thì không bị ẩn nhầm.
+
             ### Bản 1.9.53
 
             - 🧹 Bảng chính gọn hơn: bỏ cột "Hàng Đặt Trước" và ô lọc Trước/Thường (dữ liệu cũ vẫn được giữ trong file). "Ngày Gửi Đi" chỉ hiện ngày (bấm vào ô vẫn thấy và sửa được cả giờ). Cột "Sàn" thành chấm màu: cam = Shopee, đen = TikTok Shop (xanh = Lazada, xám = Khác); bấm chấm vẫn đổi được sàn. Các cột ngày, loại, trạng thái, sản phẩm, ghi chú được thu hẹp để bảng đỡ phải kéo ngang.

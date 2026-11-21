@@ -26,3 +26,14 @@ test('đọc kho: ưu tiên bản trên đĩa nếu đầy đủ hơn',()=>{
   const d=mk({localStorage:{getItem:()=>JSON.stringify([{orderId:'X'},{orderId:'Y'},{orderId:'Z'}])},window:{desktopDiskAPI:{auxReadAllSync:()=>({data:{arch:JSON.stringify([{orderId:'X'}])}})}}});
   load(d);d.loadArchivedOrders();assert.equal(d.archivedOrders.length,3);
 });
+test('ghi chú lý do khi không dời được + đánh dấu ổ đĩa mới hơn localStorage',async()=>{
+  const win={desktopDiskAPI:{auxSave:async()=>({success:true})}};
+  const c=mk({localStorage:{setItem(){throw Error('quota')},getItem(){return null}},saveOrders:async()=>({success:true}),window:win});
+  load(c);await c.checkAndAutoArchiveOrders(false);
+  assert.equal(win.__auxDiskOnly.arch,true);
+  const d=mk({isEligibleForArchive:()=>false,localStorage:{setItem(){},getItem(){return null}},saveOrders:async()=>({success:true})});
+  load(d);assert.equal(await d.checkAndAutoArchiveOrders(false),0);
+  assert.match(d.checkAndAutoArchiveOrders.lastReason,/quá 24/);
+  const e=mk({localStorage:{setItem(){throw Error('quota')},getItem(){return null}},saveOrders:async()=>({success:true})});
+  load(e);await e.checkAndAutoArchiveOrders(false);assert.match(e.checkAndAutoArchiveOrders.lastReason,/đầy/);
+});

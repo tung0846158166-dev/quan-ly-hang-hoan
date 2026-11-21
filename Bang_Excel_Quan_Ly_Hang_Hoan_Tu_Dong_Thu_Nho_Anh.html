@@ -2978,6 +2978,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const rawSet = Storage.prototype.setItem, rawRemove = Storage.prototype.removeItem;
       const flush = key => {
         timers.delete(key);
+        if (window.__auxDiskOnly && window.__auxDiskOnly[key]) return; // ổ cứng đang MỚI hơn localStorage (localStorage đầy): không ghi đè bằng bản cũ
         let value = null;
         try { value = localStorage.getItem(key); } catch (e) {}
         api.auxSave(key, value == null ? null : String(value)).then(r => {
@@ -19084,12 +19085,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         serialized = JSON.stringify(archivedOrders);
         localStorage.setItem(ARCHIVED_STORAGE_KEY, serialized);
         if (localStorage.getItem(ARCHIVED_STORAGE_KEY) !== serialized) throw new Error('Không xác minh được kho lưu trữ');
+        if (typeof window !== 'undefined' && window.__auxDiskOnly) delete window.__auxDiskOnly[ARCHIVED_STORAGE_KEY];
         updateArchivedOrdersBadge();
         return { success: true };
       } catch (e) {
         // localStorage đầy (kho có ảnh nặng hàng chục MB): ghi thẳng ra file trên ổ đĩa (chỉ bản desktop).
         const api = (typeof window !== 'undefined') ? window.desktopDiskAPI : null;
         if (serialized && api && typeof api.auxSave === 'function') {
+          window.__auxDiskOnly = Object.assign(window.__auxDiskOnly || {}, { [ARCHIVED_STORAGE_KEY]: true });
           const pendingDisk = Promise.resolve(api.auxSave(ARCHIVED_STORAGE_KEY, serialized)).then(r => !!(r && r.success)).catch(() => false);
           updateArchivedOrdersBadge();
           return { success: true, diskOnly: true, pendingDisk };
@@ -19130,10 +19133,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
 
     async function checkAndAutoArchiveOrders(showToastIfMoved = true) {
-      if (checkAndAutoArchiveOrders.running) return 0;
-      checkAndAutoArchiveOrders.running = true;
+      if (checkAndAutoArchiveOrders.running && Date.now() - (checkAndAutoArchiveOrders.startedAt || 0) < 120000) { checkAndAutoArchiveOrders.lastReason = 'Đang có một lần dời khác chạy dở, thử lại sau ít phút.'; return 0; }
+      checkAndAutoArchiveOrders.running = true; checkAndAutoArchiveOrders.startedAt = Date.now(); checkAndAutoArchiveOrders.lastReason = '';
       try {
-      if (!orders || !orders.length) return 0;
+      if (!orders || !orders.length) { checkAndAutoArchiveOrders.lastReason = 'Bảng chính chưa có dữ liệu.'; return 0; }
 
       const eligibleIndices = [];
       const ordersToArchive = [];
@@ -19148,7 +19151,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
 
-      if (ordersToArchive.length === 0) return 0;
+      if (ordersToArchive.length === 0) { checkAndAutoArchiveOrders.lastReason = 'Không có đơn nào đã về kho quá 24 giờ.'; return 0; }
 
       const previousArchive = archivedOrders.slice();
       const previousOrders = orders.slice();
@@ -19170,6 +19173,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (!archOk) {
         archivedOrders = previousArchive;
         updateArchivedOrdersBadge();
+        checkAndAutoArchiveOrders.lastReason = archSave.pendingDisk ? 'Không ghi được kho lưu trữ ra ổ đĩa.' : 'Không lưu được kho lưu trữ (bộ nhớ trình duyệt đầy).';
         if (archSave.pendingDisk && typeof showAppToast === 'function') showAppToast('❌ Chưa lưu được kho lưu trữ ra ổ đĩa. Các đơn vẫn được giữ trên bảng chính.', 'error');
         return 0;
       }
@@ -19192,6 +19196,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
         renderAll(true);
         recalcTotalsAndSummary();
+        checkAndAutoArchiveOrders.lastReason = 'Không lưu được Bảng chính sau khi dời, đã hoàn tác (đơn vẫn ở bảng chính).';
         return 0;
       }
       renderAll(true);
@@ -19205,6 +19210,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       return ordersToArchive.length;
+      } catch (err) { checkAndAutoArchiveOrders.lastReason = 'Lỗi: ' + (err && err.message || err); console.warn('Lỗi dời kho lưu trữ:', err); return 0;
       } finally { checkAndAutoArchiveOrders.running = false; }
     }
 
@@ -19213,7 +19219,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (moved > 0) {
         showAppToast(`🎉 Đã quét và dời thành công ${moved} đơn đã về kho quá 24h vào Kho Lưu Trữ!`, 'success');
       } else {
-        showAppToast('ℹ️ Không có đơn nào trên Bảng chính đã về kho quá 24 giờ để dời.', 'info');
+        showAppToast('ℹ️ Chưa dời được đơn nào: ' + (checkAndAutoArchiveOrders.lastReason || 'không rõ lý do') + ' (xem F12 → Console nếu lỗi lặp lại).', 'info');
       }
       filterArchivedOrders();
     }

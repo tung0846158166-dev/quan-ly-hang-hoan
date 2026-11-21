@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.54
+          name: QuanLyHangHoan-Windows-Installer-v1.9.55
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.54
-          name: "Quản Lý Hàng Hoàn v1.9.54 — Bảng chi tiết vừa màn hình, tự ẩn khi bấm ra ngoài, cột Nhận Tại Kho đứng trước cột tiền"
+          tag_name: v1.9.55
+          name: "Quản Lý Hàng Hoàn v1.9.55 — Sửa kho lưu trữ bị ghi đè bản cũ, báo rõ lý do khi không dời được đơn"
           body: |
+            ### Bản 1.9.55
+
+            - 📦 Kho lưu trữ: sửa lỗi bản ghi ra ổ cứng có thể bị ghi đè lại bằng bản cũ (localStorage) ngay sau khi mở app, làm đơn vừa dời vào kho biến mất khi mở lại. Nay khi kho chỉ có bản mới trên ổ cứng thì không bị ghi đè.
+            - 🔎 Nút "Quét & Dời Đơn >24h Ngay" nay báo rõ LÝ DO nếu chưa dời được (kho đầy, ghi ổ cứng lỗi, lưu bảng chính lỗi, hoặc thật sự chưa có đơn quá 24h). Lần dời bị treo quá 2 phút tự được chạy lại.
+
             ### Bản 1.9.54
 
             - 📋 Cột "Nhận Tại Kho" chuyển lên đứng trước cột "Tổng Giá Trị" để không bị che phải kéo ngang. Cột "Sản Phẩm & Phân Loại" nhỏ lại thêm.

@@ -74,6 +74,23 @@ function pageScript(action, arg) {
       click(L.el);
       return { ok: true, count: L.count };
     }
+    if (action === 'rect') {   // toạ độ giữa nút + kiểm tra phần tử trên cùng tại điểm đó đúng là nút (không bị che, không phải "cập nhật")
+      const L = locate(arg);
+      if (L.error) return { ok: false, error: L.error };
+      L.el.scrollIntoView && L.el.scrollIntoView({ block: 'center' });
+      const r = L.el.getBoundingClientRect();
+      const x = Math.round(Math.min(Math.max(r.left + r.width / 2, 1), window.innerWidth - 1)), y = Math.round(Math.min(Math.max(r.top + r.height / 2, 1), window.innerHeight - 1));
+      if (r.width < 1 || r.height < 1) return { ok: false, error: 'nút không có kích thước' };
+      const top = document.elementFromPoint(x, y);
+      const topOk = !!top && L.el.contains(top) && !FORBID.test(norm(top.textContent));   // điểm bấm phải rơi vào chính nút (không bị lớp khác che)
+      return { ok: true, x, y, topOk, topText: top ? norm(top.textContent).slice(0, 40) : '' };
+    }
+    if (action === 'hover') {   // phương án dự phòng khi không gửi được chuột thật
+      const L = locate(arg);
+      if (L.error) return { ok: false, error: L.error };
+      ['mouseover', 'mouseenter', 'mousemove'].forEach(n => L.el.dispatchEvent(new MouseEvent(n, { bubbles: n !== 'mouseenter', cancelable: true, view: window })));
+      return { ok: true };
+    }
     if (action === 'exists') { const L = locate(arg); return L.error ? { ok: false, error: L.error } : { ok: true }; }
     if (action === 'texts') {   // chữ đang nhìn thấy (ngắn) để chẩn đoán — không có giá trị dữ liệu dài
       const seen = []; const set = new Set();
@@ -181,6 +198,22 @@ class SaleworkAuto {
     return ' — trang đang ở: ' + (st.path || '?') + ', tiêu đề "' + String(st.title || '').slice(0, 60) + '", thấy các nút: [' + (st.buttons || []).join(' | ') + ']';
   }
   /** Thao tác có kiểm soát: ở chế độ xem thì viền đỏ + chờ vài giây (để người dùng kịp dừng) rồi mới bấm. */
+  /** Chuột THẬT (Salework mở menu Xuất excel khi di chuột vào, không phải khi bấm). mode: 'move' | 'click'. false = không dùng được. */
+  async _mouse(win, arg, mode) {
+    const wc = win.webContents;
+    if (typeof wc.sendInputEvent !== 'function') return false;
+    const r = await this._exec(win, 'rect', arg);
+    if (!r || !r.ok || typeof r.x !== 'number') return false;
+    if (!r.topOk) throw new Error('Nút "' + arg.text + '" đang bị che bởi "' + (r.topText || '?') + '" — không bấm để tránh bấm nhầm');
+    wc.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
+    await sleep(250);
+    if (mode === 'click') {
+      wc.sendInputEvent({ type: 'mouseDown', x: r.x, y: r.y, button: 'left', clickCount: 1 });
+      await sleep(80);
+      wc.sendInputEvent({ type: 'mouseUp', x: r.x, y: r.y, button: 'left', clickCount: 1 });
+    }
+    return true;
+  }
   async _act(win, arg, label, watch, wait) {
     if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
     // đợi phần tử xuất hiện (cửa sổ xuất có thể hiện chậm) trước khi kết luận là không thấy
@@ -202,6 +235,12 @@ class SaleworkAuto {
       await sleep(this.opts.watchPause);
       if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
     }
+    if (arg.hover) {   // chỉ đưa chuột vào (không bấm): menu mở khi rê chuột
+      if (!(await this._mouse(win, arg, 'move'))) { const h = await this._exec(win, 'hover', arg); if (!h.ok) throw new Error(h.error); }
+      return { ok: true };
+    }
+    // Chuột thật trước (đúng như người dùng); không được thì bấm bằng sự kiện trong trang
+    if (await this._mouse(win, arg, 'click')) return { ok: true };
     // Sau khi chờ, giao diện có thể đã vẽ lại (vd nút đổi chữ / đổi chỗ): tìm lại và bấm, thử lại vài lần trước khi báo lỗi
     let r = await this._exec(win, 'click', arg);
     const t1 = Date.now();
@@ -287,10 +326,18 @@ class SaleworkAuto {
       step = 'kiểm tra kênh Tiktok';
       const s2 = await this._exec(win, 'state');
       if (!s2.channelTiktok) throw new Error('Không thấy kênh Tiktok trên trang — mở cửa sổ đăng nhập, chọn kênh Tiktok rồi lưu lại trang.' + this._diag(s2));
-      step = 'bấm Xuất excel';
-      await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);
+      step = 'đưa chuột vào Xuất excel';
+      // Salework mở menu xuất khi RÊ CHUỘT vào nút "Xuất excel" (không phải bấm)
+      await this._act(win, { text: 'Xuất excel', hover: true }, 'đưa chuột vào "Xuất excel"', watch);
       await sleep(this.opts.stepPause);
       step = 'chọn "Theo bộ lọc"';
+      const seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+      if (!seen.ok) {   // rê chuột chưa mở menu: thử bấm nút
+        step = 'bấm Xuất excel';
+        await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);
+        await sleep(this.opts.stepPause);
+        step = 'chọn "Theo bộ lọc"';
+      }
       await this._act(win, { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true }, 'chọn "Theo bộ lọc"', watch);
       await sleep(600);
       step = 'bấm Bắt Đầu Xuất';

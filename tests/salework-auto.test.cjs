@@ -57,7 +57,8 @@ test('trang: mã chạy trong trang là biểu thức hợp lệ và có chặn 
 function fakeElectron(script, xlsx, opts = {}) {
   const calls = [];
   class Win extends EventEmitter {
-    constructor(o) { super(); this.o = o; this.destroyed = false; const ses = new EventEmitter(); this.webContents = { setWindowOpenHandler: h => { this.openHandler = h; }, loadedUrls: [], session: ses, getURL: () => 'https://x.example/orders', executeJavaScript: async code => { const m = /\)\("(\w+)",(.*)\)$/s.exec(code); const a = m[1], arg = JSON.parse(m[2]); calls.push([a, arg]); return script(a, arg, ses); } }; }
+    constructor(o) { super(); this.o = o; this.destroyed = false; const ses = new EventEmitter(); if (global.__mouseEvents) this.__mouse = true;
+    this.webContents = { sendInputEvent: global.__mouseEvents ? (e => global.__mouseEvents.push(e)) : undefined, setWindowOpenHandler: h => { this.openHandler = h; }, loadedUrls: [], session: ses, getURL: () => 'https://x.example/orders', executeJavaScript: async code => { const m = /\)\("(\w+)",(.*)\)$/s.exec(code); const a = m[1], arg = JSON.parse(m[2]); calls.push([a, arg]); return script(a, arg, ses); } }; }
     loadURL(u) { (this.webContents.loadedUrls = this.webContents.loadedUrls || []).push(u); return Promise.resolve(); } isDestroyed() { return this.destroyed; } destroy() { this.destroyed = true; } focus() {} close() { this.destroyed = true; this.emit('closed'); }
   }
   return { electron: { BrowserWindow: Win, session: { fromPartition: () => ({ clearStorageData: async () => {} }) } }, calls };
@@ -76,7 +77,7 @@ function mk(script, xlsx) {
 }
 const okScript = xlsx => (a, arg, ses) => {
   if (a === 'state') return { hasExport: true, hasPassword: false, channelTiktok: true, hasTab: true };
-  if (a === 'mark' || a === 'banner' || a === 'exists') return { ok: true };
+  if (a === 'mark' || a === 'banner' || a === 'exists' || a === 'hover') return { ok: true };
   if (a === 'click') { if (arg.text === 'Bắt Đầu Xuất') dl(ses, xlsx); return { ok: true }; }
 };
 
@@ -86,7 +87,8 @@ test('run: thứ tự thao tác đúng, lấy được dữ liệu, không bấm
   assert.equal(r.success, true, JSON.stringify(r)); assert.equal(r.count, 3);
   assert.ok(!('Tên khách hàng' in r.rows[0]));
   const clicks = calls.filter(c => c[0] === 'click').map(c => c[1].text);
-  assert.deepEqual(clicks, ['Đang chờ hoàn', 'Xuất excel', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
+  assert.deepEqual(clicks, ['Đang chờ hoàn', 'Theo bộ lọc', 'Bắt Đầu Xuất']);   // Xuất excel chỉ rê chuột
+  assert.ok(calls.some(c => c[0] === 'hover' && c[1].text === 'Xuất excel'));
   assert.ok(!clicks.some(t => /cập nhật/i.test(t)));
   assert.equal(a.status().running, false); assert.match(a.status().lastNote, /3 dòng/);
 });
@@ -138,8 +140,8 @@ test('dán link mới khi cửa sổ đã mở: chuyển sang link mới', () =>
 test('chế độ xem: viền đỏ (mark) trước MỖI lần bấm, theo đúng thứ tự', async () => {
   const { a, calls } = mk(okScript(sampleXlsx()));
   const r = await a.run(); assert.equal(r.success, true, JSON.stringify(r));
-  const seq = calls.filter(c => c[0] === 'mark' || c[0] === 'click').map(c => c[0] + ':' + c[1].text);
-  assert.deepEqual(seq, ['mark:Đang chờ hoàn', 'click:Đang chờ hoàn', 'mark:Xuất excel', 'click:Xuất excel', 'mark:Theo bộ lọc', 'click:Theo bộ lọc', 'mark:Bắt Đầu Xuất', 'click:Bắt Đầu Xuất']);
+  const seq = calls.filter(c => c[0] === 'mark' || c[0] === 'click' || c[0] === 'hover').map(c => c[0] + ':' + c[1].text);
+  assert.deepEqual(seq, ['mark:Đang chờ hoàn', 'click:Đang chờ hoàn', 'mark:Xuất excel', 'hover:Xuất excel', 'mark:Theo bộ lọc', 'click:Theo bộ lọc', 'mark:Bắt Đầu Xuất', 'click:Bắt Đầu Xuất']);
 });
 test('tắt chế độ xem: không viền, cửa sổ ẩn', async () => {
   const { a, calls, dir } = mk(okScript(sampleXlsx()));
@@ -192,7 +194,7 @@ test('trang trống phần Đơn hoàn: menu chưa mở -> mở Kiểm tra, đ�
   const r = await f.a.run();
   assert.equal(r.success, true, JSON.stringify(r));
   const clicks = f.calls.filter(c => c[0] === 'click').map(c => c[1].text);
-  assert.deepEqual(clicks, ['Kiểm tra, đối soát', 'Đơn hoàn', 'Đang chờ hoàn', 'Xuất excel', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
+  assert.deepEqual(clicks, ['Kiểm tra, đối soát', 'Đơn hoàn', 'Đang chờ hoàn', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
 });
 test('trang trống nhưng menu đã mở sẵn: bấm thẳng Đơn hoàn, không đóng nhóm menu', async () => {
   let inOrders = false;
@@ -275,4 +277,50 @@ test('Theo bộ lọc / Bắt Đầu Xuất tìm theo đầu chữ (nút có th�
   await f.a.run();
   const modes = f.calls.filter(c => c[0] === 'click' && /Theo bộ lọc|Bắt Đầu Xuất/.test(c[1].text)).map(c => c[1].mode);
   assert.deepEqual(modes, ['prefix', 'prefix']);
+});
+
+function mouseScript(opts = {}) {
+  return (act, arg, ses) => {
+    if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'rect') return { ok: true, x: 100 + arg.text.length, y: 50, topOk: opts.covered !== arg.text, topText: 'lớp phủ' };
+    if (act === 'exists' && arg.text === 'Theo bộ lọc') return opts.noPopover ? (opts.clickedExport ? { ok: true } : { ok: false, error: 'không thấy' }) : { ok: true };
+    if (act === 'click') { if (arg.text === 'Xuất excel') opts.clickedExport = true; }
+    if (act === 'mouse-dl') dl(ses, sampleXlsx());
+    return { ok: true };
+  };
+}
+test('chuột thật: rê vào Xuất excel (không bấm), rồi bấm thật Theo bộ lọc / Bắt Đầu Xuất', async () => {
+  global.__mouseEvents = [];
+  try {
+    const ses = {};
+    const f = mk((act, arg, s) => { if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(s, sampleXlsx()); return mouseScript()(act, arg, s); });
+    // với chuột thật, việc bấm "Bắt Đầu Xuất" là sự kiện chuột: giả lập tải file khi nhận mouseUp cuối
+    const ev = global.__mouseEvents; const orig = ev.push.bind(ev);
+    ev.push = e => { orig(e); if (e.type === 'mouseUp' && ev.filter(z => z.type === 'mouseUp').length === 3) setTimeout(() => f.sesRef && dl(f.sesRef, sampleXlsx()), 1); return ev.length; };
+    // lấy session của cửa sổ để phát will-download
+    const origRun = f.a.run.bind(f.a);
+    const p = origRun(); await new Promise(r => setTimeout(r, 50)); f.sesRef = f.a.curWin && f.a.curWin.webContents.session;
+    const r = await p; assert.equal(r.success, true, JSON.stringify(r));
+    const types = ev.map(e => e.type);
+    // 1 lần rê Xuất excel + 3 lần bấm thật (tab, Theo bộ lọc, Bắt Đầu Xuất) mỗi lần có mouseMove
+    assert.equal(types.filter(t => t === 'mouseDown').length, 3);
+    const xl = ev.find(e => e.type === 'mouseMove' && e.x === 100 + 'Xuất excel'.length);
+    assert.ok(xl, 'phải có rê chuột vào Xuất excel');
+    const idx = ev.indexOf(xl); assert.notEqual(ev[idx + 1] && ev[idx + 1].type, 'mouseDown');   // rê xong không bấm ngay
+  } finally { delete global.__mouseEvents; }
+});
+test('chuột thật: nút bị che -> không bấm, báo rõ', async () => {
+  global.__mouseEvents = [];
+  try {
+    const f = mk(mouseScript({ covered: 'Xuất excel' }));
+    const r = await f.a.run();
+    assert.equal(r.success, false); assert.match(r.error, /bị che/);
+    assert.ok(!global.__mouseEvents.some(e => e.type === 'mouseDown' && e.x === 100 + 'Xuất excel'.length));
+  } finally { delete global.__mouseEvents; }
+});
+test('rê chuột chưa mở menu: bấm Xuất excel rồi mới chọn Theo bộ lọc', async () => {
+  const opts = { noPopover: true };
+  const f = mk((act, arg, s) => { if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(s, sampleXlsx()); return mouseScript(opts)(act, arg, s); });
+  const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r));
+  assert.equal(opts.clickedExport, true);
 });

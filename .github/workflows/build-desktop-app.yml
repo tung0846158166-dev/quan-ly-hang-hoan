@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.51
+          name: QuanLyHangHoan-Windows-Installer-v1.9.52
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.51
-          name: "Quản Lý Hàng Hoàn v1.9.51 — Bộ lọc Loại (theo sàn) và Trạng thái kiện"
+          tag_name: v1.9.52
+          name: "Quản Lý Hàng Hoàn v1.9.52 — Salework: tự đánh dấu đã về theo tab Đã hoàn kho"
           body: |
+            ### Bản 1.9.52
+
+            - 📥 Salework tự động: sau tab "Đang chờ hoàn", app lấy thêm tab "Đã hoàn kho" (chỉ đọc, cũng rê chuột Xuất excel › Theo bộ lọc › Bắt Đầu Xuất, không bấm "Cập nhật"). Đơn nào kho đã quét nhập ở Salework mà Bảng chính còn "Chưa về" và khớp mã đơn + mã vận đơn/mã trả hàng thì tự chuyển "Hàng đã trả", giờ về = "Ngày xác nhận hoàn hàng" của Salework. Không tạo dòng mới; không đụng đơn đã nhận / không cần nhận / bị mất / hư hỏng / ô trạng thái đang khoá; đơn nhiều kiện không khớp mã thì bỏ qua. Tab này lỗi thì lượt lấy chính vẫn thành công. Quét 1 lần ở Salework là đủ.
+
             ### Bản 1.9.51
 
             - 🔎 Bộ lọc nâng cao có thêm 2 ô: "Loại (theo sàn)" (đúng chữ Loại của Google Sheet) và "Trạng thái kiện" (Chờ khách gửi hàng, Đang về, Đã về shop...). Danh sách tự lấy từ dữ liệu hiện có, kèm số đơn; tính vào huy hiệu số bộ lọc đang bật và được xoá khi bỏ lọc.

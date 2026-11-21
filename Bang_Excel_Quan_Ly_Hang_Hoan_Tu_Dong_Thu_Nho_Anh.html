@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bảng Excel Quản Lý Hàng Hoàn Shopee / TikTok (3 Cột Ngày & Nhiều SP / Đơn)</title>
+  <!-- Màn chờ lúc mở app: ẩn giao diện cho tới khi kiểu dáng (Tailwind) và dữ liệu đã sẵn sàng, tránh nhấp nháy giao diện cũ -> mới -->
+  <style>
+    html.app-booting body { opacity: 0 !important; pointer-events: none !important; }
+    html.app-booting { background: #fff7ed; }
+    html.app-booting::before { content: "Đang mở ứng dụng…"; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 18px/1.4 "Segoe UI", system-ui, sans-serif; color: #ea580c; z-index: 2147483647; }
+  </style>
+  <script>document.documentElement.classList.add('app-booting'); setTimeout(function () { document.documentElement.classList.remove('app-booting'); }, 10000);</script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
@@ -7782,6 +7789,25 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         `4. ➕ Thêm Tab Tuần Chủ Động & Hiển Thị Ngay Lập Tức: Bấm "Thêm Tab Tuần" sẽ tạo ngay tab tuần mới (ví dụ Tuần 46 tới) hiển thị trực tiếp trên thanh công cụ với số lượng đơn thực tế.\n` +
         `5. ⌨️ Chống Trùng Lặp Lịch Sử Ô & Accordion Đơn Gọn Gàng.`
       );
+    }
+
+    // Hiện giao diện khi Tailwind đã áp kiểu (thử bằng 1 phần tử mẫu) và bảng đã vẽ xong.
+    function revealAppWhenStyled() {
+      const root = document.documentElement;
+      if (!root.classList.contains('app-booting')) return;
+      const probe = document.createElement('div');
+      probe.className = 'fixed w-4 h-4 opacity-0 pointer-events-none';
+      document.body.appendChild(probe);
+      let tries = 0;
+      const check = () => {
+        let ok = false;
+        try { ok = getComputedStyle(probe).width === '16px'; } catch (e) { ok = true; }
+        if (ok || ++tries > 100) {
+          probe.remove();
+          requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('app-booting')));
+        } else setTimeout(check, 40);
+      };
+      check();
     }
 
     async function syncAppVersionUI() {
@@ -19753,6 +19779,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       console.warn('Initialization warning:', bootErr);
     } finally {
       renderAll();
+      try { revealAppWhenStyled(); } catch (e) { document.documentElement.classList.remove('app-booting'); }
       try {
         syncAppVersionUI();
         checkAndSyncHardDriveOnBoot();

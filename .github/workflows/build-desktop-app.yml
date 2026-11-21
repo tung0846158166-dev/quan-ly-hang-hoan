@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.57
+          name: QuanLyHangHoan-Windows-Installer-v1.9.58
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.57
+          tag_name: v1.9.58
           name: "Quản Lý Hàng Hoàn v1.9.55 — Sửa kho lưu trữ bị ghi đè bản cũ, báo rõ lý do khi không dời được đơn"
           body: |
+            ### Bản 1.9.58
+
+            - ✨ Mở app không còn hiện giao diện thô/cũ một lúc rồi mới nhảy sang giao diện đầy đủ: app hiện màn chờ "Đang mở ứng dụng…" và chỉ hiện giao diện khi kiểu dáng và bảng dữ liệu đã sẵn sàng (có chốt an toàn tối đa 10 giây).
+
             ### Bản 1.9.57
 
             - 🏷 Khi mở app không còn hiện nhãn phiên bản cũ (v1.8.6) một lúc rồi mới nhảy sang bản mới. Phiên bản thật được đọc ngay từ đầu, trước khi bảng dữ liệu tải xong.

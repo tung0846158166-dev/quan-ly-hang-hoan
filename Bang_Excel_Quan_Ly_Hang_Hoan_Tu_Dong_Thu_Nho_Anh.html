@@ -1173,10 +1173,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <th class="w-32 py-1.5">Mã Đơn Hàng</th>
             <th class="w-36 py-1.5" title="Mã Vận Đơn: Ưu tiên mã hoàn khi nhận kiện, hiển thị cả mã giao">Mã Vận Đơn</th>
             <th class="w-28 py-1.5">Đơn Vị Vận Chuyển</th>
-            <th class="min-w-[220px] w-60 !bg-sky-950 text-sky-100 py-1.5" title="Một đơn một dòng tổng: Hiển thị tóm tắt, bấm [👁️ Chi tiết] để mở danh sách sản phẩm">Sản Phẩm & Phân Loại</th>
+            <th class="min-w-[170px] w-44 !bg-sky-950 text-sky-100 py-1.5" title="Một đơn một dòng tổng: Hiển thị tóm tắt, bấm [👁️ Chi tiết] để mở danh sách sản phẩm">Sản Phẩm & Phân Loại</th>
             <th class="w-16 py-1.5 text-center" title="Tổng số lượng sản phẩm trong đơn">Tổng SL</th>
-            <th class="w-28 py-1.5 text-right">Tổng Giá Trị</th>
             <th class="min-w-[118px] w-32 !bg-emerald-950 py-1.5" title="Theo dõi riêng bằng kết quả quét kho: Chưa nhận ➔ Đã nhận (sau khi quét kiện về kho) | Không cần nhận | Bị mất">Nhận Tại Kho</th>
+            <th class="w-28 py-1.5 text-right">Tổng Giá Trị</th>
             <th class="w-24 py-1.5" title="Bấm vào ô rồi Ctrl+V để dán ảnh đơn hàng">Ảnh Đơn Hàng</th>
             <th class="w-32 py-1.5" title="Lý do hoàn hàng hoặc lý do hủy đơn từ sàn">Lý Do Hoàn / Hủy</th>
             <th class="w-36 py-1.5 !bg-amber-950" title="Ghi chú / nhận xét của người mua hàng khi đặt hoặc khi trả hàng">Ghi Chú Người Mua</th>
@@ -8194,6 +8194,20 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       renderAll(false);
     }
 
+    // Bấm ra ngoài bảng chi tiết (bất kỳ chỗ nào) thì tự ẩn bảng.
+    document.addEventListener('click', function (e) {
+      try {
+        if (!expandedOrderDrawers || expandedOrderDrawers.size === 0) return;
+        const t = e.target;
+        if (!t || !t.closest || !document.contains(t)) return;
+        if (t.closest('[id^="drawer_row_"]')) return;
+        if (t.closest('[onclick*="toggleOrderItemsDrawer"]')) return;
+        if (t.closest('.fixed, [role="dialog"], [id$="Modal"], [id$="modal"], #cellContextMenu, .context-menu')) return;
+        expandedOrderDrawers.clear();
+        renderAll(false);
+      } catch (err) {}
+    });
+
     // v1.9.19: MỘT cách tính Báo Đỏ / Báo Vàng cho mọi nơi (tab lọc, ô tổng quan, thống kê, danh sách gửi điện thoại).
     // Chỉ đơn còn chờ nhận (không tính đơn đã nhận, không cần nhận, bị mất, hư hỏng).
     function getOrderAlertLevel(order) {
@@ -12055,7 +12069,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               <div class="flex items-center justify-between gap-1.5">
                 <div class="flex items-center min-w-0">
                   ${partialBadgeHtml}
-                  <div class="truncate text-[11px] font-medium text-slate-800 max-w-[200px]" title="${escapeAttr(itemSummarySnippet.replace(/<[^>]+>/g, ''))}">
+                  <div class="truncate text-[11px] font-medium text-slate-800 max-w-[110px]" title="${escapeAttr(itemSummarySnippet.replace(/<[^>]+>/g, ''))}">
                     ${itemSummarySnippet}
                   </div>
                 </div>
@@ -12070,8 +12084,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                 ${totalOrderQty}${isPartialOrder ? ' (1 phần)' : ''}
               </span>
             </td>
+            <td class="text-center min-w-[118px] px-1">${statusHtml}</td>
             <td>${renderCellInput(`${orderIdx}:price`, `Tổng giá trị Đơn #${orderIdx+1}`, formatMoney(order.price || 0), 'text-right font-bold text-slate-900', '0 đ', `updateOrderField(${orderIdx},'price',this.value)`)}</td>
-            <td class="text-center min-w-[135px] px-1">${statusHtml}</td>
             <td class="p-1">
               <div class="photo-cell relative w-12 h-10 border border-slate-300 rounded overflow-hidden mx-auto bg-slate-50 flex items-center justify-center cursor-pointer shadow-2xs"
                    tabindex="0"
@@ -12102,7 +12116,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           html += `
             <tr id="drawer_row_${orderIdx}" class="bg-indigo-50/40 border-y-2 border-indigo-200">
               <td colspan="22" class="p-2.5 sm:p-3">
+                <div class="sticky box-border" style="left:12px;width:${(() => { const c = document.getElementById('mainTableScrollContainer'); return Math.max(560, (c ? c.clientWidth : 1000) - 36); })()}px;max-width:100%">
                 ${renderOrderItemsDrawer(order, orderIdx)}
+                </div>
               </td>
             </tr>
           `;

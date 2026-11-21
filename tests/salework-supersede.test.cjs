@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),test=require('node:test'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'..','Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'),'utf8');
 function ctx(orders){
-  const c={console,orders,isLocked:false,localStorage:{getItem:()=>null,setItem(){}},saveOrders(){},addAuditLog(){},shiftCellLocksAfterOrderDelete(){},shiftCellEditHistoryAfterOrderDelete(){},hasLockedCellsInOrder:i=>!!c.locked&&c.locked.has(i)};
+  const c={console,orders,isLocked:false,localStorage:{getItem:()=>null,setItem(){}},saveOrders(){},addAuditLog(){},shiftCellLocksAfterOrderDelete(){},shiftCellEditHistoryAfterOrderDelete(){},hasLockedCellsInOrder:i=>!!c.locked&&c.locked.has(i),cellLocks:{}};
   vm.createContext(c);
   for(const n of ['removeVietnameseTones','extractCleanTrackingCode','isScanPlaceholder','isOrderReceived','mergeWarehouseIntoKeeper','supersedeStaleRowsFromSalework']){
     const m=source.match(new RegExp('^    (?:async )?function '+n+'\\([^]*?^    }','m'));assert(m,n);vm.runInContext(m[0],c);}
@@ -28,7 +28,28 @@ test('chỉ đụng mã đơn có trong file Salework; dòng khoá thì giữ',(
   const c=ctx([row({}),row({returnTrack:'854170000001'}),row({orderId:'Z9'}),row({orderId:'Z9',returnTrack:'854170000009'})]);
   c.locked=new Set([0]);
   assert.equal(c.supersedeStaleRowsFromSalework(new Set(['A1'])).merged,0);
-  c.locked=null;
-  assert.equal(c.supersedeStaleRowsFromSalework(new Set(['A1'])).merged,1);
-  assert.equal(c.orders.filter(o=>o.orderId==='Z9').length,2);
+  assert.equal(c.orders.length,4);
+  const d=ctx([row({}),row({returnTrack:'854170000001'}),row({orderId:'Z9'}),row({orderId:'Z9',returnTrack:'854170000009'})]);
+  assert.equal(d.supersedeStaleRowsFromSalework(new Set(['A1'])).merged,1);
+  assert.equal(d.orders.filter(o=>o.orderId==='Z9').length,2);
+});
+
+test('dòng cũ bị khoá không gỡ được -> vẫn được điền mã giao/hoàn còn trống, không xoá, không ghi đè',()=>{
+  const c=ctx([row({myNote:'giữ'}),row({forwardTrack:'862700000001',returnTrack:'854170000001',track:'862700000001'})]);
+  c.locked=new Set([0]);
+  const r=c.supersedeStaleRowsFromSalework(new Set(['A1']));
+  assert.equal(r.merged,0);assert.equal(r.filled,1);assert.equal(c.orders.length,2);
+  assert.equal(c.orders[0].forwardTrack,'862700000001');assert.equal(c.orders[0].returnTrack,'854170000001');assert.equal(c.orders[0].myNote,'giữ');
+});
+test('đơn nhiều kiện khác mã hoàn nhưng chung mã giao -> điền mã giao vào dòng cũ, không đoán mã hoàn',()=>{
+  const c=ctx([row({}),row({forwardTrack:'862700000001',returnTrack:'854170000001'}),row({forwardTrack:'862700000001',returnTrack:'854170000002'})]);
+  const r=c.supersedeStaleRowsFromSalework(new Set(['A1']));
+  assert.equal(r.ambiguous,1);assert.equal(r.filled,1);assert.equal(c.orders.length,3);
+  assert.equal(c.orders[0].forwardTrack,'862700000001');assert.ok(!c.orders[0].returnTrack);
+});
+test('ô mã vận đơn do người dùng khoá thì không điền',()=>{
+  const c=ctx([row({}),row({forwardTrack:'862700000001',returnTrack:'854170000001'}),row({forwardTrack:'862700000001',returnTrack:'854170000002'})]);
+  c.cellLocks['0:track']=true;
+  assert.equal(c.supersedeStaleRowsFromSalework(new Set(['A1'])).filled,0);
+  assert.ok(!c.orders[0].forwardTrack);
 });

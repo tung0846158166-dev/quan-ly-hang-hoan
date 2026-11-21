@@ -18174,16 +18174,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const own = o => extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || o.altTrack || '');
       const by = new Map();
       orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k || !orderIdSet.has(k)) return; if (!by.has(k)) by.set(k, []); by.get(k).push(i); });
-      const drop = []; let ambiguous = 0;
+      const drop = []; let ambiguous = 0, filled = 0;
+      // v1.9.49: dòng chờ cũ KHÔNG gỡ được (đang khoá ô, hoặc đơn nhiều kiện khác mã) vẫn phải hiện mã vận đơn: chỉ ĐIỀN mã còn trống
+      // (không ghi đè, không xoá dòng nào) khi mọi dòng Salework của đơn cùng chung 1 mã giao / 1 mã hoàn -> không phải đoán.
+      const fillOnly = (bareIdx, tracked) => {
+        const one = f => { const s = new Set(tracked.map(i => extractCleanTrackingCode(orders[i][f] || '')).filter(Boolean)); return s.size === 1 ? [...s][0] : ''; };
+        const fwd = one('forwardTrack'), ret = one('returnTrack');
+        bareIdx.forEach(i => {
+          const o = orders[i]; let ch = false;
+          try { if (typeof cellLocks !== 'undefined' && cellLocks && cellLocks[i + ':track']) return; } catch (e) { return; }
+          if (fwd && !o.forwardTrack) { o.forwardTrack = fwd; ch = true; }
+          if (ret && !o.returnTrack) { o.returnTrack = ret; ch = true; }
+          if (ch) { o.trackingCodes = Array.from(new Set([].concat(o.trackingCodes || [], fwd, ret).filter(Boolean))); filled++; }
+        });
+      };
       by.forEach(idxs => {
         const tracked = idxs.filter(i => own(orders[i]));
         const bare = idxs.filter(i => !own(orders[i]) && !isScanPlaceholder(orders[i]));
         if (!tracked.length || !bare.length) return;
-        if (new Set(tracked.map(i => own(orders[i]))).size !== 1) { ambiguous++; return; }
+        if (new Set(tracked.map(i => own(orders[i]))).size !== 1) { ambiguous++; fillOnly(bare, tracked); return; }
         const keep = tracked.find(i => isOrderReceived(orders[i])) ?? tracked[0];
-        bare.forEach(i => { try { if (hasLockedCellsInOrder(i)) return; } catch (e) { return; } drop.push({ i, keep }); });
+        const stuck = [];
+        bare.forEach(i => { try { if (hasLockedCellsInOrder(i)) { stuck.push(i); return; } } catch (e) { stuck.push(i); return; } drop.push({ i, keep }); });
+        if (stuck.length) fillOnly(stuck, tracked);
       });
-      if (!drop.length) return { merged: 0, ambiguous };
+      if (filled) { try { saveOrders(); addAuditLog('🤖 SALEWORK ĐIỀN MÃ VẬN ĐƠN', 'Điền mã vận đơn còn trống cho ' + filled + ' dòng không gỡ được'); } catch (e) {} }
+      if (!drop.length) return { merged: 0, ambiguous, filled };
       drop.sort((a, b) => b.i - a.i);
       const keepers = drop.map(d => orders[d.keep]);
       const backup = [];
@@ -18201,7 +18217,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } catch (e) {}
       saveOrders();
       try { addAuditLog('🤖 SALEWORK CẬP NHẬT ĐƠN', 'Gộp ' + backup.length + ' dòng chờ cũ (chưa có mã vận đơn) vào dòng mới của Salework'); } catch (e) {}
-      return { merged: backup.length, ambiguous };
+      return { merged: backup.length, ambiguous, filled };
     }
     // v1.9.42: Salework tự động — chỉ tab "Đang chờ hoàn" (xem salework_auto.js). Hiện chạy tay bằng nút "Lấy ngay".
     function swAutoMsg(t, bad) { const e = document.getElementById('swAutoMsg'); if (e) { e.textContent = t; e.className = 'text-xs p-2 rounded-lg border ' + (bad ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200'); } }
@@ -18242,11 +18258,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!r || !r.success) { swAutoMsg('❌ Lỗi ở bước "' + ((r && r.step) || '?') + '": ' + ((r && r.error) || 'không rõ') + (r && r.relogin ? ' — bấm "Đăng nhập Salework" để đăng nhập lại.' : ''), true); return; }
         const res = await importParsedPlatformFiles([{ name: r.fileName || 'salework_dang_cho_hoan.xlsx', rows: r.rows }], 'TikTok Shop');
         if (res && res.success) {
-          let sup = { merged: 0, ambiguous: 0 }, dup = 0;
+          let sup = { merged: 0, ambiguous: 0, filled: 0 }, dup = 0;
           try { sup = supersedeStaleRowsFromSalework(new Set(r.rows.map(x => String(x['Mã đơn hàng'] || '').trim().toUpperCase()).filter(Boolean))); } catch (e) {}
           try { dup = autoRemoveShadowDuplicates() || 0; } catch (e) {}
           try { renderAll(false); } catch (e) {}
-          swAutoMsg('✅ Đã lấy ' + r.count + ' dòng từ Salework và nạp vào bảng' + (sup.merged ? ', cập nhật ' + sup.merged + ' dòng chờ cũ' : '') + (dup ? ', gộp ' + dup + ' dòng trùng' : '') + (sup.ambiguous ? '. ' + sup.ambiguous + ' đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem' : '') + '.');
+          swAutoMsg('✅ Đã lấy ' + r.count + ' dòng từ Salework và nạp vào bảng' + (sup.merged ? ', cập nhật ' + sup.merged + ' dòng chờ cũ' : '') + (dup ? ', gộp ' + dup + ' dòng trùng' : '') + (sup.filled ? ', điền mã vận đơn cho ' + sup.filled + ' dòng cũ' : '') + (sup.ambiguous ? '. ' + sup.ambiguous + ' đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem' : '') + '.');
           try { showAppToast('🤖 Đã nạp ' + r.count + ' dòng đang chờ hoàn từ Salework', 'success', 6000); } catch (e) {}
           try { addAuditLog('🤖 SALEWORK TỰ ĐỘNG', 'Nạp ' + r.count + ' dòng đang chờ hoàn'); } catch (e) {}
         } else swAutoMsg('❌ Lấy được file nhưng chưa nạp: ' + String((res && res.message) || 'lỗi không rõ').replace(/^❌\s*/, ''), true);

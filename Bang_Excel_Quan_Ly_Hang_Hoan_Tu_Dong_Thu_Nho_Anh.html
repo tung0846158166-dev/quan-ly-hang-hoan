@@ -18275,6 +18275,48 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       try { addAuditLog('🤖 SALEWORK CẬP NHẬT ĐƠN', 'Gộp ' + backup.length + ' dòng chờ cũ (chưa có mã vận đơn) vào dòng mới của Salework'); } catch (e) {}
       return { merged: backup.length, ambiguous, filled };
     }
+    // v1.9.52: tab "Đã hoàn kho" của Salework = kho đã quét nhập. Đơn nào đang "Chưa về" ở Bảng chính và khớp (mã đơn + mã vận đơn/mã trả hàng,
+    // hoặc đơn chỉ có 1 dòng chưa mã) thì chuyển "Hàng đã trả", giờ về = "Ngày xác nhận hoàn hàng" của Salework. Không tạo dòng mới, không đổi
+    // dòng đã nhận / không cần nhận / bị mất / hư hỏng / ô trạng thái đang khoá. Đơn nhiều kiện không khớp mã thì bỏ qua (không đoán).
+    function applySaleworkStocked(rows) {
+      const out = { total: 0, marked: 0, already: 0, notInApp: 0, skipped: 0, ambiguous: 0 };
+      if (isLocked || !Array.isArray(orders) || !Array.isArray(rows) || !rows.length) return out;
+      const up = v => String(v || '').trim().toUpperCase();
+      const codeOf = v => extractCleanTrackingCode(String(v || '')) || '';
+      const when = v => { const m = String(v || '').trim().match(/^(\d{1,2}:\d{2}(?::\d{2})?)\s+(\d{1,2}\/\d{1,2}\/\d{4})$/); return m ? m[2] + ' ' + (m[1].length === 5 ? m[1] + ':00' : m[1]) : ''; };
+      const per = new Map(); let cur = '';
+      rows.forEach(r => {
+        const id = up(r['Mã đơn hàng']); if (id) cur = id; if (!cur) return;
+        const stamp = when(r['Ngày xác nhận hoàn hàng']); const slip = String(r['Mã phiếu nhập hoàn'] || '').trim();
+        if (!stamp && !slip) return;   // chưa có dấu vết kho nhập -> không coi là đã về
+        let e = per.get(cur); if (!e) { e = { codes: new Set(), when: '' }; per.set(cur, e); }
+        [r['Mã vận đơn'], r['Mã trả hàng']].forEach(v => { const c = codeOf(v); if (c) e.codes.add(c); });
+        if (stamp && (!e.when || stamp < e.when)) e.when = stamp;
+      });
+      out.total = per.size;
+      const byId = new Map();
+      orders.forEach((o, i) => { const k = o && up(o.orderId); if (!k || !per.has(k)) return; if (!byId.has(k)) byId.set(k, []); byId.get(k).push(i); });
+      const ownCodes = o => new Set([o.returnTrack, o.track, o.forwardTrack, o.altTrack, ...(Array.isArray(o.trackingCodes) ? o.trackingCodes : [])].map(codeOf).filter(Boolean));
+      const marked = [];
+      per.forEach((e, id) => {
+        const idxs = byId.get(id); if (!idxs) { out.notInApp++; return; }
+        let hit = idxs.filter(i => { const c = ownCodes(orders[i]); return [...c].some(x => e.codes.has(x)); });
+        if (!hit.length) { const bare = idxs.filter(i => !ownCodes(orders[i]).size); if (idxs.length === 1 && bare.length === 1) hit = bare; }
+        if (!hit.length) { out.ambiguous++; return; }
+        hit.forEach(i => {
+          const o = orders[i];
+          if (isOrderReceived(o)) { out.already++; return; }
+          if (o.status && o.status !== 'Chưa về' && o.status !== 'Chưa trả') { out.skipped++; return; }
+          try { if (cellLocks && cellLocks[i + ':status']) { out.skipped++; return; } } catch (x) {}
+          o.status = 'Hàng đã trả';
+          if (!o.recvDate) o.recvDate = e.when || getNowDateTimeString();
+          try { recordCellEditHistory(i + ':status', 'Đã nhận thực tế Đơn #' + (i + 1), 'Chưa về', 'Hàng đã trả', 'Salework: đã hoàn kho'); } catch (x) {}
+          marked.push(o.orderId); out.marked++;
+        });
+      });
+      if (out.marked) { try { saveOrders(); addAuditLog('🤖 SALEWORK ĐÃ HOÀN KHO', 'Đánh dấu Hàng đã trả cho ' + out.marked + ' đơn theo tab Đã hoàn kho: ' + marked.slice(0, 20).join(', ') + (marked.length > 20 ? '…' : '')); } catch (x) {} }
+      return out;
+    }
     // v1.9.42: Salework tự động — chỉ tab "Đang chờ hoàn" (xem salework_auto.js). Hiện chạy tay bằng nút "Lấy ngay".
     function swAutoMsg(t, bad) { const e = document.getElementById('swAutoMsg'); if (e) { e.textContent = t; e.className = 'text-xs p-2 rounded-lg border ' + (bad ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200'); } }
     async function refreshSaleworkAuto() {
@@ -18317,8 +18359,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           let sup = { merged: 0, ambiguous: 0, filled: 0 }, dup = 0;
           try { sup = supersedeStaleRowsFromSalework(new Set(r.rows.map(x => String(x['Mã đơn hàng'] || '').trim().toUpperCase()).filter(Boolean))); } catch (e) {}
           try { dup = autoRemoveShadowDuplicates() || 0; } catch (e) {}
+          let stk = null;
+          try { if (r.stocked && Array.isArray(r.stocked.rows)) stk = applySaleworkStocked(r.stocked.rows); } catch (e) {}
           try { renderAll(false); } catch (e) {}
-          swAutoMsg('✅ Đã lấy ' + r.count + ' dòng từ Salework và nạp vào bảng' + (sup.merged ? ', cập nhật ' + sup.merged + ' dòng chờ cũ' : '') + (dup ? ', gộp ' + dup + ' dòng trùng' : '') + (sup.filled ? ', điền mã vận đơn cho ' + sup.filled + ' dòng cũ' : '') + (sup.ambiguous ? '. ' + sup.ambiguous + ' đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem' : '') + '.');
+          swAutoMsg('✅ Đã lấy ' + r.count + ' dòng từ Salework và nạp vào bảng' + (sup.merged ? ', cập nhật ' + sup.merged + ' dòng chờ cũ' : '') + (dup ? ', gộp ' + dup + ' dòng trùng' : '') + (sup.filled ? ', điền mã vận đơn cho ' + sup.filled + ' dòng cũ' : '') + (sup.ambiguous ? '. ' + sup.ambiguous + ' đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem' : '') + '.' + (stk ? ' Đã hoàn kho: ' + stk.total + ' đơn trên Salework → đánh dấu đã về ' + stk.marked + ', đã về từ trước ' + stk.already + (stk.notInApp ? ', chưa có trong bảng ' + stk.notInApp : '') + (stk.ambiguous ? ', không khớp mã ' + stk.ambiguous : '') + (stk.skipped ? ', bỏ qua ' + stk.skipped + ' (mất/hư/khoá/không cần nhận)' : '') + '.' : '') + (r.stockedError ? ' ⚠️ Chưa lấy được tab Đã hoàn kho: ' + r.stockedError : ''));
           try { showAppToast('🤖 Đã nạp ' + r.count + ' dòng đang chờ hoàn từ Salework', 'success', 6000); } catch (e) {}
           try { addAuditLog('🤖 SALEWORK TỰ ĐỘNG', 'Nạp ' + r.count + ' dòng đang chờ hoàn'); } catch (e) {}
         } else swAutoMsg('❌ Lấy được file nhưng chưa nạp: ' + String((res && res.message) || 'lỗi không rõ').replace(/^❌\s*/, ''), true);

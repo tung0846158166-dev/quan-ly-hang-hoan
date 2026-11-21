@@ -69,10 +69,10 @@ function dl(ses, xlsx, state = 'completed') {
   setTimeout(() => { if (state === 'completed') fs.writeFileSync(p, xlsx); item.emit('done', {}, state); }, 5);
   ses.emit('will-download', {}, item);
 }
-function mk(script, xlsx) {
+function mk(script, xlsx, extraCfg) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-')); const f = fakeElectron(script, xlsx);
   const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 1500, stepPause: 1, downloadTimeout: 600, watchPause: 1, actWait: 20, clickRetry: 20, keepOnError: 0 });
-  fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
+  fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify(Object.assign({ url: 'https://x.example/orders', stocked: false }, extraCfg || {})));
   return { a, calls: f.calls, dir };
 }
 const okScript = xlsx => (a, arg, ses) => {
@@ -246,7 +246,7 @@ test('chế độ xem + lỗi: cửa sổ được giữ lại để người d�
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'swt-'));
   const f = fakeElectron((act) => act === 'state' ? { hasExport: false, path: 'p', title: 't', buttons: [] } : { ok: true });
   const a = new SaleworkAuto(f.electron, dir, { pageTimeout: 100, stepPause: 1, watchPause: 1, actWait: 10, keepOnError: 50 });
-  fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders' }));
+  fs.writeFileSync(path.join(dir, 'salework_auto.json'), JSON.stringify({ url: 'https://x.example/orders', stocked: false }));
   const r = await a.run(); assert.equal(r.success, false);
   assert.equal(a.curWin.isDestroyed(), false);
   await new Promise(res => setTimeout(res, 120)); assert.equal(a.curWin.isDestroyed(), true);
@@ -323,4 +323,21 @@ test('rê chuột chưa mở menu: bấm Xuất excel rồi mới chọn Theo b�
   const f = mk((act, arg, s) => { if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(s, sampleXlsx()); return mouseScript(opts)(act, arg, s); });
   const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r));
   assert.equal(opts.clickedExport, true);
+});
+
+test('run: lấy thêm tab "Đã hoàn kho" (chỉ đọc) sau tab Đang chờ hoàn, trả về stocked', async () => {
+  const { a, calls } = mk(okScript(sampleXlsx()), null, { stocked: true });
+  const r = await a.run();
+  assert.equal(r.success, true, JSON.stringify(r)); assert.equal(r.count, 3);
+  assert.equal(r.stocked.count, 3); assert.ok(!('Tên khách hàng' in r.stocked.rows[0])); assert.equal(r.stockedError, '');
+  const clicks = calls.filter(c => c[0] === 'click').map(c => c[1].text);
+  assert.deepEqual(clicks, ['Đang chờ hoàn', 'Theo bộ lọc', 'Bắt Đầu Xuất', 'Đã hoàn kho', 'Theo bộ lọc', 'Bắt Đầu Xuất']);
+  assert.ok(!clicks.some(t => /cập nhật/i.test(t)));
+});
+test('run: tab "Đã hoàn kho" lỗi -> lượt lấy chính vẫn thành công, ghi rõ lỗi', async () => {
+  const base = okScript(sampleXlsx());
+  const { a } = mk((x, arg, ses) => (x === 'click' && arg.text === 'Đã hoàn kho') ? (() => { throw new Error('không thấy tab'); })() : base(x, arg, ses), null, { stocked: true });
+  const r = await a.run();
+  assert.equal(r.success, true); assert.equal(r.count, 3); assert.equal(r.stocked, null); assert.match(r.stockedError, /không thấy tab|Đã hoàn kho/);
+  assert.match(a.status().lastNote, /Đã hoàn kho lỗi/);
 });

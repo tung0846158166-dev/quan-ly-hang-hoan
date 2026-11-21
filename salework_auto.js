@@ -320,35 +320,46 @@ class SaleworkAuto {
         st = await this._waitFor(win, s => s.hasExport || s.hasPassword, this.opts.pageTimeout, 'Đã vào Đơn hoàn bằng menu nhưng vẫn không thấy nút "Xuất excel" sau ' + Math.round(this.opts.pageTimeout / 1000) + 's');
       }
       if (st.hasPassword && !st.hasExport) { const e = new Error('Salework yêu cầu đăng nhập lại.'); e.relogin = true; throw e; }
-      step = 'chọn tab Đang chờ hoàn';
-      await this._act(win, { text: 'Đang chờ hoàn', mode: 'prefix' }, 'chọn tab "Đang chờ hoàn"', watch);
-      await sleep(this.opts.stepPause);
-      step = 'kiểm tra kênh Tiktok';
-      const s2 = await this._exec(win, 'state');
-      if (!s2.channelTiktok) throw new Error('Không thấy kênh Tiktok trên trang — mở cửa sổ đăng nhập, chọn kênh Tiktok rồi lưu lại trang.' + this._diag(s2));
-      step = 'đưa chuột vào Xuất excel';
-      // Salework mở menu xuất khi RÊ CHUỘT vào nút "Xuất excel" (không phải bấm)
-      await this._act(win, { text: 'Xuất excel', hover: true }, 'đưa chuột vào "Xuất excel"', watch);
-      await sleep(this.opts.stepPause);
-      step = 'chọn "Theo bộ lọc"';
-      const seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
-      if (!seen.ok) {   // rê chuột chưa mở menu: thử bấm nút
-        step = 'bấm Xuất excel';
-        await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);
+      // Xuất excel của MỘT tab đang chọn: tab -> kiểm tra kênh Tiktok -> rê chuột Xuất excel -> Theo bộ lọc -> Bắt Đầu Xuất -> file.
+      const exportTab = async (tabText) => {
+        step = 'chọn tab ' + tabText;
+        await this._act(win, { text: tabText, mode: 'prefix' }, 'chọn tab "' + tabText + '"', watch);
+        await sleep(this.opts.stepPause);
+        step = 'kiểm tra kênh Tiktok';
+        const s2 = await this._exec(win, 'state');
+        if (!s2.channelTiktok) throw new Error('Không thấy kênh Tiktok trên trang — mở cửa sổ đăng nhập, chọn kênh Tiktok rồi lưu lại trang.' + this._diag(s2));
+        step = 'đưa chuột vào Xuất excel';
+        // Salework mở menu xuất khi RÊ CHUỘT vào nút "Xuất excel" (không phải bấm)
+        await this._act(win, { text: 'Xuất excel', hover: true }, 'đưa chuột vào "Xuất excel"', watch);
         await sleep(this.opts.stepPause);
         step = 'chọn "Theo bộ lọc"';
+        const seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+        if (!seen.ok) {   // rê chuột chưa mở menu: thử bấm nút
+          step = 'bấm Xuất excel';
+          await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);
+          await sleep(this.opts.stepPause);
+          step = 'chọn "Theo bộ lọc"';
+        }
+        await this._act(win, { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true }, 'chọn "Theo bộ lọc"', watch);
+        await sleep(600);
+        step = 'bấm Bắt Đầu Xuất';
+        arm();
+        await this._act(win, { text: 'Bắt Đầu Xuất', mode: 'prefix', inDialog: true }, 'bấm "Bắt Đầu Xuất"', watch);
+        step = 'chờ file tải về';
+        const f = await got;
+        step = 'đọc file';
+        return { rows: dropPersonalColumns(readXlsxRows(fs.readFileSync(f.file))), name: f.name };
+      };
+      const first = await exportTab('Đang chờ hoàn');
+      const rows = first.rows;
+      // Tab "Đã hoàn kho" (chỉ đọc): cho biết đơn nào kho đã quét nhập -> app tự đánh dấu "đã về". Lỗi ở đây KHÔNG làm hỏng lượt lấy chính.
+      let stocked = null, stockedError = '';
+      if (cfg.stocked !== false && !this.abort) {
+        try { await sleep(this.opts.stepPause); const t = await exportTab('Đã hoàn kho'); stocked = { rows: t.rows, count: t.rows.length, fileName: t.name }; }
+        catch (e5) { if (this.abort) throw e5; stockedError = 'Bước "' + step + '": ' + ((e5 && e5.message) || e5); }
       }
-      await this._act(win, { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true }, 'chọn "Theo bộ lọc"', watch);
-      await sleep(600);
-      step = 'bấm Bắt Đầu Xuất';
-      arm();
-      await this._act(win, { text: 'Bắt Đầu Xuất', mode: 'prefix', inDialog: true }, 'bấm "Bắt Đầu Xuất"', watch);
-      step = 'chờ file tải về';
-      const f = await got;
-      step = 'đọc file';
-      const rows = dropPersonalColumns(readXlsxRows(fs.readFileSync(f.file)));
-      note(true, 'Lấy ' + rows.length + ' dòng');
-      return { success: true, rows, count: rows.length, fileName: f.name };
+      note(true, 'Lấy ' + rows.length + ' dòng' + (stocked ? ' + ' + stocked.count + ' dòng Đã hoàn kho' : '') + (stockedError ? ' (Đã hoàn kho lỗi: ' + stockedError + ')' : ''));
+      return { success: true, rows, count: rows.length, fileName: first.name, stocked, stockedError };
     } catch (e) {
       let msg = (e && e.message) || String(e);
       if (this.abort && !/dừng/i.test(msg)) msg = 'Đã dừng (cửa sổ bị đóng) — ' + msg;

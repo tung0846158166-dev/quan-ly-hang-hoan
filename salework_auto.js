@@ -52,6 +52,7 @@ function pageScript(action, arg) {
         hasExport: find('xuất excel', 'exact').length > 0,
         hasTab: find('đang chờ hoàn', 'prefix').length > 0,
         channelTiktok: /k[eê]nh\s*tiktok/.test(body) || /tiktok/.test(body.slice(0, 4000)),
+        channel: (() => { const e = find('kênh', 'prefix').find(x => norm(x.textContent).length <= 40); return e ? norm(e.textContent).replace(/^kênh\s*/, '') : ''; })(),
         title: document.title,
         path: location.host + location.pathname.replace(/\d{5,}/g, '#'),
         buttons: Array.from(new Set(Array.from(document.querySelectorAll('button,[role=tab],[role=button],a')).filter(visible)
@@ -62,6 +63,15 @@ function pageScript(action, arg) {
       if (FORBID.test(a.text)) return { error: 'từ chối bấm nút có chữ "cập nhật"' };
       // Chữ "Theo bộ lọc" / "Bắt Đầu Xuất" chỉ có trong cửa sổ xuất: ưu tiên tìm trong cửa sổ nếu nhận ra, không thì tìm cả trang.
       let within = a.inDialog ? dialogRoot() : null;
+      if (a.near) {   // chỉ tìm TRONG menu đang mở có chứa chữ a.near (vd menu chọn kênh chứa "Bán ngoài sàn"), không bấm nhầm chữ trùng ở bảng
+        const n = find(a.near, 'exact')[0];
+        if (!n) return { error: 'không thấy menu có "' + a.near + '"' };
+        within = (n.closest && n.closest('ul,[role=menu],[role=listbox],.dropdown-menu,.ant-dropdown,.el-dropdown-menu,.dropdown')) || n.parentElement;
+        const cc = find(a.text, a.mode || 'exact', within);
+        if (!cc.length) return { error: 'không thấy "' + a.text + '" trong menu' };
+        if (FORBID.test(cc[0].textContent)) return { error: 'phần tử khớp có chữ "cập nhật", bỏ qua' };
+        return { el: cc[0], count: cc.length };
+      }
       let c = find(a.text, a.mode || 'exact', within);
       if (!c.length && within) c = find(a.text, a.mode || 'exact', null);
       if (!c.length) return { error: 'không thấy "' + a.text + '"' };
@@ -320,14 +330,30 @@ class SaleworkAuto {
         st = await this._waitFor(win, s => s.hasExport || s.hasPassword, this.opts.pageTimeout, 'Đã vào Đơn hoàn bằng menu nhưng vẫn không thấy nút "Xuất excel" sau ' + Math.round(this.opts.pageTimeout / 1000) + 's');
       }
       if (st.hasPassword && !st.hasExport) { const e = new Error('Salework yêu cầu đăng nhập lại.'); e.relogin = true; throw e; }
+      // Chọn kênh bán hàng (Tiktok / Shopee...) bằng menu "Kênh …" ở đầu trang. Chỉ bấm nút chọn kênh và đúng mục trong menu đó.
+      const chanName = c => String(c || '').normalize('NFC').toLowerCase().trim();
+      const selectChannel = async (name) => {
+        step = 'chọn kênh ' + name;
+        const cur = await this._exec(win, 'state');
+        if (chanName(cur.channel) === chanName(name)) return;
+        await this._act(win, { text: 'Kênh', mode: 'prefix', hover: true }, 'đưa chuột vào nút chọn kênh', watch);
+        await sleep(this.opts.stepPause);
+        const open = await this._exec(win, 'exists', { text: 'Bán ngoài sàn' });
+        if (!open.ok) { await this._act(win, { text: 'Kênh', mode: 'prefix' }, 'mở menu chọn kênh', watch); await sleep(this.opts.stepPause); }
+        await this._act(win, { text: name, near: 'Bán ngoài sàn' }, 'chọn kênh "' + name + '"', watch);
+        await sleep(this.opts.stepPause);
+        const after = await this._waitFor(win, s => chanName(s.channel) === chanName(name), this.opts.pageTimeout, 'Đã bấm chọn kênh ' + name + ' nhưng trang không chuyển sang kênh đó');
+        return after;
+      };
       // Xuất excel của MỘT tab đang chọn: tab -> kiểm tra kênh Tiktok -> rê chuột Xuất excel -> Theo bộ lọc -> Bắt Đầu Xuất -> file.
+      let curChannel = 'Tiktok';
       const exportTab = async (tabText) => {
         step = 'chọn tab ' + tabText;
         await this._act(win, { text: tabText, mode: 'prefix' }, 'chọn tab "' + tabText + '"', watch);
         await sleep(this.opts.stepPause);
         step = 'kiểm tra kênh Tiktok';
         const s2 = await this._exec(win, 'state');
-        if (!s2.channelTiktok) throw new Error('Không thấy kênh Tiktok trên trang — mở cửa sổ đăng nhập, chọn kênh Tiktok rồi lưu lại trang.' + this._diag(s2));
+        if (!(s2.channel ? chanName(s2.channel) === chanName(curChannel) : (chanName(curChannel) === 'tiktok' && s2.channelTiktok))) throw new Error('Không thấy kênh ' + curChannel + ' trên trang — mở cửa sổ đăng nhập, chọn đúng kênh rồi lưu lại trang.' + this._diag(s2));
         step = 'đưa chuột vào Xuất excel';
         // Salework mở menu xuất khi RÊ CHUỘT vào nút "Xuất excel" (không phải bấm)
         await this._act(win, { text: 'Xuất excel', hover: true }, 'đưa chuột vào "Xuất excel"', watch);
@@ -350,6 +376,7 @@ class SaleworkAuto {
         step = 'đọc file';
         return { rows: dropPersonalColumns(readXlsxRows(fs.readFileSync(f.file))), name: f.name };
       };
+      try { const c0 = await this._exec(win, 'state'); if (c0.channel && chanName(c0.channel) !== 'tiktok') await selectChannel('Tiktok'); } catch (e6) { if (this.abort) throw e6; }
       const first = await exportTab('Đang chờ hoàn');
       const rows = first.rows;
       // Tab "Đã hoàn kho" (chỉ đọc): cho biết đơn nào kho đã quét nhập -> app tự đánh dấu "đã về". Lỗi ở đây KHÔNG làm hỏng lượt lấy chính.
@@ -358,8 +385,21 @@ class SaleworkAuto {
         try { await sleep(this.opts.stepPause); const t = await exportTab('Đã hoàn kho'); stocked = { rows: t.rows, count: t.rows.length, fileName: t.name }; }
         catch (e5) { if (this.abort) throw e5; stockedError = 'Bước "' + step + '": ' + ((e5 && e5.message) || e5); }
       }
-      note(true, 'Lấy ' + rows.length + ' dòng' + (stocked ? ' + ' + stocked.count + ' dòng Đã hoàn kho' : '') + (stockedError ? ' (Đã hoàn kho lỗi: ' + stockedError + ')' : ''));
-      return { success: true, rows, count: rows.length, fileName: first.name, stocked, stockedError };
+      // Sàn khác (mặc định Shopee): chỉ lấy tab "Đã hoàn kho" để đánh dấu đã về. Xong chuyển về kênh Tiktok để lần sau mở đúng kênh.
+      const extra = []; const extraErrors = [];
+      const extraChannels = Array.isArray(cfg.extraChannels) ? cfg.extraChannels : ['Shopee'];
+      if (cfg.stocked !== false && !this.abort) {
+        for (const ch of extraChannels) {
+          if (this.abort) break;
+          try {
+            await selectChannel(ch); curChannel = ch;
+            const t = await exportTab('Đã hoàn kho'); extra.push({ channel: ch, rows: t.rows, count: t.rows.length, fileName: t.name });
+          } catch (e7) { if (this.abort) throw e7; extraErrors.push(ch + ' — bước "' + step + '": ' + ((e7 && e7.message) || e7)); }
+        }
+        if (extra.length || extraErrors.length) { try { curChannel = 'Tiktok'; await selectChannel('Tiktok'); } catch (e8) { if (this.abort) throw e8; extraErrors.push('không chuyển lại kênh Tiktok: ' + ((e8 && e8.message) || e8)); } }
+      }
+      note(true, 'Lấy ' + rows.length + ' dòng' + (stocked ? ' + ' + stocked.count + ' dòng Đã hoàn kho' : '') + (stockedError ? ' (Đã hoàn kho lỗi: ' + stockedError + ')' : '') + extra.map(x => ' + ' + x.count + ' dòng ' + x.channel + ' Đã hoàn kho').join('') + (extraErrors.length ? ' (sàn khác lỗi: ' + extraErrors.join('; ') + ')' : ''));
+      return { success: true, rows, count: rows.length, fileName: first.name, stocked, stockedError, extra, extraErrors };
     } catch (e) {
       let msg = (e && e.message) || String(e);
       if (this.abort && !/dừng/i.test(msg)) msg = 'Đã dừng (cửa sổ bị đóng) — ' + msg;

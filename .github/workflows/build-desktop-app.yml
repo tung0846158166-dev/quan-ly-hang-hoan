@@ -89,11 +89,11 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: v1.9.52
-          name: "Quản Lý Hàng Hoàn v1.9.52 — Salework: tự đánh dấu đã về theo tab Đã hoàn kho"
+          name: "Quản Lý Hàng Hoàn v1.9.52 — Salework: tự đánh dấu đã về (Tiktok + Shopee) theo tab Đã hoàn kho"
           body: |
             ### Bản 1.9.52
 
-            - 📥 Salework tự động: sau tab "Đang chờ hoàn", app lấy thêm tab "Đã hoàn kho" (chỉ đọc, cũng rê chuột Xuất excel › Theo bộ lọc › Bắt Đầu Xuất, không bấm "Cập nhật"). Đơn nào kho đã quét nhập ở Salework mà Bảng chính còn "Chưa về" và khớp mã đơn + mã vận đơn/mã trả hàng thì tự chuyển "Hàng đã trả", giờ về = "Ngày xác nhận hoàn hàng" của Salework. Không tạo dòng mới; không đụng đơn đã nhận / không cần nhận / bị mất / hư hỏng / ô trạng thái đang khoá; đơn nhiều kiện không khớp mã thì bỏ qua. Tab này lỗi thì lượt lấy chính vẫn thành công. Quét 1 lần ở Salework là đủ.
+            - 📥 Salework tự động: sau tab "Đang chờ hoàn", app lấy thêm tab "Đã hoàn kho" (chỉ đọc, cũng rê chuột Xuất excel › Theo bộ lọc › Bắt Đầu Xuất, không bấm "Cập nhật"). Đơn nào kho đã quét nhập ở Salework mà Bảng chính còn "Chưa về" và khớp mã đơn + mã vận đơn/mã trả hàng thì tự chuyển "Hàng đã trả", giờ về = "Ngày xác nhận hoàn hàng" của Salework. Không tạo dòng mới; không đụng đơn đã nhận / không cần nhận / bị mất / hư hỏng / ô trạng thái đang khoá; đơn nhiều kiện không khớp mã thì bỏ qua. Cũng làm cho Shopee: app chọn kênh Shopee trong menu "Kênh" (chỉ bấm nút chọn kênh và đúng mục trong menu đó), lấy tab Đã hoàn kho rồi chuyển LẠI kênh Tiktok. Tab/kênh nào lỗi thì lượt lấy chính vẫn thành công và thông báo ghi rõ. Quét 1 lần ở Salework là đủ.
 
             ### Bản 1.9.51
 

@@ -326,7 +326,7 @@ test('rê chuột chưa mở menu: bấm Xuất excel rồi mới chọn Theo b�
 });
 
 test('run: lấy thêm tab "Đã hoàn kho" (chỉ đọc) sau tab Đang chờ hoàn, trả về stocked', async () => {
-  const { a, calls } = mk(okScript(sampleXlsx()), null, { stocked: true });
+  const { a, calls } = mk(okScript(sampleXlsx()), null, { stocked: true, extraChannels: [] });
   const r = await a.run();
   assert.equal(r.success, true, JSON.stringify(r)); assert.equal(r.count, 3);
   assert.equal(r.stocked.count, 3); assert.ok(!('Tên khách hàng' in r.stocked.rows[0])); assert.equal(r.stockedError, '');
@@ -336,8 +336,39 @@ test('run: lấy thêm tab "Đã hoàn kho" (chỉ đọc) sau tab Đang chờ h
 });
 test('run: tab "Đã hoàn kho" lỗi -> lượt lấy chính vẫn thành công, ghi rõ lỗi', async () => {
   const base = okScript(sampleXlsx());
-  const { a } = mk((x, arg, ses) => (x === 'click' && arg.text === 'Đã hoàn kho') ? (() => { throw new Error('không thấy tab'); })() : base(x, arg, ses), null, { stocked: true });
+  const { a } = mk((x, arg, ses) => (x === 'click' && arg.text === 'Đã hoàn kho') ? (() => { throw new Error('không thấy tab'); })() : base(x, arg, ses), null, { stocked: true, extraChannels: [] });
   const r = await a.run();
   assert.equal(r.success, true); assert.equal(r.count, 3); assert.equal(r.stocked, null); assert.match(r.stockedError, /không thấy tab|Đã hoàn kho/);
   assert.match(a.status().lastNote, /Đã hoàn kho lỗi/);
+});
+
+// kênh: kịch bản trang giả có menu chọn kênh
+function channelScript(xlsx, startChannel, log) {
+  let channel = startChannel; const base = okScript(xlsx);
+  return (a, arg, ses) => {
+    if (a === 'state') return { hasExport: true, hasPassword: false, channel, channelTiktok: /tiktok/i.test(channel), hasTab: true };
+    if (a === 'exists' && arg.text === 'Bán ngoài sàn') return { ok: true };
+    if (a === 'click' && arg.near === 'Bán ngoài sàn') { log.push(arg.text); channel = arg.text; return { ok: true }; }
+    if (a === 'click') log.push(arg.text);
+    return base(a, arg, ses);
+  };
+}
+test('run: sau Tiktok, lấy tab Đã hoàn kho của Shopee rồi chuyển LẠI kênh Tiktok', async () => {
+  const log = []; const { a } = mk(channelScript(sampleXlsx(), 'Tiktok', log), null, { stocked: true });
+  const r = await a.run();
+  assert.equal(r.success, true, JSON.stringify(r)); assert.equal(r.extra.length, 1); assert.equal(r.extra[0].channel, 'Shopee'); assert.equal(r.extra[0].count, 3);
+  assert.deepEqual(r.extraErrors, []);
+  assert.deepEqual(log.filter(t => t === 'Shopee' || t === 'Tiktok'), ['Shopee', 'Tiktok']);   // đổi sang Shopee rồi về Tiktok
+  assert.ok(!log.some(t => /cập nhật/i.test(t)));
+});
+test('run: đang để kênh Shopee từ trước -> chuyển sang Tiktok trước khi xuất', async () => {
+  const log = []; const { a } = mk(channelScript(sampleXlsx(), 'Shopee', log), null, { stocked: true, extraChannels: [] });
+  const r = await a.run();
+  assert.equal(r.success, true, JSON.stringify(r)); assert.equal(log[0], 'Tiktok');
+});
+test('run: chuyển kênh Shopee lỗi -> TikTok vẫn thành công, báo lỗi sàn khác', async () => {
+  const log = []; const inner = channelScript(sampleXlsx(), 'Tiktok', log);
+  const { a } = mk((x, arg, ses) => (x === 'click' && arg.near && arg.text === 'Shopee') ? { ok: false, error: 'không thấy "Shopee" trong menu' } : inner(x, arg, ses), null, { stocked: true });
+  const r = await a.run();
+  assert.equal(r.success, true); assert.equal(r.count, 3); assert.equal(r.extra.length, 0); assert.match(r.extraErrors.join(' '), /Shopee/);
 });

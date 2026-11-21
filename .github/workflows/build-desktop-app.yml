@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.50
+          name: QuanLyHangHoan-Windows-Installer-v1.9.51
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.50
-          name: "Quản Lý Hàng Hoàn v1.9.50 — Bảng chính: hiện rõ Loại theo Google Sheet"
+          tag_name: v1.9.51
+          name: "Quản Lý Hàng Hoàn v1.9.51 — Bộ lọc Loại (theo sàn) và Trạng thái kiện"
           body: |
+            ### Bản 1.9.51
+
+            - 🔎 Bộ lọc nâng cao có thêm 2 ô: "Loại (theo sàn)" (đúng chữ Loại của Google Sheet) và "Trạng thái kiện" (Chờ khách gửi hàng, Đang về, Đã về shop...). Danh sách tự lấy từ dữ liệu hiện có, kèm số đơn; tính vào huy hiệu số bộ lọc đang bật và được xoá khi bỏ lọc.
+
             ### Bản 1.9.50
 
             - 🏷 Bảng chính: chữ "Loại" của Google Sheet (Chỉ hoàn tiền / Trả hàng + hoàn tiền / Đang chờ huỷ...) nay hiện nguyên văn ngay dưới ô chọn ở cột "Loại (theo sàn)". Đổi tên 2 cột cho rõ: "Loại (theo sàn)" = loại yêu cầu trên sàn; "Trạng thái kiện" = tình trạng kiện hàng (Chờ khách gửi hàng, Đang về...). Dữ liệu cũ không đổi.

@@ -511,6 +511,7 @@ ipcMain.handle('salework-auto-run', async () => { try { return await getSalework
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
+ipcMain.on('get-app-version-sync', (event) => { try { event.returnValue = app.getVersion(); } catch (e) { event.returnValue = ''; } });
 
 app.whenReady().then(() => {
   getDataDir();

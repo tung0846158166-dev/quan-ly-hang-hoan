@@ -1081,6 +1081,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="THẤT THU">⚫ THẤT THU</option>
         </select>
 
+        <!-- Lọc Loại (theo sàn) & Trạng thái kiện: danh sách tự lấy từ dữ liệu -->
+        <select id="sheetTypeFilterSelect" onfocus="refreshTypeStatusFilterOptions()" onmousedown="refreshTypeStatusFilterOptions()" onchange="setSheetTypeFilter(this.value)"
+                title="Lọc theo chữ Loại của sàn / Google Sheet (Chỉ hoàn tiền, Trả hàng + hoàn tiền, Đang chờ huỷ...)"
+                class="text-[11px] font-bold bg-slate-50 border border-indigo-300 text-indigo-900 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-indigo-500 max-w-[190px]">
+          <option value="all">🏷 Loại (theo sàn): Tất cả</option>
+        </select>
+        <select id="platStatusFilterSelect" onfocus="refreshTypeStatusFilterOptions()" onmousedown="refreshTypeStatusFilterOptions()" onchange="setPlatStatusFilter(this.value)"
+                title="Lọc theo Trạng thái kiện (Chờ khách gửi hàng, Đang về, Đã về shop...)"
+                class="text-[11px] font-bold bg-slate-50 border border-teal-300 text-teal-900 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-teal-500 max-w-[190px]">
+          <option value="all">📮 Trạng thái kiện: Tất cả</option>
+        </select>
+
         <!-- Lọc Hàng đặt trước -->
         <select id="preOrderFilterSelect" onchange="setPreOrderFilter(this.value)"
                 title="Lọc theo Hàng đặt trước hoặc Đơn thường"
@@ -8220,6 +8232,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (currentTrackingFilter === 'has_track' && !hasTrack) return false;
       if (currentTrackingFilter === 'no_track' && hasTrack) return false;
       }
+      if (!passesTypeStatusFilters(o)) return false;
       return true;
     }
 
@@ -8284,6 +8297,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentOrderTypeFilter = 'all';
       currentPreOrderFilter = 'all';
       currentTrackingFilter = 'all';
+      currentSheetTypeFilter = 'all'; currentPlatStatusFilter = 'all';
+      try { refreshTypeStatusFilterOptions(); } catch (e) {}
       currentDateSort = 'default';
       clearDateTimeFilter();
       const sInput = document.getElementById('searchInput');
@@ -11193,6 +11208,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // =========================================================================
     let currentPreOrderFilter = 'all'; // 'all' | 'Hàng đặt trước' | 'Đơn thường'
     let currentTrackingFilter = 'all'; // 'all' | 'has_track' | 'no_track'
+    let currentSheetTypeFilter = 'all';   // 'all' | đúng chữ Loại của sàn/Sheet
+    let currentPlatStatusFilter = 'all';  // 'all' | đúng chữ Trạng thái kiện
+    function orderPlatStatusText(o) { return String((o && (o.platformStatus || (o.rawDetails && (o.rawDetails.returnStatus || o.rawDetails.returnShippingStatus)))) || '').trim(); }
+    function passesTypeStatusFilters(o) {
+      if (currentSheetTypeFilter !== 'all' && String((o && o.sheetType) || '').trim() !== currentSheetTypeFilter) return false;
+      if (currentPlatStatusFilter !== 'all' && orderPlatStatusText(o) !== currentPlatStatusFilter) return false;
+      return true;
+    }
+    function refreshTypeStatusFilterOptions() {
+      const fill = (id, label, vals, cur) => {
+        const el = document.getElementById(id); if (!el) return;
+        const counts = new Map(); (orders || []).forEach(o => { const v = vals(o); if (v) counts.set(v, (counts.get(v) || 0) + 1); });
+        if (cur !== 'all' && !counts.has(cur)) counts.set(cur, 0);
+        const keys = Array.from(counts.keys()).sort((a, b) => counts.get(b) - counts.get(a) || a.localeCompare(b, 'vi'));
+        const sig = keys.map(k => k + '|' + counts.get(k)).join('\u0001'); if (el.dataset.sig === sig) return; el.dataset.sig = sig;
+        el.innerHTML = '';
+        const first = document.createElement('option'); first.value = 'all'; first.textContent = label; el.appendChild(first);
+        keys.forEach(k => { const op = document.createElement('option'); op.value = k; op.textContent = k + ' (' + counts.get(k) + ')'; el.appendChild(op); });
+        el.value = cur;
+      };
+      fill('sheetTypeFilterSelect', '🏷 Loại (theo sàn): Tất cả', o => String(o.sheetType || '').trim(), currentSheetTypeFilter);
+      fill('platStatusFilterSelect', '📮 Trạng thái kiện: Tất cả', orderPlatStatusText, currentPlatStatusFilter);
+    }
+    function setSheetTypeFilter(v) { currentSheetTypeFilter = v || 'all'; currentPage = 1; renderAll(); recalcTotalsAndSummary(); }
+    function setPlatStatusFilter(v) { currentPlatStatusFilter = v || 'all'; currentPage = 1; renderAll(); recalcTotalsAndSummary(); }
     let currentDateFilterType = 'returnDate'; // 'any' | 'recvDate' | 'returnDate' | 'shipDate'
     let currentCustomDateFrom = '';
     let currentCustomDateTo = '';
@@ -11539,6 +11579,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (currentTrackingFilter === 'has_track' && !hasTrack) return false;
           if (currentTrackingFilter === 'no_track' && hasTrack) return false;
         }
+        if (!passesTypeStatusFilters(order)) return false;
 
         // Keyword Search Filter
         const matched = isOrderMatch(order, kw);
@@ -12402,6 +12443,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       requestAnimationFrame(fitMainTableHeight);
       const arrow = document.getElementById('advancedFilterArrow');
       if (arrow) arrow.textContent = open ? '▴' : '▾';
+      if (open) { try { refreshTypeStatusFilterOptions(); } catch (e) {} }
     }
 
     function countActiveAdvancedFilters() {
@@ -12410,6 +12452,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (typeof currentOrderTypeFilter !== 'undefined' && currentOrderTypeFilter !== 'all') n++;
       if (typeof currentPreOrderFilter !== 'undefined' && currentPreOrderFilter !== 'all') n++;
       if (typeof currentTrackingFilter !== 'undefined' && currentTrackingFilter !== 'all') n++;
+      if (typeof currentSheetTypeFilter !== 'undefined' && currentSheetTypeFilter !== 'all') n++;
+      if (typeof currentPlatStatusFilter !== 'undefined' && currentPlatStatusFilter !== 'all') n++;
       if (val('filterDateFrom') || val('filterDateTo')) n++;
       if (val('filterTimeFrom') || val('filterTimeTo')) n++;
       const quick = val('recvDateFilterSelect');
@@ -12434,7 +12478,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (typeof setOrderTypeFilter === 'function') setOrderTypeFilter('all');
       if (typeof setPreOrderFilter === 'function') setPreOrderFilter('all');
       if (typeof setTrackingFilter === 'function') setTrackingFilter('all');
-      const sel = ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect'];
+      currentSheetTypeFilter = 'all'; currentPlatStatusFilter = 'all';
+      const sel = ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect', 'sheetTypeFilterSelect', 'platStatusFilterSelect'];
       sel.forEach(id => { const el = document.getElementById(id); if (el) el.value = 'all'; });
     }
 
@@ -12487,6 +12532,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (currentTrackingFilter === 'has_track' && !hasTrack) return;
           if (currentTrackingFilter === 'no_track' && hasTrack) return;
         }
+        if (!passesTypeStatusFilters(order)) return;
 
 
         if (archived) archivedUsedCount++;
@@ -15618,6 +15664,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentOrderTypeFilter = 'all';
       currentPreOrderFilter = 'all';
       currentTrackingFilter = 'all';
+      currentSheetTypeFilter = 'all'; currentPlatStatusFilter = 'all';
       currentCustomDateFrom = '';
       currentCustomDateTo = '';
       currentCustomTimeFrom = '';

@@ -1093,15 +1093,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <option value="all">📮 Trạng thái kiện: Tất cả</option>
         </select>
 
-        <!-- Lọc Hàng đặt trước -->
-        <select id="preOrderFilterSelect" onchange="setPreOrderFilter(this.value)"
-                title="Lọc theo Hàng đặt trước hoặc Đơn thường"
-                class="text-[11px] font-bold bg-slate-50 border border-purple-300 text-purple-950 rounded-md px-1.5 py-0.5 outline-none cursor-pointer hover:border-purple-500">
-          <option value="all">📦 Trước/Thường</option>
-          <option value="Hàng đặt trước">⭐ Đặt trước</option>
-          <option value="Đơn thường">⚡ Đơn thường</option>
-        </select>
-
         <!-- Lọc Có/Không MVĐ -->
         <select id="trackingFilterSelect" onchange="setTrackingFilter(this.value)"
                 title="Lọc đơn có mã vận đơn hoặc không có mã vận đơn"
@@ -1164,33 +1155,32 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </th>
             <th class="w-10 py-1.5">STT</th>
             <th class="w-14 py-1.5">KQ Tìm</th>
-            <th id="thCol_shipDate" onclick="toggleDateSort('shipDate')" class="min-w-[130px] w-36 py-1.5 cursor-pointer hover:bg-slate-800 transition select-none" title="Ngày & Giờ gửi đi - Bấm để sắp xếp">
+            <th id="thCol_shipDate" onclick="toggleDateSort('shipDate')" class="min-w-[88px] w-24 py-1.5 cursor-pointer hover:bg-slate-800 transition select-none" title="Ngày & Giờ gửi đi - Bấm để sắp xếp">
               <span>Ngày Gửi Đi</span> <span id="thSortIcon_shipDate" class="text-[10px] text-slate-300">⇅</span>
             </th>
-            <th id="thCol_returnDate" onclick="toggleDateSort('returnDate')" class="min-w-[135px] w-36 !bg-amber-900 hover:!bg-amber-800 py-1.5 cursor-pointer transition select-none" title="Ngày & Giờ khách bấm hoàn/hủy - Bấm để sắp xếp">
+            <th id="thCol_returnDate" onclick="toggleDateSort('returnDate')" class="min-w-[118px] w-32 !bg-amber-900 hover:!bg-amber-800 py-1.5 cursor-pointer transition select-none" title="Ngày & Giờ khách bấm hoàn/hủy - Bấm để sắp xếp">
               <span>Ngày Hoàn / Hủy</span> <span id="thSortIcon_returnDate" class="text-[10px] text-amber-200">⇅</span>
             </th>
-            <th id="thCol_deadline" onclick="toggleDateSort('deadline')" class="min-w-[130px] w-36 !bg-rose-950 hover:!bg-rose-900 py-1.5 cursor-pointer transition select-none text-rose-100" title="Hạn Người Bán Cần Phản Hồi / Xử Lý Khiếu Nại Sàn - Bấm để sắp xếp">
+            <th id="thCol_deadline" onclick="toggleDateSort('deadline')" class="min-w-[118px] w-32 !bg-rose-950 hover:!bg-rose-900 py-1.5 cursor-pointer transition select-none text-rose-100" title="Hạn Người Bán Cần Phản Hồi / Xử Lý Khiếu Nại Sàn - Bấm để sắp xếp">
               <span>Hạn Cần Xử Lý</span> <span id="thSortIcon_deadline" class="text-[10px] text-rose-200">⇅</span>
             </th>
-            <th id="thCol_recvDate" onclick="toggleDateSort('recvDate')" class="min-w-[150px] w-40 !bg-emerald-900 hover:!bg-emerald-800 py-1.5 cursor-pointer transition select-none" title="Ngày & Giờ về kho (Thời gian nhận) - Bấm để sắp xếp">
+            <th id="thCol_recvDate" onclick="toggleDateSort('recvDate')" class="min-w-[135px] w-36 !bg-emerald-900 hover:!bg-emerald-800 py-1.5 cursor-pointer transition select-none" title="Ngày & Giờ về kho (Thời gian nhận) - Bấm để sắp xếp">
               <span>Ngày & Giờ Về Kho</span> <span id="thSortIcon_recvDate" class="text-[10px] text-emerald-200">⇅</span>
             </th>
-            <th class="min-w-[122px] w-24 !bg-orange-950 py-1.5">Sàn TMĐT</th>
-            <th class="min-w-[140px] w-36 !bg-indigo-950 py-1.5" title="Loại yêu cầu theo sàn: dòng nhỏ bên dưới là chữ Loại của Google Sheet (Chỉ hoàn tiền | Trả hàng + hoàn tiền | Đang chờ huỷ...). Ô chọn là nhóm xử lý trong app: Giao KTC | Trả hàng | Đơn hủy | THẤT THU">Loại (theo sàn)</th>
-            <th class="min-w-[155px] w-40 !bg-teal-950 text-teal-100 py-1.5" title="Trạng thái của KIỆN HÀNG / yêu cầu trên sàn (Chờ khách gửi hàng, Đang về, Đã về shop, Đã hoàn tiền...) - Nhấp đúp để sửa">Trạng thái kiện</th>
-            <th class="min-w-[110px] w-28 !bg-purple-950 text-purple-100 py-1.5" title="Đơn Hàng Đặt Trước (Pre-order): Hiển thị ⭐ Đặt trước hoặc Thường">Hàng Đặt Trước</th>
+            <th class="w-9 px-0 !bg-orange-950 py-1.5 text-[10px]" title="Sàn TMĐT: chấm cam = Shopee, chấm đen = TikTok Shop">Sàn</th>
+            <th class="min-w-[120px] w-32 !bg-indigo-950 py-1.5" title="Loại yêu cầu theo sàn: dòng nhỏ bên dưới là chữ Loại của Google Sheet (Chỉ hoàn tiền | Trả hàng + hoàn tiền | Đang chờ huỷ...). Ô chọn là nhóm xử lý trong app: Giao KTC | Trả hàng | Đơn hủy | THẤT THU">Loại (theo sàn)</th>
+            <th class="min-w-[130px] w-36 !bg-teal-950 text-teal-100 py-1.5" title="Trạng thái của KIỆN HÀNG / yêu cầu trên sàn (Chờ khách gửi hàng, Đang về, Đã về shop, Đã hoàn tiền...) - Nhấp đúp để sửa">Trạng thái kiện</th>
             <th class="w-32 py-1.5">Mã Đơn Hàng</th>
             <th class="w-36 py-1.5" title="Mã Vận Đơn: Ưu tiên mã hoàn khi nhận kiện, hiển thị cả mã giao">Mã Vận Đơn</th>
             <th class="w-28 py-1.5">Đơn Vị Vận Chuyển</th>
-            <th class="min-w-[280px] w-72 !bg-sky-950 text-sky-100 py-1.5" title="Một đơn một dòng tổng: Hiển thị tóm tắt, bấm [👁️ Chi tiết] để mở danh sách sản phẩm">Sản Phẩm & Phân Loại</th>
+            <th class="min-w-[220px] w-60 !bg-sky-950 text-sky-100 py-1.5" title="Một đơn một dòng tổng: Hiển thị tóm tắt, bấm [👁️ Chi tiết] để mở danh sách sản phẩm">Sản Phẩm & Phân Loại</th>
             <th class="w-16 py-1.5 text-center" title="Tổng số lượng sản phẩm trong đơn">Tổng SL</th>
             <th class="w-28 py-1.5 text-right">Tổng Giá Trị</th>
-            <th class="min-w-[135px] w-36 !bg-emerald-950 py-1.5" title="Theo dõi riêng bằng kết quả quét kho: Chưa nhận ➔ Đã nhận (sau khi quét kiện về kho) | Không cần nhận | Bị mất">Nhận Tại Kho</th>
+            <th class="min-w-[118px] w-32 !bg-emerald-950 py-1.5" title="Theo dõi riêng bằng kết quả quét kho: Chưa nhận ➔ Đã nhận (sau khi quét kiện về kho) | Không cần nhận | Bị mất">Nhận Tại Kho</th>
             <th class="w-24 py-1.5" title="Bấm vào ô rồi Ctrl+V để dán ảnh đơn hàng">Ảnh Đơn Hàng</th>
-            <th class="w-36 py-1.5" title="Lý do hoàn hàng hoặc lý do hủy đơn từ sàn">Lý Do Hoàn / Hủy</th>
-            <th class="w-44 py-1.5 !bg-amber-950" title="Ghi chú / nhận xét của người mua hàng khi đặt hoặc khi trả hàng">Ghi Chú Người Mua</th>
-            <th class="w-48 py-1.5 !bg-indigo-950 text-indigo-100" title="Ghi chú riêng của tôi / shop (Bấm 1 lần xem đầy đủ, nhấp đúp để chỉnh sửa)">Ghi Chú Của Tôi</th>
+            <th class="w-32 py-1.5" title="Lý do hoàn hàng hoặc lý do hủy đơn từ sàn">Lý Do Hoàn / Hủy</th>
+            <th class="w-36 py-1.5 !bg-amber-950" title="Ghi chú / nhận xét của người mua hàng khi đặt hoặc khi trả hàng">Ghi Chú Người Mua</th>
+            <th class="w-40 py-1.5 !bg-indigo-950 text-indigo-100" title="Ghi chú riêng của tôi / shop (Bấm 1 lần xem đầy đủ, nhấp đúp để chỉnh sửa)">Ghi Chú Của Tôi</th>
             <th class="w-16 no-print py-1.5 text-center">Thao Tác</th>
           </tr>
         </thead>
@@ -11213,7 +11203,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // =========================================================================
     // BỘ LỌC MỚI: HÀNG ĐẶT TRƯỚC / ĐƠN THƯỜNG & ĐƠN CÓ MVĐ / KHÔNG CÓ MVĐ & KHOẢNG NGÀY
     // =========================================================================
-    let currentPreOrderFilter = 'all'; // 'all' | 'Hàng đặt trước' | 'Đơn thường'
+    let currentPreOrderFilter = 'all'; // bộ lọc đã gỡ khỏi giao diện (v1.9.53), luôn 'all' // 'all' | 'Hàng đặt trước' | 'Đơn thường'
     let currentTrackingFilter = 'all'; // 'all' | 'has_track' | 'no_track'
     let currentSheetTypeFilter = 'all';   // 'all' | đúng chữ Loại của sàn/Sheet
     let currentPlatStatusFilter = 'all';  // 'all' | đúng chữ Trạng thái kiện
@@ -11482,7 +11472,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         .replace(/\r/g, '\\r');
     }
 
-    function renderCellInput(cellKey, labelName, val, extraClass, placeholder, onInputJs, typeAttr = 'text', listId = '', onBlurJs = '', onFocusJs = '') {
+    function renderCellInput(cellKey, labelName, val, extraClass, placeholder, onInputJs, typeAttr = 'text', listId = '', onBlurJs = '', onFocusJs = '', viewText = null) {
       const locked = Boolean(cellLocks[cellKey]);
       if (locked) {
         return `
@@ -11490,7 +11480,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                title="Ô này đang khóa mật khẩu (Chỉ xem). Bấm 1 lần hoặc Chuột phải để mở khóa!"
                onclick="promptUnlockSingleCell('${cellKey}','${labelName}')"
                oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')">
-            <span class="${extraClass} truncate flex-1">${escapeAttr(val)}</span>
+            <span class="${extraClass} truncate flex-1">${escapeAttr(viewText != null ? viewText : val)}</span>
             <span class="text-[11px] ml-1 text-rose-600 font-bold" title="Đang khóa mật khẩu">🔒</span>
           </div>
         `;
@@ -11508,7 +11498,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
              oncontextmenu="handleCellContextMenu(event,'${cellKey}','${labelName}')"
              title="${fieldName === 'orderId' ? 'Bấm 1 lần: Sao chép mã đơn' : 'Bấm 1 lần: Xem đầy đủ'} | Nhấp đúp (2 lần): Chỉnh sửa | Chuột phải: Khóa ô">
           <span class="cell-view-text ${extraClass} block truncate w-full pointer-events-none">
-            ${escapeAttr(safeVal.trim()) || `<span class="text-slate-400 italic font-normal">${placeholder || '-'}</span>`}
+            ${escapeAttr((viewText != null ? String(viewText) : safeVal).trim()) || `<span class="text-slate-400 italic font-normal">${placeholder || '-'}</span>`}
           </span>
           <input type="${typeAttr}"
                  data-cell-key="${cellKey}"
@@ -11750,23 +11740,24 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           'Khác': 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
         };
         const curPlatStyle = platformClassMap[curPlatform] || platformClassMap['Khác'];
+        const platDotColor = { 'Shopee': '#f97316', 'TikTok Shop': '#111827', 'Lazada': '#2563eb' }[curPlatform] || '#94a3b8';
+        const platDotHtml = `<span class="inline-block w-3.5 h-3.5 rounded-full border border-white shadow ring-1 ring-slate-300" style="background:${platDotColor}"></span>`;
         const platformCellHtml = platformLocked
           ? `<div onclick="promptUnlockSingleCell('${orderIdx}:platform','Sàn TMĐT Đơn #${orderIdx+1}')"
                   oncontextmenu="handleCellContextMenu(event,'${orderIdx}:platform','Sàn TMĐT Đơn #${orderIdx+1}')"
-                  title="Ô Sàn TMĐT đang khóa. Bấm để mở khóa!"
-                  class="flex items-center justify-center gap-1 px-1.5 py-1 rounded cursor-pointer font-bold text-[11px] ${curPlatStyle}">
-               <span>${escapeAttr(curPlatform)}</span>
-               <span class="text-[10px] text-rose-500">🔒</span>
-             </div>`
-          : `<select class="w-full text-center font-bold text-[11px] py-0.5 px-1 rounded border outline-none cursor-pointer transition shadow-2xs h-6.5 ${curPlatStyle}"
-                    title="Sàn TMĐT (Nhấp chuột phải để khóa ô)"
+                  title="${escapeAttr(curPlatform)} — ô đang khóa. Bấm để mở khóa!"
+                  class="flex items-center justify-center gap-0.5 cursor-pointer">${platDotHtml}<span class="text-[9px] text-rose-500">🔒</span></div>`
+          : `<div class="relative inline-flex items-center justify-center w-6 h-6" title="${escapeAttr(curPlatform)} (bấm để đổi sàn, chuột phải để khóa ô)">
+               ${platDotHtml}
+               <select class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     oncontextmenu="handleCellContextMenu(event,'${orderIdx}:platform','Sàn TMĐT Đơn #${orderIdx+1}')"
                     onchange="updateOrderPlatform(${orderIdx}, this.value)">
                <option value="Shopee" ${curPlatform === 'Shopee' ? 'selected' : ''}>🟠 Shopee</option>
                <option value="TikTok Shop" ${curPlatform === 'TikTok Shop' ? 'selected' : ''}>⚫ TikTok</option>
                <option value="Lazada" ${curPlatform === 'Lazada' ? 'selected' : ''}>🔵 Lazada</option>
                <option value="Khác" ${curPlatform === 'Khác' ? 'selected' : ''}>📦 Khác</option>
-             </select>`;
+               </select>
+             </div>`;
 
         const curOrderType = getOrderType(order);
         const orderTypeLocked = Boolean(cellLocks[`${orderIdx}:orderType`]);
@@ -12046,18 +12037,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             ${(() => {
               const effectiveShipDate = resolveOrderShipDate(order);
               if (!order.shipDate && effectiveShipDate) order.shipDate = effectiveShipDate;
-              return `<td class="${shipTdClass}">${renderCellInput(`${orderIdx}:shipDate`, `Ngày & Giờ gửi đơn #${orderIdx+1}`, effectiveShipDate, 'text-center font-semibold text-slate-800 text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'shipDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'shipDate',this)`)}</td>`;
+              return `<td class="${shipTdClass}">${renderCellInput(`${orderIdx}:shipDate`, `Ngày & Giờ gửi đơn #${orderIdx+1}`, effectiveShipDate, 'text-center font-semibold text-slate-800 text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'shipDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'shipDate',this)`, '', String(effectiveShipDate||'').trim().split(/\s+/)[0])}</td>`;
             })()}
             <td class="${returnTdClass}">${renderCellInput(`${orderIdx}:returnDate`, `Ngày & Giờ hoàn/hủy đơn #${orderIdx+1}`, order.returnDate, 'text-center font-semibold text-amber-900 text-[11px]', 'DD/MM/YYYY HH:mm', `updateOrderField(${orderIdx},'returnDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'returnDate',this)`)}</td>
             <td class="${deadlineTdClass}">${deadlineHtml}</td>
             <td class="${recvTdClass}">${renderCellInput(`${orderIdx}:recvDate`, `Ngày & Giờ về kho đơn #${orderIdx+1}`, order.recvDate, 'text-center font-semibold text-emerald-800 text-[11px]', 'dd/mm/yyyy hh:mm:ss', `updateOrderField(${orderIdx},'recvDate',this.value)`, 'text', '', `handleDateBlur(${orderIdx},'recvDate',this)`)}</td>
-            <td class="text-center min-w-[122px] px-1">${platformCellHtml}</td>
-            <td class="text-center min-w-[135px] px-1">
+            <td class="text-center w-9 px-0">${platformCellHtml}</td>
+            <td class="text-center min-w-[120px] px-1">
               ${orderTypeCellHtml}${order.sheetType ? `<div class="mt-0.5 text-center text-[10px] font-bold leading-tight text-indigo-700" title="Loại theo Google Sheet / sàn">${escapeAttr(order.sheetType)}</div>` : ''}
               ${isPartialOrder ? `<div class="mt-0.5"><span class="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs whitespace-nowrap" title="⚡ Đơn hoàn 1 phần: Khách mua nhiều SP nhưng chỉ hoàn 1 sản phẩm!">⚡ Hoàn 1 phần</span></div>` : ''}
             </td>
-            <td class="text-center min-w-[150px] px-1">${platformStatusCellHtml}</td>
-            <td class="text-center min-w-[110px] px-1">${preOrderCellHtml}</td>
+            <td class="text-center min-w-[130px] px-1">${platformStatusCellHtml}</td>
             <td>${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
             <td>${trackCellHtml}</td>
             <td class="text-center min-w-[125px] px-1">${carrierCellHtml}</td>
@@ -12111,7 +12101,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (isDrawerOpen) {
           html += `
             <tr id="drawer_row_${orderIdx}" class="bg-indigo-50/40 border-y-2 border-indigo-200">
-              <td colspan="23" class="p-2.5 sm:p-3">
+              <td colspan="22" class="p-2.5 sm:p-3">
                 ${renderOrderItemsDrawer(order, orderIdx)}
               </td>
             </tr>
@@ -12168,7 +12158,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </button>
           </div>`;
         }
-        html = `<tr><td colspan="22" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
+        html = `<tr><td colspan="21" class="text-center bg-slate-50/60">${emptyMsg}</td></tr>`;
       }
       tbody.innerHTML = html;
 
@@ -12457,7 +12447,6 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const val = (id) => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
       let n = 0;
       if (typeof currentOrderTypeFilter !== 'undefined' && currentOrderTypeFilter !== 'all') n++;
-      if (typeof currentPreOrderFilter !== 'undefined' && currentPreOrderFilter !== 'all') n++;
       if (typeof currentTrackingFilter !== 'undefined' && currentTrackingFilter !== 'all') n++;
       if (typeof currentSheetTypeFilter !== 'undefined' && currentSheetTypeFilter !== 'all') n++;
       if (typeof currentPlatStatusFilter !== 'undefined' && currentPlatStatusFilter !== 'all') n++;
@@ -12483,10 +12472,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (typeof setImportWeekFilter === 'function') setImportWeekFilter('all');
       if (typeof setPlatformFilter === 'function') setPlatformFilter('all');
       if (typeof setOrderTypeFilter === 'function') setOrderTypeFilter('all');
-      if (typeof setPreOrderFilter === 'function') setPreOrderFilter('all');
       if (typeof setTrackingFilter === 'function') setTrackingFilter('all');
       currentSheetTypeFilter = 'all'; currentPlatStatusFilter = 'all';
-      const sel = ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect', 'sheetTypeFilterSelect', 'platStatusFilterSelect'];
+      const sel = ['orderTypeFilterSelect', 'trackingFilterSelect', 'sheetTypeFilterSelect', 'platStatusFilterSelect'];
       sel.forEach(id => { const el = document.getElementById(id); if (el) el.value = 'all'; });
     }
 
@@ -15676,7 +15664,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       currentCustomDateTo = '';
       currentCustomTimeFrom = '';
       currentCustomTimeTo = '';
-      for (const id of ['orderTypeFilterSelect', 'preOrderFilterSelect', 'trackingFilterSelect']) {
+      for (const id of ['orderTypeFilterSelect', 'trackingFilterSelect']) {
         const el = document.getElementById(id); if (el) el.value = 'all';
       }
       for (const id of ['filterDateFrom', 'filterDateTo', 'filterTimeFrom', 'filterTimeTo', 'customDateFrom', 'customDateTo']) {
@@ -19050,29 +19038,46 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     let filteredArchivedOrders = [];
 
     function loadArchivedOrders() {
+      let local = null, disk = null;
       try {
         const raw = localStorage.getItem(ARCHIVED_STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            archivedOrders = parsed;
-          }
-        }
+        if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) local = p; }
       } catch (e) {
         console.warn('Lỗi đọc kho lưu trữ từ localStorage:', e);
       }
+      // Bản desktop: kho lưu trữ có thể quá lớn cho localStorage (~5 MB) nên được lưu ở file trên ổ đĩa.
+      try {
+        const api = (typeof window !== 'undefined') ? window.desktopDiskAPI : null;
+        if (api && typeof api.auxReadAllSync === 'function') {
+          const r = api.auxReadAllSync();
+          const v = r && r.data ? r.data[ARCHIVED_STORAGE_KEY] : null;
+          if (typeof v === 'string' && v) { const p = JSON.parse(v); if (Array.isArray(p)) disk = p; }
+        }
+      } catch (e) {
+        console.warn('Lỗi đọc kho lưu trữ từ ổ đĩa:', e);
+      }
+      const best = (disk && (!local || disk.length >= local.length)) ? disk : local;
+      if (best) archivedOrders = best;
       updateArchivedOrdersBadge();
     }
 
     function saveArchivedOrders() {
+      let serialized = '';
       try {
         // Keep photos in the committed archive: dropping bytes before a photo DB commit loses evidence.
-        const serialized = JSON.stringify(archivedOrders);
+        serialized = JSON.stringify(archivedOrders);
         localStorage.setItem(ARCHIVED_STORAGE_KEY, serialized);
         if (localStorage.getItem(ARCHIVED_STORAGE_KEY) !== serialized) throw new Error('Không xác minh được kho lưu trữ');
         updateArchivedOrdersBadge();
         return { success: true };
       } catch (e) {
+        // localStorage đầy (kho có ảnh nặng hàng chục MB): ghi thẳng ra file trên ổ đĩa (chỉ bản desktop).
+        const api = (typeof window !== 'undefined') ? window.desktopDiskAPI : null;
+        if (serialized && api && typeof api.auxSave === 'function') {
+          const pendingDisk = Promise.resolve(api.auxSave(ARCHIVED_STORAGE_KEY, serialized)).then(r => !!(r && r.success)).catch(() => false);
+          updateArchivedOrdersBadge();
+          return { success: true, diskOnly: true, pendingDisk };
+        }
         console.warn('Lỗi lưu kho lưu trữ:', e);
         if (typeof showAppToast === 'function') showAppToast('❌ Chưa lưu được kho lưu trữ. Các đơn vẫn được giữ trên bảng chính.', 'error');
         return { success: false, error: e.message };
@@ -19143,9 +19148,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         }
       });
 
-      if (!saveArchivedOrders().success) {
+      const archSave = saveArchivedOrders();
+      let archOk = !!archSave.success;
+      if (archOk && archSave.pendingDisk) archOk = await archSave.pendingDisk; // chỉ xóa khỏi bảng chính khi file đã ghi xong
+      if (!archOk) {
         archivedOrders = previousArchive;
         updateArchivedOrdersBadge();
+        if (archSave.pendingDisk && typeof showAppToast === 'function') showAppToast('❌ Chưa lưu được kho lưu trữ ra ổ đĩa. Các đơn vẫn được giữ trên bảng chính.', 'error');
         return 0;
       }
 
@@ -19163,7 +19172,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         try { rollback = await saveOrders(true); } catch (e) { rollback = { success: false }; }
         if (rollback && rollback.success) {
           archivedOrders = previousArchive;
-          saveArchivedOrders();
+          try { const rb = saveArchivedOrders(); if (rb && rb.pendingDisk) await rb.pendingDisk; } catch (e) {}
         }
         renderAll(true);
         recalcTotalsAndSummary();

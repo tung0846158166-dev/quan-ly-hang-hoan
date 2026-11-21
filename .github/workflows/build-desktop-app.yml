@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.52
+          name: QuanLyHangHoan-Windows-Installer-v1.9.53
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.52
-          name: "Quản Lý Hàng Hoàn v1.9.52 — Trạng thái kiện TikTok đúng nghĩa, hạn khiếu nại Shopee tính từ lúc về shop"
+          tag_name: v1.9.53
+          name: "Quản Lý Hàng Hoàn v1.9.53 — Bảng gọn hơn (chấm màu sàn, ngày gửi chỉ ngày), sửa kho lưu trữ không nhận đơn"
           body: |
+            ### Bản 1.9.53
+
+            - 🧹 Bảng chính gọn hơn: bỏ cột "Hàng Đặt Trước" và ô lọc Trước/Thường (dữ liệu cũ vẫn được giữ trong file). "Ngày Gửi Đi" chỉ hiện ngày (bấm vào ô vẫn thấy và sửa được cả giờ). Cột "Sàn" thành chấm màu: cam = Shopee, đen = TikTok Shop (xanh = Lazada, xám = Khác); bấm chấm vẫn đổi được sàn. Các cột ngày, loại, trạng thái, sản phẩm, ghi chú được thu hẹp để bảng đỡ phải kéo ngang.
+            - 📦 Sửa lỗi đơn đã nhận quá 24h nhưng không vào Kho Lưu Trữ: kho lưu trữ chứa nhiều ảnh nên vượt dung lượng localStorage (~5 MB) và việc lưu thất bại âm thầm, đơn bị giữ lại bảng chính. Nay bản desktop ghi kho ra file trên ổ đĩa, ghi xong mới dời đơn khỏi bảng chính (lỗi thì giữ nguyên đơn). Các đơn đang chờ sẽ được dời ở lần kiểm tra kế tiếp (sau khi mở app ~1 giây, hoặc mở "Kho Lưu Trữ" / bấm quét).
+
             ### Bản 1.9.52
 
             - 🔧 TikTok (file Salework): cột "Trạng thái kiện" không còn hiện lý do hoàn tiếng Anh (Change of mind, Ordered wrong size...). Nay hiện tình trạng kiện: có mã trả hàng = "Đang về", chưa có = "Chờ khách gửi hàng". Lý do hoàn vẫn nằm ở ô Ghi chú, đã dịch sang tiếng Việt (thêm "Wrong product sent" = Shop gửi sai sản phẩm). Đơn cũ tự sửa ở lần "Lấy ngay" kế tiếp.

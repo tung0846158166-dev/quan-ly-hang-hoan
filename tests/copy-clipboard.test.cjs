@@ -1,5 +1,5 @@
 const test=require('node:test'),fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const html=fs.readFileSync('Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html','utf8');
+const html=fs.readFileSync('Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html','utf8').replace(/\r\n/g,'\n');
 const s=html.indexOf('    function copyTextToClipboard(');assert(s>=0,'hàm copyTextToClipboard phải được định nghĩa');
 const code=html.slice(s,html.indexOf('\n    }\n',s)+7);
 function mk(nav,docExtra){const toasts=[];const ctx=vm.createContext({navigator:nav,document:Object.assign({createElement:()=>({style:{},select(){}}),body:{appendChild(){},removeChild(){}},execCommand:()=>true},docExtra||{}),showAppToast:(m,t)=>toasts.push([m,t])});vm.runInContext(code,ctx);return{ctx,toasts};}

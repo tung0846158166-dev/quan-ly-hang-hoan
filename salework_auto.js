@@ -99,7 +99,8 @@ function pageScript(action, arg) {
         const t = String(el.textContent || '').replace(/\s+/g, ' ').trim();
         if (t && t.length <= 40 && !/\d{6,}/.test(t) && !set.has(t)) { set.add(t); seen.push(t); }
       });
-      return { ok: true, texts: seen.slice(0, 60) };
+      // v1.9.66: menu/bảng nổi thường nằm CUỐI trang: lấy cả đầu lẫn cuối để chẩn đoán thấy được
+      return { ok: true, texts: seen.length > 60 ? seen.slice(0, 25).concat(['…'], seen.slice(-35)) : seen };
     }
     if (action === 'mark') {   // chế độ xem: viền đỏ quanh nút sắp bấm (chưa bấm)
       const L = locate(arg);
@@ -205,6 +206,12 @@ class SaleworkAuto {
     const r = await this._exec(win, 'rect', arg);
     if (!r || !r.ok || typeof r.x !== 'number') return false;
     if (!r.topOk) throw new Error('Nút "' + arg.text + '" đang bị che bởi "' + (r.topText || '?') + '" — không bấm để tránh bấm nhầm');
+    // v1.9.66: đi vào nút TỪ BÊN NGOÀI qua vài bước (chuột thật vào nút từ chỗ khác). Nếu chuột đã nằm sẵn đúng chỗ đó từ lần trước
+    // thì một lệnh di chuyển đơn lẻ không tạo sự kiện "vào nút" nên menu rê chuột không mở.
+    wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 80), y: r.y + 60 });
+    await sleep(120);
+    wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 30), y: r.y + 20 });
+    await sleep(120);
     wc.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
     await sleep(250);
     if (mode === 'click') {
@@ -331,7 +338,18 @@ class SaleworkAuto {
       await this._act(win, { text: 'Xuất excel', hover: true }, 'đưa chuột vào "Xuất excel"', watch);
       await sleep(this.opts.stepPause);
       step = 'chọn "Theo bộ lọc"';
-      const seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+      let seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+      // Menu mở khi rê chuột nhưng có lúc chậm / không nhận: rê lại (đi vào nút từ ngoài) tối đa 3 lần, mỗi lần đợi menu hiện.
+      for (let k = 0; k < 3 && !seen.ok; k++) {
+        if (this.abort) throw new Error('Đã dừng theo yêu cầu.');
+        step = 'rê lại chuột vào Xuất excel (lần ' + (k + 2) + ')';
+        await sleep(1200 + k * 800);
+        seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+        if (seen.ok) break;
+        await this._act(win, { text: 'Xuất excel', hover: true }, 'rê lại chuột vào "Xuất excel"', false);
+        await sleep(1500);
+        seen = await this._exec(win, 'exists', { text: 'Theo bộ lọc', mode: 'prefix', inDialog: true });
+      }
       if (!seen.ok) {   // rê chuột chưa mở menu: thử bấm nút
         step = 'bấm Xuất excel';
         await this._act(win, { text: 'Xuất excel' }, 'bấm "Xuất excel"', watch);

@@ -15,3 +15,9 @@ test('lý do "Wrong product sent" được dịch sang tiếng Việt',async()=>
   const c=await run([sw({'Lý do hoàn':'Wrong product sent'})]);
   assert.match(c.orders[0].note,/sai sản phẩm/i);
 });
+test('file Salework: có "Ngày trả hàng thành công" => Đã về kho (chưa kiểm tra), kể cả khi chưa có mã trả hàng',async()=>{
+  const c=await run([sw({'Mã đơn hàng':'587000000000000003','Mã vận đơn':'862700000003','Mã trả hàng':'VTPVN1','Ngày trả hàng thành công':'10:15:22 21/11/2026'}),sw({'Mã đơn hàng':'587000000000000004','Mã vận đơn':'862700000004','Mã trả hàng':'VTPVN2','Ngày trả hàng thành công':''})]);
+  const by=Object.fromEntries(c.orders.map(o=>[o.orderId,o]));
+  assert.equal(by['587000000000000003'].platformStatus,'Đã về kho (chưa kiểm tra)');
+  assert.equal(by['587000000000000004'].platformStatus,'Đang về');
+});

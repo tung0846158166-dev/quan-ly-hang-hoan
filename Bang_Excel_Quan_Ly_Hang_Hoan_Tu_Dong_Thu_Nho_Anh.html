@@ -7783,43 +7783,21 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       const sortedWeeks = Array.from(weekMap.values()).sort((a, b) => b.key.localeCompare(a.key));
 
-      let html = `
-        <button type="button" onclick="setImportWeekFilter('all')"
-                class="px-2.5 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                  currentImportWeekFilter === 'all'
-                    ? 'bg-purple-800 text-white shadow-xs ring-2 ring-purple-300 font-extrabold'
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
-                }">
-          <span>🌐 Tất Cả Các Tuần</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded-full ${
-            currentImportWeekFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-          }">${totalOrdersAllWeeks} đơn (${totalQtyAllWeeks} SP)</span>
-        </button>
-      `;
-
+      // v1.9.77: các tab tuần gộp thành MỘT danh sách chọn để không chiếm chỗ của thanh đầu trang.
+      const optLabel = w => `📅 ${w.label} — ${w.orderCount} đơn (${w.qtyCount} SP)`;
+      const curWeek = sortedWeeks.find(w => w.key === currentImportWeekFilter);
+      let html = `<select id="weekSelect" onchange="setImportWeekFilter(this.value)" title="Chọn tuần nạp đơn"
+          class="px-2 py-1 rounded-lg font-extrabold text-xs cursor-pointer bg-purple-800 text-white ring-2 ring-purple-300 border border-purple-900 max-w-[330px]">
+          <option value="all" ${currentImportWeekFilter === 'all' ? 'selected' : ''}>🌐 Tất Cả Các Tuần — ${totalOrdersAllWeeks} đơn (${totalQtyAllWeeks} SP)</option>`;
       sortedWeeks.forEach(w => {
-        const isActive = (currentImportWeekFilter === w.key);
-        html += `
-          <div class="inline-flex items-center rounded-lg border transition shadow-2xs ${
-            isActive
-              ? 'bg-purple-700 text-white shadow-xs ring-2 ring-purple-300 border-purple-800'
-              : 'bg-white text-purple-900 hover:bg-purple-50 border-purple-200'
-          }">
-            <button type="button" onclick="setImportWeekFilter('${w.key}')"
-                    class="px-2.5 py-1 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
-              <span>📅 ${w.label}</span>
-              <span class="text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                isActive ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-900'
-              }">${w.orderCount} đơn (${w.qtyCount} SP)</span>
-            </button>
-            ${(w.isCustom && w.orderCount === 0) ? `
-              <button type="button" onclick="removeCustomWeekTab('${w.key}')"
-                      class="pr-2 pl-1 py-1 text-[11px] opacity-70 hover:opacity-100 hover:text-rose-300 cursor-pointer"
-                      title="Xóa tab tuần trống này">✕</button>
-            ` : ''}
-          </div>
-        `;
+        html += `<option value="${escapeAttr(w.key)}" ${currentImportWeekFilter === w.key ? 'selected' : ''}>${escapeAttr(optLabel(w))}</option>`;
       });
+      html += `</select>`;
+      if (curWeek && curWeek.isCustom && curWeek.orderCount === 0) {
+        html += `<button type="button" onclick="removeCustomWeekTab('${escapeAttr(curWeek.key)}')"
+            class="px-1.5 py-1 rounded text-[11px] font-bold bg-white text-rose-600 hover:bg-rose-50 border border-rose-300 cursor-pointer"
+            title="Xóa tuần trống này khỏi danh sách">✕</button>`;
+      }
 
       container.innerHTML = html;
     }

@@ -27,3 +27,13 @@ test('Salework: thời gian về được lưu vào returnedAt; đơn Đang về
   assert.equal(by['587000000000000005'].returnedAt,'10:15:22 21/11/2026');
   assert.ok(!by['587000000000000006'].returnedAt);
 });
+test('Salework không có mã yêu cầu hoàn: điền mã vận đơn vào dòng cũ chưa có mã, không tạo đơn trùng',async()=>{
+  const c=mk();
+  c.orders.push({orderId:'587000000000000010',platform:'TikTok Shop',returnOrderId:'4043000000000000001',track:'',returnTrack:'',forwardTrack:'',platformStatus:'Chờ khách gửi hàng',status:'Chưa về',items:[{product:'Áo',color:'Xám',size:'L',qty:1}]});
+  await c.ingestTikTokOnlyRecords([sw({'Mã đơn hàng':'587000000000000010','Mã vận đơn':'862700000010','Mã trả hàng':'VTP10','Ngày trả hàng thành công':'10:15:22 21/11/2026'})]);
+  const list=c.orders.filter(o=>o.orderId==='587000000000000010');
+  assert.equal(list.length,1,'không được tạo thêm đơn');
+  assert.equal(list[0].forwardTrack,'862700000010');assert.equal(list[0].returnTrack,'VTP10');
+  assert.equal(list[0].platformStatus,'Đã về');assert.equal(list[0].returnedAt,'10:15:22 21/11/2026');
+  assert.equal(list[0].returnOrderId,'4043000000000000001');
+});

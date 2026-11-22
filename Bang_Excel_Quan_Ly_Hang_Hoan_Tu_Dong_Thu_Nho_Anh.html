@@ -3985,6 +3985,33 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return Boolean(left.orderId && String(left.orderId).trim().toUpperCase() === String(right.orderId || '').trim().toUpperCase());
     }
 
+    // v1.9.68: Dòng Salework không có "mã yêu cầu hoàn" của TikTok nên trước đây bị coi là kiện KHÁC và tạo thêm đơn mới,
+    // còn dòng cũ (do file hoàn tiền TikTok / Google Sheet tạo, chưa có mã vận đơn nào) vẫn trống mã. Nay điền mã vào chính dòng cũ đó.
+    function findTracklessSameOrderIndex(orderData) {
+      if (!orderData || getReturnParcelId(orderData)) return -1;
+      if (!extractCleanTrackingCode(orderData.returnTrack || orderData.track || orderData.forwardTrack || '')) return -1;
+      const oid = String(orderData.orderId || '').trim().toUpperCase();
+      if (!oid) return -1;
+      for (let i = 0; i < orders.length; i++) {
+        const o = orders[i];
+        if (!o || String(o.orderId || '').trim().toUpperCase() !== oid) continue;
+        if (o.platform && o.platform !== 'TikTok Shop') continue;
+        if (extractCleanTrackingCode(o.track || '') || extractCleanTrackingCode(o.returnTrack || '') || extractCleanTrackingCode(o.forwardTrack || '') || extractCleanTrackingCode(o.altTrack || '')) continue;
+        return i;
+      }
+      return -1;
+    }
+    function fillTracklessFromSalework(order, orderData) {
+      ['track', 'forwardTrack', 'returnTrack'].forEach(k => { if (orderData[k]) order[k] = orderData[k]; });
+      order.trackingCodes = Array.from(new Set([...getOrderTrackingCodes(order), ...getOrderTrackingCodes(orderData)].filter(Boolean)));
+      if (orderData.carrier && (!order.carrier || order.carrier === 'Chờ bưu cục tiếp nhận')) order.carrier = orderData.carrier;
+      if (orderData.platformStatus) order.platformStatus = orderData.platformStatus;
+      if (orderData.returnedAt) order.returnedAt = orderData.returnedAt;
+      if (orderData.returnDate && !order.returnDate) order.returnDate = orderData.returnDate;
+      if (Array.isArray(order.items) && Array.isArray(orderData.items) && orderData.items.some(it => it && it.product) && !order.items.some(it => it && it.product && !/Sản phẩm mới|Chưa rõ sản phẩm/.test(it.product))) order.items = orderData.items;
+      return order;
+    }
+
     function parseImportedTrackingCodes(row) {
       const raw = row['Tracking Codes'] || row['Mã vận đơn lịch sử'] || '';
       if (!raw) return [];
@@ -5987,7 +6014,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
           const cleanRetOrderId = String(orderData.returnOrderId || '').trim().toUpperCase();
 
-          const existingIdx = findExistingReturnParcelIndex(orderData);
+          let existingIdx = findExistingReturnParcelIndex(orderData);
+          if (existingIdx === -1) {
+            const fillIdx = typeof findTracklessSameOrderIndex === 'function' ? findTracklessSameOrderIndex(orderData) : -1;
+            if (fillIdx !== -1) {
+              fillTracklessFromSalework(orders[fillIdx], orderData);
+              if (typeof findExistingReturnParcelIndex.touch === 'function') findExistingReturnParcelIndex.touch(orders[fillIdx], fillIdx);
+              enrichedTableCount++;
+              return;
+            }
+          }
 
           if (existingIdx !== -1) {
             const oldPlatStatus = orders[existingIdx].platformStatus || '';
@@ -8188,6 +8224,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const d = parseFullDate(tf ? tf[2] + ' ' + tf[1] : s);
       return (d && !isNaN(d.getTime())) ? d : null;
     }
+    // v1.9.68: CHỈ đơn "Đã về" (có thời gian về) hoặc đơn "Hủy sau chuẩn bị" mới được báo vàng / báo đỏ. Đơn khác (Đang về, Chờ khách gửi hàng...) không báo.
+    function isCancelAfterPrepOrder(order) {
+      if (!order) return false;
+      const txt = [order.platformStatus, order.rawDetails && order.rawDetails.returnStatus, order.rawDetails && order.rawDetails.cancelType, order.note]
+        .map(v => removeVietnameseTones(String(v || '')).toLowerCase()).join(' | ');
+      return /huy\s*sau\s*(khi\s*)?chuan\s*bi/.test(txt);
+    }
+    function isOrderAlertEligible(order) {
+      return Boolean(getOrderArrivedAt(order)) || isCancelAfterPrepOrder(order);
+    }
     function getOrderReturnElapsedInfo(order) {
       if (!order) return { level: 'none', status: 'none', text: '', timeStr: '', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       const isRecv = isOrderReceived(order);
@@ -8207,6 +8253,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const arrivedAt = getOrderArrivedAt(order);
       const refStr = arrivedAt ? (order.returnedAt || (order.rawDetails && order.rawDetails.returnSuccessTime)) : order.returnDate;
       const dangerH = arrivedAt ? ARRIVED_DANGER_HOURS : 72, warnH = arrivedAt ? ARRIVED_WARN_HOURS : 48;
+      const alertEligible = Boolean(arrivedAt) || isCancelAfterPrepOrder(order);
       if (!refStr) {
         return {
           level: 'none',
@@ -8245,7 +8292,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
-      if (totalHours >= dangerH) {
+      if (totalHours >= dangerH && alertEligible) {
         return {
           level: 'danger',
           status: 'overdue',
@@ -8260,7 +8307,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ và < 72 giờ) mà vẫn chưa nhận được hàng
-      if (totalHours >= warnH) {
+      if (totalHours >= warnH && alertEligible) {
         return {
           level: 'warning',
           status: 'upcoming',
@@ -8274,8 +8321,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         };
       }
 
+      // Đơn không thuộc diện báo (chưa về / không phải hủy sau chuẩn bị): không báo vàng/đỏ, chỉ hiện thời gian đã qua.
+      if (!alertEligible) {
+        return { level: 'none', status: 'none', text: order.deadline || '⏳ Chưa về — không báo', timeStr: timeStr, badgeText: '', rawElapsedHours: totalHours, elapsedHours: totalHours, elapsedMinutes: remMinutes, elapsedDays: days };
+      }
+
       // DƯỚI 2 NGÀY (< 48 giờ): Trong hạn an toàn
       return {
+        rawElapsedHours: totalHours,
         level: 'safe',
         status: 'normal',
         text: arrivedAt ? `⏳ Trong hạn (< 12h từ lúc về)` : `⏳ Trong hạn (< 2 ngày)`,
@@ -8299,7 +8352,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elapsed.level === 'warning') return 'upcoming';
 
       // Nếu có nhập hạn sàn cụ thể (đơn đã có thời gian về thì chỉ tính theo 12h/24h kể từ lúc về)
-      if (order.deadline && !elapsed.fromArrival) {
+      if (order.deadline && !elapsed.fromArrival && isCancelAfterPrepOrder(order)) {
         const dt = parseFullDate(order.deadline);
         if (dt) {
           const diffMs = dt.getTime() - Date.now();
@@ -8342,7 +8395,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function getOrderAlertLevel(order) {
       if (!isOrderPending(order)) return '';
       const st = getDeadlineStatus(order);
-      if (st === 'overdue' || isOrderOverdue(order, 72)) return 'overdue';
+      if (st === 'overdue') return 'overdue';
       if (st === 'upcoming') return 'soon';
       return '';
     }
@@ -8379,7 +8432,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function isOrderOverdue(order, thresholdHours = 72) {
       if (!isOrderPending(order)) return false;
       const elapsed = getOrderReturnElapsedInfo(order);
-      return elapsed.level === 'danger' || elapsed.elapsedHours >= thresholdHours;
+      return elapsed.level === 'danger' || (elapsed.rawElapsedHours !== undefined ? elapsed.rawElapsedHours : elapsed.elapsedHours) >= thresholdHours;
     }
 
     function getOrderAgeText(order) {

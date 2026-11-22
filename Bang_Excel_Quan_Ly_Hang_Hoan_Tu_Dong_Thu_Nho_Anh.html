@@ -955,6 +955,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         <button type="button" id="btnClearMainSearch" onclick="clearMainSearch()" title="Xóa từ khóa tìm kiếm" class="ml-2 px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap">✕ Xóa</button>
       </div>
 
+      <div id="searchDeletedHint" class="hidden w-full"></div>
+
       <!-- Pipeline Status Tabs (Gộp số đơn, màu sắc rõ nét) -->
       <div class="flex flex-wrap items-center gap-1 text-[11px]" id="pipelineTabs">
         <button type="button" onclick="setPipelineFilter('all')" id="tabBtn_all"
@@ -12621,6 +12623,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function recalcTotalsAndSummary(skipDomRebuildIfTyping = false) {
       updatePlatformSwitcherUI();
       const kw = document.getElementById('searchInput').value.trim();
+      try { updateSearchDeletedHint(kw); } catch (e) {}
 
       let totalQty = 0;
       let totalPrice = 0;
@@ -21470,6 +21473,31 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       });
       body.innerHTML = rows.join('') || '<tr><td colspan="6" class="text-center py-8 text-slate-400">Chưa có đơn nào bị xóa.</td></tr>';
     }
+    // v1.9.61: Khi tìm kiếm ở bảng chính mà từ khóa khớp đơn ĐÃ XÓA thì báo rõ "đã xóa" (kèm nút khôi phục).
+    function findDeletedMatchesForSearch(kw) {
+      const tokens = String(kw || '').split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(x => x.length >= 4);
+      if (!tokens.length) return [];
+      const out = [];
+      getDeletedOrders().forEach((o, i) => {
+        const keys = [o.orderId, o.track, o.returnTrack, o.forwardTrack].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+        if (tokens.some(tk => keys.some(k => k === tk || k.includes(tk)))) out.push(i);
+      });
+      return out;
+    }
+    function updateSearchDeletedHint(kw) {
+      const el = document.getElementById('searchDeletedHint'); if (!el) return;
+      const idx = findDeletedMatchesForSearch(kw);
+      if (!idx.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const list = getDeletedOrders();
+      const rows = idx.slice(0, 5).map(i => {
+        const o = list[i];
+        const from = o.deletedFrom === 'archive' ? 'Kho lưu trữ' : (o.deletedFrom === 'cancelled' ? 'Đơn hủy' : 'Bảng chính');
+        return `<div class="flex flex-wrap items-center gap-2 py-0.5"><span class="font-mono font-bold">${escapeAttr(o.orderId || o.track || '-')}</span><span class="text-rose-700 font-bold">🗑 ĐÃ XÓA</span><span class="text-slate-500">(từ ${escapeAttr(from)}${o.deletedAt ? ', ' + escapeAttr(o.deletedAt) : ''})</span><button type="button" onclick="restoreDeletedFromSearch(${i})" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded">↩ Khôi phục</button></div>`;
+      }).join('');
+      el.innerHTML = `<div class="mt-1 px-3 py-1.5 rounded-lg border border-rose-300 bg-rose-50 text-[11px] text-rose-900">${rows}${idx.length > 5 ? `<div class="text-slate-500">…và ${idx.length - 5} đơn đã xóa khác</div>` : ''}<button type="button" onclick="openDeletedOrdersModal()" class="underline text-blue-700 font-bold">Mở danh sách Đơn Đã Xóa</button></div>`;
+      el.classList.remove('hidden');
+    }
+    function restoreDeletedFromSearch(i) { restoreDeletedOrder(i); updateSearchDeletedHint(document.getElementById('searchInput').value.trim()); }
     function restoreDeletedOrder(i) {
       const list = getDeletedOrders(); const o = list[i]; if (!o) return;
       const back = Object.assign({}, o); delete back.deletedAt; delete back.deletedFrom;

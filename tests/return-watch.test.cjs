@@ -10,8 +10,8 @@ function make(orders) {
   c.removeVietnameseTones = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
   c.extractCleanTrackingCode = v => String(v || '').trim().toUpperCase();
   c.getOrderArrivedAt = o => o.arrivedAt ? new Date(o.arrivedAt) : null;
-  vm.runInContext("const RW_STAGES = ['', 'Đã đồng ý', 'Đang về', 'Đã về shop', 'Đã nhận kho'];\n" + html.match(/^    const RW_AGREED_RE = .*$/m)[0], c);
-  ['isReturnAgreedStatus', 'getReturnWatchStage', 'syncReturnWatchFlags', 'isInReturnWatch'].forEach(n => vm.runInContext(extract(n), c));
+  vm.runInContext("const RW_STAGES = ['', 'Đã đồng ý', 'Đang về', 'Đã về shop', 'Đã nhận kho'];\n" + html.match(/^    const RW_AGREED_RE = .*$/m)[0] + '\n' + html.match(/^    const RW_TIKTOK_RE = .*$/m)[0], c);
+  ['isReturnAgreedStatus', 'isReturnWatchEntryStatus', 'getReturnWatchStage', 'syncReturnWatchFlags', 'isInReturnWatch'].forEach(n => vm.runInContext(extract(n), c));
   return c;
 }
 test('đơn có trạng thái sàn "Đã đồng ý" và chưa nhận thì được đánh dấu vào bảng, chỉ một lần', () => {
@@ -60,4 +60,15 @@ test('menu Nhập / Xuất có lối mở nhanh các bảng', () => {
     assert.ok(menu.includes(fn + '();'), fn + ' phải có trong menu');
     assert.ok(new RegExp('function ' + fn + '\\s*\\(').test(html), fn + ' phải là hàm có thật');
   }
+});
+
+// v1.9.76: đơn TikTok vào bảng theo trạng thái chờ hàng về
+test('đơn TikTok chờ khách gửi / đang về / đang vận chuyển về vào bảng; đơn đã hoàn tất, đã hủy thì không; Shopee "Đang về" thì không', () => {
+  const tt = st => ({ platform: 'TikTok Shop', platformStatus: st, status: 'Chưa trả' });
+  const orders = [tt('Chờ khách gửi hàng'), tt('Đang về'), tt('Đang vận chuyển về'), tt('Đã hoàn tất'), tt('Khách đã hủy yêu cầu'), tt('Đã về'),
+    { platform: 'Shopee', platformStatus: 'Đang về', status: 'Chưa trả' }, { platform: 'TikTok Shop', platformStatus: 'Chờ khách gửi hàng', status: 'Hàng đã trả' }];
+  const c = make(orders);
+  assert.strictEqual(c.syncReturnWatchFlags(), 3);
+  assert.ok(orders[0].rwSince && orders[1].rwSince && orders[2].rwSince);
+  [3, 4, 5, 6, 7].forEach(i => assert.ok(!orders[i].rwSince, 'đơn ' + i + ' không được vào bảng'));
 });

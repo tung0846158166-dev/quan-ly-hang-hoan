@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.75
+          name: QuanLyHangHoan-Windows-Installer-v1.9.76
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.75
-          name: "Quản Lý Hàng Hoàn v1.9.75 — Mở nhanh các bảng trong menu Nhập / Xuất"
+          tag_name: v1.9.76
+          name: "Quản Lý Hàng Hoàn v1.9.76 — Bảng Hàng Hoàn Về nhận cả đơn TikTok"
           body: |
+            ### Bản 1.9.76
+
+            - 🚚 **Bảng Hàng Hoàn Về nhận cả đơn TikTok.** Trước đây bảng chỉ nhận đơn Shopee có trạng thái "Đã đồng ý". Nay đơn TikTok có trạng thái **Chờ khách gửi hàng**, **Đang về** hoặc **Đang vận chuyển về** cũng tự vào bảng, theo dõi các chặng như đơn Shopee. Lần mở đầu tiên, các đơn TikTok đang ở các trạng thái này (dữ liệu của bạn khoảng hơn 500 đơn) sẽ vào bảng một lượt; đơn đã nhận, không cần nhận hoặc bị mất không vào.
+
             ### Bản 1.9.75
 
             - 🗂 Menu **📂 Nhập / Xuất** có thêm mục **Mở nhanh các bảng**: Hàng Hoàn Về, Kho lưu trữ, Bảng đơn mới, Bảng đơn hủy, Phân tích, Thống kê, Tạo đơn nhanh, Ca quét. Các nút này ở thanh đầu trang bị tràn khỏi màn hình nhỏ nên không bấm được; nút cũ vẫn giữ nguyên.

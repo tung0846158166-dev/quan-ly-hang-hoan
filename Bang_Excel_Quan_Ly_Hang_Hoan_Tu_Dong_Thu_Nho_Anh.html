@@ -21812,6 +21812,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     const RW_STAGES = ['', 'Đã đồng ý', 'Đang về', 'Đã về shop', 'Đã nhận kho'];
     let returnWatchFilter = 'active';
     const RW_AGREED_RE = /(đồng|dong)\s*(ý|y)|agreed/i;
+    // v1.9.76: TikTok không có trạng thái "Đã đồng ý"; đơn TikTok đang chờ hàng về (khách chưa gửi / đang về / đang vận chuyển về) cũng vào bảng.
+    const RW_TIKTOK_RE = /cho khach gui hang|dang ve\b|dang van chuyen ve/;
+    function isReturnWatchEntryStatus(o) {
+      const ps = o && typeof o.platformStatus === 'string' ? o.platformStatus : '';
+      if (!ps) return false;
+      if (RW_AGREED_RE.test(ps.normalize('NFC'))) return true;
+      if (o.platform === 'TikTok Shop') return RW_TIKTOK_RE.test(removeVietnameseTones(ps).toLowerCase());
+      return false;
+    }
     function isReturnAgreedStatus(o) {
       const t = String((o && o.platformStatus) || '') + ' ' + String((o && o.rawDetails && o.rawDetails.returnStatus) || '');
       return RW_AGREED_RE.test(t.normalize('NFC'));
@@ -21834,7 +21843,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const now = Date.now();
       for (const o of orders) {
         if (!o || o.rwSince || o.rwOff || typeof o.platformStatus !== 'string') continue;
-        if (!RW_AGREED_RE.test(o.platformStatus.normalize('NFC'))) continue;
+        if (!isReturnWatchEntryStatus(o)) continue;
         if (isOrderReceived(o) || isOrderUnneeded(o) || o.status === 'Bị mất') continue;
         o.rwSince = now; n++;
       }

@@ -27,3 +27,12 @@ test('các đường xóa đều ghi nhớ; import bỏ qua đơn đã xóa',()=
   assert.equal((html.match(/buildOtherTablesIndex\(true\)/g)||[]).length,2);
   assert.equal((html.match(/=== 'deleted'\) \{ skippedDeleted\+\+; return; \}/g)||[]).length,2);
 });
+test('tìm kiếm khớp đơn đã xóa thì có gợi ý đã xóa',()=>{
+  const c=mk();vm.runInContext(fn('findDeletedMatchesForSearch'),c);
+  c.addToDeletedOrders({orderId:'ABC12345',track:'SPX999'},'main');
+  assert.deepEqual([...c.findDeletedMatchesForSearch('abc12345')],[0]);
+  assert.deepEqual([...c.findDeletedMatchesForSearch('xx\nspx999, zzzz')],[0]);
+  assert.deepEqual([...c.findDeletedMatchesForSearch('abc')],[]);
+  assert.deepEqual([...c.findDeletedMatchesForSearch('')],[]);
+  assert.equal(/updateSearchDeletedHint\(kw\)/.test(html),true);
+});

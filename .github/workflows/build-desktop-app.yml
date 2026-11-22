@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.59
+          name: QuanLyHangHoan-Windows-Installer-v1.9.60
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.59
+          tag_name: v1.9.60
           name: "Quản Lý Hàng Hoàn v1.9.55 — Sửa kho lưu trữ bị ghi đè bản cũ, báo rõ lý do khi không dời được đơn"
           body: |
+            ### Bản 1.9.60
+
+            - 🗑️ Mới: **Đơn Đã Xóa**. Đơn bạn xóa (ở Bảng chính, Bảng đơn hủy hoặc Kho lưu trữ) được ghi nhớ, nên khi cập nhật dữ liệu từ sàn (Google Sheet, file Excel Shopee/TikTok) app **không tự tạo lại** đơn đó. Xem, khôi phục hoặc "Cho phép nạp lại" tại menu Hệ Thống > Đơn Đã Xóa. Danh sách được lưu ra ổ cứng cùng dữ liệu khác. Thêm đơn thủ công hoặc quét bằng điện thoại vẫn tạo được bình thường.
+
             ### Bản 1.9.59
 
             - 📋 Bảng Theo Dõi Đơn Hàng Đặc Biệt: bấm vào Mã Đơn Hàng (hoặc Mã Vận Đơn) là sao chép ngay vào clipboard và báo nhỏ ở góc màn hình. Nguyên nhân trước đây bấm không chép được: hàm sao chép dùng ở 15 chỗ (Bảng theo dõi, chi tiết đơn, biên bản giao nhận...) chưa được định nghĩa, nay đã có nên các nút sao chép khác cũng hoạt động.

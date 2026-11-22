@@ -20,7 +20,8 @@ const AUX_KEYS = [
   'deadline_notified_v1',
   'shopee_preferred_platform_workspace',
   'tiktok_price_col_mode_v1',
-  'shopee_excel_phone_room_v1'
+  'shopee_excel_phone_room_v1',
+  'shopee_deleted_orders_v1'
 ];
 const MAX_AUX_BYTES = 512 * 1024 * 1024;
 

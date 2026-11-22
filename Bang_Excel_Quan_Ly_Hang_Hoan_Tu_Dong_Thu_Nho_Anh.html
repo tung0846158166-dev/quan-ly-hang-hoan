@@ -720,6 +720,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               </button>
 
               <button
+                onclick="closeAllHeaderMenus(); openDeletedOrdersModal();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
+              >
+                <div class="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0 font-bold text-xs">🗑️</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold text-xs text-slate-900 group-hover:text-orange-600">Đơn Đã Xóa <span id="deletedOrdersBadge" class="ml-1 px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px]">0</span></div>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Đơn bạn đã xóa không bị nạp lại từ sàn; xem và khôi phục tại đây</p>
+                </div>
+              </button>
+
+              <button
                 onclick="closeAllHeaderMenus(); removeDuplicatesAcrossTables();"
                 class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer"
               >
@@ -1403,6 +1414,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
         <span>💡 Mẹo: Bấm <b>"🎯 Định Vị Đơn"</b> tại thông báo để máy tính tự động cuộn đến đơn và nháy xanh!</span>
         <span id="notifFilteredCountText" class="font-bold text-slate-700">0 thông báo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Đơn đã xóa (v1.9.60) -->
+  <div id="deletedOrdersModal" onclick="closeDeletedOrdersModal()" class="fixed inset-0 bg-slate-900/80 z-[100] hidden flex items-center justify-center p-3 sm:p-5">
+    <div class="relative w-full max-w-[1100px] h-[88vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+      <div class="bg-gradient-to-r from-rose-700 to-rose-500 text-white px-5 py-3 flex items-center justify-between">
+        <div><div class="font-extrabold text-base">🗑️ ĐƠN ĐÃ XÓA</div><div class="text-[11px] opacity-90">Đơn nằm ở đây sẽ không bị tạo lại khi cập nhật dữ liệu từ sàn (Google Sheet, file Excel Shopee/TikTok).</div></div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="clearDeletedOrders()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold">Xóa cả danh sách</button>
+          <button type="button" onclick="closeDeletedOrdersModal()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold">✕ Đóng</button>
+        </div>
+      </div>
+      <div class="p-3 border-b border-slate-200"><input id="deletedOrdersSearch" oninput="renderDeletedOrdersTable()" placeholder="Tìm mã đơn, mã vận đơn, tên sản phẩm..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></div>
+      <div class="flex-1 overflow-auto">
+        <table class="w-full text-xs"><thead class="sticky top-0 bg-slate-900 text-white"><tr><th class="px-2 py-2 w-10">#</th><th class="px-2 py-2 text-left">Mã đơn</th><th class="px-2 py-2 text-left">Mã vận đơn</th><th class="px-2 py-2 text-left">Sản phẩm</th><th class="px-2 py-2">Xóa từ / lúc</th><th class="px-2 py-2">Thao tác</th></tr></thead><tbody id="deletedOrdersBody"></tbody></table>
       </div>
     </div>
   </div>
@@ -3984,7 +4012,38 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return set;
     }
     function orderIdKey(o) { return String((o && o.orderId) || '').trim().toUpperCase(); }
-    function buildOtherTablesIndex() {
+    // ===== Đơn đã xóa (v1.9.60): đơn bạn xóa được ghi nhớ để lần nạp dữ liệu sàn sau KHÔNG tự tạo lại. Có thể xem/khôi phục. =====
+    const DELETED_ORDERS_KEY = 'shopee_deleted_orders_v1';
+    const DELETED_ORDERS_CAP = 5000;
+    let deletedOrders = null;
+    function getDeletedOrders() {
+      if (deletedOrders) return deletedOrders;
+      deletedOrders = [];
+      try { const p = JSON.parse(localStorage.getItem(DELETED_ORDERS_KEY) || '[]'); if (Array.isArray(p)) deletedOrders = p; } catch (e) {}
+      return deletedOrders;
+    }
+    function saveDeletedOrders() {
+      try { localStorage.setItem(DELETED_ORDERS_KEY, JSON.stringify(getDeletedOrders())); return true; }
+      catch (e) { console.warn('Không lưu được danh sách đơn đã xóa:', e); return false; }
+    }
+    function addToDeletedOrders(list, from) {
+      try {
+        const keep = getDeletedOrders();
+        const stamp = new Date().toLocaleString('vi-VN');
+        (Array.isArray(list) ? list : [list]).forEach(o => {
+          if (!o || typeof o !== 'object') return;
+          if (!orderIdKey(o) && !orderTrackingCodes(o).size) return;
+          const slim = Object.assign({}, o);
+          delete slim.photo; delete slim.photoId; delete slim.photoHistory; delete slim.isWatchlist;
+          slim.deletedAt = stamp; slim.deletedFrom = from || 'main';
+          keep.unshift(slim);
+        });
+        if (keep.length > DELETED_ORDERS_CAP) keep.length = DELETED_ORDERS_CAP;
+        saveDeletedOrders();
+        if (typeof updateDeletedOrdersBadge === 'function') updateDeletedOrdersBadge();
+      } catch (e) { console.warn('Lỗi ghi nhớ đơn đã xóa:', e); }
+    }
+    function buildOtherTablesIndex(includeDeleted) {
       const map = new Map();
       const put = (k, where) => { if (k && !map.has(k)) map.set(k, where); };
       const addAll = (list, where) => {
@@ -3997,6 +4056,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       };
       try { addAll(archivedOrders, 'archive'); } catch (e) {}
       try { addAll(cancelledOrders, 'cancelled'); } catch (e) {}
+      if (includeDeleted) { try { addAll(getDeletedOrders(), 'deleted'); } catch (e) {} }
       return map;
     }
     // loose = true (điện thoại quét một mã bất kỳ): mã quét có thể là mã đơn nên so cả mã đơn.
@@ -5907,12 +5967,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
-      let skippedOther = 0, enrichedOtherCount = 0;
+      let skippedOther = 0, skippedDeleted = 0, enrichedOtherCount = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
         findExistingReturnParcelIndex.index = null;
-        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex() : new Map();
+        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex(true) : new Map();
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanOrderId = String(orderData.orderId || '').trim().toUpperCase();
@@ -5947,7 +6007,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
           } else {
             // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
-            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { if (findInOtherTables(otherIdx, orderData) === 'deleted') { skippedDeleted++; return; } const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -6027,6 +6087,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         (skippedCount > 0 ? `  Đã tự động lọc bỏ ${skippedCount} đơn vận chuyển thông thường (không phải đơn hoàn)\n` : '') +
         (enrichedOtherCount > 0 ? `  Cập nhật thông tin ${enrichedOtherCount} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (không tạo đơn mới)\n` : '') +
         (skippedOther > 0 ? `  Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') +
+        (skippedDeleted > 0 ? `  Bỏ qua ${skippedDeleted} đơn bạn đã xóa trước đó (xem ở Hệ Thống > Đơn Đã Xóa)\n` : '') +
         '\n👉 Hệ thống đã tự động chuyển giao diện sang tab [⚫ SÀN TIKTOK SHOP] để bạn theo dõi riêng biệt!'
       );
       return { success: true };
@@ -6649,12 +6710,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const pushToMain = document.getElementById('chkPushToMainOrders')?.checked ?? true;
       let newTableCount = 0;
       let enrichedTableCount = 0;
-      let skippedOther = 0, enrichedOtherCount = 0;
+      let skippedOther = 0, skippedDeleted = 0, enrichedOtherCount = 0;
 
       if (pushToMain) {
         const today = new Date().toLocaleDateString('vi-VN');
         findExistingReturnParcelIndex.index = null;
-        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex() : new Map();
+        const otherIdx = typeof buildOtherTablesIndex === 'function' ? buildOtherTablesIndex(true) : new Map();
         tempMap.forEach(orderData => {
           const cleanTrack = extractCleanTrackingCode(orderData.track || '');
           const cleanAltTrack = extractCleanTrackingCode(orderData.altTrack || '');
@@ -6692,7 +6753,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             }
           } else {
             // v1.9.9: đơn đã nằm ở kho lưu trữ / bảng đơn hủy thì không đẩy lại ra bảng chính như đơn mới.
-            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
+            if (typeof findInOtherTables === 'function' && findInOtherTables(otherIdx, orderData)) { if (findInOtherTables(otherIdx, orderData) === 'deleted') { skippedDeleted++; return; } const eo = enrichOtherTableEntry(orderData); if (eo.changed) enrichedOtherCount++; else skippedOther++; return; }
             let targetIdx = orders.length;
             if (orders.length > 0) {
               const last = orders[orders.length - 1];
@@ -6742,6 +6803,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         });
 
         if (enrichedOtherCount > 0) runImportUi('showAppToast', `🔄 Đã cập nhật thông tin ${enrichedOtherCount} đơn có sẵn ở Kho lưu trữ / Bảng đơn hủy (không tạo đơn mới).`, 'info', 6000);
+        if (skippedDeleted > 0) runImportUi('showAppToast', `⏭️ Bỏ qua ${skippedDeleted} đơn bạn đã xóa trước đó`, 'info', 3500);
         if (skippedOther > 0) runImportUi('showAppToast', `⏭️ Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (không đẩy trùng ra bảng chính).`, 'info', 6000);
         if (importState && !(await commitImportState(importState))) return { success: false };
         runImportUi('renderAll');
@@ -6758,7 +6820,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       notifyImportResult(`🎉 ĐÃ NẠP THÀNH CÔNG ${addedCount} ĐƠN HÀNG SHOPEE!\n\n` +
             `• Phân loại sàn: 🟠 Sàn Shopee (${shopeeAddedCount} đơn)${tiktokAddedCount > 0 ? ` | ⚫ Sàn TikTok Shop (${tiktokAddedCount} đơn)` : ''}\n` +
             (pushToMain ? `• Đã tự động đẩy ${newTableCount} đơn mới ra Bảng chính (Trạng thái: 🟡 Chưa trả - Đang chờ)!\n• Cập nhật đè thông tin cho: ${enrichedTableCount} đơn có sẵn\n` : '') +
-            (skippedOther > 0 ? `• Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') +
+            (skippedOther > 0 ? `• Bỏ qua ${skippedOther} đơn đã có ở Kho lưu trữ / Bảng đơn hủy (chống trùng bảng chính)\n` : '') + (skippedDeleted > 0 ? `• Bỏ qua ${skippedDeleted} đơn bạn đã xóa trước đó (xem ở Hệ Thống > Đơn Đã Xóa)\n` : '') +
             (multiItemAppendedCount > 0 ? `• Đã tự động gộp ${multiItemAppendedCount} sản phẩm thứ 2, 3 vào đúng đơn hàng nhiều SP!\n` : '') +
             (skippedSuccessCount > 0 ? `• Đã tự động lọc bỏ ${skippedSuccessCount} dòng đơn giao thành công hoặc yêu cầu trả hàng đã hủy.\n` : ''));
       return { success: true };
@@ -10694,6 +10756,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (o && o.photoId) {
         deletePhotoFromDb(o.photoId);
       }
+      addToDeletedOrders(o, 'main');
       orders.splice(orderIdx, 1);
       shiftCellLocksAfterOrderDelete(orderIdx);
       shiftCellEditHistoryAfterOrderDelete(orderIdx);
@@ -18933,6 +18996,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const snapshot = cancelledOrders.slice();
       cancelledOrders = cancelledOrders.filter(o => !ids.has(o.id));
       if (!saveCancelledOrders().success) { cancelledOrders = snapshot; return; }
+      addToDeletedOrders(list, 'cancelled');
       list.forEach(o => { if (o.photoId && typeof deletePhotoFromDb === 'function') deletePhotoFromDb(o.photoId); });
       selectedCancelledIds.clear();
       applyCancelledFilters();
@@ -19610,6 +19674,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       );
       if (!choice) return;
 
+      addToDeletedOrders(archivedOrders.filter(o => archivedSelectedIds.has(o.orderId || o.track)), 'archive');
       archivedOrders = archivedOrders.filter(o => {
         const id = o.orderId || o.track;
         return !archivedSelectedIds.has(id);
@@ -19793,6 +19858,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       loadOrders();
       loadArchivedOrders();
       setTimeout(() => checkAndAutoArchiveOrders(false), 1200);
+      try { updateDeletedOrdersBadge(); } catch (e) {}
       loadEmbeddedDataFromFile();
       loadShopeeOrderDb();
       refreshAutocompleteDatalists();
@@ -21265,6 +21331,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (o.photoId) {
             deletePhotoFromDb(o.photoId);
           }
+          addToDeletedOrders(o, 'main');
           orders.splice(idx, 1);
           shiftCellLocksAfterOrderDelete(idx);
           shiftSelectedOrdersAfterDelete(idx);
@@ -21368,6 +21435,60 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const inp = document.getElementById('watchlistSearchInput');
         if (inp) inp.focus();
       }, 100);
+    }
+
+    function updateDeletedOrdersBadge() {
+      const el = document.getElementById('deletedOrdersBadge');
+      if (el) el.textContent = String(getDeletedOrders().length);
+    }
+    function openDeletedOrdersModal() {
+      const m = document.getElementById('deletedOrdersModal'); if (!m) return;
+      m.classList.remove('hidden'); renderDeletedOrdersTable();
+    }
+    function closeDeletedOrdersModal() { const m = document.getElementById('deletedOrdersModal'); if (m) m.classList.add('hidden'); }
+    function renderDeletedOrdersTable() {
+      const body = document.getElementById('deletedOrdersBody'); if (!body) return;
+      const kw = (document.getElementById('deletedOrdersSearch')?.value || '').trim().toLowerCase();
+      const list = getDeletedOrders();
+      updateDeletedOrdersBadge();
+      const rows = [];
+      list.forEach((o, i) => {
+        const prod = (o.items || []).map(x => x && x.product).filter(Boolean).join(', ');
+        const hay = [o.orderId, o.track, o.returnTrack, o.forwardTrack, prod].join(' ').toLowerCase();
+        if (kw && !hay.includes(kw)) return;
+        const from = o.deletedFrom === 'archive' ? 'Kho lưu trữ' : (o.deletedFrom === 'cancelled' ? 'Đơn hủy' : 'Bảng chính');
+        rows.push(`<tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-2 py-1.5 text-center text-slate-500">${rows.length + 1}</td>
+          <td class="px-2 py-1.5 font-mono font-bold">${escapeAttr(o.orderId || '-')}</td>
+          <td class="px-2 py-1.5 font-mono text-blue-700">${escapeAttr(o.track || o.returnTrack || '-')}</td>
+          <td class="px-2 py-1.5 text-[11px]">${escapeAttr(prod || '-')}</td>
+          <td class="px-2 py-1.5 text-center text-[11px]">${escapeAttr(from)}<br><span class="text-slate-400">${escapeAttr(o.deletedAt || '')}</span></td>
+          <td class="px-2 py-1.5 text-center whitespace-nowrap">
+            <button type="button" onclick="restoreDeletedOrder(${i})" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded">↩ Khôi phục</button>
+            <button type="button" onclick="forgetDeletedOrder(${i})" class="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[10px] rounded" title="Bỏ khỏi danh sách: lần nạp dữ liệu sàn sau đơn này có thể xuất hiện lại">Cho phép nạp lại</button>
+          </td></tr>`);
+      });
+      body.innerHTML = rows.join('') || '<tr><td colspan="6" class="text-center py-8 text-slate-400">Chưa có đơn nào bị xóa.</td></tr>';
+    }
+    function restoreDeletedOrder(i) {
+      const list = getDeletedOrders(); const o = list[i]; if (!o) return;
+      const back = Object.assign({}, o); delete back.deletedAt; delete back.deletedFrom;
+      if (o.deletedFrom === 'archive') { archivedOrders.unshift(back); saveArchivedOrders(); }
+      else if (o.deletedFrom === 'cancelled') { cancelledOrders.unshift(back); saveCancelledOrders(); }
+      else { orders.push(back); saveOrders(); }
+      list.splice(i, 1); saveDeletedOrders();
+      renderDeletedOrdersTable(); renderAll(false);
+      showAppToast('↩ Đã khôi phục đơn ' + (back.orderId || back.track || '') + (o.deletedFrom === 'archive' ? ' về Kho lưu trữ' : o.deletedFrom === 'cancelled' ? ' về Bảng đơn hủy' : ' về Bảng chính'), 'success');
+    }
+    function forgetDeletedOrder(i) {
+      const list = getDeletedOrders(); const o = list[i]; if (!o) return;
+      list.splice(i, 1); saveDeletedOrders(); renderDeletedOrdersTable();
+      showAppToast('Đã bỏ khỏi danh sách đã xóa: ' + (o.orderId || o.track || '') + ' (lần nạp sàn sau có thể xuất hiện lại)', 'info');
+    }
+    async function clearDeletedOrders() {
+      if (!getDeletedOrders().length) return;
+      if (!(await appConfirm('Xóa toàn bộ danh sách đơn đã xóa? Các đơn này sẽ có thể xuất hiện lại ở lần nạp dữ liệu sàn sau.', 'Xóa Danh Sách Đơn Đã Xóa'))) return;
+      deletedOrders = []; saveDeletedOrders(); renderDeletedOrdersTable();
     }
 
     function closeWatchlistModal() {

@@ -282,6 +282,8 @@ test('Theo bộ lọc / Bắt Đầu Xuất tìm theo đầu chữ (nút có th�
 function mouseScript(opts = {}) {
   return (act, arg, ses) => {
     if (act === 'state') return { hasExport: true, channelTiktok: true };
+    if (act === 'rect' && arg.text === 'Xuất excel') opts.hovers = (opts.hovers || 0) + 1;
+    if (act === 'exists' && arg.text === 'Theo bộ lọc' && opts.openAfterHovers) return opts.hovers >= opts.openAfterHovers ? { ok: true } : { ok: false, error: 'không thấy' };
     if (act === 'rect') return { ok: true, x: 100 + arg.text.length, y: 50, topOk: opts.covered !== arg.text, topText: 'lớp phủ' };
     if (act === 'exists' && arg.text === 'Theo bộ lọc') return opts.noPopover ? (opts.clickedExport ? { ok: true } : { ok: false, error: 'không thấy' }) : { ok: true };
     if (act === 'click') { if (arg.text === 'Xuất excel') opts.clickedExport = true; }
@@ -323,4 +325,23 @@ test('rê chuột chưa mở menu: bấm Xuất excel rồi mới chọn Theo b�
   const f = mk((act, arg, s) => { if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(s, sampleXlsx()); return mouseScript(opts)(act, arg, s); });
   const r = await f.a.run(); assert.equal(r.success, true, JSON.stringify(r));
   assert.equal(opts.clickedExport, true);
+});
+
+test('rê chuột lần đầu không mở menu: app rê lại (đi vào nút từ ngoài) rồi mới chọn Theo bộ lọc, KHÔNG bấm Xuất excel', async () => {
+  global.__mouseEvents = [];
+  try {
+    const opts = { openAfterHovers: 2 };
+    const f = mk((act, arg, s) => { if (act === 'click' && arg.text === 'Bắt Đầu Xuất') dl(s, sampleXlsx()); return mouseScript(opts)(act, arg, s); });
+    const ev = global.__mouseEvents; const orig = ev.push.bind(ev);
+    ev.push = e => { orig(e); if (e.type === 'mouseUp' && ev.filter(z => z.type === 'mouseUp').length === 3) setTimeout(() => f.sesRef && dl(f.sesRef, sampleXlsx()), 1); return ev.length; };
+    const p = f.a.run(); await new Promise(r => setTimeout(r, 50)); f.sesRef = f.a.curWin && f.a.curWin.webContents.session;
+    const r = await p; assert.equal(r.success, true, JSON.stringify(r));
+    assert.ok(opts.hovers >= 2, 'phải rê lại');
+    assert.ok(!opts.clickedExport, 'không bấm Xuất excel khi rê lại đã mở menu');
+    // mỗi lần rê đều đi vào nút từ ngoài (có điểm lệch trước khi tới đúng nút)
+    const tx = 100 + 'Xuất excel'.length;
+    const moves = ev.filter(e => e.type === 'mouseMove');
+    const first = moves.findIndex(e => e.x === tx && e.y === 50);
+    assert.ok(first >= 2 && (moves[first - 1].x !== tx || moves[first - 1].y !== 50));
+  } finally { delete global.__mouseEvents; }
 });

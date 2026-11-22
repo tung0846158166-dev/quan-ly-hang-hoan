@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.65
+          name: QuanLyHangHoan-Windows-Installer-v1.9.66
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.65
-          name: "Quản Lý Hàng Hoàn v1.9.65 — Báo vàng 12h / báo đỏ 24h tính từ lúc hàng về"
+          tag_name: v1.9.66
+          name: "Quản Lý Hàng Hoàn v1.9.66 — Salework tự động: rê chuột mở menu Xuất excel bền hơn"
           body: |
+            ### Bản 1.9.66
+
+            - 🤖 Salework tự động: sửa lỗi dừng ở bước chọn "Theo bộ lọc" (menu Xuất excel không mở khi rê chuột). App giờ đưa chuột vào nút từ bên ngoài như người thật, và nếu menu chưa hiện thì rê lại tối đa 3 lần trước khi chuyển sang bấm nút. Khi vẫn lỗi, thông báo hiển thị cả chữ ở cuối trang (nơi menu nổi nằm) để chẩn đoán.
+
             ### Bản 1.9.65
 
             - ⏰ Cảnh báo tính từ thời gian hàng ĐÃ VỀ (cả Shopee và TikTok/Salework): quá 12 giờ là **Báo Vàng**, quá 24 giờ là **Báo Đỏ**, cho tới khi đơn được nhận/kiểm tra. Áp dụng cho các tab lọc Báo Vàng / Báo Đỏ, số đếm, ô Hạn xử lý, thông báo và danh sách gửi điện thoại. Đơn chưa có thời gian về vẫn giữ luật cũ (từ ngày hủy: 2 ngày vàng, 3 ngày đỏ).

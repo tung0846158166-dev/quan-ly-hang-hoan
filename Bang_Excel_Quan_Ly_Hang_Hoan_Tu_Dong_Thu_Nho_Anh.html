@@ -504,6 +504,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             class="header-menu-dropdown hidden absolute top-full right-0 mt-1.5 w-[360px] sm:w-[400px] max-w-[95vw] rounded-xl shadow-2xl bg-white text-slate-800 ring-1 ring-black/15 py-1.5 divide-y divide-slate-100 max-h-[85vh] overflow-y-auto"
             style="z-index: 99999 !important;"
           >
+            <!-- v1.9.75: lối mở nhanh các bảng, vì cụm nút ở thanh đầu trang bị tràn khỏi màn hình nhỏ -->
+            <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">🗂 Mở nhanh các bảng</div>
+            <div class="p-1 grid grid-cols-2 gap-1">
+              <button type="button" onclick="closeAllHeaderMenus(); openReturnWatchModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">🚚 Bảng Hàng Hoàn Về</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openArchivedOrdersModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">📦 Kho lưu trữ (24h)</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openNewOrdersModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">📥 Bảng đơn mới</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openCancelledOrdersModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">🚫 Bảng đơn hủy</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openAnalyticsDashboardModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">📊 Phân tích</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openStatsModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">📊 Thống kê</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openQuickCreateOrdersModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">⚡ Tạo đơn nhanh</button>
+              <button type="button" onclick="closeAllHeaderMenus(); openBatchSessionModal();" class="px-2 py-1.5 rounded-lg text-left text-xs font-bold text-slate-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 transition cursor-pointer">📷 Ca quét</button>
+            </div>
             <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📥 Cơ Chế Nhập Tách Riêng 2 Sàn</div>
             <div class="p-1 space-y-0.5">
               <button

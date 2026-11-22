@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.74
+          name: QuanLyHangHoan-Windows-Installer-v1.9.75
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.74
-          name: "Quản Lý Hàng Hoàn v1.9.74 — Nút Khôi phục đơn đã nhận chuyển vào menu Nhập / Xuất"
+          tag_name: v1.9.75
+          name: "Quản Lý Hàng Hoàn v1.9.75 — Mở nhanh các bảng trong menu Nhập / Xuất"
           body: |
+            ### Bản 1.9.75
+
+            - 🗂 Menu **📂 Nhập / Xuất** có thêm mục **Mở nhanh các bảng**: Hàng Hoàn Về, Kho lưu trữ, Bảng đơn mới, Bảng đơn hủy, Phân tích, Thống kê, Tạo đơn nhanh, Ca quét. Các nút này ở thanh đầu trang bị tràn khỏi màn hình nhỏ nên không bấm được; nút cũ vẫn giữ nguyên.
+
             ### Bản 1.9.74
 
             - ♻ Nút **Khôi phục đơn đã nhận** chuyển vào menu **📂 Nhập / Xuất** (mục đầu tiên) vì ở thanh đầu trang nút bị tràn ra ngoài màn hình, không thấy được. Cách dùng không đổi: chọn file khoi_phuc_don_da_nhan.json.

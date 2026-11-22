@@ -49,3 +49,15 @@ test('đã nối vào lưu đơn, nút đầu trang, bảng và dữ liệu gử
   assert.match(html, /id="returnWatchModal"/);
   assert.match(html, /if \(x\.rw\) \{ row\.rw = x\.rw; row\.rws = x\.rws \|\| 1; if \(x\.ar\) row\.ar = x\.ar; \}/);
 });
+
+// v1.9.75: mọi bảng đều mở được từ menu Nhập / Xuất (nút ở thanh đầu trang có thể bị tràn khỏi màn hình)
+test('menu Nhập / Xuất có lối mở nhanh các bảng', () => {
+  const fs2 = require('node:fs'), path2 = require('node:path');
+  const html = fs2.readFileSync(path2.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
+  const a = html.indexOf('id="headerMenuImport"'), b = html.indexOf('id="headerMenuTools"');
+  const menu = html.slice(a, b);
+  for (const fn of ['openReturnWatchModal', 'openArchivedOrdersModal', 'openNewOrdersModal', 'openCancelledOrdersModal', 'openAnalyticsDashboardModal', 'openStatsModal', 'openQuickCreateOrdersModal', 'openBatchSessionModal']) {
+    assert.ok(menu.includes(fn + '();'), fn + ' phải có trong menu');
+    assert.ok(new RegExp('function ' + fn + '\\s*\\(').test(html), fn + ' phải là hàm có thật');
+  }
+});

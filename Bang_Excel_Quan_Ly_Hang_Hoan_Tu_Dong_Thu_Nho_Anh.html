@@ -15253,8 +15253,77 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function inboxHasScanItems() {
       try { return Array.isArray(newOrdersInbox) && newOrdersInbox.some(it => it && it.fromUnmatchedScan); } catch (e) { return false; }
     }
+    // Phiếu Shopee có 2 mã: mã vận đơn (SPXVN…) và mã đơn hàng. Bảng chính nhiều đơn chỉ có mã đơn hàng, nên khi quét mã đơn
+    // thì đơn được đánh dấu đã nhận (chưa có mã vận đơn), còn lượt quét mã vận đơn ngay sát đó không biết thuộc đơn nào và
+    // rơi vào Hộp Đơn Mới. Ghép hai lượt quét theo giờ: mã vận đơn chưa có đơn + đơn chưa có mã vận đơn vừa được nhận trong
+    // vòng 20 giây → gắn mã vận đơn vào đơn đó (chọn cặp gần nhất; hai ứng viên bằng nhau thì bỏ qua, không đoán).
+    const SCAN_PAIR_WINDOW_MS = 20 * 1000;
+    function pairScansWithTracklessRows() {
+      if (typeof parseFullDate !== 'function' || typeof getOrderTrackingCodes !== 'function' || !Array.isArray(orders)) return 0;
+      const items = [];
+      try {
+        if (inboxHasScanItems()) for (const it of newOrdersInbox) {
+          if (it && it.fromUnmatchedScan && Number(it.scanTime) > 0) {
+            const c = extractCleanTrackingCode(it.track || '');
+            if (c) items.push({ kind: 'inbox', ref: it, code: c, at: Number(it.scanTime) });
+          }
+        }
+      } catch (e) {}
+      for (const e of unmatchedPhoneScans) if (e && e.code && Number(e.t) > 0) items.push({ kind: 'mem', ref: e, code: e.code, at: Number(e.t) });
+      if (!items.length) return 0;
+      let lo = Infinity, hi = -Infinity;
+      items.forEach(i => { if (i.at < lo) lo = i.at; if (i.at > hi) hi = i.at; });
+      lo -= SCAN_PAIR_WINDOW_MS; hi += SCAN_PAIR_WINDOW_MS;
+      const rows = [];
+      for (const o of orders) {
+        if (!o || o.status !== 'Hàng đã trả' || !o.recvDate) continue;
+        const d = parseFullDate(o.recvDate);
+        const t = d ? d.getTime() : NaN;
+        if (!(t >= lo && t <= hi)) continue;
+        if (getOrderTrackingCodes(o).length) continue;
+        rows.push({ o, t });
+      }
+      if (!rows.length) return 0;
+      const pairs = [];
+      items.forEach((it, i) => rows.forEach((r, j) => { const gap = Math.abs(r.t - it.at); if (gap <= SCAN_PAIR_WINDOW_MS) pairs.push({ i, j, gap }); }));
+      pairs.sort((a, b) => a.gap - b.gap);
+      const usedItem = new Set(), usedRow = new Set(), blockedItem = new Set(), blockedRow = new Set();
+      const chosen = [];
+      for (let k = 0; k < pairs.length; k++) {
+        const p = pairs[k];
+        if (usedItem.has(p.i) || usedRow.has(p.j) || blockedItem.has(p.i) || blockedRow.has(p.j)) continue;
+        const tie = pairs.some((q, m) => m !== k && q.gap === p.gap && (q.i === p.i || q.j === p.j) && !usedItem.has(q.i) && !usedRow.has(q.j));
+        if (tie) { blockedItem.add(p.i); blockedRow.add(p.j); continue; }
+        usedItem.add(p.i); usedRow.add(p.j); chosen.push(p);
+      }
+      let linked = 0;
+      const dropInbox = new Set();
+      for (const p of chosen) {
+        const it = items[p.i], o = rows[p.j].o;
+        if (!o.track) o.track = it.code; else if (!o.returnTrack) o.returnTrack = it.code;
+        o.trackingCodes = Array.from(new Set([...(Array.isArray(o.trackingCodes) ? o.trackingCodes : []), it.code]));
+        if (!o.carrier && typeof detectCarrierByTrackingCode === 'function') { const c = detectCarrierByTrackingCode(it.code); if (c) o.carrier = c; }
+        if (it.kind === 'inbox') { giveScanPhotoToOrder(o, it.ref.photo); dropInbox.add(it.ref); }
+        else { giveScanPhotoToOrder(o, unmatchedPhotoOf(it.ref)); dropScanPhoto(it.ref); unmatchedPhoneScans = unmatchedPhoneScans.filter(x => x !== it.ref); }
+        try { addAuditLog('📱 GẮN MÃ VẬN ĐƠN THEO GIỜ QUÉT', `Mã [${it.code}] quét cách đơn ${o.orderId || ''} ${Math.round(p.gap / 1000)} giây ➔ gắn mã vận đơn vào đơn này, gỡ khỏi Hộp Đơn Mới`); } catch (x) {}
+        linked++;
+      }
+      if (linked) {
+        if (dropInbox.size) { newOrdersInbox = newOrdersInbox.filter(x => !dropInbox.has(x)); try { saveNewOrdersInbox(); } catch (x) {} }
+        persistUnmatchedScans();
+        try { renderWhenNotTyping(); } catch (x) {}
+        try { setTimeout(() => { try { if (typeof saveOrders === 'function') saveOrders(); } catch (x) {} }, 0); } catch (x) {}
+        try { addAppNotification({ type: 'phone_scan', title: '📱 Đã gắn mã vận đơn vào đơn', detail: `${linked} mã vận đơn quét sát giờ với đơn chưa có mã vận đơn đã được gắn vào đúng đơn và gỡ khỏi Hộp Đơn Mới.`, code: '', orderIdx: null }); } catch (x) {}
+        try { showAppToast(`Đã gắn ${linked} mã vận đơn vào đơn ở Bảng chính`, 'success'); } catch (x) {}
+      }
+      return linked;
+    }
+
     function reconcileUnmatchedScans(force) {
       if (!unmatchedPhoneScans.length && !inboxHasScanItems()) return 0;
+      let paired = 0;
+      try { paired = pairScansWithTracklessRows(); } catch (e) {}
+      if (!unmatchedPhoneScans.length && !inboxHasScanItems()) return paired;
       const now = Date.now();
       if (!force && now - lastUnmatchedReconcileAt < 2000) return 0;
       lastUnmatchedReconcileAt = now;
@@ -15349,6 +15418,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     }
     setInterval(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 5 * 60 * 1000);
     setTimeout(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 90 * 1000);
+    setTimeout(() => { try { reconcileUnmatchedScans(true); } catch (e) {} }, 30 * 1000);
 
     function phoneOrderMatches(rawCode) {
       if (typeof getPhoneOrderMatches === 'function') return getPhoneOrderMatches(rawCode);

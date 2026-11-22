@@ -96,6 +96,14 @@
         if (!leftReturn && rightReturn && right.forwardTrack && extractCleanTrackingCode(left.track || '') === extractCleanTrackingCode(right.forwardTrack)) return true;
         if (!rightReturn && leftReturn && left.forwardTrack && extractCleanTrackingCode(right.track || '') === extractCleanTrackingCode(left.forwardTrack)) return true;
       }
+      // v1.9.71: dòng cũ chỉ có mã GIAO (chưa có mã hoàn, chưa có mã yêu cầu) và dòng mới cùng mã đơn, cùng mã giao nhưng
+      // đã có mã hoàn là CÙNG MỘT kiện: lần nạp trước TikTok chưa tạo mã hoàn, lần sau mới có.
+      if (sameOrder) {
+        const fwdOnly = o => !extractCleanTrackingCode(o.returnTrack || '') && !getReturnParcelId(o) && extractCleanTrackingCode(o.track || o.forwardTrack || '');
+        const sameFwd = (a, b) => extractCleanTrackingCode(b.forwardTrack || '') && extractCleanTrackingCode(a.track || a.forwardTrack || '') === extractCleanTrackingCode(b.forwardTrack || '');
+        if (fwdOnly(left) && rightReturn && sameFwd(left, right)) return true;
+        if (fwdOnly(right) && leftReturn && sameFwd(right, left)) return true;
+      }
       const leftPrimary = extractCleanTrackingCode(left.returnTrack || left.track || '');
       const rightPrimary = extractCleanTrackingCode(right.returnTrack || right.track || '');
       // Different parcel codes remain distinct even under the same return claim.

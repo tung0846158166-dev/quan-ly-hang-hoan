@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.67
+          name: QuanLyHangHoan-Windows-Installer-v1.9.68
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.67
-          name: "Quản Lý Hàng Hoàn v1.9.67 — Salework tự động: rê chuột mở menu Xuất excel bền hơn"
+          tag_name: v1.9.68
+          name: "Quản Lý Hàng Hoàn v1.9.68 — Chỉ báo vàng/đỏ cho đơn Đã về và Hủy sau chuẩn bị; Salework điền mã vận đơn vào đơn cũ"
           body: |
+            ### Bản 1.9.68
+
+            - ⏰ Báo vàng / báo đỏ CHỈ áp dụng cho đơn **Đã về** (12h vàng, 24h đỏ tính từ lúc về) và đơn **Hủy sau chuẩn bị** (2 ngày vàng, 3 ngày đỏ tính từ ngày hủy, hoặc 12h/24h nếu đã có thời gian về). Đơn Đang về, Chờ khách gửi hàng... không còn báo. Danh sách khiếu nại quá 72h vẫn như cũ.
+            - 📦 Nạp file Salework: đơn đã có dòng cũ cùng mã đơn nhưng chưa có mã vận đơn nào (tạo từ file hoàn tiền / Google Sheet TikTok) giờ được điền mã vận đơn, mã hoàn, trạng thái vào chính dòng đó, không tạo thêm đơn trùng.
+
             ### Bản 1.9.67
 
             - 🤖 Salework tự động: sửa lỗi dừng ở bước chọn "Theo bộ lọc" (menu Xuất excel không mở khi rê chuột). App giờ đưa chuột vào nút từ bên ngoài như người thật, và nếu menu chưa hiện thì rê lại tối đa 3 lần trước khi chuyển sang bấm nút. Khi vẫn lỗi, thông báo hiển thị cả chữ ở cuối trang (nơi menu nổi nằm) để chẩn đoán.

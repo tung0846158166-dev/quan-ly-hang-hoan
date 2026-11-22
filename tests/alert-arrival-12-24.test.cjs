@@ -5,9 +5,9 @@ const pad=n=>String(n).padStart(2,'0');
 const fmt=d=>`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 const fmtSw=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`;
 function mk(){
-  const c=vm.createContext({Date,Number,String,isNaN,Boolean,isOrderReceived:o=>o.status==='Đã trả',isOrderUnneeded:()=>false,isOrderPending:o=>o.status!=='Đã trả'});
+  const c=vm.createContext({Date,Number,String,isNaN,Boolean,isOrderReceived:o=>o.status==='Đã trả',isOrderUnneeded:()=>false,isOrderPending:o=>o.status!=='Đã trả',removeVietnameseTones:x=>String(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D')});
   const consts='const ARRIVED_WARN_HOURS = 12, ARRIVED_DANGER_HOURS = 24;';
-  vm.runInContext(consts+['parseFullDate','getOrderArrivedAt','getOrderReturnElapsedInfo','isOrderOverdue','getDeadlineStatus','getOrderAlertLevel'].map(fn).join('\n'),c);return c;
+  vm.runInContext(consts+['parseFullDate','getOrderArrivedAt','isCancelAfterPrepOrder','isOrderAlertEligible','getOrderReturnElapsedInfo','isOrderOverdue','getDeadlineStatus','getOrderAlertLevel'].map(fn).join('\n'),c);return c;
 }
 const ago=h=>fmt(new Date(Date.now()-h*3600e3));
 const agoSw=h=>fmtSw(new Date(Date.now()-h*3600e3));
@@ -24,17 +24,30 @@ test('Shopee: lấy thời gian về từ rawDetails.returnSuccessTime',()=>{
   assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(1),rawDetails:{returnSuccessTime:ago(30)}}),'overdue');
   assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(1),rawDetails:{returnSuccessTime:ago(14)}}),'soon');
 });
-test('đã nhận thì không báo; chưa có thời gian về giữ luật cũ 48h/72h từ ngày hủy',()=>{
+test('đã nhận thì không báo; đơn hủy sau chuẩn bị chưa có thời gian về giữ luật cũ 48h/72h từ ngày hủy',()=>{
   const c=mk();
+  const hc=(h,extra)=>Object.assign({status:'Chưa trả',platformStatus:'Huỷ sau chuẩn bị · Đã huỷ',returnDate:ago(h)},extra||{});
   assert.equal(c.getOrderAlertLevel({status:'Đã trả',returnDate:ago(100),returnedAt:ago(50)}),'');
-  assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(20)}),'');
-  assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(50)}),'soon');
-  assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(80)}),'overdue');
+  assert.equal(c.getOrderAlertLevel(hc(20)),'');
+  assert.equal(c.getOrderAlertLevel(hc(50)),'soon');
+  assert.equal(c.getOrderAlertLevel(hc(80)),'overdue');
+});
+test('đơn Đang về / Chờ khách gửi hàng (chưa về, không phải hủy sau chuẩn bị) KHÔNG báo vàng/đỏ dù đã lâu',()=>{
+  const c=mk();
+  ['Đang về','Chờ khách gửi hàng','Đã đồng ý'].forEach(ps=>{
+    assert.equal(c.getOrderAlertLevel({status:'Chưa trả',platformStatus:ps,returnDate:ago(200),deadline:fmt(new Date(Date.now()-3600e3))}),'',ps);
+  });
+  assert.equal(c.getOrderReturnElapsedInfo({status:'Chưa trả',platformStatus:'Đang về',returnDate:ago(200)}).level,'none');
+});
+test('danh sách khiếu nại quá 72h (isOrderOverdue) vẫn tính theo ngày hủy như cũ',()=>{
+  const c=mk();
+  assert.equal(c.isOrderOverdue({status:'Chưa trả',platformStatus:'Đang về',returnDate:ago(80)},72),true);
+  assert.equal(c.isOrderOverdue({status:'Chưa trả',platformStatus:'Đang về',returnDate:ago(20)},72),false);
 });
 test('đơn đã về: hạn sàn cũ (deadline) không làm báo vàng sớm',()=>{
   const c=mk();
   const soon=new Date(Date.now()+3600e3);
-  assert.equal(c.getOrderAlertLevel({status:'Chưa trả',returnDate:ago(1),returnedAt:ago(2),deadline:fmt(soon)}),'');
+  assert.equal(c.getOrderAlertLevel({status:'Chưa trả',platformStatus:'Đã về',returnDate:ago(1),returnedAt:ago(2),deadline:fmt(soon)}),'');
 });
 test('định dạng giờ-trước-ngày của Salework được đọc đúng',()=>{
   const c=mk();

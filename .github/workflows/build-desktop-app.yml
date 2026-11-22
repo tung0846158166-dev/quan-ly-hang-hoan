@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.62
+          name: QuanLyHangHoan-Windows-Installer-v1.9.63
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.62
-          name: "Quản Lý Hàng Hoàn v1.9.62 — Bảng chi tiết đơn: cột Tên rộng hơn"
+          tag_name: v1.9.63
+          name: "Quản Lý Hàng Hoàn v1.9.63 — File Salework: đơn có ngày trả hàng thành công hiện Đã về kho (chưa kiểm tra)"
           body: |
+            ### Bản 1.9.63
+
+            - 📦 Nạp file Salework (don_hoan_...xlsx): đơn có cột "Ngày trả hàng thành công" được ghi Trạng thái sàn là "Đã về kho (chưa kiểm tra)" (trước đây chỉ hiện "Đang về"). Đơn vẫn chưa tính là Đã nhận cho tới khi bạn kiểm tra thực tế.
+
             ### Bản 1.9.62
 
             - 📐 Bảng chi tiết mặt hàng khi bấm mở đơn: cột Tên Sản Phẩm rộng ra chiếm phần lớn bề ngang, các cột Màu / Size / Số lượng / Thao tác thu nhỏ lại.

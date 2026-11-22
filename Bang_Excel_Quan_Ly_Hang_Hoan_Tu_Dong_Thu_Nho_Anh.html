@@ -5435,6 +5435,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         ['returnlogisticstrackingid', 'mvdtrahang', 'returntracking']
       );
       // File Salework (don_hoan_...xlsx) ghi mã vận đơn hoàn về ở cột "Mã trả hàng".
+      // v1.9.63: File Salework có cột "Ngày trả hàng thành công" = hàng đã về kho nhưng CHƯA kiểm tra thực tế.
+      const saleworkReturnedKey = returnLogisticsTrackKey ? '' : findKeyExactOrIncludes(['Ngày trả hàng thành công']);
       const saleworkReturnTrackKey = returnLogisticsTrackKey ? '' : findKeyExactOrIncludes(['Mã trả hàng', 'Mã vận đơn hoàn', 'Mã vận đơn hoàn về']);
       const returnTypeKey = findKeyExactOrIncludes(
         ['Return Type', 'Cancelation/Return Type', 'Loại yêu cầu', 'Loại hủy'],
@@ -5791,7 +5793,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (saleworkReturnTrackKey) {
           // File Salework: cột "Lý do hoàn" là LÝ DO của khách (đã dịch vào Ghi chú), không phải trạng thái kiện.
           // Trạng thái kiện suy ra từ mã trả hàng: khách đã gửi (có mã trả hàng) = Đang về, chưa có = Chờ khách gửi hàng.
-          rawPlatStatus = String(row[saleworkReturnTrackKey] || '').trim() ? 'Đang về' : 'Chờ khách gửi hàng';
+          rawPlatStatus = (saleworkReturnedKey && String(row[saleworkReturnedKey] || '').trim()) ? 'Đã về kho (chưa kiểm tra)'
+            : (String(row[saleworkReturnTrackKey] || '').trim() ? 'Đang về' : 'Chờ khách gửi hàng');
         } else if (rawCancelReason) {
           rawPlatStatus = rawCancelReason;
         } else {

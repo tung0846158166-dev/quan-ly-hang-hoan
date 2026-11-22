@@ -16444,6 +16444,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return work;
     }
 
+    // Tin phát lại được coi là "của chính lần nhận hàng": đã đánh dấu xử lý, hoặc đơn được nhận hàng vào/sau thời điểm quét tin đó.
+    function isReplayOfOwnReceipt(capture, order) {
+      if (!capture) return false;
+      if (capture.__replaySilent === true) return true;
+      const at = Number(capture.__replayAt) || 0;
+      if (!at || !order) return false;
+      const rd = order.recvDate ? parseFullDate(order.recvDate) : null;
+      return Boolean(rd && !isNaN(rd.getTime()) && rd.getTime() >= at - 2000);
+    }
+
     function applyIncomingPhoneBarcode(rawCode, requestId, photoDataUrl, clientRoom, capture, sendAckToPhone, recordCodeToActiveSession, saveOrders, deferUi = fn => fn()) {
       if (!rawCode) return;
       const cleanCode = extractCleanTrackingCode(rawCode);
@@ -16476,6 +16486,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           // ALREADY RETURNED! Duplicate scan
           if (photoDataUrl) {
             saveOrders();
+          }
+          if (isReplayOfOwnReceipt(capture, order)) {
+            // Tin phát lại khi mở app (đối soát đám mây 12h): chính lượt quét này đã nhận hàng rồi, không phải quét trùng mới.
+            sendAckToPhone(existingIdx + 1, cleanCode, '⚠️ ĐÃ TRẢ TỪ TRƯỚC (QUÉT TRÙNG)', 'duplicate', true, requestId, clientRoom);
+            return;
           }
           addAuditLog('⚠️ QUÉT ĐT TRÙNG LẶP', `Quét lại mã [${cleanCode}] ➔ Đơn #${existingIdx + 1} ĐÃ TRẢ từ trước!`);
           appendPhoneLiveLog(`🚨 TRÙNG LẶP: Đơn #${existingIdx + 1} (${cleanCode}) ĐÃ QUÉT TRẢ TRƯỚC ĐÓ!`);
@@ -20521,6 +20536,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             } else if (ev.message) payload = JSON.parse(ev.message);
             if (!payload || payload.type === 'pc_ack') continue;
             // Replaying even a processed transport message recovers a lost ACK.
+            // v1.9.69: tin đã xử lý trước đây (hoặc đã nhận hàng SAU lúc quét tin này) chỉ phát lại lặng lẽ: không còn
+            // thông báo "QUÉT LẠI / đã trả từ trước", nháy dòng, âm báo mỗi lần mở app.
+            try {
+              if (payload && typeof payload === 'object') {
+                payload.__replaySilent = Boolean(ev.id && processedCloudMsgIds.has(String(ev.id)));
+                payload.__replayAt = Number(ev.time) > 0 ? Number(ev.time) * 1000 : 0;
+              }
+            } catch (e) {}
             const result = await processIncomingPhonePayload(payload);
             if (result?.success === true) {
               if (ev.id) markCloudMsgProcessed(ev.id);

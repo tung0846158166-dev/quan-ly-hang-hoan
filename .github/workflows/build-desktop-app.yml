@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.68
+          name: QuanLyHangHoan-Windows-Installer-v1.9.69
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.68
-          name: "Quản Lý Hàng Hoàn v1.9.68 — Chỉ báo vàng/đỏ cho đơn Đã về và Hủy sau chuẩn bị; Salework điền mã vận đơn vào đơn cũ"
+          tag_name: v1.9.69
+          name: "Quản Lý Hàng Hoàn v1.9.69 — Hết báo QUÉT LẠI mỗi lần mở app"
           body: |
+            ### Bản 1.9.69
+
+            - 🔕 Hết thông báo "[QUÉT LẠI] Đơn ... đã trả từ trước" mỗi lần mở app. Nguyên nhân: khi khởi động app đối soát lại tin quét điện thoại trong 12 giờ qua (để khôi phục xác nhận bị mất) và coi lượt quét cũ là quét trùng. Nay tin đã xử lý hoặc đã nhận hàng đúng bởi lượt quét đó chỉ được phát lại lặng lẽ (vẫn gửi xác nhận cho điện thoại, không thông báo, không nháy dòng, không kêu). Quét trùng thật vẫn báo như cũ.
+
             ### Bản 1.9.68
 
             - ⏰ Báo vàng / báo đỏ CHỈ áp dụng cho đơn **Đã về** (12h vàng, 24h đỏ tính từ lúc về) và đơn **Hủy sau chuẩn bị** (2 ngày vàng, 3 ngày đỏ tính từ ngày hủy, hoặc 12h/24h nếu đã có thời gian về). Đơn Đang về, Chờ khách gửi hàng... không còn báo. Danh sách khiếu nại quá 72h vẫn như cũ.

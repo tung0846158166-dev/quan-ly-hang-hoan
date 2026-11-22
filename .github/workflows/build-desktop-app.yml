@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.69
+          name: QuanLyHangHoan-Windows-Installer-v1.9.70
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.69
-          name: "Quản Lý Hàng Hoàn v1.9.69 — Hết báo QUÉT LẠI mỗi lần mở app"
+          tag_name: v1.9.70
+          name: "Quản Lý Hàng Hoàn v1.9.70 — Tự gắn mã vận đơn vào đơn chỉ có mã đơn hàng"
           body: |
+            ### Bản 1.9.70
+
+            - 📱 Hộp Đơn Mới không còn giữ những mã vận đơn (SPXVN…) của đơn đã có ở Bảng chính. Nguyên nhân: Bảng chính nhiều đơn chỉ có mã đơn hàng, nên khi quét phiếu thì mã đơn hàng nhận hàng đúng đơn còn mã vận đơn quét sát đó không biết thuộc đơn nào và rơi vào Hộp Đơn Mới. Nay app ghép theo giờ quét: mã vận đơn chưa có đơn + đơn chưa có mã vận đơn vừa nhận trong vòng 20 giây → gắn mã vận đơn (và ảnh) vào đúng đơn, gỡ khỏi Hộp Đơn Mới. Hai đơn cùng cách đều thì không đoán, để lại cho bạn kiểm tra. Các mã đang nằm trong hộp cũng được tự xử lý sau khi mở app.
+
             ### Bản 1.9.69
 
             - 🔕 Hết thông báo "[QUÉT LẠI] Đơn ... đã trả từ trước" mỗi lần mở app. Nguyên nhân: khi khởi động app đối soát lại tin quét điện thoại trong 12 giờ qua (để khôi phục xác nhận bị mất) và coi lượt quét cũ là quét trùng. Nay tin đã xử lý hoặc đã nhận hàng đúng bởi lượt quét đó chỉ được phát lại lặng lẽ (vẫn gửi xác nhận cho điện thoại, không thông báo, không nháy dòng, không kêu). Quét trùng thật vẫn báo như cũ.

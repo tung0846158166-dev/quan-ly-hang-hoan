@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.64
+          name: QuanLyHangHoan-Windows-Installer-v1.9.65
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.64
-          name: "Quản Lý Hàng Hoàn v1.9.64 — Trạng thái kiện 'Đã về' kèm thời gian về"
+          tag_name: v1.9.65
+          name: "Quản Lý Hàng Hoàn v1.9.65 — Báo vàng 12h / báo đỏ 24h tính từ lúc hàng về"
           body: |
+            ### Bản 1.9.65
+
+            - ⏰ Cảnh báo tính từ thời gian hàng ĐÃ VỀ (cả Shopee và TikTok/Salework): quá 12 giờ là **Báo Vàng**, quá 24 giờ là **Báo Đỏ**, cho tới khi đơn được nhận/kiểm tra. Áp dụng cho các tab lọc Báo Vàng / Báo Đỏ, số đếm, ô Hạn xử lý, thông báo và danh sách gửi điện thoại. Đơn chưa có thời gian về vẫn giữ luật cũ (từ ngày hủy: 2 ngày vàng, 3 ngày đỏ).
+
             ### Bản 1.9.64
 
             - 📦 Cột Trạng thái kiện: đơn đã về (Shopee "Đã về shop", Salework/TikTok "Đã về") hiện thời gian về ngay dưới ô trạng thái. File Salework: đơn có "Ngày trả hàng thành công" thành "Đã về" (thay chữ "Đã về kho (chưa kiểm tra)" của bản trước); đơn vẫn chưa tính Đã nhận cho tới khi bạn kiểm tra thực tế.

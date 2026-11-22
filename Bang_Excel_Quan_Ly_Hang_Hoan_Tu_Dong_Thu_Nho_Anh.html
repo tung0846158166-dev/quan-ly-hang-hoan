@@ -984,14 +984,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         </button>
         <button type="button" onclick="setPipelineFilter('upcoming')" id="tabBtn_upcoming"
                 class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
-                title="Cảnh báo vàng: Từ lúc hủy 2 ngày (>= 48 giờ) chưa nhận được hàng">
-          <span>⚠️ Báo Vàng (2 ngày)</span>
+                title="Cảnh báo vàng: đơn ĐÃ VỀ quá 12 giờ kể từ lúc về mà chưa nhận/kiểm tra. Đơn chưa có thời gian về: quá 2 ngày (>= 48 giờ) từ lúc hủy chưa nhận được hàng">
+          <span>⚠️ Báo Vàng (12h)</span>
           <span id="tabCountUpcomingDeadline" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('overdue')" id="tabBtn_overdue"
                 class="px-2 py-1 rounded-md font-bold transition flex items-center gap-1 border bg-white text-slate-700 border-slate-300 hover:bg-slate-100 cursor-pointer"
-                title="Cảnh báo đỏ: Sau 3 ngày (>= 72 giờ) từ lúc hủy vẫn chưa nhận được hàng">
-          <span>🚨 Báo Đỏ (3 ngày)</span>
+                title="Cảnh báo đỏ: đơn ĐÃ VỀ quá 24 giờ kể từ lúc về mà chưa nhận/kiểm tra. Đơn chưa có thời gian về: quá 3 ngày (>= 72 giờ) từ lúc hủy chưa nhận được hàng">
+          <span>🚨 Báo Đỏ (24h)</span>
           <span id="tabCountOverdue" class="bg-black/10 text-[10px] px-1.5 rounded-full font-mono">0</span>
         </button>
         <button type="button" onclick="setPipelineFilter('lost')" id="tabBtn_lost"
@@ -8176,6 +8176,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ) mà chưa nhận được hàng
     // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
     // =========================================================================
+    // v1.9.65: đơn đã có thời gian HÀNG VỀ (Shopee "Về shop lúc", Salework/TikTok "Ngày trả hàng thành công") thì cảnh báo tính từ lúc đó:
+    // >= 12 giờ báo vàng, >= 24 giờ báo đỏ (cho đến khi kiểm tra/nhận thực tế). Đơn chưa có thời gian về giữ luật cũ (từ ngày hủy: 48h / 72h).
+    const ARRIVED_WARN_HOURS = 12, ARRIVED_DANGER_HOURS = 24;
+    function getOrderArrivedAt(order) {
+      if (!order) return null;
+      const s = String(order.returnedAt || (order.rawDetails && order.rawDetails.returnSuccessTime) || '').trim();
+      if (!s) return null;
+      // Salework ghi giờ trước ngày ("10:15:22 21/11/2026") nên tự đổi sang "21/11/2026 10:15:22" cho parseFullDate đọc được.
+      const tf = s.match(/^(\d{1,2}:\d{1,2}(?::\d{1,2})?)\s+(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})/);
+      const d = parseFullDate(tf ? tf[2] + ' ' + tf[1] : s);
+      return (d && !isNaN(d.getTime())) ? d : null;
+    }
     function getOrderReturnElapsedInfo(order) {
       if (!order) return { level: 'none', status: 'none', text: '', timeStr: '', elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       const isRecv = isOrderReceived(order);
@@ -8192,7 +8204,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
       // v1.6.5: CHỈ TÍNH HẠN THEO NGÀY HỦY/HOÀN (returnDate)
       // TUYỆT ĐỐI KHÔNG FALLBACK SANG shipDate ĐỂ TRÁNH BÁO ĐỎ OAN CHO ĐƠN MỚI GỬI!
-      const refStr = order.returnDate;
+      const arrivedAt = getOrderArrivedAt(order);
+      const refStr = arrivedAt ? (order.returnedAt || (order.rawDetails && order.rawDetails.returnSuccessTime)) : order.returnDate;
+      const dangerH = arrivedAt ? ARRIVED_DANGER_HOURS : 72, warnH = arrivedAt ? ARRIVED_WARN_HOURS : 48;
       if (!refStr) {
         return {
           level: 'none',
@@ -8204,7 +8218,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           elapsedDays: 0
         };
       }
-      const refDt = parseFullDate(refStr);
+      const refDt = arrivedAt || parseFullDate(refStr);
       if (!refDt) {
         return { level: 'none', status: 'none', text: refStr, timeStr: refStr, elapsedHours: 0, elapsedMinutes: 0, elapsedDays: 0 };
       }
@@ -8231,13 +8245,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       // BÁO ĐỎ: Sau 3 ngày (>= 72 giờ) từ thời gian hủy mà vẫn chưa nhận được hàng
-      if (totalHours >= 72) {
+      if (totalHours >= dangerH) {
         return {
           level: 'danger',
           status: 'overdue',
-          text: `🚨 QUÁ HẠN (+3 ngày)`,
+          fromArrival: Boolean(arrivedAt),
+          text: arrivedAt ? `🚨 QUÁ 24H TỪ LÚC VỀ` : `🚨 QUÁ HẠN (+3 ngày)`,
           timeStr: timeStr,
-          badgeText: `🚨 Quá 3 ngày`,
+          badgeText: arrivedAt ? `🚨 Quá 24h` : `🚨 Quá 3 ngày`,
           elapsedHours: totalHours,
           elapsedMinutes: remMinutes,
           elapsedDays: days
@@ -8245,13 +8260,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       }
 
       // BÁO VÀNG: Từ thời gian ngày hủy là 2 ngày (>= 48 giờ và < 72 giờ) mà vẫn chưa nhận được hàng
-      if (totalHours >= 48) {
+      if (totalHours >= warnH) {
         return {
           level: 'warning',
           status: 'upcoming',
-          text: `⚠️ CẦN XỬ LÝ (+2 ngày)`,
+          fromArrival: Boolean(arrivedAt),
+          text: arrivedAt ? `⚠️ CẦN XỬ LÝ (+12h từ lúc về)` : `⚠️ CẦN XỬ LÝ (+2 ngày)`,
           timeStr: timeStr,
-          badgeText: `⚠️ 2 ngày`,
+          badgeText: arrivedAt ? `⚠️ 12h` : `⚠️ 2 ngày`,
           elapsedHours: totalHours,
           elapsedMinutes: remMinutes,
           elapsedDays: days
@@ -8262,9 +8278,11 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return {
         level: 'safe',
         status: 'normal',
-        text: `⏳ Trong hạn (< 2 ngày)`,
+        text: arrivedAt ? `⏳ Trong hạn (< 12h từ lúc về)` : `⏳ Trong hạn (< 2 ngày)`,
         timeStr: timeStr,
         badgeText: '',
+        fromArrival: Boolean(arrivedAt),
+        warnHours: warnH,
         elapsedHours: totalHours,
         elapsedMinutes: remMinutes,
         elapsedDays: days
@@ -8280,8 +8298,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (elapsed.level === 'danger') return 'overdue';
       if (elapsed.level === 'warning') return 'upcoming';
 
-      // Nếu có nhập hạn sàn cụ thể
-      if (order.deadline) {
+      // Nếu có nhập hạn sàn cụ thể (đơn đã có thời gian về thì chỉ tính theo 12h/24h kể từ lúc về)
+      if (order.deadline && !elapsed.fromArrival) {
         const dt = parseFullDate(order.deadline);
         if (dt) {
           const diffMs = dt.getTime() - Date.now();
@@ -11845,9 +11863,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const elapsedInfo = getOrderReturnElapsedInfo(order);
         let overdueTag = '';
         if (elapsedInfo.level === 'danger') {
-          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-rose-100 text-rose-700 rounded border border-rose-300 whitespace-nowrap" title="Đã quá 3 ngày từ lúc hủy mà chưa nhận được hàng! Cần khiếu nại sàn ngay!">🚨 Quá 3 ngày</span>`;
+          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-rose-100 text-rose-700 rounded border border-rose-300 whitespace-nowrap" title="${elapsedInfo.fromArrival ? 'Hàng đã về quá 24 giờ mà chưa nhận/kiểm tra!' : 'Đã quá 3 ngày từ lúc hủy mà chưa nhận được hàng! Cần khiếu nại sàn ngay!'}">${elapsedInfo.fromArrival ? '🚨 Quá 24h' : '🚨 Quá 3 ngày'}</span>`;
         } else if (elapsedInfo.level === 'warning') {
-          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300 whitespace-nowrap" title="Đã trôi qua từ 2 ngày từ lúc hủy mà chưa nhận được hàng!">⚠️ 2 ngày</span>`;
+          overdueTag = `<br/><span class="inline-block mt-0.5 px-1 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300 whitespace-nowrap" title="${elapsedInfo.fromArrival ? 'Hàng đã về quá 12 giờ mà chưa nhận/kiểm tra!' : 'Đã trôi qua từ 2 ngày từ lúc hủy mà chưa nhận được hàng!'}">${elapsedInfo.fromArrival ? '⚠️ 12h' : '⚠️ 2 ngày'}</span>`;
         }
 
         const actualPhoto = order.photo || (order.photoId && photoMemoryCache.get(order.photoId)) || '';
@@ -12028,10 +12046,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (elapsed.level === 'danger') {
           deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
                class="px-1.5 py-1 bg-rose-100 hover:bg-rose-200 border-2 border-rose-500 text-rose-950 rounded-lg font-bold text-[10.5px] text-center cursor-pointer shadow-xs whitespace-nowrap leading-tight transition" 
-               title="🚨 BÁO ĐỎ: Đã quá 3 ngày (${elapsed.timeStr}) từ lúc khách bấm hủy mà vẫn chưa nhận được hàng về kho! Bấm để sửa hạn hoặc khiếu nại">
+               title="${elapsed.fromArrival ? '🚨 BÁO ĐỎ: Hàng đã về ' + elapsed.timeStr + ' trước (quá 24 giờ kể từ lúc về) mà chưa được nhận/kiểm tra! Bấm để sửa hạn' : '🚨 BÁO ĐỎ: Đã quá 3 ngày (' + elapsed.timeStr + ') từ lúc khách bấm hủy mà vẫn chưa nhận được hàng về kho! Bấm để sửa hạn hoặc khiếu nại'}">
             <div class="text-rose-700 font-black animate-pulse flex items-center justify-center gap-1">
               <span>🚨 BÁO ĐỎ</span>
-              <span class="text-[9.5px]">(+3 ngày)</span>
+              <span class="text-[9.5px]">${elapsed.fromArrival ? '(+24h từ lúc về)' : '(+3 ngày)'}</span>
             </div>
             <div class="text-[9.5px] text-rose-900 font-extrabold mt-0.5">
               Đã qua: ${elapsed.timeStr}
@@ -12041,10 +12059,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (elapsed.level === 'warning') {
           deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
                class="px-1.5 py-1 bg-amber-100 hover:bg-amber-200 border-2 border-amber-500 text-amber-950 rounded-lg font-bold text-[10.5px] text-center cursor-pointer shadow-xs whitespace-nowrap leading-tight transition" 
-               title="⚠️ BÁO VÀNG: Đã qua từ 2 ngày (${elapsed.timeStr}) từ lúc khách hủy mà vẫn chưa nhận được hàng! Bấm để sửa hạn">
+               title="${elapsed.fromArrival ? '⚠️ BÁO VÀNG: Hàng đã về ' + elapsed.timeStr + ' trước (quá 12 giờ kể từ lúc về) mà chưa được nhận/kiểm tra! Bấm để sửa hạn' : '⚠️ BÁO VÀNG: Đã qua từ 2 ngày (' + elapsed.timeStr + ') từ lúc khách hủy mà vẫn chưa nhận được hàng! Bấm để sửa hạn'}">
             <div class="text-amber-800 font-black flex items-center justify-center gap-1">
               <span>⚠️ BÁO VÀNG</span>
-              <span class="text-[9.5px]">(2 ngày)</span>
+              <span class="text-[9.5px]">${elapsed.fromArrival ? '(12h từ lúc về)' : '(2 ngày)'}</span>
             </div>
             <div class="text-[9.5px] text-amber-950 font-extrabold mt-0.5">
               Đã qua: ${elapsed.timeStr}
@@ -12054,8 +12072,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (elapsed.level === 'safe') {
           deadlineHtml = `<div onclick="promptEditDeadline(${orderIdx})" oncontextmenu="handleCellContextMenu(event,'${orderIdx}:deadline','Hạn xử lý #${orderIdx+1}')" 
                class="px-1.5 py-0.5 bg-sky-50 hover:bg-sky-100 border border-sky-300 text-sky-900 rounded font-medium text-[10.5px] text-center cursor-pointer whitespace-nowrap leading-tight transition" 
-               title="⏳ Trong hạn: Đã hủy ${elapsed.timeStr}. Còn ${Math.max(0, 48 - elapsed.elapsedHours)}h trước khi sang mốc báo vàng (2 ngày). Bấm để chỉnh sửa">
-            <div class="text-sky-800 font-bold text-[10px]">⏳ An toàn (&lt; 2 ngày)</div>
+               title="⏳ Trong hạn: Đã hủy ${elapsed.timeStr}. Còn ${Math.max(0, (elapsed.warnHours || 48) - elapsed.elapsedHours)}h trước khi sang mốc báo vàng (${elapsed.fromArrival ? '12h từ lúc về' : '2 ngày'}). Bấm để chỉnh sửa">
+            <div class="text-sky-800 font-bold text-[10px]">⏳ An toàn (${elapsed.fromArrival ? '&lt; 12h từ lúc về' : '&lt; 2 ngày'})</div>
             <div class="text-[9.5px] text-sky-700 font-semibold mt-0.5">${elapsed.timeStr}</div>
             ${order.deadline ? `<div class="text-[9px] text-slate-500 font-normal mt-0.5">Hạn sàn: ${escapeAttr(order.deadline)}</div>` : ''}
           </div>`;
@@ -21657,13 +21675,13 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         } else if (elapsed.level === 'danger') {
           deadlineBadgeHtml = `
             <div class="px-2 py-1 rounded-lg bg-rose-100 border border-rose-300 text-rose-900 font-bold text-[10.5px] leading-tight">
-              <div class="text-rose-700 font-black animate-pulse">🚨 BÁO ĐỎ (+3 ngày)</div>
+              <div class="text-rose-700 font-black animate-pulse">🚨 BÁO ĐỎ (${elapsed.fromArrival ? '+24h từ lúc về' : '+3 ngày'})</div>
               <div class="text-[9.5px] text-rose-800 font-extrabold mt-0.5">${elapsed.timeStr}</div>
             </div>`;
         } else if (elapsed.level === 'warning') {
           deadlineBadgeHtml = `
             <div class="px-2 py-1 rounded-lg bg-amber-100 border border-amber-300 text-amber-950 font-bold text-[10.5px] leading-tight">
-              <div class="text-amber-800 font-black">⚠️ BÁO VÀNG (2 ngày)</div>
+              <div class="text-amber-800 font-black">⚠️ BÁO VÀNG (${elapsed.fromArrival ? '12h từ lúc về' : '2 ngày'})</div>
               <div class="text-[9.5px] text-amber-900 font-extrabold mt-0.5">${elapsed.timeStr}</div>
             </div>`;
         } else {
@@ -21927,7 +21945,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           'Ngày Hủy/Hoàn': o.returnDate || '',
           'Hạn Xử Lý': elapsed.text || '',
           'Thời Gian Trôi Qua': elapsed.timeStr || '',
-          'Mức Cảnh Báo': elapsed.level === 'danger' ? 'BÁO ĐỎ (+3 ngày)' : elapsed.level === 'warning' ? 'BÁO VÀNG (2 ngày)' : 'Trong hạn',
+          'Mức Cảnh Báo': elapsed.level === 'danger' ? (elapsed.fromArrival ? 'BÁO ĐỎ (+24h từ lúc về)' : 'BÁO ĐỎ (+3 ngày)') : elapsed.level === 'warning' ? (elapsed.fromArrival ? 'BÁO VÀNG (12h từ lúc về)' : 'BÁO VÀNG (2 ngày)') : 'Trong hạn',
           'Trạng Thái Sàn': o.platformStatus || '',
           'Nhận Tại Kho': o.status || 'Chưa nhận',
           'Ngày Về Kho': o.recvDate || '',

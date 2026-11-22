@@ -208,10 +208,12 @@ class SaleworkAuto {
     if (!r.topOk) throw new Error('Nút "' + arg.text + '" đang bị che bởi "' + (r.topText || '?') + '" — không bấm để tránh bấm nhầm');
     // v1.9.66: đi vào nút TỪ BÊN NGOÀI qua vài bước (chuột thật vào nút từ chỗ khác). Nếu chuột đã nằm sẵn đúng chỗ đó từ lần trước
     // thì một lệnh di chuyển đơn lẻ không tạo sự kiện "vào nút" nên menu rê chuột không mở.
-    wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 80), y: r.y + 60 });
-    await sleep(120);
-    wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 30), y: r.y + 20 });
-    await sleep(120);
+    if (mode === 'move') {   // chỉ khi RÊ chuột (bấm thì giữ nhanh như cũ để không làm chậm các bước bấm)
+      wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 80), y: r.y + 60 });
+      await sleep(120);
+      wc.sendInputEvent({ type: 'mouseMove', x: Math.max(1, r.x - 30), y: r.y + 20 });
+      await sleep(120);
+    }
     wc.sendInputEvent({ type: 'mouseMove', x: r.x, y: r.y });
     await sleep(250);
     if (mode === 'click') {

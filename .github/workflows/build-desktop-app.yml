@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.66
+          name: QuanLyHangHoan-Windows-Installer-v1.9.67
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,10 +88,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.66
-          name: "Quản Lý Hàng Hoàn v1.9.66 — Salework tự động: rê chuột mở menu Xuất excel bền hơn"
+          tag_name: v1.9.67
+          name: "Quản Lý Hàng Hoàn v1.9.67 — Salework tự động: rê chuột mở menu Xuất excel bền hơn"
           body: |
-            ### Bản 1.9.66
+            ### Bản 1.9.67
 
             - 🤖 Salework tự động: sửa lỗi dừng ở bước chọn "Theo bộ lọc" (menu Xuất excel không mở khi rê chuột). App giờ đưa chuột vào nút từ bên ngoài như người thật, và nếu menu chưa hiện thì rê lại tối đa 3 lần trước khi chuyển sang bấm nút. Khi vẫn lỗi, thông báo hiển thị cả chữ ở cuối trang (nơi menu nổi nằm) để chẩn đoán.
 

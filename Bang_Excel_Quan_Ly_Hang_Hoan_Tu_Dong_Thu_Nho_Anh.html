@@ -12347,16 +12347,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <td class="py-1 px-2">
               ${renderCellInput(`${orderIdx}:${itemIdx}:product`, `Tên SP ${itemIdx+1} (Đơn #${orderIdx+1})`, it.product, 'font-semibold text-slate-900', 'Gõ tên sản phẩm...', `updateItemField(${orderIdx},${itemIdx},'product',this.value);showSmartSuggest(this,'product',${orderIdx},${itemIdx})`, 'text', '', '', `showSmartSuggest(this,'product',${orderIdx},${itemIdx})`)}
             </td>
-            <td class="py-1 px-2 w-32">
+            <td class="py-1 px-2">
               ${renderCellInput(`${orderIdx}:${itemIdx}:color`, `Màu SP ${itemIdx+1}`, it.color, 'text-center', 'Màu sắc...', `updateItemField(${orderIdx},${itemIdx},'color',this.value);showSmartSuggest(this,'color',${orderIdx},${itemIdx})`, 'text', '', `handleItemFieldBlur(${orderIdx},${itemIdx},'color',this)`, `showSmartSuggest(this,'color',${orderIdx},${itemIdx})`)}
             </td>
-            <td class="py-1 px-2 w-24">
+            <td class="py-1 px-2">
               ${renderCellInput(`${orderIdx}:${itemIdx}:size`, `Size SP ${itemIdx+1}`, it.size, 'text-center font-bold', 'Size...', `updateItemField(${orderIdx},${itemIdx},'size',this.value);showSmartSuggest(this,'size',${orderIdx},${itemIdx})`, 'text', '', `handleItemFieldBlur(${orderIdx},${itemIdx},'size',this)`, `showSmartSuggest(this,'size',${orderIdx},${itemIdx})`)}
             </td>
-            <td class="py-1 px-2 w-20">
+            <td class="py-1 px-2">
               ${renderCellInput(`${orderIdx}:${itemIdx}:qty`, `Số lượng SP ${itemIdx+1}`, it.qty, 'text-center font-bold text-slate-900', '1', `updateItemField(${orderIdx},${itemIdx},'qty',this.value)`, 'number')}
             </td>
-            <td class="text-center py-1 px-2 w-20 no-print">
+            <td class="text-center py-1 px-1 no-print">
               <div class="flex items-center justify-center gap-1">
                 ${items.length > 1 ? `
                   <button type="button" onclick="removeProductFromOrder(${orderIdx}, ${itemIdx})" class="px-2 py-0.5 text-rose-600 hover:bg-rose-100 rounded text-xs font-bold" title="Xóa mặt hàng này khỏi đơn">
@@ -12403,15 +12403,16 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             </div>
           </div>
           <div class="overflow-x-auto rounded-lg border border-indigo-200 bg-white">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs" style="table-layout:fixed">
+              <colgroup><col style="width:40px"><col><col style="width:110px"><col style="width:64px"><col style="width:64px"><col style="width:64px"></colgroup>
               <thead class="bg-indigo-100/70 text-indigo-950 font-bold border-b border-indigo-200">
                 <tr>
                   <th class="py-1 px-2 text-center w-10">#</th>
                   <th class="py-1 px-2">Tên Sản Phẩm</th>
-                  <th class="py-1 px-2 text-center w-32">Màu Sắc</th>
-                  <th class="py-1 px-2 text-center w-24">Size</th>
-                  <th class="py-1 px-2 text-center w-20">Số Lượng</th>
-                  <th class="py-1 px-2 text-center w-20 no-print">Thao Tác</th>
+                  <th class="py-1 px-2 text-center">Màu Sắc</th>
+                  <th class="py-1 px-2 text-center">Size</th>
+                  <th class="py-1 px-2 text-center">SL</th>
+                  <th class="py-1 px-2 text-center no-print">Thao Tác</th>
                 </tr>
               </thead>
               <tbody>

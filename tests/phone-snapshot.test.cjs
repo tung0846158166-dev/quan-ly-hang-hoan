@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert'), fs = require('fs'), vm = require('vm'), path = require('path'), zlib = require('zlib');
 const src = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
 function grab(name) { const m = src.match(new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\r?\\n    \\}\\r?\\n')); assert.ok(m, name); return m[0]; }
-const code = 'const PHONE_SNAPSHOT_MAX_ROWS = 30000;\n' + grab('buildPhoneSnapshotRows');
+const code = 'const PHONE_SNAPSHOT_MAX_ROWS = 30000;\n' + grab('getPhoneDueMs') + grab('buildPhoneSnapshotRows');
 function ctx(orders, cancelled, archived) {
   const c = {
     orders, cancelledOrders: cancelled, archivedOrders: archived || [],
@@ -10,7 +10,8 @@ function ctx(orders, cancelled, archived) {
     isOrderPending: o => !(o.status === 'Hàng đã trả' || o.status === 'Đã nhận') && o.status !== 'Không cần nhận' && o.status !== 'Bị mất' && o.status !== 'Hư hỏng',
     getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền',
     getOrderPlatform: o => o.platform || 'Shopee',
-    computeDeadlineInfo: (rd, dl) => rd ? { due: 1000 } : null
+    computeDeadlineInfo: (rd, dl) => rd ? { due: 1000 } : null,
+    ARRIVED_DANGER_HOURS: 24, getOrderArrivedAt: o => o.arrivedAt ? new Date(o.arrivedAt) : null, isCancelAfterPrepOrder: o => /huỷ sau chuẩn bị/i.test(o.platformStatus || '')
   };
   vm.createContext(c); vm.runInContext(code, c); return c;
 }
@@ -28,7 +29,7 @@ test('v1.9.3: snapshot gửi TOÀN BỘ đơn kèm cờ (đã nhận, lưu trữ
   assert.strictEqual(rows.length, 8, 'không bỏ đơn nào có mã');
   assert.deepStrictEqual(rows.slice(0, 3).map(r => r.c).sort(), ['A1', 'E1', 'X1'], 'đơn đang chờ xếp trước');
   assert.ok(rows.slice(3).every(r => r.pd === 0), 'đơn không còn chờ có pd = 0');
-  assert.strictEqual(by('A1').co, 'Đen'); assert.strictEqual(by('A1').q, 2); assert.strictEqual(by('A1').due, 1000);
+  assert.strictEqual(by('A1').co, 'Đen'); assert.strictEqual(by('A1').q, 2); assert.strictEqual(by('A1').due, 0, 'v1.9.71: đơn chưa về không có hạn gửi iPhone');
   assert.strictEqual(by('A1').pre, 1); assert.strictEqual(by('A1').wl, 1); assert.strictEqual(by('A1').wr, 'Khiếu nại'); assert.strictEqual(by('A1').nt, 'Gọi shop');
   assert.strictEqual(by('A1').pd, undefined, 'đơn chờ không gửi pd (mặc định là chờ)');
   assert.strictEqual(by('B1').rv, 1); assert.strictEqual(by('B1').due, 0);
@@ -139,4 +140,17 @@ test('v1.9.19: Báo Đỏ/Báo Vàng trong bảng đối chiếu chỉ đếm đ
   const st = vm.runInContext('buildPhoneSnapshotStats(3)', c);
   assert.strictEqual(st.m_danger, 1);
   assert.strictEqual(st.m_warn, 0);
+});
+
+test('v1.9.71: due gửi iPhone chỉ có cho đơn đã về (giờ về + 24h) và hủy sau chuẩn bị; đơn chưa về due = 0', () => {
+  const t0 = new Date(2026, 10, 22, 10, 0, 0).getTime();
+  const c = ctx([
+    { track: 'NOTYET', status: 'Chưa nhận', returnDate: 'x', platformStatus: 'Chờ khách gửi hàng' },
+    { track: 'ARR', status: 'Chưa nhận', returnDate: 'x', platformStatus: 'Đã về', arrivedAt: t0 },
+    { track: 'CANC', status: 'Chưa nhận', returnDate: 'x', platformStatus: 'Huỷ sau chuẩn bị · Đã huỷ' }
+  ], []);
+  const by = k => get(c).find(r => r.c === k);
+  assert.strictEqual(by('NOTYET').due, 0, 'đơn chưa về: iPhone không lên lịch thông báo');
+  assert.strictEqual(by('ARR').due, t0 + 24 * 3600000);
+  assert.strictEqual(by('CANC').due, 1000);
 });

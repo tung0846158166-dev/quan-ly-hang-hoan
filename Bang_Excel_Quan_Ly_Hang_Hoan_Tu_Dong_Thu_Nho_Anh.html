@@ -3969,6 +3969,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (!leftReturn && rightReturn && right.forwardTrack && extractCleanTrackingCode(left.track || '') === extractCleanTrackingCode(right.forwardTrack)) return true;
         if (!rightReturn && leftReturn && left.forwardTrack && extractCleanTrackingCode(right.track || '') === extractCleanTrackingCode(left.forwardTrack)) return true;
       }
+      // v1.9.71: dòng cũ chỉ có mã GIAO (chưa có mã hoàn, chưa có mã yêu cầu) và dòng mới cùng mã đơn, cùng mã giao nhưng
+      // đã có mã hoàn là CÙNG MỘT kiện: lần nạp trước TikTok chưa tạo mã hoàn, lần sau mới có.
+      if (sameOrder) {
+        const fwdOnly = o => !extractCleanTrackingCode(o.returnTrack || '') && !getReturnParcelId(o) && extractCleanTrackingCode(o.track || o.forwardTrack || '');
+        const sameFwd = (a, b) => extractCleanTrackingCode(b.forwardTrack || '') && extractCleanTrackingCode(a.track || a.forwardTrack || '') === extractCleanTrackingCode(b.forwardTrack || '');
+        if (fwdOnly(left) && rightReturn && sameFwd(left, right)) return true;
+        if (fwdOnly(right) && leftReturn && sameFwd(right, left)) return true;
+      }
       const leftPrimary = extractCleanTrackingCode(left.returnTrack || left.track || '');
       const rightPrimary = extractCleanTrackingCode(right.returnTrack || right.track || '');
       // Different parcel codes remain distinct even under the same return claim.
@@ -4279,6 +4287,17 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const byTrack = new Map();
         alive.forEach(i => { const t = ownTrack(orders[i]); if (!t) return; if (!byTrack.has(t)) byTrack.set(t, []); byTrack.get(t).push(i); });
         byTrack.forEach(arr => { if (arr.length < 2) return; const keep = arr.find(i => recv(orders[i])) ?? arr[0]; arr.forEach(i => plan(i, keep, { mergeItems: true, why: 'chung kiện' })); });
+        // B2b (v1.9.71). Dòng chỉ có mã GIAO + dòng cùng mã đơn, cùng mã giao đã có mã HOÀN: cùng một kiện. Gộp vào dòng có mã hoàn
+        // (chỉ khi có đúng 1 dòng như vậy, nhiều dòng thì là nhiều kiện hoàn một phần, để người dùng xem).
+        alive.forEach(i => {
+          if (dupPlanOf.has(orders[i])) return;
+          const a = orders[i];
+          if (extractCleanTrackingCode(a.returnTrack || '') || cid(a)) return;
+          const fwd = extractCleanTrackingCode(a.track || a.forwardTrack || '');
+          if (!fwd) return;
+          const targets = alive.filter(j => j !== i && !dupPlanOf.has(orders[j]) && extractCleanTrackingCode(orders[j].returnTrack || '') && extractCleanTrackingCode(orders[j].forwardTrack || '') === fwd);
+          if (targets.length === 1) plan(i, targets[0], { why: 'mã giao đã có mã hoàn' });
+        });
         const alive2 = alive.filter(i => !dupPlanOf.has(orders[i]));
         // B3. yêu cầu đã huỷ / đóng trong khi còn dòng khác đang xử lý
         const open = alive2.filter(i => !isClosedRequest(orders[i]));
@@ -5375,6 +5394,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } finally { if (target) target.value = ''; }
       const res = await importParsedPlatformFiles(parsedFiles, forcedPlatform);
       if (res.message) alert(res.message);
+      if (res.success) { try { autoRemoveShadowDuplicates(); } catch (e) {} }
       return res.success ? { success: true, fileCount: parsedFiles.length, duplicateCount: res.duplicateCount } : { success: false };
       } finally { handlePlatformExcelUpload.busy = false; }
     }
@@ -14751,6 +14771,18 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     // v1.9.3: gửi TOÀN BỘ đơn (chưa nhận, đã nhận, đơn hủy, đặt trước, kho lưu trữ, đang theo dõi) kèm cờ phân loại.
     //   k: m = bảng chính, c = bảng đơn hủy, a = kho lưu trữ | ty: loại đơn | pre: đặt trước | pd: 0 nếu không còn chờ nhận
     //   rv: đã nhận | wl: đang theo dõi | wr: lý do theo dõi | nt: ghi chú
+    // v1.9.71: hạn gửi sang iPhone. iPhone tự lên lịch thông báo "sắp đến hạn / đã đến hạn" từ trường due của MỌI đơn đang chờ,
+    // nên đơn chưa về cũng bị báo. Nay chỉ đơn thuộc diện báo (đã về → hạn = giờ về + 24h; hủy sau chuẩn bị → hạn như cũ) mới có
+    // due, đơn còn lại due = 0 (iPhone không lên lịch thông báo cho đơn có due = 0).
+    function getPhoneDueMs(o) {
+      try {
+        if (!o || !isOrderPending(o)) return 0;
+        const arr = getOrderArrivedAt(o);
+        if (arr && !isNaN(arr.getTime())) return arr.getTime() + ARRIVED_DANGER_HOURS * 3600000;
+        if (isCancelAfterPrepOrder(o)) { const info = computeDeadlineInfo(o.returnDate, o.deadline); return info ? info.due : 0; }
+      } catch (e) {}
+      return 0;
+    }
     function buildPhoneSnapshotRows() {
       const rows = [];
       const pack = (kind, o, platform, due, rd, status, x) => {
@@ -14790,8 +14822,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const packOrder = (kind, o) => {
         if (!o) return;
         const pending = isOrderPending(o);
-        const info = pending ? computeDeadlineInfo(o.returnDate, o.deadline) : null;
-        pack(kind, o, getOrderPlatform(o), info ? info.due : 0, o.returnDate, o.status,
+        pack(kind, o, getOrderPlatform(o), getPhoneDueMs(o), o.returnDate, o.status,
           { ty: getOrderType(o), pre: o.preOrder === 'Hàng đặt trước', pd: pending, rv: isOrderReceived(o),
             lv: (() => { try { const l = getOrderAlertLevel(o); return l === 'overdue' ? 2 : (l === 'soon' ? 1 : 0); } catch (e) { return 0; } })() });
       };
@@ -15419,6 +15450,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     setInterval(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 5 * 60 * 1000);
     setTimeout(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 90 * 1000);
     setTimeout(() => { try { reconcileUnmatchedScans(true); } catch (e) {} }, 30 * 1000);
+    setTimeout(() => { try { autoRemoveShadowDuplicates(); } catch (e) {} }, 45 * 1000);   // v1.9.71: gộp dòng trùng cũ (mã giao + mã hoàn)
 
     function phoneOrderMatches(rawCode) {
       if (typeof getPhoneOrderMatches === 'function') return getPhoneOrderMatches(rawCode);

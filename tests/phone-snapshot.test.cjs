@@ -105,7 +105,7 @@ test('v1.9.8: PC nhận sửa/xóa đơn từ iPhone và tự gửi lại danh s
 });
 
 test('v1.9.9: nạp file sàn không đẩy lại đơn đã có ở Kho lưu trữ / Bảng đơn hủy ra Bảng chính', () => {
-  assert.strictEqual((src.match(/findInOtherTables === 'function' && findInOtherTables\(otherIdx, orderData\)\) \{ const eo = enrichOtherTableEntry\(orderData\); if \(eo\.changed\) enrichedOtherCount\+\+; else skippedOther\+\+; return; \}/g) || []).length, 2, 'cả nạp Shopee và TikTok');
+  assert.strictEqual((src.match(/findInOtherTables === 'function' && findInOtherTables\(otherIdx, orderData\)\) \{ if \(findInOtherTables\(otherIdx, orderData\) === 'deleted'\) \{ skippedDeleted\+\+; return; \} const eo = enrichOtherTableEntry\(orderData\); if \(eo\.changed\) enrichedOtherCount\+\+; else skippedOther\+\+; return; \}/g) || []).length, 2, 'cả nạp Shopee và TikTok');
   const ctx = { archivedOrders: [{ orderId: 'a1', track: 'spx111' }], cancelledOrders: [{ orderId: 'B2', returnTrack: 'T222' }],
     extractCleanTrackingCode: v => String(v || '').trim().toUpperCase() };
   vm.createContext(ctx);

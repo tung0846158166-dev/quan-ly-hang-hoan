@@ -41,6 +41,18 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(p.rows[0].ps, "Huỷ sau chuẩn bị · Đã huỷ")
     }
 
+    func testReturnWatchFields() throws {
+        let json = #"{"time":1,"count":3,"rows":[{"k":"m","c":"W1","rw":1795000000000,"rws":3,"ar":1794990000000},{"k":"m","c":"W2","rw":1795000000001,"rws":1,"rv":true},{"k":"m","c":"N1"}]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows.map { $0.inReturnWatch }, [true, true, false])
+        XCTAssertEqual(p.rows[0].returnWatchStage, 3)
+        XCTAssertEqual(p.rows[0].ar, 1794990000000)
+        XCTAssertEqual(p.rows[1].returnWatchStage, 4)   // điện thoại đã quét nhận thì là chặng 4
+        XCTAssertEqual(p.rows[2].rw, 0)                 // PC cũ không gửi
+        let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
+        XCTAssertEqual(again.rows[0].rws, 3)
+    }
+
     func testInboxPushManyAndCancelReceiveMessages() throws {
         let a = SyncProtocol.inboxPushMany(ids: ["inbox_1", "inbox_2"], room: "R", requestId: "q1")
         let ja = try JSONSerialization.jsonObject(with: Data(a.utf8)) as! [String: Any]

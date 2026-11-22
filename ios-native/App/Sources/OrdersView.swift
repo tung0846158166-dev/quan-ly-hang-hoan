@@ -141,6 +141,7 @@ struct OrdersView: View {
     private var tables: some View {
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
         let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
+        let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
         return HStack(spacing: 6) {
             NavigationLink { InboxView() } label: {
                 VStack(spacing: 1) { Text("📥 Đơn mới").font(.caption.bold()); Text("\(store.inbox.count)").font(.subheadline.bold()) }
@@ -157,6 +158,11 @@ struct OrdersView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered).tint(afterPrepPending == 0 ? .gray : .purple)
+            NavigationLink { ReturnWatchView() } label: {
+                VStack(spacing: 1) { Text("🚚 Hoàn về").font(.caption.bold()); Text("đang về \(returnWatchActive)").font(.caption2.bold()) }
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered).tint(returnWatchActive == 0 ? .gray : .teal)
         }
         .padding(.horizontal)
     }

@@ -889,6 +889,14 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>📊 Phân Tích</span>
         </button>
 
+        <!-- v1.9.72: BẢNG HÀNG HOÀN VỀ -->
+        <button type="button" onclick="openReturnWatchModal()" id="btnReturnWatchHeader"
+                class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-sky-400"
+                title="Đơn khách yêu cầu hoàn mà kiện đã chuyển sang Đã đồng ý: theo dõi quá trình hàng về shop">
+          <span>🚚 HÀNG HOÀN VỀ</span>
+          <span id="returnWatchCountBadge" class="bg-white text-sky-900 px-1.5 py-0.2 rounded-full font-mono text-[10px] font-black">0</span>
+        </button>
+
         
         <!-- NÚT BẢNG ĐƠN MỚI TỪ ĐIỆN THOẠI (v1.7.5) -->
         <button type="button" onclick="openNewOrdersModal()" id="btnNewOrdersHeader"
@@ -1433,6 +1441,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       <div class="p-3 border-b border-slate-200"><input id="deletedOrdersSearch" oninput="renderDeletedOrdersTable()" placeholder="Tìm mã đơn, mã vận đơn, tên sản phẩm..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"></div>
       <div class="flex-1 overflow-auto">
         <table class="w-full text-xs"><thead class="sticky top-0 bg-slate-900 text-white"><tr><th class="px-2 py-2 w-10">#</th><th class="px-2 py-2 text-left">Mã đơn</th><th class="px-2 py-2 text-left">Mã vận đơn</th><th class="px-2 py-2 text-left">Sản phẩm</th><th class="px-2 py-2">Xóa từ / lúc</th><th class="px-2 py-2">Thao tác</th></tr></thead><tbody id="deletedOrdersBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- v1.9.72: Bảng Hàng Hoàn Về -->
+  <div id="returnWatchModal" onclick="closeReturnWatchModal()" class="fixed inset-0 bg-slate-900/80 z-[100] hidden flex items-center justify-center p-3 sm:p-5">
+    <div class="relative w-full max-w-[1250px] h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200" onclick="event.stopPropagation()">
+      <div class="bg-gradient-to-r from-sky-700 to-sky-500 text-white px-5 py-3 flex items-center justify-between">
+        <div><div class="font-extrabold text-base">🚚 BẢNG HÀNG HOÀN VỀ</div><div class="text-[11px] opacity-90">Đơn khách yêu cầu hoàn mà kiện chuyển sang "Đã đồng ý" được thêm vào đây tự động, theo dõi tới khi hàng về shop và được quét nhận.</div></div>
+        <button type="button" onclick="closeReturnWatchModal()" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold">✕ Đóng</button>
+      </div>
+      <div class="p-3 border-b border-slate-200 flex flex-wrap items-center gap-2">
+        <input id="returnWatchSearch" oninput="renderReturnWatchTable()" placeholder="Tìm mã đơn, mã vận đơn, sản phẩm..." class="flex-1 min-w-[220px] px-3 py-2 border border-slate-300 rounded-lg text-sm">
+        <div id="returnWatchFilters" class="flex flex-wrap gap-1"></div>
+      </div>
+      <div class="flex-1 overflow-auto">
+        <table class="w-full text-xs"><thead class="sticky top-0 bg-slate-900 text-white"><tr><th class="px-2 py-2 w-10">#</th><th class="px-2 py-2 text-left">Mã đơn</th><th class="px-2 py-2">Sàn</th><th class="px-2 py-2 text-left">Mã vận đơn</th><th class="px-2 py-2 text-left">Sản phẩm</th><th class="px-2 py-2">Vào theo dõi</th><th class="px-2 py-2">Quá trình</th><th class="px-2 py-2">Giờ về shop</th><th class="px-2 py-2">Đã nhận kho</th><th class="px-2 py-2">Thao tác</th></tr></thead><tbody id="returnWatchBody"></tbody></table>
       </div>
     </div>
   </div>
@@ -10280,6 +10305,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     function saveOrders(immediate = false, importCommit = false) {
       if (typeof activeImportBatch !== 'undefined' && activeImportBatch && !importCommit) return Promise.resolve({ success: false, deferred: true });
       try { if (typeof reconcileUnmatchedScans === 'function') reconcileUnmatchedScans(importCommit); } catch (e) {}
+      try { syncReturnWatchFlags(); } catch (e) {}
       markUnsavedToFile();
       try { schedulePhoneWatchSync(); schedulePhoneSnapshotSync(); } catch (e) {}
       if (immediate) {
@@ -12731,6 +12757,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       updatePlatformSwitcherUI();
       const kw = document.getElementById('searchInput').value.trim();
       try { updateSearchDeletedHint(kw); } catch (e) {}
+      try { updateReturnWatchBadge(); } catch (e) {}
 
       let totalQty = 0;
       let totalPrice = 0;
@@ -14810,6 +14837,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             .map(v => extractCleanTrackingCode(v) || '').forEach(v => { if (v && !own.has(v)) { own.add(v); extra.push(v); } });
           if (extra.length) row.x = extra.slice(0, 6).join(' ');
         } catch (e) {}
+        if (x.rw) { row.rw = x.rw; row.rws = x.rws || 1; if (x.ar) row.ar = x.ar; }   // v1.9.72: Bảng Hàng Hoàn Về (rw = giờ vào bảng, rws = chặng 1-4, ar = giờ về shop)
         if (x.pre) row.pre = 1;
         if (x.lv !== undefined) row.lv = x.lv;
         if (!x.pd) row.pd = 0;
@@ -14824,6 +14852,9 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const pending = isOrderPending(o);
         pack(kind, o, getOrderPlatform(o), getPhoneDueMs(o), o.returnDate, o.status,
           { ty: getOrderType(o), pre: o.preOrder === 'Hàng đặt trước', pd: pending, rv: isOrderReceived(o),
+            rw: (typeof isInReturnWatch === 'function' && isInReturnWatch(o)) ? o.rwSince : 0,
+            rws: (typeof isInReturnWatch === 'function' && isInReturnWatch(o)) ? getReturnWatchStage(o) : 0,
+            ar: (() => { try { const a = getOrderArrivedAt(o); return a && !isNaN(a.getTime()) ? a.getTime() : 0; } catch (e) { return 0; } })(),
             lv: (() => { try { const l = getOrderAlertLevel(o); return l === 'overdue' ? 2 : (l === 'soon' ? 1 : 0); } catch (e) { return 0; } })() });
       };
       (orders || []).forEach(o => packOrder('m', o));
@@ -21650,6 +21681,108 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         const inp = document.getElementById('watchlistSearchInput');
         if (inp) inp.focus();
       }, 100);
+    }
+
+    // =========================================================================
+    // v1.9.72: BẢNG HÀNG HOÀN VỀ. Đơn khách yêu cầu hoàn mà kiện chuyển sang "Đã đồng ý" tự vào bảng (đánh dấu rwSince), theo dõi
+    // 4 chặng: Đã đồng ý → Đang về → Đã về shop → Đã nhận kho (quét). Đơn vào bảng rồi thì ở lại dù trạng thái sàn đổi tiếp.
+    // =========================================================================
+    const RW_STAGES = ['', 'Đã đồng ý', 'Đang về', 'Đã về shop', 'Đã nhận kho'];
+    let returnWatchFilter = 'active';
+    const RW_AGREED_RE = /(đồng|dong)\s*(ý|y)|agreed/i;
+    function isReturnAgreedStatus(o) {
+      const t = String((o && o.platformStatus) || '') + ' ' + String((o && o.rawDetails && o.rawDetails.returnStatus) || '');
+      return RW_AGREED_RE.test(t.normalize('NFC'));
+    }
+    function getReturnWatchStage(o) {
+      if (!o) return 0;
+      try {
+        if (isOrderReceived(o)) return 4;
+        const arr = getOrderArrivedAt(o);
+        if (arr && !isNaN(arr.getTime())) return 3;
+        const t = removeVietnameseTones(String(o.platformStatus || '')).toLowerCase();
+        if (/dang ve|dang van chuyen|van chuyen ve|dang giao/.test(t) || extractCleanTrackingCode(o.returnTrack || '')) return 2;
+      } catch (e) {}
+      return 1;
+    }
+    // Gọi mỗi lần lưu: đơn đang chờ có trạng thái "Đã đồng ý" mà chưa có dấu thì đánh dấu vào bảng.
+    function syncReturnWatchFlags() {
+      if (!Array.isArray(orders)) return 0;
+      let n = 0;
+      const now = Date.now();
+      for (const o of orders) {
+        if (!o || o.rwSince || o.rwOff || typeof o.platformStatus !== 'string') continue;
+        if (!RW_AGREED_RE.test(o.platformStatus.normalize('NFC'))) continue;
+        if (isOrderReceived(o) || isOrderUnneeded(o) || o.status === 'Bị mất') continue;
+        o.rwSince = now; n++;
+      }
+      return n;
+    }
+    function isInReturnWatch(o) {
+      return Boolean(o && o.rwSince && !o.rwOff && !isOrderUnneeded(o) && o.status !== 'Bị mất');
+    }
+    function updateReturnWatchBadge() {
+      const el = document.getElementById('returnWatchCountBadge');
+      if (!el || !Array.isArray(orders)) return;
+      let n = 0;
+      for (const o of orders) if (isInReturnWatch(o) && !isOrderReceived(o)) n++;
+      el.textContent = String(n);
+    }
+    function openReturnWatchModal() {
+      try { if (syncReturnWatchFlags()) saveOrders(); } catch (e) {}
+      const m = document.getElementById('returnWatchModal'); if (!m) return;
+      m.classList.remove('hidden'); renderReturnWatchTable();
+    }
+    function closeReturnWatchModal() { const m = document.getElementById('returnWatchModal'); if (m) m.classList.add('hidden'); }
+    function setReturnWatchFilter(f) { returnWatchFilter = f; renderReturnWatchTable(); }
+    function removeFromReturnWatch(i) {
+      const o = orders[i]; if (!o) return;
+      o.rwOff = true; delete o.rwSince;
+      saveOrders(); renderReturnWatchTable(); updateReturnWatchBadge();
+    }
+    function jumpToReturnWatchOrder(i) {
+      closeReturnWatchModal();
+      try { highlightAndFlashOrderRow(i, { isDuplicate: false, source: 'watch' }); } catch (e) {}
+    }
+    function renderReturnWatchTable() {
+      const body = document.getElementById('returnWatchBody'); if (!body) return;
+      const kw = removeVietnameseTones(String((document.getElementById('returnWatchSearch') || {}).value || '')).toLowerCase().trim();
+      const all = [];
+      orders.forEach((o, i) => { if (isInReturnWatch(o)) all.push({ o, i, st: getReturnWatchStage(o) }); });
+      const counts = { active: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+      all.forEach(r => { counts[r.st]++; if (r.st < 4) counts.active++; });
+      const filt = document.getElementById('returnWatchFilters');
+      if (filt) {
+        const defs = [['active', 'Đang theo dõi'], ['1', 'Đã đồng ý'], ['2', 'Đang về'], ['3', 'Đã về shop'], ['4', 'Đã nhận kho'], ['all', 'Tất cả']];
+        filt.innerHTML = defs.map(([k, label]) => `<button type="button" onclick="setReturnWatchFilter('${k}')" class="px-2.5 py-1 rounded-md text-[11px] font-bold border ${returnWatchFilter === k ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-slate-700 border-slate-300'}">${label} (${k === 'all' ? all.length : counts[k]})</button>`).join('');
+      }
+      let list = all.filter(r => returnWatchFilter === 'all' ? true : returnWatchFilter === 'active' ? r.st < 4 : String(r.st) === returnWatchFilter);
+      if (kw) list = list.filter(r => removeVietnameseTones([r.o.orderId, r.o.track, r.o.returnTrack, r.o.forwardTrack, (r.o.items || []).map(x => x.product).join(' ')].join(' ')).toLowerCase().includes(kw));
+      list.sort((a, b) => (a.st - b.st) || ((a.o.rwSince || 0) - (b.o.rwSince || 0)));
+      if (!list.length) { body.innerHTML = '<tr><td colspan="10" class="text-center text-slate-400 py-10">Chưa có đơn nào trong bảng này.</td></tr>'; return; }
+      const dot = (on, label) => `<span class="inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold ${on ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-400'}">${label}</span>`;
+      body.innerHTML = list.slice(0, 1500).map((r, idx) => {
+        const o = r.o;
+        const arr = (() => { try { return getOrderArrivedAt(o); } catch (e) { return null; } })();
+        const code = extractCleanTrackingCode(o.returnTrack || o.track || o.forwardTrack || '') || '';
+        const prod = ((o.items || [])[0] || {}).product || '';
+        const plat = getOrderPlatform ? getOrderPlatform(o) : (o.platform || '');
+        const steps = [1, 2, 3, 4].map(k => dot(r.st >= k, RW_STAGES[k])).join('<span class="text-slate-300">›</span>');
+        return `<tr class="border-b border-slate-100 hover:bg-sky-50/50">
+          <td class="px-2 py-1.5 text-center font-mono text-slate-500">${idx + 1}</td>
+          <td class="px-2 py-1.5 font-mono font-bold">${escapeAttr(o.orderId || '')}</td>
+          <td class="px-2 py-1.5 text-center">${escapeAttr(plat)}</td>
+          <td class="px-2 py-1.5 font-mono">${escapeAttr(code)}</td>
+          <td class="px-2 py-1.5 max-w-[240px] truncate" title="${escapeAttr(prod)}">${escapeAttr(prod)}</td>
+          <td class="px-2 py-1.5 text-center font-mono text-[10.5px]">${escapeAttr(formatScanTime(o.rwSince))}</td>
+          <td class="px-2 py-1.5"><div class="flex items-center gap-1 justify-center whitespace-nowrap">${steps}</div><div class="text-center text-[10px] text-slate-500 mt-0.5">Sàn: ${escapeAttr(o.platformStatus || '')}</div></td>
+          <td class="px-2 py-1.5 text-center font-mono text-[10.5px]">${arr ? escapeAttr(formatScanTime(arr.getTime())) : '<span class="text-slate-300">—</span>'}</td>
+          <td class="px-2 py-1.5 text-center font-mono text-[10.5px]">${o.recvDate ? escapeAttr(o.recvDate) : '<span class="text-slate-300">—</span>'}</td>
+          <td class="px-2 py-1.5 text-center whitespace-nowrap">
+            <button type="button" onclick="jumpToReturnWatchOrder(${r.i})" class="px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 rounded text-[10.5px] font-bold">Xem ở bảng chính</button>
+            <button type="button" onclick="removeFromReturnWatch(${r.i})" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded text-[10.5px] font-bold" title="Bỏ đơn này khỏi bảng theo dõi">✕</button>
+          </td></tr>`;
+      }).join('');
     }
 
     function updateDeletedOrdersBadge() {

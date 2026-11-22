@@ -18,6 +18,12 @@ test('lý do "Wrong product sent" được dịch sang tiếng Việt',async()=>
 test('file Salework: có "Ngày trả hàng thành công" => Đã về kho (chưa kiểm tra), kể cả khi chưa có mã trả hàng',async()=>{
   const c=await run([sw({'Mã đơn hàng':'587000000000000003','Mã vận đơn':'862700000003','Mã trả hàng':'VTPVN1','Ngày trả hàng thành công':'10:15:22 21/11/2026'}),sw({'Mã đơn hàng':'587000000000000004','Mã vận đơn':'862700000004','Mã trả hàng':'VTPVN2','Ngày trả hàng thành công':''})]);
   const by=Object.fromEntries(c.orders.map(o=>[o.orderId,o]));
-  assert.equal(by['587000000000000003'].platformStatus,'Đã về kho (chưa kiểm tra)');
+  assert.equal(by['587000000000000003'].platformStatus,'Đã về');
   assert.equal(by['587000000000000004'].platformStatus,'Đang về');
+});
+test('Salework: thời gian về được lưu vào returnedAt; đơn Đang về thì không có',async()=>{
+  const c=await run([sw({'Mã đơn hàng':'587000000000000005','Mã vận đơn':'862700000005','Mã trả hàng':'V5','Ngày trả hàng thành công':'10:15:22 21/11/2026'}),sw({'Mã đơn hàng':'587000000000000006','Mã vận đơn':'862700000006','Mã trả hàng':'V6'})]);
+  const by=Object.fromEntries(c.orders.map(o=>[o.orderId,o]));
+  assert.equal(by['587000000000000005'].returnedAt,'10:15:22 21/11/2026');
+  assert.ok(!by['587000000000000006'].returnedAt);
 });

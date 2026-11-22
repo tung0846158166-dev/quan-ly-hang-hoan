@@ -4102,7 +4102,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           if (orderData.platform) set('platform', orderData.platform);
           if (orderData.deadline) set('deadline', orderData.deadline);
           if (where === 'cancelled') { if (orderData.platformStatus) set('platStatus', orderData.platformStatus); fill('preorder', orderData.preOrder); }
-          else { if (orderData.platformStatus) set('platformStatus', orderData.platformStatus); fill('preOrder', orderData.preOrder); }
+          else { if (orderData.platformStatus) set('platformStatus', orderData.platformStatus); if (orderData.returnedAt) set('returnedAt', orderData.returnedAt); fill('preOrder', orderData.preOrder); }
           if (!Number(entry.price) && Number(orderData.price)) { entry.price = orderData.price; result.changed = true; }
           const hasReal = Array.isArray(entry.items) && entry.items.some(it => it && it.product && !/Sản phẩm mới|Chưa rõ sản phẩm/.test(it.product));
           if (!hasReal && Array.isArray(orderData.items) && orderData.items.some(it => it && it.product)) {
@@ -5788,13 +5788,15 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         // Trạng thái sàn (Platform Status)
         let rawPlatStatus = '';
+        let rawReturnedAt = '';   // v1.9.64: thời gian hàng về (cột "Ngày trả hàng thành công" của Salework)
         if (isTikTokReturnRefundFile) {
           rawPlatStatus = translateTikTokReturnStatus(rawStatusText, rawSubStatusText);
         } else if (saleworkReturnTrackKey) {
           // File Salework: cột "Lý do hoàn" là LÝ DO của khách (đã dịch vào Ghi chú), không phải trạng thái kiện.
           // Trạng thái kiện suy ra từ mã trả hàng: khách đã gửi (có mã trả hàng) = Đang về, chưa có = Chờ khách gửi hàng.
-          rawPlatStatus = (saleworkReturnedKey && String(row[saleworkReturnedKey] || '').trim()) ? 'Đã về kho (chưa kiểm tra)'
+          rawPlatStatus = (saleworkReturnedKey && String(row[saleworkReturnedKey] || '').trim()) ? 'Đã về'
             : (String(row[saleworkReturnTrackKey] || '').trim() ? 'Đang về' : 'Chờ khách gửi hàng');
+          rawReturnedAt = saleworkReturnedKey ? String(row[saleworkReturnedKey] || '').trim() : '';
         } else if (rawCancelReason) {
           rawPlatStatus = rawCancelReason;
         } else {
@@ -5867,6 +5869,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             shipDate: rawShipDate,
             returnDate: rawReturnDate,
             platformStatus: rawPlatStatus,
+            returnedAt: rawReturnedAt,
             note: rawNote,
             buyerNote: buyerComment,
             items: []
@@ -5915,6 +5918,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (rawShipDate && !entry.shipDate) entry.shipDate = rawShipDate;
         if (rawReturnDate && !entry.returnDate) entry.returnDate = rawReturnDate;
         if (rawPlatStatus && !entry.platformStatus) entry.platformStatus = rawPlatStatus;
+        if (rawReturnedAt && !entry.returnedAt) entry.returnedAt = rawReturnedAt;
         if (rawNote && !entry.note) entry.note = rawNote;
         if (buyerComment && !entry.buyerNote) entry.buyerNote = buyerComment;
         if (carrier && entry.carrier === 'Chờ bưu cục tiếp nhận') entry.carrier = carrier;
@@ -5993,6 +5997,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             if (orderData.platformStatus && orderData.platformStatus !== oldPlatStatus) {
               orders[existingIdx].platformStatus = orderData.platformStatus;
             }
+            if (orderData.returnedAt) orders[existingIdx].returnedAt = orderData.returnedAt;
             if (orderData.buyerNote) orders[existingIdx].buyerNote = orderData.buyerNote;
             if (changed || (newPlatStatus && newPlatStatus !== oldPlatStatus)) {
               enrichedTableCount++;
@@ -6029,6 +6034,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               orderType: orderData.orderType || 'Trả hàng/Hoàn tiền',
               isPartialReturn: Boolean(orderData.isPartialReturn),
               platformStatus: orderData.platformStatus || 'Chờ xử lý',
+              returnedAt: orderData.returnedAt || '',
               preOrder: orderData.preOrder || 'Đơn thường',
               orderId: orderData.orderId || orderData.returnOrderId || '',
               returnOrderId: orderData.returnOrderId || '',
@@ -11936,6 +11942,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           platStatusBadgeClass = 'bg-amber-100 text-amber-950 border-amber-300 font-extrabold';
         } else if (stLower.includes('da hoan tien') || stLower.includes('hoan tien thanh cong')) {
           platStatusBadgeClass = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
+        } else if (/^da ve\b/.test(stLower)) {
+          platStatusBadgeClass = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
         } else if (stLower.includes('giao hang hoan tra thanh cong') || stLower.includes('tra hang thanh cong')) {
           platStatusBadgeClass = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
         } else if (stLower.includes('van chuyen') || stLower.includes('chuyen hoan')) {
@@ -11961,6 +11969,10 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
                   oncontextmenu="handleCellContextMenu(event,'${orderIdx}:platformStatus','Trạng thái sàn Đơn #${orderIdx+1}')">
                ${escapeAttr(curPlatStatus)}
              </div>`;
+        // v1.9.64: đơn "Đã về" (Shopee: "Đã về shop"; Salework/TikTok: "Đã về") hiện thời gian về ngay dưới trạng thái.
+        const returnedAtText = /^da ve\b/.test(stLower) ? String(order.returnedAt || (order.rawDetails && order.rawDetails.returnSuccessTime) || '').trim() : '';
+        const returnedAtHtml = returnedAtText
+          ? `<div class="text-center text-[9.5px] leading-tight text-emerald-800 font-semibold mt-0.5" title="Thời gian hàng về (chưa kiểm tra thực tế)">${escapeAttr(returnedAtText)}</div>` : '';
 
         const preOrderLocked = Boolean(cellLocks[`${orderIdx}:preOrder`]);
         const isPreOrder = order.preOrder === 'Hàng đặt trước';
@@ -12190,7 +12202,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
               ${orderTypeCellHtml}${order.sheetType ? `<div class="mt-0.5 text-center text-[10px] font-bold leading-tight text-indigo-700" title="Loại theo Google Sheet / sàn">${escapeAttr(order.sheetType)}</div>` : ''}
               ${isPartialOrder ? `<div class="mt-0.5"><span class="inline-block px-1.5 py-0.2 rounded text-[9.5px] font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs whitespace-nowrap" title="⚡ Đơn hoàn 1 phần: Khách mua nhiều SP nhưng chỉ hoàn 1 sản phẩm!">⚡ Hoàn 1 phần</span></div>` : ''}
             </td>
-            <td class="text-center min-w-[130px] px-1">${platformStatusCellHtml}</td>
+            <td class="text-center min-w-[130px] px-1">${platformStatusCellHtml}${returnedAtHtml}</td>
             <td>${renderCellInput(`${orderIdx}:orderId`, `Mã đơn #${orderIdx+1}`, order.orderId, 'text-center font-mono font-bold text-slate-900', 'Nhập mã đơn...', `updateOrderField(${orderIdx},'orderId',this.value)`)}</td>
             <td>${trackCellHtml}</td>
             <td class="text-center min-w-[125px] px-1">${carrierCellHtml}</td>

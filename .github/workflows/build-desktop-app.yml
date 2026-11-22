@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.63
+          name: QuanLyHangHoan-Windows-Installer-v1.9.64
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.63
-          name: "Quản Lý Hàng Hoàn v1.9.63 — File Salework: đơn có ngày trả hàng thành công hiện Đã về kho (chưa kiểm tra)"
+          tag_name: v1.9.64
+          name: "Quản Lý Hàng Hoàn v1.9.64 — Trạng thái kiện 'Đã về' kèm thời gian về"
           body: |
+            ### Bản 1.9.64
+
+            - 📦 Cột Trạng thái kiện: đơn đã về (Shopee "Đã về shop", Salework/TikTok "Đã về") hiện thời gian về ngay dưới ô trạng thái. File Salework: đơn có "Ngày trả hàng thành công" thành "Đã về" (thay chữ "Đã về kho (chưa kiểm tra)" của bản trước); đơn vẫn chưa tính Đã nhận cho tới khi bạn kiểm tra thực tế.
+
             ### Bản 1.9.63
 
             - 📦 Nạp file Salework (don_hoan_...xlsx): đơn có cột "Ngày trả hàng thành công" được ghi Trạng thái sàn là "Đã về kho (chưa kiểm tra)" (trước đây chỉ hiện "Đang về"). Đơn vẫn chưa tính là Đã nhận cho tới khi bạn kiểm tra thực tế.

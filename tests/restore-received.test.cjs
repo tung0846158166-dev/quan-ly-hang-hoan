@@ -31,3 +31,15 @@ test('khóa kho lưu trữ phân biệt 2 yêu cầu khác nhau của cùng mã 
   const x = { orderId: 'O', track: 'T', rawDetails: { claimId: 'C1' }, recvDate: '1' }, y = { orderId: 'O', track: 'T', rawDetails: { claimId: 'C2' }, recvDate: '2' };
   assert.notStrictEqual(f(x), f(y)); assert.strictEqual(f(x), f(Object.assign({}, x)));
 });
+
+// v1.9.74: nút khôi phục nằm trong menu Nhập / Xuất (không còn bị tràn khỏi thanh đầu trang)
+test('nút Khôi phục đơn đã nhận nằm trong menu Nhập / Xuất', () => {
+  const fs = require('node:fs'), path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
+  const menuStart = html.indexOf('id="headerMenuImport"');
+  const btn = html.indexOf('id="btnRestoreReceived"');
+  const nextMenu = html.indexOf('id="headerMenuTools"');
+  assert.ok(menuStart > 0 && btn > menuStart && btn < nextMenu, 'nút phải nằm trong menu Nhập / Xuất');
+  assert.equal(html.split('id="btnRestoreReceived"').length - 1, 1, 'chỉ một nút');
+  assert.ok(html.includes('id="restoreReceivedFile"'), 'vẫn còn ô chọn file');
+});

@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.76
+          name: QuanLyHangHoan-Windows-Installer-v1.9.77
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.76
-          name: "Quản Lý Hàng Hoàn v1.9.76 — Bảng Hàng Hoàn Về nhận cả đơn TikTok"
+          tag_name: v1.9.77
+          name: "Quản Lý Hàng Hoàn v1.9.77 — Tab tuần gộp thành danh sách chọn"
           body: |
+            ### Bản 1.9.77
+
+            - 📅 **Các tab tuần gộp thành một danh sách chọn** (Tất Cả Các Tuần, Tuần 48, Tuần 47...), mỗi dòng ghi số đơn và số SP. Thanh đầu trang gọn lại, không còn bị tràn làm mất các nút bên phải. Nút "➕ Tuần" giữ nguyên; tuần trống tự tạo có nút ✕ để xóa.
+
             ### Bản 1.9.76
 
             - 🚚 **Bảng Hàng Hoàn Về nhận cả đơn TikTok.** Trước đây bảng chỉ nhận đơn Shopee có trạng thái "Đã đồng ý". Nay đơn TikTok có trạng thái **Chờ khách gửi hàng**, **Đang về** hoặc **Đang vận chuyển về** cũng tự vào bảng, theo dõi các chặng như đơn Shopee. Lần mở đầu tiên, các đơn TikTok đang ở các trạng thái này (dữ liệu của bạn khoảng hơn 500 đơn) sẽ vào bảng một lượt; đơn đã nhận, không cần nhận hoặc bị mất không vào.

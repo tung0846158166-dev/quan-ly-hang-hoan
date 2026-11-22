@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.71
+          name: QuanLyHangHoan-Windows-Installer-v1.9.72
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.71
-          name: "Quản Lý Hàng Hoàn v1.9.71 — Hết trùng đơn mã giao/mã hoàn, iPhone hết báo hạn oan"
+          tag_name: v1.9.72
+          name: "Quản Lý Hàng Hoàn v1.9.72 — Bảng Hàng Hoàn Về (máy tính + iPhone)"
           body: |
+            ### Bản 1.9.72
+
+            - 🚚 **Bảng Hàng Hoàn Về** (nút xanh "🚚 HÀNG HOÀN VỀ" trên thanh đầu trang). Đơn khách yêu cầu hoàn mà kiện chuyển sang **Đã đồng ý** tự vào bảng, theo dõi 4 chặng: Đã đồng ý → Đang về → Đã về shop → Đã nhận kho (quét). Đơn vào bảng rồi thì ở lại dù trạng thái sàn đổi tiếp, tới khi được quét nhận. Có ô tìm, lọc theo chặng, nút "Xem ở bảng chính" và nút ✕ bỏ khỏi bảng. Lần đầu mở bản này, các đơn đang ở trạng thái Đã đồng ý sẽ được đưa vào bảng.
+            - 📱 Máy tính gửi bảng này sang iPhone (giờ vào bảng, chặng, giờ về shop). App iPhone mới (0.10.34) có mục "🚚 Hoàn về" ở màn Đơn. App iPhone cũ vẫn chạy bình thường, chỉ chưa hiện bảng mới.
+
             ### Bản 1.9.71
 
             - 🧹 Hết trùng đơn TikTok kiểu "một dòng chỉ có mã giao, một dòng có thêm mã hoàn" (lần nạp trước chưa có mã hoàn, lần sau mới có nên app tạo thêm dòng). Nạp file lần sau nhận ra đây là cùng một kiện và cập nhật vào dòng cũ. Các dòng trùng đang có (dữ liệu của bạn có khoảng 100 đơn) tự được gộp: giữ dòng có mã hoàn, chuyển sang trạng thái đã nhận, giờ nhận, ảnh nếu dòng cũ có. Đơn nhiều kiện / hoàn một phần (nhiều dòng cùng mã giao) giữ nguyên, không đoán. Có lưu bản sao để khôi phục.

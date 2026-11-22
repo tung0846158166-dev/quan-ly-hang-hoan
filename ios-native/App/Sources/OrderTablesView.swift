@@ -363,6 +363,96 @@ struct CancelAfterPrepView: View {
 }
 
 
+/// Bảng "Hàng hoàn về": đơn khách yêu cầu hoàn mà kiện chuyển sang "Đã đồng ý" (máy tính tự đưa vào bảng). Theo dõi 4 chặng:
+/// Đã đồng ý → Đang về → Đã về shop → Đã nhận kho. Chạm vào đơn để xem chi tiết.
+struct ReturnWatchView: View {
+    @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var store: SnapshotStore
+    private enum Show: String, CaseIterable { case active = "Đang về", received = "Đã nhận", all = "Tất cả" }
+    @State private var show: Show = .active
+    @State private var detail: OrderRow?
+
+    private var all: [OrderRow] { store.rows.filter { $0.inReturnWatch } }
+    private func matches(_ r: OrderRow, _ s: Show) -> Bool {
+        switch s {
+        case .active: return r.returnWatchStage < 4
+        case .received: return r.returnWatchStage >= 4
+        case .all: return true
+        }
+    }
+    private var list: [OrderRow] {
+        all.filter { matches($0, show) }.sorted { a, b in
+            if a.returnWatchStage != b.returnWatchStage { return a.returnWatchStage > b.returnWatchStage }   // hàng đã về shop lên trước
+            return a.rw < b.rw
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Picker("", selection: $show) {
+                ForEach(Show.allCases, id: \.self) { s in Text("\(s.rawValue) (\(count(s)))").tag(s) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            if let b = engine.banner { BannerStrip(banner: b).padding(.horizontal) }
+            List {
+                if list.isEmpty {
+                    Text(store.rows.contains { $0.rw > 0 } ? "Không có đơn trong mục này" : "Máy tính chưa gửi Bảng Hàng Hoàn Về — cập nhật máy tính lên bản mới rồi kéo xuống để tải lại")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(list) { r in
+                    Button { detail = r } label: { line(r) }.buttonStyle(.plain)
+                }
+            }
+            .listStyle(.plain)
+        }
+        .navigationTitle("Hàng hoàn về (\(count(.active)))")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $detail) { DetailView(row: $0) }
+        .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+    }
+
+    private func count(_ s: Show) -> Int { all.filter { matches($0, s) }.count }
+
+    private func date(_ ms: Int) -> String {
+        Date(timeIntervalSince1970: Double(ms) / 1000).formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func info(_ r: OrderRow) -> String {
+        var parts: [String] = ["Vào theo dõi: " + date(r.rw)]
+        if r.ar > 0 { parts.append("Về shop: " + date(r.ar)) }
+        if !r.ps.isEmpty { parts.append("Sàn: " + r.ps) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func line(_ r: OrderRow) -> some View {
+        let stage = r.returnWatchStage
+        let color: Color = stage >= 4 ? .green : (stage == 3 ? .orange : .blue)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(r.o.isEmpty ? r.c : r.o).font(.system(.body, design: .monospaced).bold()).lineLimit(1)
+                Spacer(minLength: 0)
+                Text(OrderRow.returnWatchStageNames[stage]).font(.caption.bold())
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(color.opacity(0.18), in: Capsule())
+                    .foregroundColor(color)
+            }
+            if !r.o.isEmpty && r.c.uppercased() != r.o.uppercased() {
+                Text("Vận đơn: \(r.c)").font(.caption.monospaced()).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 4) {
+                ForEach(1...4, id: \.self) { k in
+                    Capsule().fill(k <= stage ? color : Color.gray.opacity(0.25)).frame(height: 5)
+                }
+            }
+            if !r.n.isEmpty { Text(r.n).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+            Text(info(r)).font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+}
+
 /// Dòng báo kết quả gửi lệnh (đã gửi, máy tính đã làm xong, lỗi…) cho các bảng ngoài màn Quét.
 /// Chỉ hiện các thông báo mới (trong 6 giây sau khi đổi), không hiện lại thông báo cũ từ màn Quét.
 struct BannerStrip: View {

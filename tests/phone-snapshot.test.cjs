@@ -11,6 +11,7 @@ function ctx(orders, cancelled, archived) {
     getOrderType: o => o.orderType || 'Trả hàng/Hoàn tiền',
     getOrderPlatform: o => o.platform || 'Shopee',
     computeDeadlineInfo: (rd, dl) => rd ? { due: 1000 } : null,
+    isInReturnWatch: o => !!o.rwSince, getReturnWatchStage: o => o.stage || 1,
     ARRIVED_DANGER_HOURS: 24, getOrderArrivedAt: o => o.arrivedAt ? new Date(o.arrivedAt) : null, isCancelAfterPrepOrder: o => /huỷ sau chuẩn bị/i.test(o.platformStatus || '')
   };
   vm.createContext(c); vm.runInContext(code, c); return c;
@@ -153,4 +154,17 @@ test('v1.9.71: due gửi iPhone chỉ có cho đơn đã về (giờ về + 24h)
   assert.strictEqual(by('NOTYET').due, 0, 'đơn chưa về: iPhone không lên lịch thông báo');
   assert.strictEqual(by('ARR').due, t0 + 24 * 3600000);
   assert.strictEqual(by('CANC').due, 1000);
+});
+
+test('v1.9.72: đơn trong Bảng Hàng Hoàn Về gửi iPhone kèm rw (giờ vào bảng), rws (chặng), ar (giờ về shop)', () => {
+  const t0 = new Date(2026, 10, 22, 10, 0, 0).getTime();
+  const c = ctx([
+    { track: 'W1', status: 'Chưa nhận', returnDate: 'x', rwSince: 1795000000000, stage: 3, arrivedAt: t0 },
+    { track: 'W2', status: 'Chưa nhận', returnDate: 'x', rwSince: 1795000000001, stage: 1 },
+    { track: 'N1', status: 'Chưa nhận', returnDate: 'x' }
+  ], []);
+  const rows = get(c), by = k => rows.find(r => r.c === k);
+  assert.deepStrictEqual([by('W1').rw, by('W1').rws, by('W1').ar], [1795000000000, 3, t0]);
+  assert.deepStrictEqual([by('W2').rw, by('W2').rws, by('W2').ar], [1795000000001, 1, undefined]);
+  assert.strictEqual(by('N1').rw, undefined);
 });

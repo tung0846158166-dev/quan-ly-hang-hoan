@@ -507,6 +507,19 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
             <div class="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">📥 Cơ Chế Nhập Tách Riêng 2 Sàn</div>
             <div class="p-1 space-y-0.5">
               <button
+                id="btnRestoreReceived"
+                onclick="closeAllHeaderMenus(); document.getElementById('restoreReceivedFile').click();"
+                class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-amber-50 transition group cursor-pointer border border-amber-200/80"
+                title="Chọn file khoi_phuc_don_da_nhan.json để khôi phục các đơn đã nhận nhưng bị đặt lại thành Chưa trả"
+              >
+                <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-hover:bg-amber-200 font-bold text-xs">♻</div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-extrabold text-xs text-amber-800">Khôi phục đơn đã nhận</div>
+                  <p class="text-[10.5px] text-slate-500 leading-snug">Chọn file khoi_phuc_don_da_nhan.json để trả đơn đã nhận bị đặt lại về Chưa nhận</p>
+                </div>
+              </button>
+
+              <button
                 id="btnShopeeDb"
                 onclick="closeAllHeaderMenus(); openShopeeDbModal('shopee');"
                 class="w-full flex items-start gap-2.5 p-2 rounded-lg text-left hover:bg-orange-50 transition group cursor-pointer border border-orange-100/80"
@@ -891,9 +904,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
 
         <!-- v1.9.73: khôi phục đơn đã nhận bị đặt lại về "Chưa trả" từ file sao lưu -->
         <input type="file" id="restoreReceivedFile" accept=".json" class="hidden" onchange="restoreReceivedFromPatch(this)">
-        <button type="button" onclick="document.getElementById('restoreReceivedFile').click()" id="btnRestoreReceived"
-                class="px-2 py-1 rounded-md font-bold text-[10px] bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition cursor-pointer"
-                title="Chọn file khoi_phuc_don_da_nhan.json để khôi phục các đơn đã nhận nhưng bị đặt lại thành Chưa trả">♻ Khôi phục đơn đã nhận</button>
+
 
         <!-- v1.9.72: BẢNG HÀNG HOÀN VỀ -->
         <button type="button" onclick="openReturnWatchModal()" id="btnReturnWatchHeader"

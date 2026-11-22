@@ -4,12 +4,13 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict'), test = require('node:test'), path = require('node:path');
 const current = fs.readFileSync(process.env.PARCEL_TEST_SOURCE || path.join(__dirname, '..', 'Bang_Excel_Quan_Ly_Hang_Hoan_Tu_Dong_Thu_Nho_Anh.html'), 'utf8');
 const original = fs.readFileSync(path.join(__dirname, 'fixtures', 'import-reference-functions.txt'), 'utf8');
-const NAMES = ['extractCleanTrackingCode', 'getOrderTrackingCodes', 'getReturnParcelId', 'getReturnParcelKey', 'isSameReturnParcel', 'findExistingReturnParcelIndex',
-  'getShopeeDbParcels', 'registerImportedParcel', 'lookupShopeeDb', 'mergeImportedItems', 'reconcileImportPrices', 'getImportProductMode'];
+const NAMES = ['removeVietnameseTones', 'extractCleanTrackingCode', 'getOrderTrackingCodes', 'getReturnParcelId', 'getReturnParcelKey', 'isSameReturnParcel', 'findExistingReturnParcelIndex',
+  'getShopeeDbParcels', 'registerImportedParcel', 'lookupShopeeDb', 'dedupeOrderItems','mergeImportedItems', 'reconcileImportPrices', 'getImportProductMode'];
 function build(source) {
   const c = vm.createContext({ console, activeImportBatch: { messages: [] }, orders: [], shopeeOrderDb: {}, document: { getElementById: () => ({ value: 'supplement' }) } });
   for (const name of NAMES) {
-    const m = source.match(new RegExp('^    (?:async )?function ' + name + '\\([^]*?^    }', 'm'));
+    // dedupeOrderItems (v1.9.73) does not exist in the frozen reference file: both builds use the current one.
+    const m = (name === 'dedupeOrderItems' || name === 'removeVietnameseTones' ? current : source).match(new RegExp('^    (?:async )?function ' + name + '\\([^]*?^    }', 'm'));
     assert(m, name);
     vm.runInContext(m[0], c);
   }

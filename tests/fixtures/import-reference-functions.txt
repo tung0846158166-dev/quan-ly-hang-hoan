@@ -174,7 +174,7 @@
       const result = [], seen = new Set();
       (previous || []).forEach(item => { const k = key(item); if (replacements.has(k)) { if (!seen.has(k)) result.push(...replacements.get(k)); } else result.push(item); seen.add(k); });
       replacements.forEach((items, k) => { if (!seen.has(k)) result.push(...items); });
-      return JSON.parse(JSON.stringify(result));
+      return JSON.parse(JSON.stringify(dedupeOrderItems(result)));
     }
 
     function reconcileImportPrices(previous, incoming, retained) {

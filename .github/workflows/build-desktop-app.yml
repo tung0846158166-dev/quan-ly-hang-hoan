@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.72
+          name: QuanLyHangHoan-Windows-Installer-v1.9.73
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.72
-          name: "Quản Lý Hàng Hoàn v1.9.72 — Bảng Hàng Hoàn Về (máy tính + iPhone)"
+          tag_name: v1.9.73
+          name: "Quản Lý Hàng Hoàn v1.9.73 — Sửa mặt hàng nhân đôi + khôi phục đơn đã nhận bị đặt lại"
           body: |
+            ### Bản 1.9.73
+
+            - 🧹 **Sửa lỗi mặt hàng bị nhân đôi** (đơn trên sàn 2 sản phẩm nhưng app báo 6). Nguyên nhân: mỗi nguồn (file Shopee, file TikTok, Google Sheet) ghi tên sản phẩm/màu/size khác nhau nên app cộng thêm thành dòng mới. Nay app nhận ra cùng sản phẩm + màu + size (kể cả tên ghi tắt hoặc dòng thiếu màu/size) và gộp lại, lấy số lượng lớn nhất chứ không cộng dồn. Tự dọn các đơn cũ đã bị phình sau khi mở app (có sao lưu và ghi nhật ký '🧹 GỘP MẶT HÀNG TRÙNG'). Trên dữ liệu thật đã thử: khoảng 580 đơn được sửa, đơn 261107NKBGPAV4 từ 6 về đúng 2.
+            - ♻ **Khôi phục đơn đã nhận bị đặt lại về Chưa trả** (nút cam "Khôi phục đơn đã nhận" trên thanh đầu trang, chọn file khoi_phuc_don_da_nhan.json). Chỉ sửa đơn đang chưa nhận, lưu sẵn bản gốc để hoàn tác.
+            - 📦 **Sửa lỗi kho lưu trữ**: trước đây 2 yêu cầu khác nhau của cùng mã đơn + cùng mã giao bị coi là một, dòng thứ hai bị bỏ khỏi kho nhưng vẫn bị xóa khỏi Bảng chính. Nay khóa phân biệt theo mã yêu cầu, mã hoàn và ngày nhận.
+
             ### Bản 1.9.72
 
             - 🚚 **Bảng Hàng Hoàn Về** (nút xanh "🚚 HÀNG HOÀN VỀ" trên thanh đầu trang). Đơn khách yêu cầu hoàn mà kiện chuyển sang **Đã đồng ý** tự vào bảng, theo dõi 4 chặng: Đã đồng ý → Đang về → Đã về shop → Đã nhận kho (quét). Đơn vào bảng rồi thì ở lại dù trạng thái sàn đổi tiếp, tới khi được quét nhận. Có ô tìm, lọc theo chặng, nút "Xem ở bảng chính" và nút ✕ bỏ khỏi bảng. Lần đầu mở bản này, các đơn đang ở trạng thái Đã đồng ý sẽ được đưa vào bảng.

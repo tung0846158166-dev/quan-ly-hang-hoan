@@ -889,6 +889,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           <span>📊 Phân Tích</span>
         </button>
 
+        <!-- v1.9.73: khôi phục đơn đã nhận bị đặt lại về "Chưa trả" từ file sao lưu -->
+        <input type="file" id="restoreReceivedFile" accept=".json" class="hidden" onchange="restoreReceivedFromPatch(this)">
+        <button type="button" onclick="document.getElementById('restoreReceivedFile').click()" id="btnRestoreReceived"
+                class="px-2 py-1 rounded-md font-bold text-[10px] bg-amber-600 hover:bg-amber-700 text-white shadow-2xs transition cursor-pointer"
+                title="Chọn file khoi_phuc_don_da_nhan.json để khôi phục các đơn đã nhận nhưng bị đặt lại thành Chưa trả">♻ Khôi phục đơn đã nhận</button>
+
         <!-- v1.9.72: BẢNG HÀNG HOÀN VỀ -->
         <button type="button" onclick="openReturnWatchModal()" id="btnReturnWatchHeader"
                 class="px-2.5 py-1 rounded-md font-extrabold text-[11px] bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white shadow-2xs transition flex items-center gap-1.5 cursor-pointer ring-1 ring-sky-400"
@@ -3870,6 +3876,96 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       return document.getElementById('importProductUpdateMode')?.value === 'replace' ? 'replace' : 'supplement';
     }
 
+    // v1.9.73: cùng một mặt hàng nhưng mỗi nguồn (file Shopee, Google Sheet, Salework) ghi khác: tên đầy đủ / tên rút gọn ("LEMONN"),
+    // có hoặc không có màu-size. Trước đây coi là các mặt hàng khác nhau nên đơn 2 sản phẩm hiện thành 6. Quy tắc gộp:
+    //  - cùng sku → một mặt hàng; cùng màu + size và tên hàng chứa nhau (hoặc một bên trống) → một mặt hàng, lấy tên dài nhất, số lượng lớn nhất (không cộng);
+    //  - dòng không màu không size mà đã có dòng cùng tên hàng có màu/size → bỏ dòng trống đó (các dòng trống với nhau không gộp).
+    function dedupeOrderItems(items) {
+      if (!Array.isArray(items) || items.length < 2) return items;
+      const nm = v => removeVietnameseTones(String(v || '')).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const compat = (a, b) => !a || !b || a === b || a.includes(b) || b.includes(a);
+      const info = items.map(it => ({ it, name: nm(it && it.product), color: nm(it && it.color), size: nm(it && it.size), sku: String((it && (it.sku || it.sellerSku || it.skuId)) || '').trim() }));
+      const hasVariant = x => Boolean(x.color || x.size);
+      const out = [];
+      const same = (a, b) => (a.sku || b.sku) ? (a.sku && a.sku === b.sku) : (a.color === b.color && a.size === b.size && compat(a.name, b.name));
+      info.filter(hasVariant).concat(info.filter(x => !hasVariant(x))).forEach(x => {
+        if (!hasVariant(x) && !x.sku) {
+          // dòng trống: chỉ bỏ khi đã có dòng có màu/size cùng tên hàng. Các dòng trống với nhau giữ nguyên (không biết là trùng hay là 2 chiếc thật).
+          if (out.some(y => (hasVariant(y) || y.sku) && compat(x.name, y.name))) return;
+        } else {
+          const m = out.find(y => same(y, x));
+          if (m) {
+            m.qty = Math.max(m.qty, Number(x.it.qty) || 1);
+            if (x.name.length > m.name.length) { m.it.product = x.it.product; m.name = x.name; }
+            if (!m.it.importPrices && x.it.importPrices) m.it.importPrices = x.it.importPrices;
+            return;
+          }
+        }
+        out.push({ it: Object.assign({}, x.it), name: x.name, color: x.color, size: x.size, sku: x.sku, qty: Number(x.it.qty) || 1 });
+      });
+      const res = out.map(y => { y.it.qty = y.qty; return y.it; });
+      // giữ thứ tự gốc theo lần xuất hiện đầu tiên
+      const rank = it => { const i = items.findIndex(z => z && (z.color || '') === (it.color || '') && (z.size || '') === (it.size || '')); return i < 0 ? 1e9 : i; };
+      return res.length < items.length ? res.sort((a, b) => rank(a) - rank(b)) : items;
+    }
+    // Dọn các đơn đã bị phình mặt hàng (lưu bản gốc để khôi phục). Trả về số đơn được sửa.
+    function dedupeAllOrderItems() {
+      if (!Array.isArray(orders)) return 0;
+      let fixed = 0; const backup = [];
+      for (const o of orders) {
+        if (!o || !Array.isArray(o.items) || o.items.length < 2) continue;
+        const next = dedupeOrderItems(o.items);
+        if (next !== o.items && next.length < o.items.length) { backup.push({ orderId: o.orderId, track: o.track, items: o.items }); o.items = next; fixed++; }
+      }
+      if (fixed) {
+        try { const key = 'items_dedupe_backup'; const old = JSON.parse(localStorage.getItem(key) || '[]'); localStorage.setItem(key, JSON.stringify(old.concat(backup.map(b => Object.assign({ at: Date.now() }, b))).slice(-300))); } catch (e) {}
+        try { addAuditLog('🧹 GỘP MẶT HÀNG TRÙNG', `Gộp mặt hàng trùng ở ${fixed} đơn (cùng sản phẩm, màu, size ghi khác nhau giữa các nguồn): ` + backup.slice(0, 15).map(b => b.orderId || b.track).join(', ')); } catch (e) {}
+        try { saveOrders(); renderAll(false); } catch (e) {}
+      }
+      return fixed;
+    }
+
+    // v1.9.73: khôi phục đơn đã nhận bị đặt lại về "Chưa trả" (dữ liệu nhận hàng lấy từ bản sao lưu). Chỉ điền lại các trường nhận hàng, có sao lưu trước khi sửa.
+    function applyReceivedPatch(patch) {
+      const out = { restored: 0, notFound: 0, already: 0, ambiguous: 0 };
+      if (!patch || !Array.isArray(patch.rows)) return out;
+      const claimOf = o => String((o.rawDetails && o.rawDetails.claimId) || o.returnOrderId || '');
+      const by = new Map();
+      orders.forEach(o => { if (!o) return; const k = String(o.orderId || '') + '|' + claimOf(o); if (!by.has(k)) by.set(k, []); by.get(k).push(o); });
+      const backup = [];
+      patch.rows.forEach(r => {
+        const list = by.get(String(r.orderId || '') + '|' + String(r.claimId || '')) || [];
+        if (!list.length) { out.notFound++; return; }
+        if (list.length > 1) { out.ambiguous++; return; }
+        const o = list[0];
+        if (o.status === 'Hàng đã trả' || o.recvDate) { out.already++; return; }
+        backup.push(JSON.parse(JSON.stringify(Object.assign({}, o, { photo: '' }))));
+        const f = r.fields || {};
+        Object.keys(f).forEach(k => { if (k === 'priceHasValue' || k === 'myNote') { if (o[k] === undefined || o[k] === '') o[k] = f[k]; } else if (o[k] === undefined || o[k] === '' || k === 'status' || k === 'recvDate') o[k] = f[k]; });
+        out.restored++;
+      });
+      if (out.restored) {
+        try { localStorage.setItem('restore_received_backup', JSON.stringify({ at: Date.now(), orders: backup.slice(0, 400) })); } catch (e) {}
+        try { addAuditLog('♻ KHÔI PHỤC ĐƠN ĐÃ NHẬN', `Khôi phục trạng thái đã nhận cho ${out.restored} đơn bị đặt lại từ bản sao lưu`); } catch (e) {}
+        try { saveOrders(); renderAll(false); } catch (e) {}
+      }
+      return out;
+    }
+    async function restoreReceivedFromPatch(input) {
+      const file = input && input.files && input.files[0];
+      if (input) input.value = '';
+      if (!file) return;
+      try {
+        if (isLocked) { alert('Bảng đang khóa, hãy mở khóa rồi thử lại.'); return; }
+        const patch = JSON.parse(await file.text());
+        const n = Array.isArray(patch.rows) ? patch.rows.length : 0;
+        if (!n) { alert('File không có đơn nào để khôi phục.'); return; }
+        if (!(await appConfirm(`Khôi phục trạng thái ĐÃ NHẬN (ngày nhận, mã hoàn, ảnh) cho tối đa ${n} đơn đang bị hiện "Chưa trả"?\n\nChỉ đơn đang chưa nhận mới được sửa. App lưu sẵn bản gốc để hoàn tác.`, 'Khôi phục đơn đã nhận'))) return;
+        const r = applyReceivedPatch(patch);
+        alert(`Đã khôi phục ${r.restored} đơn.\nĐã ở trạng thái nhận sẵn: ${r.already}\nKhông tìm thấy: ${r.notFound}\nBị trùng nên bỏ qua: ${r.ambiguous}`);
+      } catch (e) { alert('Không đọc được file khôi phục: ' + (e && e.message || e)); }
+    }
+
     function mergeImportedItems(previous, incoming, mode = getImportProductMode()) {
       if (mode === 'replace') return JSON.parse(JSON.stringify(incoming || []));
       const key = item => item.sku || item.sellerSku || item.skuId ? 'SKU:' + String(item.sku || item.sellerSku || item.skuId).trim() :
@@ -3879,7 +3975,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const result = [], seen = new Set();
       (previous || []).forEach(item => { const k = key(item); if (replacements.has(k)) { if (!seen.has(k)) result.push(...replacements.get(k)); } else result.push(item); seen.add(k); });
       replacements.forEach((items, k) => { if (!seen.has(k)) result.push(...items); });
-      return JSON.parse(JSON.stringify(result));
+      return JSON.parse(JSON.stringify(dedupeOrderItems(result)));
     }
 
     function reconcileImportPrices(previous, incoming, retained) {
@@ -5419,7 +5515,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       } finally { if (target) target.value = ''; }
       const res = await importParsedPlatformFiles(parsedFiles, forcedPlatform);
       if (res.message) alert(res.message);
-      if (res.success) { try { autoRemoveShadowDuplicates(); } catch (e) {} }
+      if (res.success) { try { autoRemoveShadowDuplicates(); } catch (e) {} try { dedupeAllOrderItems(); } catch (e) {} }
       return res.success ? { success: true, fileCount: parsedFiles.length, duplicateCount: res.duplicateCount } : { success: false };
       } finally { handlePlatformExcelUpload.busy = false; }
     }
@@ -15481,7 +15577,8 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
     setInterval(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 5 * 60 * 1000);
     setTimeout(() => { try { promoteUnmatchedScans(); } catch (e) {} }, 90 * 1000);
     setTimeout(() => { try { reconcileUnmatchedScans(true); } catch (e) {} }, 30 * 1000);
-    setTimeout(() => { try { autoRemoveShadowDuplicates(); } catch (e) {} }, 45 * 1000);   // v1.9.71: gộp dòng trùng cũ (mã giao + mã hoàn)
+    setTimeout(() => { try { autoRemoveShadowDuplicates(); } catch (e) {} }, 45 * 1000);
+    setTimeout(() => { try { dedupeAllOrderItems(); } catch (e) {} }, 50 * 1000);   // v1.9.73: gộp mặt hàng trùng cũ   // v1.9.71: gộp dòng trùng cũ (mã giao + mã hoàn)
 
     function phoneOrderMatches(rawCode) {
       if (typeof getPhoneOrderMatches === 'function') return getPhoneOrderMatches(rawCode);
@@ -19518,10 +19615,12 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       const previousArchive = archivedOrders.slice();
       const previousOrders = orders.slice();
       // Đưa vào archivedOrders, kiểm tra tránh trùng lặp mã đơn
-      const existingKeys = new Set(archivedOrders.map(a => `${String(a.orderId || '').trim()}|||${String(a.track || '').trim()}`));
+      // v1.9.73: khóa gồm cả mã yêu cầu hoàn + ngày nhận, để 2 yêu cầu khác nhau của cùng mã đơn / cùng mã giao không bị coi là một (trước đây dòng thứ 2 bị bỏ khỏi kho nhưng vẫn bị xóa khỏi bảng chính).
+      const archKey = a => `${String(a.orderId || '').trim()}|||${String(a.track || '').trim()}|||${String((a.rawDetails && a.rawDetails.claimId) || a.returnOrderId || '').trim()}|||${String(a.returnTrack || '').trim()}|||${String(a.recvDate || '').trim()}`;
+      const existingKeys = new Set(archivedOrders.map(archKey));
       let added = 0;
       ordersToArchive.forEach(o => {
-        const key = `${String(o.orderId || '').trim()}|||${String(o.track || '').trim()}`;
+        const key = archKey(o);
         if (!existingKeys.has(key)) {
           archivedOrders.unshift(o);
           existingKeys.add(key);

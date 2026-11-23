@@ -1,10 +1,11 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.Core.Alerts;
 using QuanLyHangHoan.Core.Models;
+using QuanLyHangHoan.Core.Stats;
 
 namespace QuanLyHangHoan.App.ViewModels;
 
@@ -30,6 +31,10 @@ public sealed record OrderTypeStatRow(
     int Count,
     string PercentText,
     string TotalValueFormatted);
+
+public sealed record ProductRowVm(int Rank, string Name, int Units, int Orders, string ShareText, double SharePercent, string TopReason, string PlatformText, string VariantText, ProductStat Source);
+
+public sealed record VariantRowVm(string Variant, int Units, string ShareText, double SharePercent);
 
 public sealed partial class StatisticsViewModel : ObservableObject
 {
@@ -224,6 +229,51 @@ public sealed partial class StatisticsViewModel : ObservableObject
         Recalculate();
     }
 
+    // ---- Thống kê sản phẩm (cùng bộ lọc: phạm vi, sàn, loại đơn, ngày) ----
+    [ObservableProperty] private IReadOnlyList<ProductRowVm> _productRows = Array.Empty<ProductRowVm>();
+    [ObservableProperty] private ProductRowVm? _selectedProduct;
+    [ObservableProperty] private IReadOnlyList<VariantRowVm> _variantRows = Array.Empty<VariantRowVm>();
+    [ObservableProperty] private string _productSummaryText = "";
+    [ObservableProperty] private string _variantTitle = "";
+    public bool HasProducts => ProductRows.Count > 0;
+    public bool HasSelectedProduct => SelectedProduct is not null;
+
+    partial void OnProductRowsChanged(IReadOnlyList<ProductRowVm> value) => OnPropertyChanged(nameof(HasProducts));
+
+    partial void OnSelectedProductChanged(ProductRowVm? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedProduct));
+        if (value is null) { VariantRows = Array.Empty<VariantRowVm>(); VariantTitle = ""; return; }
+        VariantTitle = $"Màu / size của: {value.Name}";
+        VariantRows = value.Source.Variants.Select(v => new VariantRowVm(
+            VariantLabel(v), v.Units,
+            (value.Units == 0 ? 0 : (double)v.Units / value.Units).ToString("P0", ViCulture),
+            value.Units == 0 ? 0 : 100.0 * v.Units / value.Units)).ToList();
+    }
+
+    private static string VariantLabel(VariantStat v)
+    {
+        var parts = new[] { v.Color, v.Size }.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+        return parts.Length == 0 ? "(không ghi màu/size)" : string.Join(" / ", parts);
+    }
+
+    private void BuildProductStatistics(IReadOnlyList<Order> filtered)
+    {
+        var result = ProductStatistics.Compute(filtered);
+        var keep = SelectedProduct?.Name;
+        var rows = result.Products.Take(100).Select((p, i) => new ProductRowVm(
+            i + 1, p.Name, p.Units, p.Orders,
+            p.Share.ToString("P1", ViCulture), p.Share * 100, string.IsNullOrWhiteSpace(p.TopReason) ? "—" : p.TopReason,
+            p.ShopeeUnits > 0 && p.TikTokUnits > 0 ? $"Shopee {p.ShopeeUnits:N0} • TikTok {p.TikTokUnits:N0}" : p.ShopeeUnits > 0 ? "Shopee" : p.TikTokUnits > 0 ? "TikTok" : "—",
+            string.Join(" · ", p.Variants.Take(3).Select(v => $"{VariantLabel(v)} ×{v.Units:N0}")),
+            p)).ToList();
+        ProductRows = rows;
+        ProductSummaryText = result.TotalUnits == 0
+            ? "Chưa có sản phẩm nào trong bộ lọc hiện tại."
+            : $"{result.Products.Count:N0} sản phẩm • {result.TotalUnits:N0} cái bị hoàn trong {result.OrdersWithItems:N0} đơn" + (result.UnknownUnits > 0 ? $" • {result.UnknownUnits:N0} cái chưa rõ sản phẩm (không tính)" : "") + (result.Products.Count > rows.Count ? $" • đang hiện {rows.Count} sản phẩm đầu" : "");
+        SelectedProduct = keep is null ? null : rows.FirstOrDefault(r => r.Name == keep);
+    }
+
     public void Recalculate()
     {
         var active = new List<Order>(_mainOrders.Count + (IsScopeIncludeArchive ? _archivedOrders.Count : 0));
@@ -328,6 +378,8 @@ public sealed partial class StatisticsViewModel : ObservableObject
             pendingSafeOrTransit, safeVal,
             lost, lostVal,
             unneeded, unneededVal);
+
+        BuildProductStatistics(filtered);
 
         var scopeLabel = IsScopeIncludeArchive ? "Bảng chính + Kho lưu trữ" : "Chỉ bảng chính";
         var platLabel = PlatformFilter == "all" ? "Tất cả sàn" : PlatformFilter;

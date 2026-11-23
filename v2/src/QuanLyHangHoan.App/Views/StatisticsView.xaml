@@ -318,6 +318,112 @@
                         </Border>
                     </StackPanel>
                 </Grid>
+
+                <!-- Thống kê SẢN PHẨM bị hoàn (cùng bộ lọc ở trên) -->
+                <TextBlock Text="SẢN PHẨM BỊ HOÀN NHIỀU NHẤT" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,20,0,4" />
+                <TextBlock Text="{Binding ProductSummaryText}" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="2,0,0,8" TextWrapping="Wrap" />
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="290" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                        <DataGrid x:Name="ProductGrid"
+                                  ItemsSource="{Binding ProductRows}"
+                                  SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  CanUserDeleteRows="False"
+                                  CanUserSortColumns="True"
+                                  SelectionMode="Single"
+                                  HeadersVisibility="Column"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
+                                  BorderThickness="0"
+                                  Background="{DynamicResource CardBgBrush}"
+                                  RowHeight="40"
+                                  MaxHeight="520"
+                                  ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
+                                  CellStyle="{StaticResource ModernDataGridCellStyle}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="40" />
+                                <DataGridTextColumn Header="Sản phẩm" Binding="{Binding Name}" Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="FontWeight" Value="Bold" />
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="ToolTip" Value="{Binding Name}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="Số cái" Binding="{Binding Units, StringFormat='{}{0:N0}'}" Width="70" />
+                                <DataGridTemplateColumn Header="Tỷ trọng" Width="130" SortMemberPath="SharePercent">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid VerticalAlignment="Center" Margin="4,0">
+                                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding SharePercent, Mode=OneWay}" Height="16" Foreground="{DynamicResource AccentOrangeBrush}" Background="{DynamicResource SurfaceMutedBgBrush}" BorderThickness="0" />
+                                                <TextBlock Text="{Binding ShareText}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="Số đơn" Binding="{Binding Orders, StringFormat='{}{0:N0}'}" Width="70" />
+                                <DataGridTextColumn Header="Sàn" Binding="{Binding PlatformText}" Width="150" />
+                                <DataGridTextColumn Header="Lý do hay gặp" Binding="{Binding TopReason}" Width="170">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="ToolTip" Value="{Binding TopReason}" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+
+                    <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="🎨 Màu / size" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                            <TextBlock Text="Chọn một sản phẩm ở bảng bên trái để xem màu và size nào bị hoàn nhiều." FontSize="12" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasSelectedProduct}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding VariantTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,8" />
+                            <ItemsControl ItemsSource="{Binding VariantRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Variant}" FontSize="12.5" Foreground="{DynamicResource InkPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Units, StringFormat='{}{0:N0} cái'}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Minimum="0" Maximum="100" Value="{Binding SharePercent, Mode=OneWay}" Height="5" Margin="0,3,0,0" Foreground="{DynamicResource AccentOrangeBrush}" Background="{DynamicResource SurfaceMutedBgBrush}" BorderThickness="0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </StackPanel>
         </ScrollViewer>
 

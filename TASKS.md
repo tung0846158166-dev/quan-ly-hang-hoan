@@ -95,7 +95,8 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
 ## Giai đoạn 4+ 
 - [x] SyncTransport (MQTT/ntfy) XONG. CÒN LẠI: trang quét điện thoại (PWA) - hiện vẫn dùng `mobile_scanner.html` của app cũ với mã phòng v2; chưa làm bản mới
 - [x] Bản chạy được không cần dev tool: `dotnet publish` -> `v2\dist\QuanLyHangHoan\QuanLyHangHoan.App.exe` (framework-dependent, khởi động `--demo` thử 6 giây OK, đóng sạch, không tạo DB); hướng dẫn `v2/CHAY-APP.md`
-- [ ] Tính năng phụ, installer thật (MSIX/Inno), tự cập nhật
+- [~] Bộ cài đặt: `v2/installer/build-installer.ps1` (publish SELF-CONTAINED không cần cài .NET + gói portable `.zip` ~69 MB, thử chạy `--demo` từ thư mục giải nén OK) và `v2/installer/QuanLyHangHoan.iss` (Inno Setup: cài theo người dùng không cần admin, giữ nguyên dữ liệu khi cập nhật/gỡ, tùy chọn tự mở cùng Windows dùng đúng khóa Run của app). CHƯA biên dịch được `.iss` vì máy chưa cài Inno Setup (`winget install JRSoftware.InnoSetup` - chờ chủ dự án đồng ý cài); chưa thử cài/gỡ thật; chưa có tự cập nhật
+- [ ] Tự cập nhật (kiểm tra bản mới trên GitHub Releases, tải, chạy bộ cài) - chưa làm
 - [ ] (sau) Relay riêng mã hóa đầu cuối
 
 

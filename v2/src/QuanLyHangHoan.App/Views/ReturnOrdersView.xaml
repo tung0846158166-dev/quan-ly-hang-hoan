@@ -1,0 +1,728 @@
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.ReturnOrdersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ReturnOrdersViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: Screen Title & Quick Data Benchmark Controls -->
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,12">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                            Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                    <Button Content="↺ 40 đơn mẫu"
+                            Command="{Binding LoadSample40Command}"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            Margin="0,0,8,0"
+                            ToolTip="Nạp lại 40 đơn giả đại diện đủ mọi trạng thái &amp; kiện A/B" />
+                    <Button Content="⚡ Thử 50.000 dòng giả"
+                            Command="{Binding LoadStress50kCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#2563EB"
+                            ToolTip="Kiểm tra hiệu năng virtualization của DataGrid với 50.000 dòng dữ liệu giả" />
+                </StackPanel>
+
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ScreenTitle}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Border Background="{DynamicResource DemoBadgeBgBrush}" BorderBrush="{DynamicResource DemoBadgeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource DemoBadgeFgBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ScreenSubtitle}" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,2,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Row 1: Search Box, Platform Segmented Filter, Sort -->
+        <Border Grid.Row="1" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,9">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="260" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Search Input -->
+                <Border Grid.Column="0" Background="{DynamicResource SearchBoxBgBrush}" BorderBrush="{DynamicResource SearchBoxBorderBrush}" BorderThickness="1.2" CornerRadius="7" Padding="8,0" Height="34" Margin="0,0,12,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="13" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 VerticalContentAlignment="Center"
+                                 FontSize="12.5"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource InkPrimaryBrush}"
+                                 ToolTip="Tìm mã đơn, mã vận đơn hoàn/giao, ĐVVC, sản phẩm, ghi chú (hỗ trợ tiếng Việt không dấu)" />
+                        <TextBlock Grid.Column="1"
+                                   Text="Tìm mã đơn, mã vận đơn, sản phẩm, ĐVVC, ghi chú..."
+                                   Foreground="{DynamicResource SearchBoxPlaceholderBrush}" Opacity="0.75"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SearchText}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <Button Grid.Column="2"
+                                Content="✕"
+                                Command="{Binding ClearSearchCommand}"
+                                Visibility="{Binding SearchText, Converter={StaticResource StringNotEmptyToVis}}"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{DynamicResource AlertRedTextBrush}"
+                                FontWeight="Bold"
+                                Cursor="Hand"
+                                Padding="6,2"
+                                ToolTip="Xóa từ khóa tìm kiếm" />
+                    </Grid>
+                </Border>
+
+                <!-- Platform Filter (chỉ hiện ở chế độ All; các bảng đã tách sàn sẽ ẩn) -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="0,0,12,0"
+                            Visibility="{Binding ShowPlatformFilter, Converter={StaticResource BoolToVis}}">
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="all">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformAll}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding TotalCount, StringFormat='🌐 Cả 2 sàn ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="Shopee">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformShopee}" Value="True">
+                                        <Setter Property="Background" Value="#EE4D2D" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#EE4D2D" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding ShopeeCount, StringFormat='🟠 Shopee ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="TikTok" Margin="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformTikTok}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource TikTokBadgeBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource TikTokBadgeBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding TikTokCount, StringFormat='⚫ TikTok ({0:N0})'}" />
+                    </Button>
+                </StackPanel>
+
+                <!-- Sort Selector -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Sắp xếp:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding SortOptions}"
+                              SelectedItem="{Binding SelectedSortOption}"
+                              DisplayMemberPath="Label"
+                              Width="220"
+                              Height="32"
+                              VerticalContentAlignment="Center"
+                              FontSize="12" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Row 2: Pipeline Status, Alert Threshold Pills & OrderType Chips -->
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,7">
+            <StackPanel>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right"
+                            Content="↺ Xóa bộ lọc"
+                            Command="{Binding ResetAllFiltersCommand}"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            Margin="0" />
+
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="all">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusAll}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="📋 Tất cả" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="pending">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusPending}" Value="True">
+                                        <Setter Property="Background" Value="#D97706" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#D97706" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding PendingCount, StringFormat='⏳ Chưa nhận ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="received">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusReceived}" Value="True">
+                                        <Setter Property="Background" Value="#16A34A" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#16A34A" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding ReceivedCount, StringFormat='🟢 Đã nhận ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="yellow">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowBorderStrongBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusYellow}" Value="True">
+                                        <Setter Property="Background" Value="#D97706" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowTextBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding YellowAlertCount, StringFormat='⚠️ Báo Vàng &gt;12h ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="red">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Setter Property="BorderBrush" Value="{DynamicResource AlertRedBorderStrongBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusRed}" Value="True">
+                                        <Setter Property="Background" Value="#DC2626" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#991B1B" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding RedAlertCount, StringFormat='🚨 Báo Đỏ &gt;24h ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="lost">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusLost}" Value="True">
+                                        <Setter Property="Background" Value="#991B1B" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#991B1B" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding LostCount, StringFormat='🔴 Bị mất ({0:N0})'}" />
+                    </Button>
+
+                    <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="unneeded">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusUnneeded}" Value="True">
+                                        <Setter Property="Background" Value="#475569" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#475569" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="{Binding UnneededCount, StringFormat='⚪ K.cần nhận ({0:N0})'}" />
+                    </Button>
+                </WrapPanel>
+            </DockPanel>
+
+                <!-- OrderType Filter Chips (TikTok / Shopee Hoàn hàng) -->
+                <StackPanel Orientation="Horizontal"
+                            Margin="0,7,0,0"
+                            Visibility="{Binding ShowOrderTypeFilter, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Loại đơn:"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource InkSecondaryBrush}"
+                               Margin="0,0,8,0" />
+                    <ItemsControl ItemsSource="{Binding OrderTypeChips}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding DataContext.SetOrderTypeFilterCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding Key}">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Background" Value="#2563EB" />
+                                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                                    <Setter Property="BorderBrush" Value="#2563EB" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Text="{Binding DisplayText}" />
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Row 3: Bulk Action Bar (visible when multiple rows selected) -->
+        <Border Grid.Row="3"
+                Background="{DynamicResource InfoBlueCardBgBrush}"
+                BorderBrush="{DynamicResource InfoBlueCardBorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="18,7"
+                Visibility="{Binding HasMultipleSelected, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SelectedCount, StringFormat='Đã chọn {0:N0} dòng'}"
+                           FontSize="12.5"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource InfoBlueTextBrush}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,14,0" />
+                <Button Content="✅ Đánh dấu đã nhận"
+                        Command="{Binding BulkMarkReceivedCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#16A34A"
+                        Margin="0,0,8,0" />
+                <Button Content="📦 Dời sang lưu trữ"
+                        Command="{Binding BulkArchiveCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#2563EB"
+                        Margin="0,0,8,0" />
+                <Button Content="🗑️ Xóa"
+                        Command="{Binding BulkDeleteCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#DC2626" />
+            </StackPanel>
+        </Border>
+
+        <!-- Row 4: Virtualized DataGrid + Empty State + Loading Overlay -->
+        <Grid Grid.Row="4" Margin="14,10,14,10">
+            <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                <DataGrid x:Name="OrdersGrid"
+                          ItemsSource="{Binding VisibleOrders}"
+                          SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                          SelectionChanged="OrdersGrid_SelectionChanged"
+                          PreviewKeyDown="OrdersGrid_PreviewKeyDown"
+                          MouseDoubleClick="OrdersGrid_MouseDoubleClick"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          CanUserResizeRows="False"
+                          CanUserSortColumns="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
+                          BorderThickness="0"
+                          Background="{DynamicResource CardBgBrush}"
+                          RowHeight="36"
+                          FrozenColumnCount="2"
+                          EnableRowVirtualization="True"
+                          EnableColumnVirtualization="True"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.CacheLengthUnit="Page"
+                          VirtualizingPanel.CacheLength="1,1"
+                          ScrollViewer.CanContentScroll="True"
+                          SelectionMode="Extended"
+                          SelectionUnit="FullRow"
+                          ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
+                          CellStyle="{StaticResource ModernDataGridCellStyle}">
+
+                    <DataGrid.Resources>
+                        <ContextMenu x:Key="RowActionContextMenu">
+                            <MenuItem Header="🔍 Xem chi tiết"
+                                      FontWeight="SemiBold"
+                                      Command="{Binding DataContext.OpenDetailCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <Separator />
+                            <MenuItem Header="🔄 Đổi trạng thái..."
+                                      Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="📝 Ghi chú của tôi..."
+                                      Command="{Binding DataContext.EditUserNoteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="✏️ Sửa lý do..."
+                                      Command="{Binding DataContext.EditNoteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="⭐ Bật/tắt theo dõi..."
+                                      Command="{Binding DataContext.ToggleWatchlistCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <Separator />
+                            <MenuItem Header="📦 Dời sang kho lưu trữ"
+                                      Command="{Binding DataContext.ArchiveRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="📜 Xem lịch sử sửa"
+                                      Command="{Binding DataContext.ShowHistoryCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                            <Separator />
+                            <MenuItem Header="🗑️ Xóa... (Del)"
+                                      Command="{Binding DataContext.DeleteRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
+                        </ContextMenu>
+                    </DataGrid.Resources>
+
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background" Value="{DynamicResource DataGridRowBgBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+                            <Setter Property="BorderThickness" Value="0" />
+                            <Setter Property="ContextMenu" Value="{StaticResource RowActionContextMenu}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AlertLevel}" Value="Yellow">
+                                    <Setter Property="Background" Value="{DynamicResource AlertYellowRowBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding AlertLevel}" Value="Red">
+                                    <Setter Property="Background" Value="{DynamicResource AlertRedRowBrush}" />
+                                </DataTrigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource DemoBadgeBgBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource DataGridSelectedBgBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource DataGridSelectedFgBrush}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+
+                    <DataGrid.Columns>
+                        <!-- 1. STT -->
+                        <DataGridTextColumn Header="STT" Binding="{Binding Stt}" Width="56">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                    <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 2. Cảnh báo (Vàng > 12h / Đỏ > 24h) -->
+                        <DataGridTemplateColumn Header="Cảnh báo (12h / 24h)" Width="165" SortMemberPath="AlertPriority">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding AlertLevel, Converter={StaticResource AlertBadgeBrushConverter}}"
+                                            CornerRadius="5"
+                                            Padding="7,2"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding AlertBadgeText}"
+                                                   Foreground="{Binding AlertLevel, Converter={StaticResource AlertBadgeBrushConverter}, ConverterParameter=Foreground}"
+                                                   FontSize="11.5"
+                                                   FontWeight="Bold" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- 3. Sàn -->
+                        <DataGridTemplateColumn Header="Sàn" Width="96" SortMemberPath="Platform">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding Platform, Converter={StaticResource PlatformBrushConverter}}"
+                                            CornerRadius="5"
+                                            Padding="7,2"
+                                            HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding Platform}"
+                                                   Foreground="{Binding Platform, Converter={StaticResource PlatformBrushConverter}, ConverterParameter=Foreground}"
+                                                   FontSize="11"
+                                                   FontWeight="Bold" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- 3b. Loại đơn -->
+                        <DataGridTemplateColumn Header="Loại đơn" Width="155" SortMemberPath="OrderType">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource SurfaceSubtleBgBrush}"
+                                            BorderBrush="{DynamicResource BorderBrushStrong}"
+                                            BorderThickness="1"
+                                            CornerRadius="5"
+                                            Padding="7,2"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding OrderType}"
+                                                   Foreground="{DynamicResource InkTertiaryBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- 4. Mã đơn hàng -->
+                        <DataGridTextColumn Header="Mã đơn hàng" Binding="{Binding OrderId}" Width="145">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="Consolas" />
+                                    <Setter Property="FontWeight" Value="Bold" />
+                                    <Setter Property="FontSize" Value="12.5" />
+                                    <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 5. Mã vận đơn -->
+                        <DataGridTextColumn Header="Mã vận đơn (Hoàn / Giao)" Binding="{Binding DisplayTracking}" Width="245">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="Consolas" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                    <Setter Property="FontSize" Value="12.5" />
+                                    <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding DisplayTracking}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 6. Trạng thái kho -->
+                        <DataGridTemplateColumn Header="Nhận tại kho" Width="125" SortMemberPath="Status">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding Status, Converter={StaticResource StatusBrushConverter}}"
+                                            CornerRadius="5"
+                                            Padding="8,2"
+                                            HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding Status}"
+                                                   Foreground="{Binding Status, Converter={StaticResource StatusBrushConverter}, ConverterParameter=Foreground}"
+                                                   FontSize="11.5"
+                                                   FontWeight="Bold" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- 7. Trạng thái sàn -->
+                        <DataGridTextColumn Header="Trạng thái kiện" Binding="{Binding PlatformStatus}" Width="135" />
+
+                        <!-- 8. Ngày giao -->
+                        <DataGridTextColumn Header="Ngày giao" Binding="{Binding ShipDate}" Width="115" SortMemberPath="ShipDateParsed" />
+
+                        <!-- 9. Ngày hoàn / hủy -->
+                        <DataGridTextColumn Header="Ngày hoàn / hủy" Binding="{Binding ReturnDate}" Width="130" SortMemberPath="ReturnDateParsed" />
+
+                        <!-- 10. Giờ hàng về -->
+                        <DataGridTextColumn Header="Giờ hàng về shop" Binding="{Binding ReturnedAt}" Width="130" SortMemberPath="ArrivedAtDate" />
+
+                        <!-- 11. Ngày về kho (đã nhận) -->
+                        <DataGridTextColumn Header="Ngày nhận kho" Binding="{Binding RecvDate}" Width="130" />
+
+                        <!-- 12. ĐVVC -->
+                        <DataGridTextColumn Header="ĐVVC" Binding="{Binding Carrier}" Width="105" />
+
+                        <!-- 13. Sản phẩm -->
+                        <DataGridTextColumn Header="Sản phẩm &amp; Phân loại" Binding="{Binding ItemsSummary}" Width="240">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding ItemsSummary}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 14. SL -->
+                        <DataGridTextColumn Header="SL" Binding="{Binding TotalQty}" Width="46">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center" />
+                                    <Setter Property="FontWeight" Value="Bold" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 15. Giá trị -->
+                        <DataGridTextColumn Header="Giá trị" Binding="{Binding PriceFormatted}" Width="105" SortMemberPath="Price">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Right" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 16. Ảnh -->
+                        <DataGridTemplateColumn Header="Ảnh" Width="86" SortMemberPath="HasPhoto">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Button Content="📷 Xem"
+                                                Command="{Binding DataContext.OpenPhotoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Visibility="{Binding HasPhoto, Converter={StaticResource BoolToVis}}"
+                                                Background="{DynamicResource InfoBlueCardBgBrush}"
+                                                Foreground="{DynamicResource InfoBlueTextBrush}"
+                                                BorderBrush="{DynamicResource InfoBlueCardBorderBrush}"
+                                                BorderThickness="1"
+                                                Padding="8,2"
+                                                FontSize="11"
+                                                FontWeight="SemiBold"
+                                                Cursor="Hand" />
+                                        <TextBlock Text="—"
+                                                   Foreground="{DynamicResource InkSubtleBrush}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="{Binding HasPhoto, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- 17. Ghi chú -->
+                        <DataGridTextColumn Header="Ghi chú / Lý do" Binding="{Binding NoteDisplay}" Width="220">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                                    <Setter Property="ToolTip" Value="{Binding NoteDisplay}" />
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <!-- 18. Thao tác -->
+                        <DataGridTemplateColumn Header="Thao tác" Width="64">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="•••"
+                                            Click="RowActionButton_Click"
+                                            Tag="{Binding}"
+                                            Style="{StaticResource FilterPillButtonStyle}"
+                                            Padding="8,2"
+                                            Margin="0"
+                                            HorizontalAlignment="Center"
+                                            ToolTip="Mở menu thao tác trên dòng (hoặc chuột phải)" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <!-- Empty State Overlay -->
+            <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                    CornerRadius="10"
+                    BorderBrush="{DynamicResource BorderBrushLight}"
+                    BorderThickness="1"
+                    Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+                    <TextBlock Text="📭" FontSize="40" HorizontalAlignment="Center" />
+                    <TextBlock Text="Không có đơn hàng nào khớp bộ lọc hiện tại"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource InkPrimaryBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,4" />
+                    <TextBlock Text="Thử xóa từ khóa tìm kiếm hoặc chuyển sang tab Tất cả / Cả 2 sàn."
+                               FontSize="12.5"
+                               Foreground="{DynamicResource InkMutedBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,14" />
+                    <Button Content="✕ Xóa toàn bộ bộ lọc"
+                            Command="{Binding ResetAllFiltersCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#EE4D2D"
+                            HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- Loading Overlay (for 50k generation) -->
+            <Border Background="#CC0F172A"
+                    CornerRadius="10"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVis}}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock Text="⏳ Đang sinh 50.000 dòng dữ liệu giả..." Foreground="#FFFFFF" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="Xử lý nền để không treo giao diện WPF" Foreground="#CBD5E1" FontSize="12" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Row 5: Bottom Status & Performance Dock -->
+        <Border Grid.Row="5" Background="#0F172A" Padding="18,8">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Cảnh báo Đỏ: " Foreground="#FCA5A5" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding RedAlertCount, StringFormat='{}{0:N0}'}" Foreground="#FECACA" FontSize="12" FontWeight="Bold" Margin="0,0,14,0" />
+                    <TextBlock Text="Cảnh báo Vàng: " Foreground="#FCD34D" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding YellowAlertCount, StringFormat='{}{0:N0}'}" Foreground="#FEF08A" FontSize="12" FontWeight="Bold" />
+                </StackPanel>
+                <TextBlock Text="{Binding StatusBarText}" Foreground="#E2E8F0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

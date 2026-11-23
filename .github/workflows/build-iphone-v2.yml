@@ -1,0 +1,82 @@
+name: Build iPhone App v2 (IPA chưa ký)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Số phiên bản app iPhone v2 (vd 2.0.0)"
+        required: true
+        default: "2.0.0"
+  # Mỗi lần đẩy nhánh v2-rewrite có sửa app iPhone v2: tự biên dịch + test lõi + build IPA (tải ở trang chạy, mục Artifacts; không phát hành).
+  push:
+    branches: [ v2-rewrite ]
+    paths:
+      - "ios-app/**"
+      - ".github/workflows/build-iphone-v2.yml"
+  # Kiểm tra biên dịch + test lõi cho mọi PR có sửa code app iPhone v2 (không phát hành).
+  pull_request:
+    paths:
+      - "ios-app/**"
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event.inputs.version || '0.0.0-test' }}
+
+jobs:
+  build-v2:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kiểm thử lõi (ScannerCore)
+        working-directory: ios-app/ScannerCore
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tail -80
+
+      - name: Cài XcodeGen
+        run: brew install xcodegen
+
+      - name: Biểu tượng và dự án Xcode
+        working-directory: ios-app/App
+        run: |
+          sips -z 1024 1024 ../../app_icon.png --out Sources/Assets.xcassets/AppIcon.appiconset/icon.png
+          sed -i '' "s/MARKETING_VERSION: \"[^\"]*\"/MARKETING_VERSION: \"${VERSION}\"/" project.yml
+          sed -i '' "s/CURRENT_PROJECT_VERSION: \"[^\"]*\"/CURRENT_PROJECT_VERSION: \"${{ github.run_number }}\"/" project.yml
+          xcodegen generate
+
+      - name: Build (không ký)
+        working-directory: ios-app/App
+        run: |
+          set -o pipefail
+          xcodebuild -project QuetHangHoan.xcodeproj -scheme QuetHangHoan -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/build/App.xcarchive" archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tail -120
+
+      - name: Đóng gói IPA
+        working-directory: ios-app/App/build
+        run: |
+          mkdir -p Payload
+          cp -R App.xcarchive/Products/Applications/*.app Payload/
+          zip -qry "QuetHangHoan-v2-v${VERSION}.ipa" Payload
+          ls -lh *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuetHangHoan-v2-v${{ env.VERSION }}
+          path: ios-app/App/build/*.ipa
+
+      - name: Phát hành
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-v2-v${{ env.VERSION }}
+          name: "App iPhone v2 Quét Hàng Hoàn v${{ env.VERSION }} (IPA chưa ký)"
+          make_latest: "false"
+          files: ios-app/App/build/*.ipa
+          body: |
+            App iPhone v2 (SwiftUI), `.ipa` **chưa ký**, dùng với PC v2 qua mã phòng. Cài bằng **Sideloadly** hoặc **AltStore** với Apple ID.
+            Apple ID miễn phí: app chạy 7 ngày rồi phải cài lại.
+            Lần đầu mở: Cài đặt > Cài đặt chung > Quản lý VPN & thiết bị > tin cậy tài khoản của bạn, cho phép camera và nhập mã phòng hiện ở màn "Đồng bộ điện thoại" của app PC v2.

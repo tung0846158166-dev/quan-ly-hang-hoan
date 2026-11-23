@@ -1,0 +1,374 @@
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.ScanReceiveView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ScanReceiveViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox IsChecked="{Binding IsSoundEnabled}"
+                              Content="🔊 Âm báo"
+                              FontSize="12.5"
+                              FontWeight="SemiBold"
+                              Foreground="{DynamicResource InkPrimaryBrush}"
+                              VerticalAlignment="Center"
+                              Margin="0,0,14,0"
+                              Click="OnControlClickedRefocus" />
+                    <Border Background="{DynamicResource AlertGreenBadgeBgBrush}" BorderBrush="{DynamicResource AlertGreenCardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
+                        <TextBlock Foreground="{DynamicResource AlertGreenTextBrush}" FontWeight="Bold" FontSize="12.5">
+                            <Run Text="Nhận: " /><Run Text="{Binding ReceivedCount, Mode=OneWay}" />
+                        </TextBlock>
+                    </Border>
+                    <Border Background="{DynamicResource AlertYellowBadgeBgBrush}" BorderBrush="{DynamicResource AlertYellowCardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
+                        <TextBlock Foreground="{DynamicResource AlertYellowTextBrush}" FontWeight="Bold" FontSize="12.5">
+                            <Run Text="Trước đó: " /><Run Text="{Binding AlreadyReceivedCount, Mode=OneWay}" />
+                        </TextBlock>
+                    </Border>
+                    <Border Background="{DynamicResource AlertRedBadgeBgBrush}" BorderBrush="{DynamicResource AlertRedCardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,4">
+                        <TextBlock Foreground="{DynamicResource AlertRedTextBrush}" FontWeight="Bold" FontSize="12.5">
+                            <Run Text="Lỗi: " /><Run Text="{Binding ErrorCount, Mode=OneWay}" />
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📷 Quét nhận hàng" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Border Background="{DynamicResource DemoBadgeBgBrush}" BorderBrush="{DynamicResource DemoBadgeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="GIẢ LẬP — KHÔNG GHI DB" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource DemoBadgeFgBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Dùng máy quét USB hoặc gõ mã vận đơn / mã đơn rồi nhấn Enter. Ô nhập luôn giữ tiêu điểm."
+                               FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,3,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Body: Left (Scanner + Large Result Card) | Right (Session History) -->
+        <Grid Grid.Row="1" Margin="20,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.45*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Column -->
+            <StackPanel Grid.Column="0">
+                <!-- Scan Input Card -->
+                <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="MÃ QUÉT (MÁY QUÉT USB + ENTER)" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,8" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource AccentBlueBrush}" BorderThickness="2" CornerRadius="8" Padding="12,0" Height="46" Margin="0,0,10,0">
+                                <Grid>
+                                    <TextBox x:Name="ScanCodeBox"
+                                             Text="{Binding ScanInput, UpdateSourceTrigger=PropertyChanged}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             VerticalContentAlignment="Center"
+                                             FontFamily="Consolas"
+                                             FontSize="18"
+                                             FontWeight="Bold"
+                                             Foreground="{DynamicResource InkPrimaryBrush}"
+                                             CaretBrush="{DynamicResource InkPrimaryBrush}"
+                                             KeyDown="OnScanCodeBoxKeyDown" />
+                                    <TextBlock Text="Quét mã vận đơn hoặc mã đơn..."
+                                               Foreground="{DynamicResource InkSubtleBrush}"
+                                               FontSize="14"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ScanInput}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+
+                            <Button Grid.Column="1"
+                                    Content="Nhận kiện (Enter)"
+                                    Command="{Binding SubmitScanCommand}"
+                                    Style="{StaticResource PrimaryActionButtonStyle}"
+                                    Background="#2563EB"
+                                    Height="46"
+                                    Padding="18,0"
+                                    FontSize="13.5"
+                                    Click="OnControlClickedRefocus" />
+                        </Grid>
+
+                        <!-- Optional Photo Attachment -->
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0" VerticalAlignment="Center">
+                            <Button Content="📎 Chọn ảnh"
+                                    Command="{Binding PickPhotoCommand}"
+                                    Style="{StaticResource FilterPillButtonStyle}"
+                                    Padding="12,6"
+                                    Click="OnControlClickedRefocus" />
+                            <TextBlock Text="Đính kèm cho lần quét kế tiếp:"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource InkMutedBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,6,0"
+                                       Visibility="{Binding HasPendingPhoto, Converter={StaticResource BoolToVis}}" />
+                            <Border Background="{DynamicResource InfoBlueCardBgBrush}" BorderBrush="{DynamicResource InfoBlueCardBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,3"
+                                    Visibility="{Binding HasPendingPhoto, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding PendingPhotoName}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InfoBlueTextBrush}" VerticalAlignment="Center" />
+                                    <Button Content="✕"
+                                            Command="{Binding ClearPhotoCommand}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="{DynamicResource AlertRedStrongTextBrush}"
+                                            FontWeight="Bold"
+                                            Cursor="Hand"
+                                            Margin="8,0,0,0"
+                                            Padding="2,0"
+                                            Click="OnControlClickedRefocus" />
+                                </StackPanel>
+                            </Border>
+                            <TextBlock Text="Chưa chọn ảnh (tùy chọn)"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource InkSubtleBrush}"
+                                       VerticalAlignment="Center"
+                                       Visibility="{Binding HasPendingPhoto, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Empty Prompt Before First Scan -->
+                <Border Background="{DynamicResource CardBgBrush}"
+                        BorderBrush="{DynamicResource BorderBrushLight}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Padding="28,36"
+                        Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock Text="SẴN SÀNG QUÉT" FontSize="26" FontWeight="Bold" Foreground="{DynamicResource InkTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="Đưa mã vạch vào máy quét hoặc nhập mã và nhấn Enter." FontSize="13.5" Foreground="{DynamicResource InkMutedBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Large Result Card (Theme-aware via DataTriggers on ResultBgHex) -->
+                <Border BorderThickness="3"
+                        CornerRadius="14"
+                        Padding="22,20"
+                        Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushStrong}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ResultBgHex}" Value="#DCFCE7">
+                                    <Setter Property="Background" Value="{DynamicResource AlertGreenCardBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AlertGreenBorderStrongBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ResultBgHex}" Value="#FEF3C7">
+                                    <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowBorderStrongBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ResultBgHex}" Value="#FEE2E2">
+                                    <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AlertRedBorderStrongBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ResultBgHex}" Value="#FFEDD5">
+                                    <Setter Property="Background" Value="{DynamicResource OrangeBadgeBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource OrangeBadgeBorderBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <StackPanel>
+                        <StackPanel.Resources>
+                            <Style x:Key="ScanResultTextStyle" TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ResultBgHex}" Value="#DCFCE7">
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultBgHex}" Value="#FEF3C7">
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultBgHex}" Value="#FEE2E2">
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ResultBgHex}" Value="#FFEDD5">
+                                        <Setter Property="Foreground" Value="{DynamicResource DemoBadgeFgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Resources>
+
+                        <TextBlock Text="{Binding ResultHeadline}"
+                                   FontSize="30"
+                                   FontWeight="Heavy"
+                                   Style="{StaticResource ScanResultTextStyle}"
+                                   TextWrapping="Wrap" />
+
+                        <TextBlock Text="{Binding ResultReason}"
+                                   FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Style="{StaticResource ScanResultTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,6,0,0" />
+
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+                            <TextBlock Text="{Binding ResultAckText}"
+                                       FontSize="13.5"
+                                       FontWeight="Bold"
+                                       Style="{StaticResource ScanResultTextStyle}" />
+                        </Border>
+
+                        <!-- Order Details -->
+                        <Border Background="{DynamicResource CardBgBrush}"
+                                BorderBrush="{DynamicResource BorderBrushLight}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="16,14"
+                                Margin="0,14,0,0"
+                                Visibility="{Binding HasOrderDetails, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="100" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Mã đơn:" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" FontSize="13" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ResultOrderId}" FontFamily="Consolas" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,0,12,0" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Sàn:" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" FontSize="13" />
+                                <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding ResultPlatform}" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" FontSize="14" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Mã vận đơn:" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" FontSize="13" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ResultTracking}" FontFamily="Consolas" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" FontSize="14" TextWrapping="Wrap" Margin="0,0,12,0" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Loại đơn:" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" FontSize="13" />
+                                <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding ResultOrderType}" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" FontSize="13.5" TextWrapping="Wrap" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Sản phẩm:" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" FontSize="13" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding ResultItemsText}" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" FontSize="13.5" TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Right Column: Session History (newest on top) -->
+            <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="16,14">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top" Text="ĐÃ QUÉT TRONG PHIÊN (MỚI NHẤT TRÊN CÙNG)" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,0,0,10" />
+
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Chưa có lượt quét nào trong phiên này."
+                               FontSize="12.5"
+                               Foreground="{DynamicResource InkSubtleBrush}"
+                               Visibility="{Binding HasSessionHistory, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding SessionHistory}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderThickness="1"
+                                            CornerRadius="8"
+                                            Padding="10,8"
+                                            Margin="0,0,0,8">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource SurfaceMutedBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding BgHex}" Value="#DCFCE7">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertGreenBadgeBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertGreenCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding BgHex}" Value="#FEF3C7">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertYellowBadgeBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding BgHex}" Value="#FEE2E2">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertRedBadgeBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertRedCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding BgHex}" Value="#FFEDD5">
+                                                        <Setter Property="Background" Value="{DynamicResource OrangeBadgeBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource OrangeBadgeBorderBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding ScannedAtText}" FontFamily="Consolas" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Code}" FontFamily="Consolas" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding OutcomeLabel}"
+                                                       FontWeight="Bold"
+                                                       FontSize="12"
+                                                       Margin="0,2,0,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding BgHex}" Value="#DCFCE7">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding BgHex}" Value="#FEF3C7">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding BgHex}" Value="#FEE2E2">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding BgHex}" Value="#FFEDD5">
+                                                                <Setter Property="Foreground" Value="{DynamicResource DemoBadgeFgBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Message}"
+                                                       FontSize="11.5"
+                                                       Foreground="{DynamicResource InkTertiaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,1,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

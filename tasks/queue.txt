@@ -1,0 +1,12 @@
+# Hang doi phieu cho agy (chay lan luot, xem run-agy-queue.ps1). Them ma phieu vao cuoi; phieu da XONG tu bo qua.
+T019
+T020
+T026
+T021
+T028
+T029
+T022
+T023
+T024
+T025
+T027

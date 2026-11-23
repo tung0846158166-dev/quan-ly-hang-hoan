@@ -1,0 +1,369 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.GoogleSheetView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:GoogleSheetViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding RunNowCommand}"
+                            Content="{Binding RunNowButtonText}"
+                            IsEnabled="{Binding CanRunNow}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#2563EB"
+                            Height="34"
+                            Padding="16,0" />
+                </StackPanel>
+
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📊 Google Sheet" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Border Background="{DynamicResource DemoBadgeBgBrush}" BorderBrush="{DynamicResource DemoBadgeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="GIẢ LẬP (--demo)" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource DemoBadgeFgBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Tự động tải đơn Shopee từ Google Sheet qua Apps Script (mỗi 10 phút)."
+                               FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,3,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Body -->
+        <Grid Grid.Row="1" Margin="20,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.15*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Column: URL, Token + Guide, Last Status, Options -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                <StackPanel>
+                    <!-- Apps Script URL (masked, never shown again once saved) -->
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="ĐỊA CHỈ APPS SCRIPT" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,8" />
+
+                            <!-- Saved State -->
+                            <DockPanel LastChildFill="True"
+                                       Visibility="{Binding ShowSavedUrlState, Converter={StaticResource BoolToVis}}">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Đổi địa chỉ"
+                                        Command="{Binding StartEditUrlCommand}"
+                                        Style="{StaticResource FilterPillButtonStyle}"
+                                        Height="32"
+                                        Padding="12,0" />
+                                <Border Background="{DynamicResource AlertGreenCardBgBrush}"
+                                        BorderBrush="{DynamicResource AlertGreenCardBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="12,7"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="🔒 Đã lưu địa chỉ (đã mã hóa)"
+                                               FontSize="12.5"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AlertGreenTextBrush}"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                            </DockPanel>
+
+                            <!-- Editor State -->
+                            <StackPanel Visibility="{Binding ShowUrlEditor, Converter={StaticResource BoolToVis}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <PasswordBox x:Name="UrlPasswordBox"
+                                                 Grid.Column="0"
+                                                 PasswordChar="•"
+                                                 PasswordChanged="UrlPasswordBox_PasswordChanged"
+                                                 Background="{DynamicResource SurfaceMutedBgBrush}"
+                                                 Foreground="{DynamicResource InkPrimaryBrush}"
+                                                 BorderBrush="{DynamicResource InputBorderBrush}"
+                                                 BorderThickness="1"
+                                                 Padding="10,7"
+                                                 FontSize="12.5"
+                                                 VerticalContentAlignment="Center"
+                                                 ToolTip="Dán địa chỉ Web App từ Google Apps Script (https://script.google.com/...)" />
+                                    <Button Grid.Column="2"
+                                            Content="Lưu"
+                                            Command="{Binding SaveUrlCommand}"
+                                            Style="{StaticResource PrimaryActionButtonStyle}"
+                                            Background="#2563EB"
+                                            Height="34"
+                                            Padding="16,0" />
+                                    <Button Grid.Column="3"
+                                            Content="Hủy"
+                                            Command="{Binding CancelEditUrlCommand}"
+                                            Visibility="{Binding HasUrl, Converter={StaticResource BoolToVis}}"
+                                            Style="{StaticResource FilterPillButtonStyle}"
+                                            Height="34"
+                                            Padding="12,0"
+                                            Margin="6,0,0,0" />
+                                </Grid>
+
+                                <TextBlock Text="{Binding UrlError}"
+                                           Visibility="{Binding HasUrlError, Converter={StaticResource BoolToVis}}"
+                                           Foreground="{DynamicResource AlertRedTextBrush}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap"
+                                           Margin="0,6,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Token & 3-line Guide -->
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="TOKEN XÁC THỰC APPS SCRIPT" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,8" />
+
+                            <DockPanel LastChildFill="True" Margin="0,0,0,10">
+                                <Button DockPanel.Dock="Right"
+                                        Content="📋 Sao chép"
+                                        Command="{Binding CopyTokenCommand}"
+                                        IsEnabled="{Binding HasToken}"
+                                        Style="{StaticResource FilterPillButtonStyle}"
+                                        Height="34"
+                                        Padding="12,0" />
+                                <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                                        BorderBrush="{DynamicResource BorderBrushLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="12,8"
+                                        Margin="0,0,8,0">
+                                    <TextBlock Text="{Binding DisplayTokenText}"
+                                               FontFamily="Consolas"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource InkPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+                                </Border>
+                            </DockPanel>
+
+                            <TextBlock Text="{Binding CopiedNotice}"
+                                       Visibility="{Binding HasCopiedNotice, Converter={StaticResource BoolToVis}}"
+                                       Foreground="{DynamicResource AlertGreenTextBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,8" />
+
+                            <Border Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="8" Padding="12,10">
+                                <TextBlock Text="{Binding AppsScriptGuideText}"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource InkSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           LineHeight="18" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Last Run Status -->
+                    <Border CornerRadius="10" BorderThickness="1" Padding="16,12" Margin="0,0,0,14">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusSuccess}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource AlertGreenCardBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertGreenCardBorderBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertRedCardBorderBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="TRẠNG THÁI LƯỢT GẦN NHẤT" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Text="{Binding LastStatusText}"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       Margin="0,5,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource InkSecondaryBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsStatusSuccess}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Options -->
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16">
+                        <StackPanel>
+                            <TextBlock Text="CẤU HÌNH ĐỒNG BỘ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,10" />
+
+                            <CheckBox IsChecked="{Binding IsEnabled}"
+                                      Content="Tự cập nhật mỗi 10 phút"
+                                      FontSize="13"
+                                      FontWeight="SemiBold"
+                                      Foreground="{DynamicResource InkPrimaryBrush}"
+                                      Margin="0,0,0,12" />
+
+                            <TextBlock Text="Tên các tab (ngăn cách bằng ;)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding Tabs, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="{DynamicResource SurfaceMutedBgBrush}"
+                                     Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource InputBorderBrush}"
+                                     BorderThickness="1"
+                                     Padding="10,6"
+                                     FontSize="12.5"
+                                     Margin="0,0,0,10" />
+
+                            <TextBlock Text="Chỉ lấy đơn trong N ngày gần nhất hoặc từ ngày (vd 30 hoặc 01/11/2026)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding MaxDays, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="{DynamicResource SurfaceMutedBgBrush}"
+                                     Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource InputBorderBrush}"
+                                     BorderThickness="1"
+                                     Padding="10,6"
+                                     FontSize="12.5"
+                                     Margin="0,0,0,10" />
+
+                            <TextBlock Text="Loại huỷ bỏ qua (ngăn cách bằng ;)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
+                            <TextBox Text="{Binding SkipTypes, UpdateSourceTrigger=PropertyChanged}"
+                                     Background="{DynamicResource SurfaceMutedBgBrush}"
+                                     Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource InputBorderBrush}"
+                                     BorderThickness="1"
+                                     Padding="10,6"
+                                     FontSize="12.5"
+                                     Margin="0,0,0,4" />
+                            <TextBlock Text="Để trống = mặc định (Huỷ trước chuẩn bị)." FontSize="11" Foreground="{DynamicResource InkSubtleBrush}" Margin="0,0,0,12" />
+
+                            <CheckBox IsChecked="{Binding OnlyReturns}"
+                                      Content="Chỉ nạp đơn hoàn/hủy/thất bại"
+                                      FontSize="12.5"
+                                      Foreground="{DynamicResource InkPrimaryBrush}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Right Column: Run Log -->
+            <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="16">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock Text="NHẬT KÝ CÁC LƯỢT CHẠY" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" />
+                        <TextBlock Text="Mới nhất trên cùng (tối đa 100 dòng)." FontSize="11.5" Foreground="{DynamicResource InkSubtleBrush}" Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <Grid>
+                        <TextBlock Text="Chưa có lượt cập nhật nào trong phiên này."
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource InkSubtleBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasLogs}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ListBox ItemsSource="{Binding Logs}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 HorizontalContentAlignment="Stretch"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Visibility="{Binding HasLogs, Converter={StaticResource BoolToVis}}">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,0,8" />
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="8" BorderThickness="1" Padding="10,8">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource SurfaceMutedBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsError}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertRedCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" />
+                                                <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="Bold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsError}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding SummaryText}" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

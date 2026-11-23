@@ -1,0 +1,1582 @@
+[
+  {
+    "name": "tracking-codes-column-json-and-separated",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "T1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111",
+          "OLD11111",
+          "OLD22222"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "T2",
+        "returnOrderId": "R2",
+        "forwardTrack": "",
+        "returnTrack": "RT222222",
+        "trackingCodes": [
+          "RT222222",
+          "OLD33333",
+          "OLD44444",
+          "OLD55555"
+        ],
+        "track": "RT222222",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "vietnamese-shipping-word-is-not-cancel",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Đơn hủy",
+        "isPartialReturn": false,
+        "platformStatus": "Đã hủy",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "V2",
+        "returnOrderId": "",
+        "forwardTrack": "SPXVN0123456780",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SPXVN0123456780"
+        ],
+        "track": "SPXVN0123456780",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Đơn hủy",
+        "isPartialReturn": false,
+        "platformStatus": "Cancelled - Cancelled by buyer",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "V3",
+        "returnOrderId": "",
+        "forwardTrack": "SPXVN0123456781",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SPXVN0123456781"
+        ],
+        "track": "SPXVN0123456781",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "salework-that-thu-with-reason",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "THẤT THOÁT",
+        "isPartialReturn": false,
+        "platformStatus": "Khách không nghe máy",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S1",
+        "returnOrderId": "",
+        "forwardTrack": "862799512623",
+        "returnTrack": "",
+        "trackingCodes": [
+          "862799512623"
+        ],
+        "track": "862799512623",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "THẤT THOÁT | Khách không nghe máy",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "THẤT THOÁT",
+        "isPartialReturn": false,
+        "platformStatus": "THẤT THU",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S2",
+        "returnOrderId": "",
+        "forwardTrack": "862799512624",
+        "returnTrack": "",
+        "trackingCodes": [
+          "862799512624"
+        ],
+        "track": "862799512624",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "THẤT THOÁT (Trạng thái Salework)",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Quần",
+            "color": "",
+            "size": "",
+            "qty": 2,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "option-not-only-returns-keeps-ordinary-shipping",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Đang chuyển hoàn / Vận chuyển",
+        "isPartialReturn": false,
+        "platformStatus": "Delivered",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "",
+        "forwardTrack": "SPXVN0123456789",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SPXVN0123456789"
+        ],
+        "track": "SPXVN0123456789",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Đơn hủy",
+        "isPartialReturn": false,
+        "platformStatus": "Out of stock",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "O2",
+        "returnOrderId": "",
+        "forwardTrack": "SPXVN0123456780",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SPXVN0123456780"
+        ],
+        "track": "SPXVN0123456780",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "Out of stock",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "option-skip-unshipped-cancel",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Đơn hủy",
+        "isPartialReturn": false,
+        "platformStatus": "Out of stock",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "O2",
+        "returnOrderId": "",
+        "forwardTrack": "SPXVN0123456780",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SPXVN0123456780"
+        ],
+        "track": "SPXVN0123456780",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "Out of stock",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Hủy đã gửi",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "sku-subtotal-columns-are-summed-per-line",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "K1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 45000,
+        "priceNeedsReview": false,
+        "importModeSlots": {
+          "tong_gia_tri": "discounted",
+          "sau_chiet_khau": "discounted",
+          "gia_salework": "subtotal",
+          "doanh_thu_uoc_tinh": "discounted"
+        },
+        "importSelectedPriceMode": "sau_chiet_khau",
+        "priceModes": {
+          "tong_gia_tri": 45000,
+          "sau_chiet_khau": 45000,
+          "gia_salework": 60000,
+          "doanh_thu_uoc_tinh": 45000,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "A",
+            "color": "",
+            "size": "",
+            "qty": 2,
+            "importPrices": {
+              "discounted": 18000,
+              "subtotal": 25000
+            }
+          },
+          {
+            "product": "B",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {
+              "discounted": 27000,
+              "subtotal": 35000
+            }
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "order-level-amount-repeated-on-each-row-is-not-summed",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "K2",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 100000,
+        "priceNeedsReview": false,
+        "importModeSlots": {
+          "tong_gia_tri": null,
+          "sau_chiet_khau": null,
+          "gia_salework": null,
+          "doanh_thu_uoc_tinh": null
+        },
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 100000,
+          "sau_chiet_khau": 100000,
+          "gia_salework": 100000,
+          "doanh_thu_uoc_tinh": 100000,
+          "hasOrderLevelZ": true,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "A",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          },
+          {
+            "product": "B",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "salework-gia-and-doanh-thu-and-unit-price-qty",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "W1",
+        "returnOrderId": "",
+        "forwardTrack": "862799512623",
+        "returnTrack": "854170248243",
+        "trackingCodes": [
+          "862799512623",
+          "854170248243"
+        ],
+        "track": "862799512623",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 300000,
+        "priceNeedsReview": false,
+        "importModeSlots": {
+          "gia_salework": "saleworkUnit",
+          "doanh_thu_uoc_tinh": null
+        },
+        "importSelectedPriceMode": "gia_salework",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 300000,
+          "doanh_thu_uoc_tinh": 250000,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": true
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 3,
+            "importPrices": {
+              "saleworkUnit": 300000
+            }
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "carrier-from-excel-column-when-code-unknown",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "C1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "ABC",
+        "trackingCodes": [
+          "ABC"
+        ],
+        "track": "ABC",
+        "altTrack": "",
+        "carrier": "Giao hàng X",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "sku-code-gives-color-and-size",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "U1",
+        "returnOrderId": "",
+        "forwardTrack": "862799512623",
+        "returnTrack": "854170248243",
+        "trackingCodes": [
+          "862799512623",
+          "854170248243"
+        ],
+        "track": "862799512623",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "BUTTER",
+            "color": "Trang",
+            "size": "XL",
+            "qty": 1,
+            "importPrices": {},
+            "sellerSku": "BUTTER_Trang_XL"
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "U2",
+        "returnOrderId": "",
+        "forwardTrack": "862799512625",
+        "returnTrack": "854170248244",
+        "trackingCodes": [
+          "862799512625",
+          "854170248244"
+        ],
+        "track": "862799512625",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo Khoác Len Dệt Kim Lavi Studio Jacket Zip Xanh Than",
+            "color": "Xanh Than",
+            "size": "XL",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "U3",
+        "returnOrderId": "",
+        "forwardTrack": "862799512626",
+        "returnTrack": "854170248245",
+        "trackingCodes": [
+          "862799512626",
+          "854170248245"
+        ],
+        "track": "862799512626",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "ERWIN",
+            "color": "XanhThanMori",
+            "size": "L",
+            "qty": 1,
+            "importPrices": {},
+            "sellerSku": "ERWIN_XanhThanMori_L"
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "buyer-note-long-column-name",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "B1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "Hàng bị rách",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "B2",
+        "returnOrderId": "R2",
+        "forwardTrack": "",
+        "returnTrack": "RT222222",
+        "trackingCodes": [
+          "RT222222"
+        ],
+        "track": "RT222222",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "quoted-order-id-and-date-fallbacks",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "02/11/2026 09:00",
+        "returnDate": "02/11/2026 09:00",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "587139504996779037",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "03/11/2026 10:00",
+        "returnDate": "03/11/2026 10:00",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "B2",
+        "returnOrderId": "R2",
+        "forwardTrack": "",
+        "returnTrack": "RT222222",
+        "trackingCodes": [
+          "RT222222"
+        ],
+        "track": "RT222222",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "same-claim-two-rows-different-products-and-partial-by-text",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": true,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "M1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "Hoàn một phần",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo A",
+            "color": "Đen",
+            "size": "M",
+            "qty": 1,
+            "importPrices": {}
+          },
+          {
+            "product": "Áo B",
+            "color": "Trắng",
+            "size": "L",
+            "qty": 2,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "return-sub-status-translations",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang vận chuyển về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "RT111111",
+        "trackingCodes": [
+          "RT111111"
+        ],
+        "track": "RT111111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Từ chối hoàn",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S2",
+        "returnOrderId": "R2",
+        "forwardTrack": "",
+        "returnTrack": "RT222222",
+        "trackingCodes": [
+          "RT222222"
+        ],
+        "track": "RT222222",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Something else",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S3",
+        "returnOrderId": "R3",
+        "forwardTrack": "",
+        "returnTrack": "RT333333",
+        "trackingCodes": [
+          "RT333333"
+        ],
+        "track": "RT333333",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "S4",
+        "returnOrderId": "R4",
+        "forwardTrack": "",
+        "returnTrack": "RT444444",
+        "trackingCodes": [
+          "RT444444"
+        ],
+        "track": "RT444444",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "salework-already-returned-and-waiting-customer",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang về",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "W1",
+        "returnOrderId": "",
+        "forwardTrack": "862799512623",
+        "returnTrack": "854170248243",
+        "trackingCodes": [
+          "862799512623",
+          "854170248243"
+        ],
+        "track": "862799512623",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ khách gửi hàng",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "W2",
+        "returnOrderId": "",
+        "forwardTrack": "862799512624",
+        "returnTrack": "",
+        "trackingCodes": [
+          "862799512624"
+        ],
+        "track": "862799512624",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đã về",
+        "returnedAt": "13:14:41 05/11/2026",
+        "preOrder": "Đơn thường",
+        "orderId": "W3",
+        "returnOrderId": "",
+        "forwardTrack": "862799512625",
+        "returnTrack": "854170248246",
+        "trackingCodes": [
+          "862799512625",
+          "854170248246"
+        ],
+        "track": "862799512625",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "pre-order-variants-and-url-tracking",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Hàng đặt trước",
+        "orderId": "P1",
+        "returnOrderId": "R1",
+        "forwardTrack": "",
+        "returnTrack": "SPXVN0123456789",
+        "trackingCodes": [
+          "SPXVN0123456789"
+        ],
+        "track": "SPXVN0123456789",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Chờ xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "P2",
+        "returnOrderId": "R2",
+        "forwardTrack": "",
+        "returnTrack": "SPXVN0123456780",
+        "trackingCodes": [
+          "SPXVN0123456780"
+        ],
+        "track": "SPXVN0123456780",
+        "altTrack": "",
+        "carrier": "SPX Express",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "p",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  }
+]

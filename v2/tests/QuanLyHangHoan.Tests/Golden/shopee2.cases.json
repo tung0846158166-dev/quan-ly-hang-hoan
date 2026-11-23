@@ -1,0 +1,31 @@
+[
+ {"name":"color-size-from-product-name","rows":[
+  {"Mã đơn hàng":"SP2611BBB001","Mã vận đơn":"SPXVN0000000201","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Giao hàng thất bại","Tên sản phẩm":"Ao thun - Den - XL","Tên phân loại hàng":"","Số lượng":"1","Tổng giá trị đơn hàng":"99.000"}]},
+ {"name":"explicit-color-size-columns","rows":[
+  {"Mã đơn hàng":"SP2611BBB002","Mã vận đơn":"SPXVN0000000202","Trạng thái Trả hàng/Hoàn tiền":"Đã hoàn tiền","Tên sản phẩm":"Quan tay","Màu sắc":"Xanh navy","Kích thước":"32","Số lượng":"1","Tổng số tiền hoàn trả":"250000"},
+  {"Mã đơn hàng":"SP2611BBB002","Mã vận đơn":"SPXVN0000000202","Trạng thái Trả hàng/Hoàn tiền":"Đã hoàn tiền","Tên sản phẩm":"Quan tay","Màu sắc":"Den","Kích thước":"Den","Số lượng":"1","Tổng số tiền hoàn trả":"250000"}]},
+ {"name":"source-file-cancel-vs-failed","rows":[
+  {"__sourceFileName":"Order.cancelled.2026.xlsx","Mã đơn hàng":"SP2611BBB003","Mã vận đơn":"SPXVN0000000203","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Người mua hủy","Tên sản phẩm":"Mu","Tên phân loại hàng":"Den","Số lượng":"1"},
+  {"__sourceFileName":"Order.failed_delivery.xlsx","Mã đơn hàng":"SP2611BBB004","Mã vận đơn":"SPXVN0000000204","Trạng thái đơn hàng":"Đang xử lý","Tên sản phẩm":"Mu","Tên phân loại hàng":"Trang","Số lượng":"1"},
+  {"__sourceFileName":"Order.return_refund.xlsx","Mã đơn hàng":"SP2611BBB005","Mã vận đơn":"SPXVN0000000205","Trạng thái đơn hàng":"Đang xử lý","Tên sản phẩm":"Mu","Tên phân loại hàng":"Be","Số lượng":"2"}]},
+ {"name":"that-thu-status","rows":[
+  {"Mã đơn hàng":"SP2611BBB006","Mã vận đơn":"SPXVN0000000206","Trạng thái đơn hàng":"Thất thu","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1"}]},
+ {"name":"claim-only-rows-no-track-no-order","rows":[
+  {"Mã số khiếu nại":"RR900A","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tổng số tiền hoàn trả":"10000"},
+  {"Mã số khiếu nại":"RR900B","Tên sản phẩm":"Quan","Tên phân loại hàng":"Be,L","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tổng số tiền hoàn trả":"20000"},
+  {"Mã số khiếu nại":"RR900B","Tên sản phẩm":"Non","Tên phân loại hàng":"Den","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tổng số tiền hoàn trả":"20000"}]},
+ {"name":"tracking-codes-column-and-preorder","rows":[
+  {"Mã đơn hàng":"SP2611BBB007","Mã vận đơn":"SPXVN0000000207","Tracking Codes":"[\"SPXVN0000000208\",\"JT0000000209\"]","Loại đơn hàng":"Hàng đặt trước","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Doanh thu":"50000"}]},
+ {"name":"carriers-and-dates","rows":[
+  {"Mã đơn hàng":"SP2611BBB008","Mã vận đơn":"GHN12345678","Đơn vị vận chuyển giao hàng":"Giao Hàng Tiết Kiệm","Thời gian gửi":"15/11/2026 09:30","Thời gian yêu cầu":"18/11","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Ngày đặt hàng":"10/11/2026","Mã vận đơn trả hàng":"SPXVN0000000210","Đơn vị vận chuyển trả hàng":"Viettel Post","Tổng số tiền hoàn trả":"0","Tổng giá trị đơn hàng":"180000"},
+  {"Mã đơn hàng":"SP2611BBB009","Mã vận đơn":"TTVN00001111","Đơn vị vận chuyển":"Best Express","Thời gian gửi":"2026-11-14 18:00:00","Trạng thái đơn hàng":"Hoàn","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1"}]},
+ {"name":"buyer-note-variants","rows":[
+  {"Mã đơn hàng":"SP2611BBB010","Mã vận đơn":"SPXVN0000000211","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Nhận xét từ Người mua":"Màu không giống ảnh","Ghi chú":"Không"},
+  {"Mã đơn hàng":"SP2611BBB011","Mã vận đơn":"SPXVN0000000212","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Ghi chú":"Không"}]},
+ {"name":"reason-fallbacks-and-refund-immediately","rows":[
+  {"Mã đơn hàng":"SP2611BBB012","Mã vận đơn":"SPXVN0000000213","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Phương án":"Hoàn tiền ngay","Lý do hủy":"Khách đổi ý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1"},
+  {"Mã đơn hàng":"SP2611BBB013","Mã vận đơn":"SPXVN0000000214","Trạng thái trả hàng":"Không","Trạng thái Trả hàng/Hoàn tiền":"Yêu cầu của Người mua đã hủy","Lý do trả hàng/hoàn tiền":"Không cần nữa","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1"}]},
+ {"name":"qty-text-and-zero-with-cancel-file","rows":[
+  {"__sourceFileName":"cancelled.xlsx","Mã đơn hàng":"SP2611BBB014","Mã vận đơn":"SPXVN0000000215","Trạng thái đơn hàng":"Đã hủy","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"2","Số lượng hoàn":"0"},
+  {"Mã đơn hàng":"SP2611BBB015","Mã vận đơn":"SPXVN0000000216","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"2.0","Số lượng hoàn":"1"}]}
+]

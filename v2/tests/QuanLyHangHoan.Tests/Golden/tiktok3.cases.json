@@ -1,0 +1,89 @@
+[
+  {
+    "name": "forward-only-existing-row-is-upgraded-by-return-row",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ xử lý", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "", "track": "FWD11111", "returnTrack": "", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "userNote": "ghi chú kho", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RET22222", "Tracking ID": "FWD11111", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "supplement-mode-keeps-products-not-in-file",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ xử lý", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "C1", "track": "RET22222", "returnTrack": "RET22222", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }, { "product": "Pants", "color": "", "size": "", "qty": 2 }] }
+    ],
+    "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RET22222", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 3 }
+    ]
+  },
+  {
+    "name": "replace-mode-replaces-products",
+    "options": { "productMode": "replace" },
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ xử lý", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "C1", "track": "RET22222", "returnTrack": "RET22222", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }, { "product": "Pants", "color": "", "size": "", "qty": 2 }] }
+    ],
+    "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RET22222", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 3 }
+    ]
+  },
+  {
+    "name": "deleted-order-is-not-recreated",
+    "options": { "deleted": [ { "platform": "TikTok Shop", "orderId": "O9", "returnOrderId": "C9", "track": "RET99999", "returnTrack": "RET99999", "items": [] } ] },
+    "rows": [
+      { "Order ID": "O9", "Return Order ID": "C9", "Return Logistics Tracking ID": "RET99999", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "archived-order-is-enriched-not-duplicated",
+    "options": { "archived": [ { "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "orderId": "O9", "returnOrderId": "", "track": "RET99999", "returnTrack": "", "forwardTrack": "", "altTrack": "", "carrier": "", "shipDate": "", "price": 0, "status": "Hàng đã trả", "recvDate": "10/11/2026 09:00:00", "photo": "", "note": "", "items": [ { "product": "", "color": "", "size": "", "qty": 1 } ] } ] },
+    "rows": [
+      { "Order ID": "O9", "Return Order ID": "C9", "Return Logistics Tracking ID": "RET99999", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "Return Reason": "Poor quality" }
+    ]
+  },
+  {
+    "name": "archived-same-order-but-new-return-parcel-creates-new-row",
+    "options": { "archived": [ { "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "orderId": "O9", "returnOrderId": "C9", "track": "RET99999", "returnTrack": "RET99999", "forwardTrack": "", "altTrack": "", "price": 0, "status": "Hàng đã trả", "items": [ { "product": "Old", "color": "", "size": "", "qty": 1 } ] } ] },
+    "rows": [
+      { "Order ID": "O9", "Return Order ID": "C10", "Return Logistics Tracking ID": "RET88888", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "existing-shopee-label-is-overwritten-by-tiktok-file",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "Shopee", "orderType": "Giao không thành công", "platformStatus": "Cũ", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "C1", "track": "RET22222", "returnTrack": "RET22222", "forwardTrack": "", "altTrack": "", "carrier": "SPX Express", "price": 50000, "status": "Chưa về", "photo": "", "note": "ghi chú cũ", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RET22222", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 1, "Return unit price": 12000, "Return Reason": "Change of mind", "Shipping Provider Name": "J&T Express" }
+    ]
+  },
+  {
+    "name": "existing-gets-status-returned-at-and-buyer-note",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Đang về", "preOrder": "Đơn thường", "orderId": "W1", "returnOrderId": "", "track": "862799512623", "returnTrack": "854170248243", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Áo", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Mã đơn hàng": "W1", "Trạng thái": "Đã hoàn", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243", "Ngày trả hàng thành công": "2026-11-20 10:15:30", "Ghi chú của khách": "Giao giờ hành chính" }
+    ]
+  },
+  {
+    "name": "trackless-row-with-placeholder-product-gets-real-items",
+    "existing": [
+      { "shipDate": "", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ khách gửi hàng", "preOrder": "Đơn thường", "orderId": "W5", "returnOrderId": "", "track": "", "returnTrack": "", "forwardTrack": "", "altTrack": "", "carrier": "Chờ bưu cục tiếp nhận", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Sản phẩm mới", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Mã đơn hàng": "W5", "Trạng thái": "Đang hoàn", "Tên sản phẩm trên sàn": "Áo Polo", "Tên phân loại trên sàn": "Đen, M", "Số lượng": 2, "Mã vận đơn": "862799512630", "Mã trả hàng": "854170248250" }
+    ]
+  },
+  {
+    "name": "ambiguous-two-candidates-old-app-creates-third-row",
+    "v2Deviates": "v2 báo nhập nhằng và KHÔNG tạo dòng thứ ba",
+    "existing": [
+      { "shipDate": "", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Cũ", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "", "track": "AAA11111", "returnTrack": "", "forwardTrack": "", "altTrack": "", "trackingCodes": ["SHARED11"], "carrier": "GHN", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }] },
+      { "shipDate": "", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Cũ", "preOrder": "Đơn thường", "orderId": "O1", "returnOrderId": "", "track": "BBB22222", "returnTrack": "", "forwardTrack": "", "altTrack": "", "trackingCodes": ["SHARED11"], "carrier": "GHN", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Order ID": "O1", "Return Order ID": "", "Return Logistics Tracking ID": "", "Tracking ID": "SHARED11", "Product Name": "Pants", "Order Status": "Refunded", "Quantity": 1 }
+    ]
+  }
+]

@@ -4,3 +4,35 @@ temp_*
 *.log
 .DS_Store
 Thumbs.db
+
+# v2 (C#/.NET): sản phẩm build, bản chạy, bộ nhớ đệm
+v2/**/bin/
+v2/**/obj/
+v2/dist/
+.vs/
+*.user
+
+# KHÔNG BAO GIỜ đưa dữ liệu thật hay cài đặt cá nhân lên Git
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.ipa
+du_lieu_hang_hoan*.json
+phu_*.json
+sao_luu_tu_dong/
+khoi_phuc/
+photos/
+settings.json
+folder_watch.json
+**/legacy-copies/
+.claude/settings.local.json
+
+# Swift / Xcode
+.build/
+DerivedData/
+*.xcodeproj/
+*.xcuserstate
+
+# Anh chup man hinh cua nguoi dung (co the chua du lieu that): khong dua len Git
+anh-tu-nguoi-dung/

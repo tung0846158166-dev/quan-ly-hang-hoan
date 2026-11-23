@@ -1,0 +1,72 @@
+[
+  {
+    "name": "single-file-plain",
+    "files": [ { "name": "a.csv", "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+      { "Order ID": "O2", "Return Order ID": "C2", "Return Logistics Tracking ID": "RT2", "Product Name": "Pants", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "continuation-rows-inherit-identity-and-status",
+    "files": [ { "name": "a.csv", "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1, "Return Status": "In Process" },
+      { "Product Name": "Second SKU", "Quantity": 2 },
+      { "Product Name": "Third SKU", "Quantity": 1, "Return Status": "Own status" },
+      { "Order ID": "O2", "Return Order ID": "C2", "Return Logistics Tracking ID": "RT2", "Product Name": "Pants", "Quantity": 1 },
+      { "Product Name": "Pants second", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "exact-duplicate-rows-in-later-file-are-dropped",
+    "files": [
+      { "name": "week1.csv", "rows": [
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+        { "Order ID": "O2", "Return Order ID": "C2", "Return Logistics Tracking ID": "RT2", "Product Name": "Pants", "Quantity": 1 } ] },
+      { "name": "week2.csv", "rows": [
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+        { "Order ID": "O3", "Return Order ID": "C3", "Return Logistics Tracking ID": "RT3", "Product Name": "Hat", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "same-row-twice-inside-one-file-is-kept-both-times",
+    "files": [ { "name": "a.csv", "rows": [
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+      { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "same-row-twice-in-first-file-once-in-second-keeps-no-extra",
+    "files": [
+      { "name": "a.csv", "rows": [
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 } ] },
+      { "name": "b.csv", "rows": [
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 },
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "different-column-layouts-are-separate-groups",
+    "files": [
+      { "name": "tiktok.csv", "rows": [
+        { "Order ID": "O1", "Return Order ID": "C1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 } ] },
+      { "name": "salework.csv", "rows": [
+        { "Mã đơn hàng": "S1", "Mã vận đơn": "VT1", "Mã trả hàng": "RT9", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1 } ] },
+      { "name": "tiktok2.csv", "rows": [
+        { "Order ID": "O5", "Return Order ID": "C5", "Return Logistics Tracking ID": "RT5", "Product Name": "Hat", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "aliases-share-one-fingerprint-across-languages",
+    "files": [
+      { "name": "en.csv", "rows": [
+        { "Order ID": "O1", "Return Logistics Tracking ID": "RT1", "Product Name": "Shirt", "Quantity": 1 } ] },
+      { "name": "vi.csv", "rows": [
+        { "Mã đơn hàng": "O1", "Mã vận đơn trả hàng": "RT1", "Tên sản phẩm": "Shirt", "Số lượng": 1 } ] } ]
+  },
+  {
+    "name": "rows-without-any-identity-stay-and-source-markers-are-added",
+    "files": [ { "name": "a.csv", "rows": [
+      { "Product Name": "Orphan", "Quantity": 1 },
+      { "Order ID": "O1", "Return Order ID": "C1", "Product Name": "Shirt", "Quantity": 1 } ] } ]
+  },
+  {
+    "name": "empty-and-nonobject-rows-are-ignored",
+    "files": [ { "name": "a.csv", "rows": [ null, { "Order ID": "O1", "Return Order ID": "C1", "Product Name": "Shirt", "Quantity": 1 } ] } ]
+  }
+]

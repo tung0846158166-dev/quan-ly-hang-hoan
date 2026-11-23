@@ -1,0 +1,163 @@
+[
+  {
+    "name": "three-tabs-merge",
+    "rows": [
+      {
+        "Mã đơn hàng": "SP1",
+        "Mã vận đơn": "SPX001",
+        "Mã số khiếu nại": "RR1",
+        "Lý do trả hàng/hoàn tiền": "Sai mô tả",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "20/11/2026 09:00",
+        "Thời gian giao hàng thành công": "21/11/2026 10:00",
+        "Người bán cần phản hồi trước": "22/11/2026 10:00",
+        "Tổng số tiền hoàn trả": "250000",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đang về",
+        "Tên sản phẩm": "Áo thun",
+        "Tên phân loại hàng": "Đen, M",
+        "Số lượng": "2"
+      },
+      {
+        "Mã đơn hàng": "SP1",
+        "Mã vận đơn": "SPX001",
+        "Mã số khiếu nại": "RR1",
+        "Lý do trả hàng/hoàn tiền": "Sai mô tả",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "20/11/2026 09:00",
+        "Thời gian giao hàng thành công": "21/11/2026 10:00",
+        "Người bán cần phản hồi trước": "22/11/2026 10:00",
+        "Tổng số tiền hoàn trả": "",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đang về",
+        "Tên sản phẩm": "Quần short",
+        "Tên phân loại hàng": "Be, L",
+        "Số lượng": "1"
+      },
+      {
+        "Mã đơn hàng": "SP2",
+        "Mã vận đơn": "",
+        "Mã số khiếu nại": "",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "19/11/2026",
+        "Thời gian giao hàng thành công": "",
+        "Người bán cần phản hồi trước": "",
+        "Tổng số tiền hoàn trả": "",
+        "Trạng thái đơn hàng": "Huỷ sau chuẩn bị · Đã huỷ",
+        "Tên sản phẩm": "Mũ lưỡi trai",
+        "Tên phân loại hàng": "",
+        "Số lượng": "1"
+      }
+    ],
+    "removedTotal": 0,
+    "skippedCancel": 1,
+    "tooOld": 0,
+    "parcelCount": 2
+  },
+  {
+    "name": "bom-and-latest-request",
+    "rows": [
+      {
+        "Mã đơn hàng": "SP10",
+        "Mã vận đơn": "SPX010",
+        "Mã số khiếu nại": "RR10",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "2026-11-20",
+        "Thời gian giao hàng thành công": "2026-11-22 15:30:00",
+        "Người bán cần phản hồi trước": "23/11/2026 15:30",
+        "Tổng số tiền hoàn trả": "",
+        "Lý do hủy": "Giao hàng thất bại",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đã về shop",
+        "Tên sản phẩm": "Giày",
+        "Tên phân loại hàng": "Trắng, 42",
+        "Số lượng": "1"
+      },
+      {
+        "Mã đơn hàng": "SP11",
+        "Mã vận đơn": "SPX012",
+        "Mã số khiếu nại": "RR12",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "05/11/2026",
+        "Thời gian giao hàng thành công": "",
+        "Người bán cần phản hồi trước": "30/11/2026",
+        "Tổng số tiền hoàn trả": "40000",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đang về",
+        "Tên sản phẩm": "Dây nịt",
+        "Tên phân loại hàng": "",
+        "Số lượng": "4"
+      }
+    ],
+    "removedTotal": 1,
+    "skippedCancel": 0,
+    "tooOld": 0,
+    "parcelCount": 2
+  },
+  {
+    "name": "max-days-and-skip-types",
+    "rows": [
+      {
+        "Mã đơn hàng": "SP21",
+        "Mã vận đơn": "SPX021",
+        "Mã số khiếu nại": "RR21",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "15/11/2026",
+        "Thời gian giao hàng thành công": "",
+        "Người bán cần phản hồi trước": "",
+        "Tổng số tiền hoàn trả": "1000",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đã về shop",
+        "Tên sản phẩm": "Ao",
+        "Tên phân loại hàng": "",
+        "Số lượng": "1"
+      },
+      {
+        "Mã đơn hàng": "SP22",
+        "Mã vận đơn": "SPX022",
+        "Mã số khiếu nại": "RR22",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "",
+        "Thời gian giao hàng thành công": "",
+        "Người bán cần phản hồi trước": "",
+        "Tổng số tiền hoàn trả": "1000",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đã về shop",
+        "Tên sản phẩm": "Ao",
+        "Tên phân loại hàng": "",
+        "Số lượng": "1"
+      }
+    ],
+    "removedTotal": 0,
+    "skippedCancel": 0,
+    "tooOld": 1,
+    "parcelCount": 2
+  },
+  {
+    "name": "fixed-date-and-unknown-tab",
+    "rows": [
+      {
+        "Mã đơn hàng": "SP31",
+        "Mã vận đơn": "SPX031",
+        "Mã số khiếu nại": "RR31",
+        "Lý do trả hàng/hoàn tiền": "",
+        "Ghi chú của Người mua khi trả hàng": "",
+        "Thời gian yêu cầu": "10/11/2026",
+        "Thời gian giao hàng thành công": "",
+        "Người bán cần phản hồi trước": "",
+        "Tổng số tiền hoàn trả": "1000",
+        "Trạng thái Trả hàng/Hoàn tiền": "Đã về shop",
+        "Tên sản phẩm": "Ao",
+        "Tên phân loại hàng": "Đen",
+        "Số lượng": "1"
+      },
+      {
+        "Cột lạ": "x",
+        "Giá": "1"
+      }
+    ],
+    "removedTotal": 0,
+    "skippedCancel": 0,
+    "tooOld": 1,
+    "parcelCount": 1
+  }
+]

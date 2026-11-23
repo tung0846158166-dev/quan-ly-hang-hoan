@@ -1,0 +1,213 @@
+[
+  {
+    "name": "return-qty-wins-zero-skips-product",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "Sku Quantity of return": 1, "SKU Unit Original Price": 10000 },
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Not returned", "Return Status": "In Process", "Quantity": 5, "Sku Quantity of return": 0, "SKU Unit Original Price": 20000 }
+    ]
+  },
+  {
+    "name": "blank-return-qty-falls-back-to-ordered",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "Sku Quantity of return": "", "SKU Unit Original Price": 10000 }
+    ]
+  },
+  {
+    "name": "all-zero-return-qty-gives-nothing",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "Sku Quantity of return": 0 }
+    ]
+  },
+  {
+    "name": "return-quantity-alias-and-unit-price",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "Return Quantity": 2, "Return unit price": 10000 }
+    ]
+  },
+  {
+    "name": "price-modes-tong-gia-tri",
+    "mode": "tong_gia_tri",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "SKU Subtotal After Discount": 18000, "SKU Subtotal Before Discount": 25000, "Doanh thu ước tính": 42000 },
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Pants", "Return Status": "In Process", "Quantity": 1, "Return unit price": 30000, "SKU Subtotal After Discount": 27000, "SKU Subtotal Before Discount": 35000, "Doanh thu ước tính": 42000 }
+    ]
+  },
+  {
+    "name": "price-modes-sau-chiet-khau",
+    "mode": "sau_chiet_khau",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "SKU Subtotal After Discount": 18000, "SKU Subtotal Before Discount": 25000, "Doanh thu ước tính": 42000 },
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Pants", "Return Status": "In Process", "Quantity": 1, "Return unit price": 30000, "SKU Subtotal After Discount": 27000, "SKU Subtotal Before Discount": 35000, "Doanh thu ước tính": 42000 }
+    ]
+  },
+  {
+    "name": "price-modes-gia-salework",
+    "mode": "gia_salework",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "SKU Subtotal After Discount": 18000, "SKU Subtotal Before Discount": 25000, "Doanh thu ước tính": 42000 },
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Pants", "Return Status": "In Process", "Quantity": 1, "Return unit price": 30000, "SKU Subtotal After Discount": 27000, "SKU Subtotal Before Discount": 35000, "Doanh thu ước tính": 42000 }
+    ]
+  },
+  {
+    "name": "price-modes-doanh-thu",
+    "mode": "doanh_thu_uoc_tinh",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "SKU Subtotal After Discount": 18000, "SKU Subtotal Before Discount": 25000, "Doanh thu ước tính": 42000 },
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Pants", "Return Status": "In Process", "Quantity": 1, "Return unit price": 30000, "SKU Subtotal After Discount": 27000, "SKU Subtotal Before Discount": 35000, "Doanh thu ước tính": 42000 }
+    ]
+  },
+  {
+    "name": "only-returns-filter-delivered",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Delivered" }]
+  },
+  {
+    "name": "only-returns-filter-vietnamese-shipping",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Trạng thái đang giao hàng" }]
+  },
+  {
+    "name": "only-returns-filter-in-transit",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "In transit" }]
+  },
+  {
+    "name": "status-refunded-kept",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Refunded" }]
+  },
+  {
+    "name": "status-return-shipped-kept",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Return shipped" }]
+  },
+  {
+    "name": "status-vi-da-tra-hang-kept",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Đã trả hàng" }]
+  },
+  {
+    "name": "status-vi-dang-hoan-hang-kept",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "", "Order Status": "Đang hoàn hàng" }]
+  },
+  {
+    "name": "explicit-return-order-id-kept",
+    "rows": [{ "Order ID": "ORDER001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Quantity": 1, "Return Order ID": "CLAIM001", "Order Status": "In Process" }]
+  },
+  {
+    "name": "continuation-rows-and-new-claim",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5 },
+      { "Product Name": "Second SKU", "Quantity": 2 },
+      { "Return Order ID": "CLAIM002", "Product Name": "Another claim", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "forward-and-return-tracking-both-kept",
+    "rows": [{ "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5 }]
+  },
+  {
+    "name": "source-file-boundary-orphan-sku",
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "__sourceFileId": "file1" },
+      { "Product Name": "Orphan SKU", "Quantity": 2, "__sourceFileId": "file2" }
+    ]
+  },
+  {
+    "name": "seller-sku-and-sku-id",
+    "rows": [{ "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5, "Seller SKU": "SELLER001", "SKU ID": "SKU001" }]
+  },
+  {
+    "name": "forward-only-before-return-tracking",
+    "rows": [{ "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "", "Tracking ID": "FORWARD001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 5 }]
+  },
+  {
+    "name": "salework-return-file-with-ma-tra-hang",
+    "rows": [
+      { "Mã đơn hàng": "587139504996779037", "Trạng thái": "THẤT THU", "Mã sản phẩm": "DELAX_Den_M", "Số lượng": 1, "Giá Salework": 700000, "Tên sản phẩm trên sàn": "Áo Polo Len - Đen, M - Premium Cao Cấp", "Tổng COD": 390150, "Mã vận đơn": "862799512623", "Đơn vị vận chuyển": "J&T Express", "Mã trả hàng": "854170248243" },
+      { "Mã đơn hàng": "587139219296323354", "Trạng thái": "THẤT THU", "Mã sản phẩm": "DELAX_Den_M", "Số lượng": 1, "Giá Salework": 700000, "Tên sản phẩm trên sàn": "Áo Polo Len - Đen, M - Premium Cao Cấp", "Tổng COD": 390150, "Mã vận đơn": "862762232763", "Đơn vị vận chuyển": "J&T Express", "Mã trả hàng": "" }
+    ]
+  },
+  {
+    "name": "salework-returned-date-means-da-ve",
+    "rows": [
+      { "Mã đơn hàng": "587139504996779037", "Trạng thái": "Đang hoàn", "Tên sản phẩm trên sàn": "Áo Thun", "Tên phân loại trên sàn": "Trắng, XL", "Số lượng": 2, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243", "Ngày trả hàng thành công": "2026-11-20 10:15:30", "Lý do hoàn": "Change of mind" }
+    ]
+  },
+  {
+    "name": "failed-delivery-and-cancel-and-types",
+    "rows": [
+      { "Order ID": "A1", "Tracking ID": "SPXVN0123456789", "Product Name": "Giao thất bại", "Quantity": 1, "Order Status": "Cancelled", "Cancel Reason": "Giao gói hàng thất bại" },
+      { "Order ID": "A2", "Tracking ID": "", "Product Name": "Đơn hủy chưa gửi", "Quantity": 1, "Order Status": "Cancelled", "Cancel Reason": "Out of stock" },
+      { "Order ID": "A3", "Return Order ID": "R3", "Return Logistics Tracking ID": "VTP123456789", "Product Name": "Chỉ hoàn tiền", "Quantity": 1, "Return Status": "To Process", "Cancelation/Return Type": "Refund only" }
+    ]
+  },
+  {
+    "name": "carriers-by-code",
+    "rows": [
+      { "Order ID": "C1", "Return Order ID": "R1", "Return Logistics Tracking ID": "SPXVN0123456789A", "Product Name": "p", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "C2", "Return Order ID": "R2", "Return Logistics Tracking ID": "862799512623", "Product Name": "p", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "C3", "Return Order ID": "R3", "Return Logistics Tracking ID": "GHN12345678", "Product Name": "p", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "C4", "Return Order ID": "R4", "Return Logistics Tracking ID": "NLVN12345678", "Product Name": "p", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "C5", "Return Order ID": "R5", "Return Logistics Tracking ID": "", "Product Name": "p", "Return Status": "To Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "dates-and-formats",
+    "rows": [
+      { "Order ID": "D1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Time Requested": "2026-11-05 13:14:41", "Shipped Time": "2026-11-01 08:00:00" },
+      { "Order ID": "D2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Time Requested": "13:14:41 05/11/2026" },
+      { "Order ID": "D3", "Return Order ID": "R3", "Return Logistics Tracking ID": "RT333333", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Time Requested": "5/11/26" }
+    ]
+  },
+  {
+    "name": "scientific-order-id-and-money-formats",
+    "rows": [
+      { "Order ID": "5.8702686118684454e+17", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": "1.0", "Order Amount": "138580.00" },
+      { "Order ID": "26111238E12", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": "2", "Order Amount": "459,000.00" },
+      { "Order ID": "D3", "Return Order ID": "R3", "Return Logistics Tracking ID": "RT333333", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Order Amount": "138.580" }
+    ]
+  },
+  {
+    "name": "premium-product-and-variation-parsing",
+    "rows": [
+      { "Order ID": "P1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "Áo Polo Lavi Studio Nam Nữ Unisex - Nâu, XL - Premium Cao Cấp", "Variation": "Nâu, XL - Premium Cao Cấp", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "P2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "Quần Short", "Variation": "Màu: Đen, Size: L", "Return Status": "To Process", "Quantity": 1 },
+      { "Order ID": "P3", "Return Order ID": "R3", "Return Logistics Tracking ID": "RT333333", "Product Name": "Áo Khoác", "Variation": "Xanh Than ( Premium ), M", "Return Status": "To Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "pre-order-and-buyer-note-and-reason-translation",
+    "rows": [
+      { "Order ID": "N1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Pre-order": "Yes", "Buyer Note": "Giao giờ hành chính", "Return Reason": "Ordered wrong size" },
+      { "Order ID": "N2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Buyer Note": "Không", "Return Reason": "Poor quality", "Return Sub Status": "Awaiting customer shipment" }
+    ]
+  },
+  {
+    "name": "partial-return-by-quantity",
+    "rows": [
+      { "Order ID": "Q1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 3, "Sku Quantity of return": 1 }
+    ]
+  },
+  {
+    "name": "update-existing-order-keeps-warehouse-fields",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "10/11/2026 09:00:00", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ xử lý", "preOrder": "Đơn thường", "orderId": "ORDER001", "returnOrderId": "CLAIM001", "track": "RETURN001", "returnTrack": "RETURN001", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Hàng đã trả", "photo": "", "note": "", "buyerNote": "", "userNote": "đã kiểm", "items": [{ "product": "", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM001", "Return Logistics Tracking ID": "RETURN001", "Product Name": "Shirt", "Return Status": "In Process", "Quantity": 2, "Return unit price": 10000, "Return Reason": "Change of mind" }
+    ]
+  },
+  {
+    "name": "same-order-different-claim-is-separate-parcel",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ xử lý", "preOrder": "Đơn thường", "orderId": "ORDER001", "returnOrderId": "CLAIM001", "track": "RETURN001", "returnTrack": "RETURN001", "forwardTrack": "", "altTrack": "", "carrier": "J&T Express", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "Shirt", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Order ID": "ORDER001", "Return Order ID": "CLAIM002", "Return Logistics Tracking ID": "RETURN002", "Product Name": "Pants", "Return Status": "In Process", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "trackless-existing-row-gets-filled-from-salework",
+    "existing": [
+      { "shipDate": "01/11/2026", "returnDate": "05/11/2026", "recvDate": "", "platform": "TikTok Shop", "orderType": "Trả hàng/Hoàn tiền", "platformStatus": "Chờ khách gửi hàng", "preOrder": "Đơn thường", "orderId": "587139504996779037", "returnOrderId": "", "track": "", "returnTrack": "", "forwardTrack": "", "altTrack": "", "carrier": "Chờ bưu cục tiếp nhận", "price": 0, "status": "Chưa về", "photo": "", "note": "", "buyerNote": "", "items": [{ "product": "", "color": "", "size": "", "qty": 1 }] }
+    ],
+    "rows": [
+      { "Mã đơn hàng": "587139504996779037", "Trạng thái": "Đang hoàn", "Tên sản phẩm trên sàn": "Áo Thun - Trắng, XL", "Số lượng": 1, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243" }
+    ]
+  }
+]

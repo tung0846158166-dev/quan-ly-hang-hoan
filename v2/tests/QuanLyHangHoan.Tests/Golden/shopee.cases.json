@@ -1,0 +1,34 @@
+[
+ {"name":"return-refund-basic","rows":[
+  {"Mã đơn hàng":"SP2611AAA001","Mã số khiếu nại":"RR001","Mã vận đơn":"SPXVN0000000001","Tên sản phẩm":"Ao thun Local Brand","Tên phân loại hàng":"Den, M","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ bạn xác nhận hàng trả về","Lý do trả hàng/hoàn tiền":"Sản phẩm không đúng mô tả","Thời gian yêu cầu":"20/11/2026 10:15","Tổng số tiền hoàn trả":"199000"}]},
+ {"name":"multi-item-order","rows":[
+  {"Mã đơn hàng":"SP2611AAA002","Mã số khiếu nại":"RR002","Mã vận đơn":"SPXVN0000000002","Tên sản phẩm":"Quan jean ong rong","Tên phân loại hàng":"Xanh,30","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Đã chấp thuận yêu cầu","Thời gian yêu cầu":"2026-11-19 08:00:00","Tổng số tiền hoàn trả":"350000"},
+  {"Mã đơn hàng":"SP2611AAA002","Mã số khiếu nại":"RR002","Mã vận đơn":"SPXVN0000000002","Tên sản phẩm":"Ao so mi","Tên phân loại hàng":"Trang,L","Số lượng":"2","Trạng thái Trả hàng/Hoàn tiền":"Đã chấp thuận yêu cầu","Thời gian yêu cầu":"2026-11-19 08:00:00","Tổng số tiền hoàn trả":"350000"}]},
+ {"name":"two-parcels-same-order","rows":[
+  {"Mã đơn hàng":"SP2611AAA003","Mã số khiếu nại":"RR003A","Mã vận đơn trả hàng":"SPXVN0000000031","Tên sản phẩm":"Ao khoac","Tên phân loại hàng":"Den,XL","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tổng số tiền hoàn trả":"100000"},
+  {"Mã đơn hàng":"SP2611AAA003","Mã số khiếu nại":"RR003B","Mã vận đơn trả hàng":"SPXVN0000000032","Tên sản phẩm":"Quan short","Tên phân loại hàng":"Be,M","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ xử lý","Tổng số tiền hoàn trả":"80000"}]},
+ {"name":"cancelled-order-file","rows":[
+  {"Mã đơn hàng":"SP2611AAA004","Mã vận đơn":"SPXVN0000000004","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Người mua yêu cầu hủy","Tên sản phẩm":"Non luoi trai","Tên phân loại hàng":"Den","Số lượng":"1","Tổng giá trị đơn hàng":"120000","Đơn vị vận chuyển":"SPX Express"}]},
+ {"name":"failed-delivery","rows":[
+  {"Mã đơn hàng":"SP2611AAA005","Mã vận đơn":"SPXVN0000000005","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Giao hàng thất bại","Tên sản phẩm":"Giay the thao","Tên phân loại hàng":"Trang,42","Số lượng":"1","Tổng giá trị đơn hàng":"450000","Đơn vị vận chuyển":"Giao Hàng Nhanh"}]},
+ {"name":"cancel-no-track","rows":[
+  {"Mã đơn hàng":"SP2611AAA006","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Đổi ý","Tên sản phẩm":"Tui xach","Tên phân loại hàng":"Nau","Số lượng":"1","Tổng giá trị đơn hàng":"90000"}]},
+ {"name":"delivered-completed-skipped","rows":[
+  {"Mã đơn hàng":"SP2611AAA007","Mã vận đơn":"SPXVN0000000007","Trạng thái đơn hàng":"Hoàn thành","Tên sản phẩm":"Kinh mat","Tên phân loại hàng":"Den","Số lượng":"1","Tổng giá trị đơn hàng":"70000"},
+  {"Mã đơn hàng":"SP2611AAA008","Mã vận đơn":"SPXVN0000000008","Trạng thái đơn hàng":"Hoàn thành","Trạng thái Trả hàng/Hoàn tiền":"Đã chấp thuận yêu cầu","Tên sản phẩm":"Vi nam","Tên phân loại hàng":"Den","Số lượng":"1","Tổng giá trị đơn hàng":"110000"}]},
+ {"name":"partial-return-qty","rows":[
+  {"Mã đơn hàng":"SP2611AAA009","Mã số khiếu nại":"RR009","Mã vận đơn":"SPXVN0000000009","Tên sản phẩm":"Ao ba lo","Tên phân loại hàng":"Den,M","Số lượng":"3","Số lượng hoàn":"1","Trạng thái Trả hàng/Hoàn tiền":"Chờ bạn xác nhận hàng trả về","Trả hàng/Hoàn tiền toàn bộ đơn hàng":"Một phần","Tổng số tiền hoàn trả":"60000"},
+  {"Mã đơn hàng":"SP2611AAA009","Mã số khiếu nại":"RR009","Mã vận đơn":"SPXVN0000000009","Tên sản phẩm":"Ao ba lo","Tên phân loại hàng":"Trang,L","Số lượng":"2","Số lượng hoàn":"0","Trạng thái Trả hàng/Hoàn tiền":"Chờ bạn xác nhận hàng trả về","Trả hàng/Hoàn tiền toàn bộ đơn hàng":"Một phần","Tổng số tiền hoàn trả":"60000"}]},
+ {"name":"forward-and-return-tracks","rows":[
+  {"Mã đơn hàng":"SP2611AAA010","Mã số khiếu nại":"RR010","Mã vận đơn":"SPXVN0000000100","Mã vận đơn trả hàng":"SPXVN0000000101","Đơn vị vận chuyển giao hàng":"Shopee Express","Đơn vị vận chuyển trả hàng":"J&T Express","Tên sản phẩm":"Day nit","Tên phân loại hàng":"Den","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Đang trả về","Trạng thái trả hàng":"Đang vận chuyển","Phương án":"Trả hàng và hoàn tiền","Ghi chú của Người mua khi trả hàng":"Hàng bị rách","Tổng số tiền hoàn trả":"45000","Người bán cần phản hồi trước":"25/11/2026 23:59"}]},
+ {"name":"order-total-vs-line-price","rows":[
+  {"Mã đơn hàng":"SP2611AAA011","Mã vận đơn":"SPXVN0000000011","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Giao hàng thất bại","Tên sản phẩm":"Ao A","Tên phân loại hàng":"Den,S","Số lượng":"2","Giá gốc":"50000","Tổng giá trị đơn hàng":"140000"},
+  {"Mã đơn hàng":"SP2611AAA011","Mã vận đơn":"SPXVN0000000011","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Giao hàng thất bại","Tên sản phẩm":"Ao B","Tên phân loại hàng":"Den,M","Số lượng":"1","Giá gốc":"40000","Tổng giá trị đơn hàng":"140000"}]},
+ {"name":"salework-style-blank-continuation","rows":[
+  {"Mã đơn hàng":"SP2611AAA012","Mã vận đơn":"SPXVN0000000012","Tên sản phẩm trên sàn":"Ao polo","Tên phân loại trên sàn":"Xanh,M","Số lượng":"1","Trạng thái đơn hàng":"Đã hủy","Lý do hủy":"Giao hàng thất bại"},
+  {"Mã đơn hàng":"","Mã vận đơn":"","Tên sản phẩm trên sàn":"Ao thun","Tên phân loại trên sàn":"Den,L","Số lượng":"2","Trạng thái đơn hàng":"","Lý do hủy":""}]},
+ {"name":"only-returns-off-keeps-delivered","options":{"onlyReturns":false},"rows":[
+  {"Mã đơn hàng":"SP2611AAA013","Mã vận đơn":"SPXVN0000000013","Trạng thái đơn hàng":"Hoàn thành","Tên sản phẩm":"Kinh","Tên phân loại hàng":"Den","Số lượng":"1","Tổng giá trị đơn hàng":"70000"}]},
+ {"name":"existing-order-update","existing":[{"orderId":"SP2611AAA014","track":"SPXVN0000000014","trackingCodes":["SPXVN0000000014"],"platform":"Shopee","status":"Chưa trả","orderType":"Trả hàng/Hoàn tiền","carrier":"SPX Express","price":0,"note":"","items":[{"product":"Ao","color":"Den","size":"M","qty":1}]}],"rows":[
+  {"Mã đơn hàng":"SP2611AAA014","Mã số khiếu nại":"RR014","Mã vận đơn":"SPXVN0000000014","Tên sản phẩm":"Ao","Tên phân loại hàng":"Den,M","Số lượng":"1","Trạng thái Trả hàng/Hoàn tiền":"Đã hoàn tiền","Tổng số tiền hoàn trả":"150000"}]}
+]

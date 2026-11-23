@@ -1,0 +1,35 @@
+name: QuetHangHoan
+options:
+  bundleIdPrefix: com.quanlyhanghoan
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  ScannerCore:
+    path: ../ScannerCore
+targets:
+  QuetHangHoan:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: ScannerCore
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Quét Hàng Hoàn
+        NSCameraUsageDescription: Cần camera để quét mã vạch hàng hoàn
+        ITSAppUseNonExemptEncryption: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.quanlyhanghoan.scannernative
+        MARKETING_VERSION: "0.10.31"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"

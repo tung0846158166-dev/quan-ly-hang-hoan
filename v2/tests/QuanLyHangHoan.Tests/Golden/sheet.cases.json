@@ -1,0 +1,20 @@
+[
+ {"name":"three-tabs-merge","tabs":[
+  [{"Mã":"RR1","Mã đơn":"SP1","Loại":"Trả hàng + hoàn tiền","Mã vận đơn":"SPX001","Trạng thái về":"Đang về","Về shop lúc":"21/11/2026 10:00","Hạn khiếu nại":"24/11/2026 10:00","Hàng":"Áo thun · Đen, M × 2; Quần short · Be, L × 1","SL":"3","Tiền":"250000","Lý do":"Sai mô tả","Ngày":"20/11/2026 09:00","Cập nhật":"22/11/2026 08:00"}],
+  [{"Mã trả hàng":"TH1","Mã đơn":"SP1","Trạng thái":"Đang xử lý","Tên sản phẩm":"Áo thun","Ngày yêu cầu":"20/11/2026 09:00","SL":"2"}],
+  [{"Mã đơn":"SP2","Loại":"Huỷ sau chuẩn bị","Ai huỷ":"Người mua","Hành trình":"Chưa gửi","Trạng thái":"Đã huỷ","Tên sản phẩm":"Mũ lưỡi trai","SL":"1","Ngày":"19/11/2026"},
+   {"Mã đơn":"SP3","Loại":"Huỷ trước chuẩn bị","Ai huỷ":"Người mua","Hành trình":"Chưa gửi","Trạng thái":"Đã huỷ","Tên sản phẩm":"Kính","SL":"1","Ngày":"19/11/2026"}]]},
+ {"name":"bom-and-latest-request","tabs":[
+  [{"Mã":"RR10","Mã đơn":"SP10","Loại":"Bom","Mã vận đơn":"SPX010","Trạng thái về":"Đã về shop","Về shop lúc":"2026-11-22 15:30:00","Hạn khiếu nại":"","Hàng":"Giày · Trắng, 42","SL":"1","Tiền":"","Lý do":"","Ngày":"2026-11-20","Cập nhật":"2026-11-22 16:00:00"},
+   {"Mã":"RR11","Mã đơn":"SP11","Loại":"Chỉ hoàn tiền","Mã vận đơn":"","Trạng thái về":"Khách huỷ","Về shop lúc":"","Hạn khiếu nại":"30/11/2026","Hàng":"Dây nịt","SL":"4","Tiền":"40000","Lý do":"","Ngày":"01/11/2026","Cập nhật":"01/11/2026"},
+   {"Mã":"RR12","Mã đơn":"SP11","Loại":"Trả hàng + hoàn tiền","Mã vận đơn":"SPX012","Trạng thái về":"Đang về","Về shop lúc":"","Hạn khiếu nại":"30/11/2026","Hàng":"Dây nịt","SL":"4","Tiền":"40000","Lý do":"","Ngày":"05/11/2026","Cập nhật":"05/11/2026"}]]},
+ {"name":"max-days-and-skip-types","maxDays":"30","skipTypes":"huy truoc chuan bi;huy sau","tabs":[
+  [{"Mã":"RR20","Mã đơn":"SP20","Loại":"Trả hàng","Mã vận đơn":"SPX020","Trạng thái về":"Đã về shop","Về shop lúc":"","Hạn khiếu nại":"","Hàng":"Ao","SL":"1","Tiền":"1000","Lý do":"","Ngày":"01/09/2026","Cập nhật":"01/09/2026"},
+   {"Mã":"RR21","Mã đơn":"SP21","Loại":"Trả hàng","Mã vận đơn":"SPX021","Trạng thái về":"Đã về shop","Về shop lúc":"","Hạn khiếu nại":"","Hàng":"Ao","SL":"1","Tiền":"1000","Lý do":"","Ngày":"15/11/2026","Cập nhật":"15/11/2026"},
+   {"Mã":"RR22","Mã đơn":"SP22","Loại":"Trả hàng","Mã vận đơn":"SPX022","Trạng thái về":"Đã về shop","Về shop lúc":"","Hạn khiếu nại":"","Hàng":"Ao","SL":"1","Tiền":"1000","Lý do":"","Ngày":"","Cập nhật":""}]]},
+ {"name":"fixed-date-and-unknown-tab","maxDays":"10/11/2026","tabs":[
+  [{"Mã":"RR30","Mã đơn":"SP30","Loại":"Trả hàng","Mã vận đơn":"SPX030","Trạng thái về":"Đã về shop","Hàng":"Ao · Đen × 1","SL":"1","Tiền":"1000","Ngày":"09/11/2026"},
+   {"Mã":"RR31","Mã đơn":"SP31","Loại":"Trả hàng","Mã vận đơn":"SPX031","Trạng thái về":"Đã về shop","Hàng":"Ao · Đen × 1","SL":"1","Tiền":"1000","Ngày":"10/11/2026"}],
+  [{"Cột lạ":"x","Giá":"1"}],
+  []]}
+]

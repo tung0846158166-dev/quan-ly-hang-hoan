@@ -1,0 +1,570 @@
+[
+  {
+    "name": "forward-only-existing-row-is-upgraded-by-return-row",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "01/11/2026",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đang xử lý",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "C1",
+        "track": "RET22222",
+        "returnTrack": "RET22222",
+        "forwardTrack": "FWD11111",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "userNote": "ghi chú kho",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ],
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceHasValue": false,
+        "trackingCodes": [
+          "FWD11111",
+          "RET22222"
+        ],
+        "isPartialReturn": false,
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        }
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "supplement-mode-keeps-products-not-in-file",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "01/11/2026",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đang xử lý",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "C1",
+        "track": "RET22222",
+        "returnTrack": "RET22222",
+        "forwardTrack": "",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 3,
+            "importPrices": {}
+          },
+          {
+            "product": "Pants",
+            "color": "",
+            "size": "",
+            "qty": 2
+          }
+        ],
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceHasValue": false,
+        "trackingCodes": [
+          "RET22222"
+        ],
+        "isPartialReturn": false,
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        }
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "replace-mode-replaces-products",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "01/11/2026",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đang xử lý",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "C1",
+        "track": "RET22222",
+        "returnTrack": "RET22222",
+        "forwardTrack": "",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 3,
+            "importPrices": {}
+          }
+        ],
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceHasValue": false,
+        "trackingCodes": [
+          "RET22222"
+        ],
+        "isPartialReturn": false,
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        }
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "deleted-order-is-not-recreated",
+    "error": null,
+    "orders": [],
+    "archived": []
+  },
+  {
+    "name": "archived-order-is-enriched-not-duplicated",
+    "error": null,
+    "orders": [],
+    "archived": [
+      {
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "orderId": "O9",
+        "returnOrderId": "C9",
+        "track": "RET99999",
+        "returnTrack": "RET99999",
+        "forwardTrack": "",
+        "altTrack": "",
+        "carrier": "GHN",
+        "shipDate": "",
+        "price": 20000,
+        "status": "Hàng đã trả",
+        "recvDate": "10/11/2026 09:00:00",
+        "photo": "",
+        "note": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 2,
+            "importPrices": {
+              "unitReturn": 20000
+            }
+          }
+        ],
+        "platformStatus": "Đang xử lý",
+        "preOrder": "Đơn thường",
+        "trackingCodes": [
+          "RET99999"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "archived-same-order-but-new-return-parcel-creates-new-row",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Đang xử lý",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "O9",
+        "returnOrderId": "C10",
+        "forwardTrack": "",
+        "returnTrack": "RET88888",
+        "trackingCodes": [
+          "RET88888"
+        ],
+        "track": "RET88888",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": [
+      {
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "orderId": "O9",
+        "returnOrderId": "C9",
+        "track": "RET99999",
+        "returnTrack": "RET99999",
+        "forwardTrack": "",
+        "altTrack": "",
+        "price": 0,
+        "status": "Hàng đã trả",
+        "items": [
+          {
+            "product": "Old",
+            "color": "",
+            "size": "",
+            "qty": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "existing-shopee-label-is-overwritten-by-tiktok-file",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "01/11/2026",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đang xử lý",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "C1",
+        "track": "RET22222",
+        "returnTrack": "RET22222",
+        "forwardTrack": "",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 12000,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "Đổi ý / Không còn nhu cầu",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {
+              "unitReturn": 12000
+            }
+          }
+        ],
+        "importModeSlots": {
+          "tong_gia_tri": "unitReturn",
+          "sau_chiet_khau": "unitReturn",
+          "gia_salework": "unitReturn",
+          "doanh_thu_uoc_tinh": "unitReturn"
+        },
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceNeedsReview": false,
+        "priceHasValue": true,
+        "trackingCodes": [
+          "RET22222"
+        ],
+        "isPartialReturn": false,
+        "priceModes": {
+          "tong_gia_tri": 12000,
+          "sau_chiet_khau": 12000,
+          "gia_salework": 12000,
+          "doanh_thu_uoc_tinh": 12000,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        }
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "existing-gets-status-returned-at-and-buyer-note",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "01/11/2026",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đã về",
+        "preOrder": "Đơn thường",
+        "orderId": "W1",
+        "returnOrderId": "",
+        "track": "862799512623",
+        "returnTrack": "854170248243",
+        "forwardTrack": "862799512623",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "Giao giờ hành chính",
+        "items": [
+          {
+            "product": "Áo",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ],
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceHasValue": false,
+        "trackingCodes": [
+          "862799512623",
+          "854170248243"
+        ],
+        "isPartialReturn": false,
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "returnedAt": "2026-11-20 10:15:30"
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "trackless-row-with-placeholder-product-gets-real-items",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Đang về",
+        "preOrder": "Đơn thường",
+        "orderId": "W5",
+        "returnOrderId": "",
+        "track": "862799512630",
+        "returnTrack": "854170248250",
+        "forwardTrack": "862799512630",
+        "altTrack": "",
+        "carrier": "J&T Express",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Áo Polo",
+            "color": "Đen",
+            "size": "M",
+            "qty": 2,
+            "importPrices": {}
+          }
+        ],
+        "trackingCodes": [
+          "862799512630",
+          "854170248250"
+        ]
+      }
+    ],
+    "archived": []
+  },
+  {
+    "name": "ambiguous-two-candidates-old-app-creates-third-row",
+    "error": null,
+    "orders": [
+      {
+        "shipDate": "",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Cũ",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "",
+        "track": "AAA11111",
+        "returnTrack": "",
+        "forwardTrack": "",
+        "altTrack": "",
+        "trackingCodes": [
+          "SHARED11"
+        ],
+        "carrier": "GHN",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "05/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "platformStatus": "Cũ",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "",
+        "track": "BBB22222",
+        "returnTrack": "",
+        "forwardTrack": "",
+        "altTrack": "",
+        "trackingCodes": [
+          "SHARED11"
+        ],
+        "carrier": "GHN",
+        "price": 0,
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Shirt",
+            "color": "",
+            "size": "",
+            "qty": 1
+          }
+        ]
+      },
+      {
+        "shipDate": "",
+        "returnDate": "23/11/2026",
+        "recvDate": "",
+        "platform": "TikTok Shop",
+        "orderType": "Trả hàng/Hoàn tiền",
+        "isPartialReturn": false,
+        "platformStatus": "Refunded",
+        "returnedAt": "",
+        "preOrder": "Đơn thường",
+        "orderId": "O1",
+        "returnOrderId": "",
+        "forwardTrack": "SHARED11",
+        "returnTrack": "",
+        "trackingCodes": [
+          "SHARED11"
+        ],
+        "track": "SHARED11",
+        "altTrack": "",
+        "carrier": "GHN",
+        "price": 0,
+        "importModeSlots": {},
+        "importSelectedPriceMode": "tong_gia_tri",
+        "priceModes": {
+          "tong_gia_tri": 0,
+          "sau_chiet_khau": 0,
+          "gia_salework": 0,
+          "doanh_thu_uoc_tinh": 0,
+          "hasOrderLevelZ": false,
+          "hasOrderLevelAM": false,
+          "hasOrderLevelAO": false,
+          "hasOrderLevelL": false
+        },
+        "status": "Chưa về",
+        "photo": "",
+        "note": "",
+        "buyerNote": "",
+        "items": [
+          {
+            "product": "Pants",
+            "color": "",
+            "size": "",
+            "qty": 1,
+            "importPrices": {}
+          }
+        ]
+      }
+    ],
+    "archived": []
+  }
+]

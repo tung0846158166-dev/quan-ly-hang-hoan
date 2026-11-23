@@ -1,0 +1,108 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Sidebar -->
+    <SolidColorBrush x:Key="SidebarBgBrush" Color="#0F172A" />
+    <SolidColorBrush x:Key="SidebarBorderBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="SidebarCardBgBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="SidebarHoverBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="SidebarActiveBrush" Color="#EE4D2D" />
+    <SolidColorBrush x:Key="SidebarTextBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="SidebarMutedBrush" Color="#94A3B8" />
+    <SolidColorBrush x:Key="SidebarSectionBrush" Color="#64748B" />
+    <SolidColorBrush x:Key="SidebarBadgeBgBrush" Color="#334155" />
+    <SolidColorBrush x:Key="SidebarBadgeFgBrush" Color="#F1F5F9" />
+
+    <!-- App & Surfaces -->
+    <SolidColorBrush x:Key="AppBgBrush" Color="#F1F5F9" />
+    <SolidColorBrush x:Key="CardBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceMutedBgBrush" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="SurfaceSubtleBgBrush" Color="#F1F5F9" />
+    <SolidColorBrush x:Key="BorderBrushLight" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="BorderBrushStrong" Color="#CBD5E1" />
+
+    <!-- Text / Ink -->
+    <SolidColorBrush x:Key="InkPrimaryBrush" Color="#0F172A" />
+    <SolidColorBrush x:Key="InkSecondaryBrush" Color="#475569" />
+    <SolidColorBrush x:Key="InkTertiaryBrush" Color="#334155" />
+    <SolidColorBrush x:Key="InkMutedBrush" Color="#64748B" />
+    <SolidColorBrush x:Key="InkSubtleBrush" Color="#94A3B8" />
+    <SolidColorBrush x:Key="AccentOrangeBrush" Color="#EE4D2D" />
+    <SolidColorBrush x:Key="AccentBlueBrush" Color="#2563EB" />
+    <SolidColorBrush x:Key="AccentBarBlueBrush" Color="#3B82F6" />
+
+    <!-- Inputs & Buttons -->
+    <SolidColorBrush x:Key="InputBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="SearchBoxBgBrush" Color="#FFFBEB" />
+    <SolidColorBrush x:Key="SearchBoxBorderBrush" Color="#F59E0B" />
+    <SolidColorBrush x:Key="SearchBoxPlaceholderBrush" Color="#92400E" />
+    <SolidColorBrush x:Key="PillBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PillFgBrush" Color="#334155" />
+    <SolidColorBrush x:Key="PillBorderBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="PrimaryBtnBgBrush" Color="#0F172A" />
+    <SolidColorBrush x:Key="PrimaryBtnFgBrush" Color="#FFFFFF" />
+
+    <!-- DataGrid -->
+    <SolidColorBrush x:Key="DataGridBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DataGridRowBgBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DataGridAltRowBgBrush" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="DataGridHeaderBgBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="DataGridHeaderFgBrush" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="DataGridHeaderBorderBrush" Color="#334155" />
+    <SolidColorBrush x:Key="DataGridGridLinesBrush" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="DataGridSelectedBgBrush" Color="#DBEAFE" />
+    <SolidColorBrush x:Key="DataGridSelectedFgBrush" Color="#0F172A" />
+
+    <!-- Alerts & Status (Semantic) -->
+    <SolidColorBrush x:Key="AlertRedRowBrush" Color="#FEE2E2" />
+    <SolidColorBrush x:Key="AlertYellowRowBrush" Color="#FEF3C7" />
+    <SolidColorBrush x:Key="AlertRedCardBgBrush" Color="#FEF2F2" />
+    <SolidColorBrush x:Key="AlertRedBadgeBgBrush" Color="#FEE2E2" />
+    <SolidColorBrush x:Key="AlertRedCardBorderBrush" Color="#FCA5A5" />
+    <SolidColorBrush x:Key="AlertRedBorderStrongBrush" Color="#DC2626" />
+    <SolidColorBrush x:Key="AlertRedTextBrush" Color="#B91C1C" />
+    <SolidColorBrush x:Key="AlertRedDarkTextBrush" Color="#991B1B" />
+    <SolidColorBrush x:Key="AlertRedStrongTextBrush" Color="#DC2626" />
+
+    <SolidColorBrush x:Key="AlertYellowCardBgBrush" Color="#FFFBEB" />
+    <SolidColorBrush x:Key="AlertYellowBadgeBgBrush" Color="#FEF3C7" />
+    <SolidColorBrush x:Key="AlertYellowCardBorderBrush" Color="#FCD34D" />
+    <SolidColorBrush x:Key="AlertYellowBorderStrongBrush" Color="#D97706" />
+    <SolidColorBrush x:Key="AlertYellowTextBrush" Color="#B45309" />
+    <SolidColorBrush x:Key="AlertYellowDarkTextBrush" Color="#92400E" />
+    <SolidColorBrush x:Key="AlertYellowStrongTextBrush" Color="#D97706" />
+
+    <SolidColorBrush x:Key="AlertGreenCardBgBrush" Color="#F0FDF4" />
+    <SolidColorBrush x:Key="AlertGreenBadgeBgBrush" Color="#DCFCE7" />
+    <SolidColorBrush x:Key="AlertGreenCardBorderBrush" Color="#86EFAC" />
+    <SolidColorBrush x:Key="AlertGreenBorderStrongBrush" Color="#16A34A" />
+    <SolidColorBrush x:Key="AlertGreenTextBrush" Color="#15803D" />
+    <SolidColorBrush x:Key="AlertGreenStrongTextBrush" Color="#166534" />
+
+    <SolidColorBrush x:Key="InfoBlueCardBgBrush" Color="#EFF6FF" />
+    <SolidColorBrush x:Key="InfoBlueBadgeBgBrush" Color="#DBEAFE" />
+    <SolidColorBrush x:Key="InfoBlueCardBorderBrush" Color="#BFDBFE" />
+    <SolidColorBrush x:Key="InfoBlueTextBrush" Color="#1D4ED8" />
+    <SolidColorBrush x:Key="InfoBlueStrongTextBrush" Color="#1E40AF" />
+    <SolidColorBrush x:Key="InfoBlueSubTextBrush" Color="#3B82F6" />
+
+    <SolidColorBrush x:Key="DemoBadgeBgBrush" Color="#FFF7ED" />
+    <SolidColorBrush x:Key="DemoBadgeBorderBrush" Color="#FDBA74" />
+    <SolidColorBrush x:Key="DemoBadgeFgBrush" Color="#C2410C" />
+    <SolidColorBrush x:Key="OrangeBadgeBgBrush" Color="#FFEDD5" />
+    <SolidColorBrush x:Key="OrangeBadgeBorderBrush" Color="#EA580C" />
+
+    <SolidColorBrush x:Key="ShopeeCardBorderBrush" Color="#FED7AA" />
+    <SolidColorBrush x:Key="TikTokCardBorderBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="TikTokBarBrush" Color="#1E293B" />
+    <SolidColorBrush x:Key="TikTokBadgeBgBrush" Color="#0F172A" />
+    <SolidColorBrush x:Key="TikTokBadgeFgBrush" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="NeutralBadgeBgBrush" Color="#F1F5F9" />
+    <SolidColorBrush x:Key="NeutralBadgeBorderBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="NeutralBadgeFgBrush" Color="#475569" />
+    <SolidColorBrush x:Key="SafeBadgeBgBrush" Color="#E0F2FE" />
+    <SolidColorBrush x:Key="SafeBadgeFgBrush" Color="#0369A1" />
+
+</ResourceDictionary>

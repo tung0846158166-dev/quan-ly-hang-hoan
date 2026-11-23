@@ -1,0 +1,364 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.FileImportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:FileImportViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding BrowseFilesCommand}"
+                            Content="Chọn file..."
+                            IsEnabled="{Binding CanSelectFiles}"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            Height="34"
+                            Padding="14,0"
+                            Margin="0,0,8,0" />
+                    <Button Command="{Binding ImportFilesCommand}"
+                            Content="{Binding ImportButtonText}"
+                            IsEnabled="{Binding CanImport}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#2563EB"
+                            Height="34"
+                            Padding="18,0" />
+                </StackPanel>
+
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📄 Nạp file Excel" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Border Background="{DynamicResource DemoBadgeBgBrush}" BorderBrush="{DynamicResource DemoBadgeBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="GIẢ LẬP (--demo)" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource DemoBadgeFgBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Nạp tay một hoặc nhiều file Excel/CSV xuất từ TikTok, Salework hoặc Shopee."
+                               FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,3,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Body -->
+        <Grid Grid.Row="1" Margin="20,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Column: File Picker + Selected Files + Options + Fixed Note -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0">
+                <StackPanel>
+                    <!-- Drop zone + File List -->
+                    <Border Background="{DynamicResource CardBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrushLight}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="18,16"
+                            Margin="0,0,0,14"
+                            AllowDrop="True"
+                            DragOver="OnFileDragOver"
+                            Drop="OnFileDrop">
+                        <StackPanel>
+                            <DockPanel LastChildFill="True" Margin="0,0,0,10">
+                                <Button DockPanel.Dock="Right"
+                                        Content="Xóa danh sách"
+                                        Command="{Binding ClearFilesCommand}"
+                                        Visibility="{Binding HasSelectedFiles, Converter={StaticResource BoolToVis}}"
+                                        Style="{StaticResource FilterPillButtonStyle}"
+                                        Height="26"
+                                        Padding="10,0"
+                                        FontSize="11.5" />
+                                <TextBlock Text="FILE ĐÃ CHỌN" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                            </DockPanel>
+
+                            <!-- Drop Zone Hint -->
+                            <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                                    BorderBrush="{DynamicResource InputBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="14,12"
+                                    Margin="0,0,0,10">
+                                <DockPanel LastChildFill="True">
+                                    <Button DockPanel.Dock="Right"
+                                            Content="Chọn file..."
+                                            Command="{Binding BrowseFilesCommand}"
+                                            IsEnabled="{Binding CanSelectFiles}"
+                                            Style="{StaticResource FilterPillButtonStyle}"
+                                            Height="30"
+                                            Padding="12,0" />
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="Kéo-thả file .xlsx / .csv vào đây hoặc bấm Chọn file..."
+                                                   FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="Có thể chọn nhiều file TikTok, Salework và Shopee cùng lúc."
+                                                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Empty hint when no file selected -->
+                            <TextBlock Text="Chưa chọn file nào."
+                                       FontSize="12"
+                                       Foreground="{DynamicResource InkSubtleBrush}"
+                                       Margin="2,2,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasSelectedFiles}" Value="False">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <!-- Selected Files List -->
+                            <ItemsControl ItemsSource="{Binding SelectedFiles}"
+                                          Visibility="{Binding HasSelectedFiles, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                                                BorderBrush="{DynamicResource BorderBrushLight}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="10,7"
+                                                Margin="0,0,0,6">
+                                            <DockPanel LastChildFill="True">
+                                                <Button DockPanel.Dock="Right"
+                                                        Content="✕"
+                                                        Command="{Binding DataContext.RemoveFileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        IsEnabled="{Binding DataContext.CanSelectFiles, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        Background="Transparent"
+                                                        BorderThickness="0"
+                                                        Foreground="{DynamicResource InkMutedBrush}"
+                                                        FontWeight="Bold"
+                                                        FontSize="12"
+                                                        Padding="6,2"
+                                                        Cursor="Hand"
+                                                        ToolTip="Bỏ file này" />
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Text="{Binding SizeText}"
+                                                           FontSize="11.5"
+                                                           Foreground="{DynamicResource InkMutedBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="8,0,8,0" />
+                                                <TextBlock Text="{Binding FileName}"
+                                                           FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Options -->
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="TÙY CHỌN NẠP FILE" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,10" />
+
+                            <TextBlock Text="Cách cập nhật sản phẩm" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding ProductModeOptions}"
+                                      SelectedItem="{Binding SelectedProductMode}"
+                                      DisplayMemberPath="Label"
+                                      Height="32"
+                                      Margin="0,0,0,12" />
+
+                            <TextBlock Text="Cột giá để lấy" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
+                            <ComboBox ItemsSource="{Binding PriceModeOptions}"
+                                      SelectedItem="{Binding SelectedPriceMode}"
+                                      DisplayMemberPath="Label"
+                                      Height="32"
+                                      Margin="0,0,0,12" />
+
+                            <CheckBox IsChecked="{Binding OnlyReturns}"
+                                      Content="Chỉ nạp đơn hoàn/hủy/thất bại"
+                                      FontSize="12.5"
+                                      Foreground="{DynamicResource InkPrimaryBrush}"
+                                      Margin="0,0,0,8" />
+
+                            <CheckBox IsChecked="{Binding SkipUnshippedCancel}"
+                                      Content="Bỏ đơn hủy chưa gửi (TikTok)"
+                                      FontSize="12.5"
+                                      Foreground="{DynamicResource InkPrimaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Fixed Safety Note -->
+                    <Border Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <TextBlock Text="{Binding FixedNoteText}"
+                                   FontSize="11.5"
+                                   Foreground="{DynamicResource InkMutedBrush}"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Right Column: Import Result -->
+            <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="16">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock Text="KẾT QUẢ NẠP FILE" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" />
+                        <TextBlock Text="Tự nhận diện từng file, file lạ/hỏng báo riêng không ảnh hưởng file khác." FontSize="11.5" Foreground="{DynamicResource InkSubtleBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- Banners (Error / Summary / Ambiguous Warning) -->
+                    <StackPanel DockPanel.Dock="Top">
+                        <Border Background="{DynamicResource AlertRedCardBgBrush}"
+                                BorderBrush="{DynamicResource AlertRedCardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12,10"
+                                Margin="0,0,0,10"
+                                Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding ErrorMessage}"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AlertRedTextBrush}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border Background="{DynamicResource AlertGreenCardBgBrush}"
+                                BorderBrush="{DynamicResource AlertGreenCardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12,10"
+                                Margin="0,0,0,10"
+                                Visibility="{Binding HasSummary, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding SummaryText}"
+                                       FontSize="13"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource AlertGreenTextBrush}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <Border Background="{DynamicResource AlertYellowCardBgBrush}"
+                                BorderBrush="{DynamicResource AlertYellowCardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12,10"
+                                Margin="0,0,0,10"
+                                Visibility="{Binding HasAmbiguousWarning, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding AmbiguousWarningText}"
+                                       FontSize="12.5"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AlertYellowTextBrush}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+
+                    <Grid>
+                        <TextBlock Text="Chọn file và bấm Nạp để xem kết quả."
+                                   FontSize="12.5"
+                                   Foreground="{DynamicResource InkSubtleBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasResults}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ListBox ItemsSource="{Binding ResultFiles}"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 HorizontalContentAlignment="Stretch"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,0,8" />
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="8" BorderThickness="1" Padding="12,9">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource SurfaceMutedBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsUnknown}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertRedCardBorderBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <StackPanel>
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Right"
+                                                           Text="{Binding Rows, StringFormat='{}{0:N0} dòng'}"
+                                                           FontSize="11.5"
+                                                           Foreground="{DynamicResource InkMutedBrush}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="12.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource InkPrimaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="0,0,10,0" />
+                                            </DockPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding KindLabel}" FontSize="11.5" FontWeight="Bold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsUnknown}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding ErrorText}"
+                                                       FontSize="11.5"
+                                                       Foreground="{DynamicResource AlertRedTextBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,4,0,0"
+                                                       Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

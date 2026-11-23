@@ -1,0 +1,329 @@
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.StatisticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:StatisticsViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,12">
+            <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="📥 Xuất CSV"
+                            Command="{Binding ExportCsvCommand}"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            Margin="0,0,8,0" />
+                    <Button Content="🔄 Tính lại số liệu"
+                            Command="{Binding RefreshCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#2563EB"
+                            VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📊 Thống kê &amp; báo cáo" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Border Background="{DynamicResource InfoBlueBadgeBgBrush}" BorderBrush="{DynamicResource InfoBlueCardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
+                                Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="TÍNH TỪ DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InfoBlueTextBrush}" />
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                        <TextBlock Text="{Binding AlertRuleNote}" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding MissingPhotoText, StringFormat=' • {0}'}"
+                                   Visibility="{Binding HasMissingPhotos, Converter={StaticResource BoolToVis}}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AlertYellowTextBrush}" />
+                    </StackPanel>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Scope, Platform, OrderType & Date Filters -->
+        <Border Grid.Row="1" Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,8">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,16,2">
+                    <TextBlock Text="Phạm vi:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,8,0" />
+                    <Button Command="{Binding SetScopeFilterCommand}" CommandParameter="include_archive">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsScopeIncludeArchive}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="📦 Bảng chính + Lưu trữ" />
+                    </Button>
+                    <Button Command="{Binding SetScopeFilterCommand}" CommandParameter="main_only" Margin="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsScopeMainOnly}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="🚚 Chỉ bảng chính" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,16,2">
+                    <TextBlock Text="Sàn:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,8,0" />
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="all">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformAll}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="🌐 Tất cả" />
+                    </Button>
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="Shopee">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformShopee}" Value="True">
+                                        <Setter Property="Background" Value="#EE4D2D" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#EE4D2D" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="🟠 Shopee" />
+                    </Button>
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="TikTok" Margin="0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformTikTok}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource TikTokBadgeBgBrush}" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource TikTokBadgeBgBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="⚫ TikTok" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,14,2">
+                    <TextBlock Text="Loại đơn:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding OrderTypeOptions}"
+                              SelectedItem="{Binding SelectedOrderType}"
+                              Width="165"
+                              Height="30"
+                              VerticalContentAlignment="Center"
+                              FontSize="12" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,2">
+                    <TextBlock Text="Từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,4,0" />
+                    <DatePicker SelectedDate="{Binding FromDate}" Width="118" Height="30" VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="Đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,4,0" />
+                    <DatePicker SelectedDate="{Binding ToDate}" Width="118" Height="30" VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                    <Button Content="↺ Xóa lọc" Command="{Binding ClearDateFiltersCommand}" Style="{StaticResource FilterPillButtonStyle}" Margin="0" />
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Scrollable Dashboard Body -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="18,14">
+            <StackPanel>
+                <!-- KPI Cards -->
+                <TextBlock Text="TỔNG QUAN THEO BỘ LỌC" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,0,0,8" />
+                <UniformGrid Columns="5" Margin="0,0,0,16">
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="📋 Tổng đơn" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Text="{Binding TotalOrders, StringFormat='{}{0:N0}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,4,0,2" />
+                            <TextBlock Text="{Binding TotalValueFormatted, StringFormat='Giá trị: {0}'}" FontSize="11.5" Foreground="{DynamicResource AccentBlueBrush}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource AlertGreenCardBgBrush}" BorderBrush="{DynamicResource AlertGreenCardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="🟢 Đã nhận tại kho" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AlertGreenTextBrush}" />
+                            <TextBlock Text="{Binding ReceivedCount, StringFormat='{}{0:N0}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AlertGreenStrongTextBrush}" Margin="0,4,0,2" />
+                            <TextBlock Text="Đã quét nhận / hoàn tất" FontSize="11" Foreground="{DynamicResource AlertGreenTextBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="⏳ Đang chờ về" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Text="{Binding PendingCount, StringFormat='{}{0:N0}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,4,0,2" />
+                            <TextBlock Text="Chưa xác nhận nhận kho" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource AlertYellowCardBgBrush}" BorderBrush="{DynamicResource AlertYellowCardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="⚠️ Báo Vàng (&gt;12h)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AlertYellowTextBrush}" />
+                            <TextBlock Text="{Binding YellowAlertCount, StringFormat='{}{0:N0}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AlertYellowStrongTextBrush}" Margin="0,4,0,2" />
+                            <TextBlock Text="Quá 12h từ lúc hàng về" FontSize="11" Foreground="{DynamicResource AlertYellowDarkTextBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource AlertRedCardBgBrush}" BorderBrush="{DynamicResource AlertRedCardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12">
+                        <StackPanel>
+                            <TextBlock Text="🚨 Báo Đỏ (&gt;24h)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AlertRedTextBrush}" />
+                            <TextBlock Text="{Binding RedAlertCount, StringFormat='{}{0:N0}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource AlertRedStrongTextBrush}" Margin="0,4,0,2" />
+                            <TextBlock Text="Cần ưu tiên xử lý ngay" FontSize="11" Foreground="{DynamicResource AlertRedDarkTextBrush}" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <!-- Table 1: Breakdown by Platform -->
+                <TextBlock Text="CHI TIẾT THEO SÀN TMĐT" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,0,0,8" />
+                <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,0,0,16">
+                    <DataGrid ItemsSource="{Binding PlatformBreakdown}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              CanUserSortColumns="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
+                              BorderThickness="0"
+                              Background="{DynamicResource CardBgBrush}"
+                              RowHeight="36"
+                              ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
+                              CellStyle="{StaticResource ModernDataGridCellStyle}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Sàn TMĐT" Binding="{Binding Platform}" Width="160">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Tổng đơn" Binding="{Binding Total}" Width="100" />
+                            <DataGridTextColumn Header="Đã về kho" Binding="{Binding Received}" Width="100" />
+                            <DataGridTextColumn Header="Đang chờ" Binding="{Binding Pending}" Width="100" />
+                            <DataGridTextColumn Header="Mất / K.cần" Binding="{Binding Other}" Width="110" />
+                            <DataGridTextColumn Header="Vàng (&gt;12h)" Binding="{Binding Yellow}" Width="105">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="#D97706" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Đỏ (&gt;24h)" Binding="{Binding Red}" Width="100">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontWeight" Value="Bold" />
+                                        <Setter Property="Foreground" Value="#DC2626" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Tổng giá trị" Binding="{Binding TotalValueFormatted}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="HorizontalAlignment" Value="Right" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <!-- Table 2: Breakdown by OrderType & Status side-by-side -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="CƠ CẤU LOẠI ĐƠN THEO SÀN" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,0,0,8" />
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                            <DataGrid ItemsSource="{Binding OrderTypeBreakdown}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
+                                      BorderThickness="0"
+                                      Background="{DynamicResource CardBgBrush}"
+                                      RowHeight="34"
+                                      ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
+                                      CellStyle="{StaticResource ModernDataGridCellStyle}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Sàn" Binding="{Binding Platform}" Width="85" />
+                                    <DataGridTextColumn Header="Loại đơn" Binding="{Binding OrderType}" Width="*" />
+                                    <DataGridTextColumn Header="Số đơn" Binding="{Binding Count}" Width="75" />
+                                    <DataGridTextColumn Header="Tỷ lệ" Binding="{Binding PercentText}" Width="70" />
+                                    <DataGridTextColumn Header="Giá trị" Binding="{Binding TotalValueFormatted}" Width="110" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="PHÂN BỐ THEO TRẠNG THÁI XỬ LÝ" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,0,0,8" />
+                        <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                            <DataGrid ItemsSource="{Binding StatusBreakdown}"
+                                      AutoGenerateColumns="False"
+                                      IsReadOnly="True"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
+                                      BorderThickness="0"
+                                      Background="{DynamicResource CardBgBrush}"
+                                      RowHeight="34"
+                                      ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
+                                      CellStyle="{StaticResource ModernDataGridCellStyle}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusLabel}" Width="*" />
+                                    <DataGridTextColumn Header="Số đơn" Binding="{Binding Count}" Width="75" />
+                                    <DataGridTextColumn Header="Tỷ lệ" Binding="{Binding PercentText}" Width="70" />
+                                    <DataGridTextColumn Header="Giá trị" Binding="{Binding TotalValueFormatted}" Width="110" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="3" Background="#0F172A" Padding="18,8">
+            <TextBlock Text="{Binding StatusBarText}" Foreground="#E2E8F0" FontSize="12" FontWeight="SemiBold" />
+        </Border>
+    </Grid>
+</UserControl>

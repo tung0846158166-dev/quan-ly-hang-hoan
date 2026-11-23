@@ -1,0 +1,121 @@
+[
+  {
+    "name": "tracking-codes-column-json-and-separated",
+    "rows": [
+      { "Order ID": "T1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Tracking Codes": "[\"OLD11111\",\"OLD22222\"]" },
+      { "Order ID": "T2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Mã vận đơn lịch sử": "OLD33333; OLD44444|OLD55555" }
+    ]
+  },
+  {
+    "name": "vietnamese-shipping-word-is-not-cancel",
+    "rows": [
+      { "Order ID": "V1", "Tracking ID": "SPXVN0123456789", "Product Name": "p", "Quantity": 1, "Order Status": "Đang vận chuyển" },
+      { "Order ID": "V2", "Tracking ID": "SPXVN0123456780", "Product Name": "p", "Quantity": 1, "Order Status": "Đã hủy" },
+      { "Order ID": "V3", "Tracking ID": "SPXVN0123456781", "Product Name": "p", "Quantity": 1, "Order Status": "Cancelled", "Order Substatus": "Cancelled by buyer" }
+    ]
+  },
+  {
+    "name": "salework-that-thu-with-reason",
+    "rows": [
+      { "Mã đơn hàng": "S1", "Trạng thái": "THẤT THU", "Lý do hoàn": "Khách không nghe máy", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1, "Mã vận đơn": "862799512623" },
+      { "Mã đơn hàng": "S2", "Trạng thái": "THẤT THU", "Tên sản phẩm trên sàn": "Quần", "Số lượng": 2, "Mã vận đơn": "862799512624" }
+    ]
+  },
+  {
+    "name": "option-not-only-returns-keeps-ordinary-shipping",
+    "options": { "onlyReturns": false },
+    "rows": [
+      { "Order ID": "O1", "Tracking ID": "SPXVN0123456789", "Product Name": "p", "Quantity": 1, "Order Status": "Delivered" },
+      { "Order ID": "O2", "Tracking ID": "SPXVN0123456780", "Product Name": "p", "Quantity": 1, "Order Status": "Cancelled", "Cancel Reason": "Out of stock" }
+    ]
+  },
+  {
+    "name": "option-skip-unshipped-cancel",
+    "options": { "skipUnshippedCancel": true },
+    "rows": [
+      { "Order ID": "O1", "Tracking ID": "", "Product Name": "Hủy chưa gửi", "Quantity": 1, "Order Status": "Cancelled", "Cancel Reason": "Out of stock" },
+      { "Order ID": "O2", "Tracking ID": "SPXVN0123456780", "Product Name": "Hủy đã gửi", "Quantity": 1, "Order Status": "Cancelled", "Cancel Reason": "Out of stock" }
+    ]
+  },
+  {
+    "name": "sku-subtotal-columns-are-summed-per-line",
+    "mode": "sau_chiet_khau",
+    "rows": [
+      { "Order ID": "K1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "A", "Return Status": "To Process", "Quantity": 2, "SKU Subtotal After Discount": "18,000", "SKU Subtotal Before Discount": "25,000" },
+      { "Order ID": "K1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "B", "Return Status": "To Process", "Quantity": 1, "SKU Subtotal After Discount": "27,000", "SKU Subtotal Before Discount": "35,000" }
+    ]
+  },
+  {
+    "name": "order-level-amount-repeated-on-each-row-is-not-summed",
+    "rows": [
+      { "Order ID": "K2", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "A", "Return Status": "To Process", "Quantity": 1, "Order Amount": "100000" },
+      { "Order ID": "K2", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "B", "Return Status": "To Process", "Quantity": 1, "Order Amount": "100000" }
+    ]
+  },
+  {
+    "name": "salework-gia-and-doanh-thu-and-unit-price-qty",
+    "mode": "gia_salework",
+    "rows": [
+      { "Mã đơn hàng": "W1", "Trạng thái": "Đang hoàn", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 3, "Giá Salework": 100000, "Doanh thu ước tính": 250000, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243" }
+    ]
+  },
+  {
+    "name": "carrier-from-excel-column-when-code-unknown",
+    "rows": [
+      { "Order ID": "C1", "Return Order ID": "R1", "Return Logistics Tracking ID": "abc", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Shipping Provider Name": "Giao hàng X" }
+    ]
+  },
+  {
+    "name": "sku-code-gives-color-and-size",
+    "rows": [
+      { "Mã đơn hàng": "U1", "Trạng thái": "Đang hoàn", "Mã sản phẩm Salework": "BUTTER_Trang_XL", "Số lượng": 1, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243" },
+      { "Mã đơn hàng": "U2", "Trạng thái": "Đang hoàn", "Tên sản phẩm trên sàn": "Áo Khoác Len Dệt Kim Lavi Studio Jacket Zip Xanh Than", "Tên phân loại trên sàn": "XL", "Số lượng": 1, "Mã vận đơn": "862799512625", "Mã trả hàng": "854170248244" },
+      { "Mã đơn hàng": "U3", "Trạng thái": "Đang hoàn", "Mã sản phẩm Salework": "ERWIN_XanhThanMori_L", "Số lượng": 1, "Mã vận đơn": "862799512626", "Mã trả hàng": "854170248245" }
+    ]
+  },
+  {
+    "name": "buyer-note-long-column-name",
+    "rows": [
+      { "Order ID": "B1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Ghi chú của Người mua khi trả hàng": "Hàng bị rách" },
+      { "Order ID": "B2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Nhận xét từ Người mua": "-" }
+    ]
+  },
+  {
+    "name": "quoted-order-id-and-date-fallbacks",
+    "rows": [
+      { "Order ID": "'587139504996779037'", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Ngày tạo đơn": "2026-11-02 09:00:00" },
+      { "Order ID": "B2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Cancelled Time": "03/11/2026 10:00", "Refund Time": "2026-11-04" }
+    ]
+  },
+  {
+    "name": "same-claim-two-rows-different-products-and-partial-by-text",
+    "rows": [
+      { "Order ID": "M1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "Áo A", "Variation": "Đen, M", "Return Status": "To Process", "Quantity": 1, "Return Reason": "Hoàn một phần" },
+      { "Order ID": "M1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "Áo B", "Variation": "Trắng, L", "Return Status": "To Process", "Quantity": 2 }
+    ]
+  },
+  {
+    "name": "return-sub-status-translations",
+    "rows": [
+      { "Order ID": "S1", "Return Order ID": "R1", "Return Logistics Tracking ID": "RT111111", "Product Name": "p", "Return Status": "To Process", "Return Sub Status": "Return Shipped", "Quantity": 1 },
+      { "Order ID": "S2", "Return Order ID": "R2", "Return Logistics Tracking ID": "RT222222", "Product Name": "p", "Return Status": "Refund rejected", "Quantity": 1 },
+      { "Order ID": "S3", "Return Order ID": "R3", "Return Logistics Tracking ID": "RT333333", "Product Name": "p", "Return Status": "Something else", "Quantity": 1 },
+      { "Order ID": "S4", "Return Order ID": "R4", "Return Logistics Tracking ID": "RT444444", "Product Name": "p", "Return Status": "", "Quantity": 1 }
+    ]
+  },
+  {
+    "name": "salework-already-returned-and-waiting-customer",
+    "rows": [
+      { "Mã đơn hàng": "W1", "Trạng thái": "Đã hoàn", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1, "Mã vận đơn": "862799512623", "Mã trả hàng": "854170248243", "Ngày trả hàng thành công": "" },
+      { "Mã đơn hàng": "W2", "Trạng thái": "Chờ hoàn", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1, "Mã vận đơn": "862799512624", "Mã trả hàng": "" },
+      { "Mã đơn hàng": "W3", "Trạng thái": "Đã hoàn", "Tên sản phẩm trên sàn": "Áo", "Số lượng": 1, "Mã vận đơn": "862799512625", "Mã trả hàng": "854170248246", "Ngày trả hàng thành công": "13:14:41 05/11/2026" }
+    ]
+  },
+  {
+    "name": "pre-order-variants-and-url-tracking",
+    "rows": [
+      { "Order ID": "P1", "Return Order ID": "R1", "Return Logistics Tracking ID": "https://spx.vn/track?SPX=SPXVN0123456789", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Hàng đặt trước": "Có" },
+      { "Order ID": "P2", "Return Order ID": "R2", "Return Logistics Tracking ID": "HAN-DDA/SPXVN0123456780", "Product Name": "p", "Return Status": "To Process", "Quantity": 1, "Pre-order": "No" }
+    ]
+  }
+]

@@ -1,0 +1,234 @@
+import Foundation
+
+/// MQTT 3.1.1 tối giản (đủ dùng cho kênh dự phòng): CONNECT, SUBSCRIBE, PUBLISH (QoS 0), PINGREQ.
+/// Nhận được PUBLISH QoS 0 hoặc 1 (QoS 1 sẽ được trả PUBACK).
+public enum MQTTPacket {
+    static func string(_ s: String) -> [UInt8] {
+        let b = Array(s.utf8)
+        return [UInt8(b.count >> 8 & 0xFF), UInt8(b.count & 0xFF)] + b
+    }
+
+    /// Mã hoá độ dài còn lại (1-4 byte, 7 bit mỗi byte).
+    public static func remainingLength(_ n: Int) -> [UInt8] {
+        var out: [UInt8] = []
+        var x = n
+        repeat {
+            var d = UInt8(x % 128)
+            x /= 128
+            if x > 0 { d |= 0x80 }
+            out.append(d)
+        } while x > 0
+        return out
+    }
+
+    public static func connect(clientId: String, keepAlive: Int) -> Data {
+        var body: [UInt8] = [0x00, 0x04, 0x4D, 0x51, 0x54, 0x54, 0x04, 0x02]
+        body += [UInt8(keepAlive >> 8 & 0xFF), UInt8(keepAlive & 0xFF)]
+        body += string(clientId)
+        return Data([0x10] + remainingLength(body.count) + body)
+    }
+
+    public static func subscribe(packetId: UInt16, topic: String) -> Data {
+        var body: [UInt8] = [UInt8(packetId >> 8), UInt8(packetId & 0xFF)]
+        body += string(topic)
+        body.append(0x00)
+        return Data([0x82] + remainingLength(body.count) + body)
+    }
+
+    public static func publish(topic: String, payload: Data) -> Data {
+        let body = string(topic) + [UInt8](payload)
+        return Data([0x30] + remainingLength(body.count) + body)
+    }
+
+    public static func puback(packetId: UInt16) -> Data {
+        Data([0x40, 0x02, UInt8(packetId >> 8), UInt8(packetId & 0xFF)])
+    }
+
+    public static let pingReq = Data([0xC0, 0x00])
+}
+
+public enum MQTTIncoming: Equatable {
+    case connack(code: UInt8)
+    case suback
+    case publish(topic: String, payload: Data, qos: UInt8, packetId: UInt16)
+    case pingResp
+    case other
+}
+
+/// Ghép các mảnh dữ liệu WebSocket thành gói MQTT hoàn chỉnh (một gói có thể bị cắt hoặc nhiều gói dính nhau).
+public struct MQTTDecoder {
+    private var buf: [UInt8] = []
+    public init() {}
+
+    public mutating func feed(_ data: Data) -> [MQTTIncoming] {
+        buf += [UInt8](data)
+        var out: [MQTTIncoming] = []
+        while true {
+            guard buf.count >= 2 else { break }
+            // Đọc độ dài còn lại (tối đa 4 byte).
+            var multiplier = 1, value = 0, idx = 1
+            var complete = false
+            while idx < buf.count && idx <= 4 {
+                let b = Int(buf[idx])
+                value += (b & 0x7F) * multiplier
+                multiplier *= 128
+                idx += 1
+                if b & 0x80 == 0 { complete = true; break }
+            }
+            if !complete {
+                if idx > 4 { buf.removeAll(); break }   // dữ liệu hỏng
+                break                                      // chưa đủ byte độ dài
+            }
+            let total = idx + value
+            guard buf.count >= total else { break }
+            let first = buf[0]
+            let body = Array(buf[idx..<total])
+            buf.removeFirst(total)
+            out.append(Self.parse(first: first, body: body))
+        }
+        return out
+    }
+
+    private static func parse(first: UInt8, body: [UInt8]) -> MQTTIncoming {
+        switch first >> 4 {
+        case 2:
+            return .connack(code: body.count >= 2 ? body[1] : 0xFF)
+        case 9:
+            return .suback
+        case 13:
+            return .pingResp
+        case 3:
+            let qos = (first >> 1) & 0x03
+            guard body.count >= 2 else { return .other }
+            let tlen = Int(body[0]) << 8 | Int(body[1])
+            guard body.count >= 2 + tlen else { return .other }
+            let topic = String(decoding: body[2..<(2 + tlen)], as: UTF8.self)
+            var i = 2 + tlen
+            var pid: UInt16 = 0
+            if qos > 0 {
+                guard body.count >= i + 2 else { return .other }
+                pid = UInt16(body[i]) << 8 | UInt16(body[i + 1])
+                i += 2
+            }
+            return .publish(topic: topic, payload: Data(body[i...]), qos: qos, packetId: pid)
+        default:
+            return .other
+        }
+    }
+}
+
+/// Một kết nối MQTT qua WebSocket (wss). Tự nối lại; mỗi broker một đối tượng.
+public final class MQTTClient: @unchecked Sendable {
+    public let name: String
+    private let url: URL
+    private let lock = NSLock()
+    private var task: URLSessionWebSocketTask?
+    private var connected = false
+
+    public init(name: String, url: String) {
+        self.name = name
+        self.url = URL(string: url)!
+    }
+
+    public var isConnected: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return connected
+    }
+
+    private func set(task t: URLSessionWebSocketTask?, connected c: Bool) {
+        lock.lock(); task = t; connected = c; lock.unlock()
+    }
+
+    private func markConnected(_ c: Bool) {
+        lock.lock(); connected = c; lock.unlock()
+    }
+
+    /// Gửi một bản tin (QoS 0). Không làm gì nếu chưa nối. Gửi theo đúng thứ tự gọi.
+    public func publish(topic: String, body: String) {
+        lock.lock()
+        let t = connected ? task : nil
+        lock.unlock()
+        guard let t = t else { return }
+        t.send(.data(MQTTPacket.publish(topic: topic, payload: Data(body.utf8)))) { _ in }
+    }
+
+    /// Chạy vòng lặp: nối, đăng ký topic, nhận bản tin; mất kết nối thì thử lại. Kết thúc khi Task bị huỷ.
+    public func run(topic: String,
+                    onMessage: @escaping @Sendable (String) -> Void,
+                    onState: @escaping @Sendable (Bool) -> Void) async {
+        var backoff = 1.0
+        while !Task.isCancelled {
+            let ws = URLSession.shared.webSocketTask(with: url, protocols: ["mqtt"])
+            ws.maximumMessageSize = 4 * 1024 * 1024
+            set(task: ws, connected: false)
+            ws.resume()
+            let watchdog = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 12_000_000_000)
+                if self?.isConnected == false { ws.cancel(with: .goingAway, reason: nil) }
+            }
+            var pinger: Task<Void, Never>?
+            await withTaskCancellationHandler {
+                do {
+                    let clientId = "ql" + String(UUID().uuidString.prefix(8)).lowercased()
+                    try await ws.send(.data(MQTTPacket.connect(clientId: clientId, keepAlive: 30)))
+                    var decoder = MQTTDecoder()
+                    while !Task.isCancelled {
+                        let msg = try await ws.receive()
+                        let data: Data
+                        switch msg {
+                        case .data(let d): data = d
+                        case .string(let s): data = Data(s.utf8)
+                        @unknown default: continue
+                        }
+                        for packet in decoder.feed(data) {
+                            switch packet {
+                            case .connack(let code):
+                                if code != 0 { throw URLError(.userAuthenticationRequired) }
+                                try await ws.send(.data(MQTTPacket.subscribe(packetId: 1, topic: topic)))
+                            case .suback:
+                                self.markConnected(true)
+                                backoff = 1
+                                onState(true)
+                                pinger?.cancel()
+                                pinger = Task {
+                                    while !Task.isCancelled {
+                                        try? await Task.sleep(nanoseconds: 25_000_000_000)
+                                        ws.send(.data(MQTTPacket.pingReq)) { _ in }
+                                    }
+                                }
+                            case .publish(let t, let payload, let qos, let pid):
+                                if qos == 1 { ws.send(.data(MQTTPacket.puback(packetId: pid))) { _ in } }
+                                if t == topic, let s = String(data: payload, encoding: .utf8) { onMessage(s) }
+                            case .pingResp, .other:
+                                break
+                            }
+                        }
+                    }
+                } catch {}
+            } onCancel: {
+                ws.cancel(with: .goingAway, reason: nil)
+            }
+            watchdog.cancel()
+            pinger?.cancel()
+            set(task: nil, connected: false)
+            onState(false)
+            ws.cancel(with: .goingAway, reason: nil)
+            if Task.isCancelled { return }
+            try? await Task.sleep(nanoseconds: UInt64(backoff * 1_000_000_000))
+            backoff = min(backoff * 2, 15)
+        }
+    }
+}
+
+public extension SyncProtocol {
+    /// Topic MQTT dùng chung với PC và bản web cũ. Phân biệt hoa/thường nên dùng đúng mã phòng đã chuẩn hoá (chữ hoa).
+    static func mqttTopic(room: String) -> String {
+        "agy_shopee_return_scanner_2026/" + room
+    }
+
+    static let mqttBrokers: [(name: String, url: String)] = [
+        ("emqx", "wss://broker.emqx.io:8084/mqtt"),
+        ("hivemq", "wss://broker.hivemq.com:8884/mqtt"),
+        ("mosquitto", "wss://test.mosquitto.org:8081/")
+    ]
+}

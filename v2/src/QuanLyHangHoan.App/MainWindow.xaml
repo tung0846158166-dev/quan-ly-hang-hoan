@@ -214,6 +214,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0"
@@ -295,10 +296,131 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource NeutralBadgeFgBrush}" />
                     </Border>
+
+                    <Button x:Name="NotificationBellButton" Grid.Column="2" Margin="10,0,0,0" Padding="8,0" Height="34" Cursor="Hand"
+                            Command="{Binding NotificationsVm.ToggleCommand}"
+                            Background="{DynamicResource NeutralBadgeBgBrush}" BorderBrush="{DynamicResource NeutralBadgeBorderBrush}" BorderThickness="1"
+                            ToolTip="Thông báo (Ctrl+Shift+N)" AutomationProperties.Name="Thông báo">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔔" FontSize="15" VerticalAlignment="Center" />
+                            <Border Margin="6,0,0,0" Padding="6,1" CornerRadius="9" VerticalAlignment="Center"
+                                    Background="{DynamicResource AlertRedStrongTextBrush}"
+                                    Visibility="{Binding NotificationsVm.HasUnread, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding NotificationsVm.UnreadText}" FontSize="11" FontWeight="Bold" Foreground="White" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </Border>
 
             <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+
+            <!-- Chuông thông báo: khung thả xuống (T027) -->
+            <Border x:Name="NotificationDropdown" Grid.Row="1" Panel.ZIndex="110" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,4,16,0" Width="430" MaxHeight="520"
+                    Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushStrong}" BorderThickness="1.2" CornerRadius="10"
+                    Visibility="{Binding NotificationsVm.IsOpen, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.22" Color="#000000" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="14,10,10,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="🔔 Thông báo" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <Button Grid.Column="1" Content="Đánh dấu đã đọc" Command="{Binding NotificationsVm.MarkAllReadCommand}" Padding="8,3" Margin="0,0,6,0" Cursor="Hand" />
+                        <Button Grid.Column="2" Content="Xóa tất cả" Command="{Binding NotificationsVm.ClearAllCommand}" Padding="8,3" Cursor="Hand"
+                                ToolTip="Chỉ xóa danh sách thông báo, không đụng dữ liệu đơn" />
+                    </Grid>
+                    <TextBlock Grid.Row="1" Text="Chưa có thông báo nào." HorizontalAlignment="Center" Margin="0,20,0,28"
+                               Foreground="{DynamicResource InkMutedBrush}"
+                               Visibility="{Binding NotificationsVm.IsEmpty, Converter={StaticResource BoolToVis}}" />
+                    <ListBox Grid.Row="1" ItemsSource="{Binding NotificationsVm.Items}" BorderThickness="0,1,0,0" Background="Transparent"
+                             HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Button Command="{Binding DataContext.NotificationsVm.OpenItemCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        CommandParameter="{Binding}" HorizontalContentAlignment="Stretch" Padding="14,8" Cursor="Hand" BorderThickness="0,0,0,1"
+                                        BorderBrush="{DynamicResource BorderBrushLight}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceMutedBgBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsUnread}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBgBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="11" Height="11" CornerRadius="6" Margin="2,4,0,0" VerticalAlignment="Top" HorizontalAlignment="Left"
+                                                ToolTip="{Binding LevelKey}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource InkMutedBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding LevelKey}" Value="Red">
+                                                            <Setter Property="Background" Value="{DynamicResource AlertRedStrongTextBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding LevelKey}" Value="Yellow">
+                                                            <Setter Property="Background" Value="{DynamicResource AlertYellowBorderStrongBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding LevelKey}" Value="Success">
+                                                            <Setter Property="Background" Value="{DynamicResource AlertGreenBorderStrongBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Top" Foreground="{DynamicResource InkMutedBrush}" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
 
             <!-- Global Search Results Dropdown Overlay (T020) -->
             <Border x:Name="GlobalSearchDropdown"

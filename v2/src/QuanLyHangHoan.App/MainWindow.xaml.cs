@@ -73,6 +73,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.N && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            vm.NotificationsVm.ToggleCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape && vm.NotificationsVm.IsOpen)
+        {
+            vm.NotificationsVm.CloseCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control)
         {
             if (!IsTextInputFocused())

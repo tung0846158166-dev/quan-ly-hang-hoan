@@ -14,10 +14,15 @@ public sealed record AlertCheckResult(
 /// Kiểm tra định kỳ các đơn chưa nhận quá 12h (Vàng) / 24h (Đỏ),
 /// gửi MỘT thông báo gộp cho mỗi lần kiểm tra và nhớ mỗi đơn mỗi mức chỉ báo 1 lần.
 /// </summary>
+public sealed record NewAlertItem(string Code, string Platform, AlertLevel Level);
+
 public sealed class AlertNotificationMonitor : IDisposable
 {
     public static readonly TimeSpan DefaultInitialDelay = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan DefaultInterval = TimeSpan.FromMinutes(5);
+
+    /// <summary>Các đơn VỪA chuyển Vàng/Đỏ lần này (mỗi đơn mỗi mức một lần) và câu tóm tắt. Dùng cho chuông thông báo.</summary>
+    public event Action<IReadOnlyList<NewAlertItem>, string>? NewAlerts;
 
     private readonly IReturnOrderProvider _orderProvider;
     private readonly IAlertNotifyStateStore _stateStore;
@@ -81,6 +86,7 @@ public sealed class AlertNotificationMonitor : IDisposable
         var hasAnyRed = false;
         var newYellowKeys = new List<string>();
         var newRedKeys = new List<string>();
+        var newOnes = new List<NewAlertItem>();
         var notifyEnabled = _isNotifyEnabled();
 
         foreach (var order in orders)
@@ -97,6 +103,9 @@ public sealed class AlertNotificationMonitor : IDisposable
 
             var key = BuildKey(order.Id, level);
             if (_stateStore.HasNotified(key)) continue;
+            newOnes.Add(new NewAlertItem(
+                string.IsNullOrWhiteSpace(order.Track) ? (string.IsNullOrWhiteSpace(order.OrderId) ? order.Id : order.OrderId) : order.Track,
+                order.Platform, level));
 
             if (level == AlertLevel.Red)
             {
@@ -118,6 +127,7 @@ public sealed class AlertNotificationMonitor : IDisposable
         var message = FormatMessage(newYellowKeys.Count, newRedKeys.Count);
         _notificationService.ShowAlert("Cảnh báo hàng hoàn", message, hasRed: newRedKeys.Count > 0);
         _stateStore.MarkNotified(newYellowKeys.Concat(newRedKeys));
+        try { NewAlerts?.Invoke(newOnes, message); } catch (Exception) { /* chuông lỗi không được chặn cảnh báo */ }
 
         return new AlertCheckResult(
             newYellowKeys.Count,

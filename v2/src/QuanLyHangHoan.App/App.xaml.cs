@@ -169,6 +169,7 @@ public partial class App : Application
                 backupController: new SqliteBackupController(AppPaths.DatabasePath),
                 activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
                 orderExportService: new OrderExportService(fileSaveService),
+                notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),
                 diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)));
         }
 

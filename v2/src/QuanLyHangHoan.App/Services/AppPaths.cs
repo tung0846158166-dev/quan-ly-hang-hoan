@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 
 namespace QuanLyHangHoan.App.Services;
 
@@ -15,6 +15,8 @@ public static class AppPaths
     public static string SettingsPath => Path.Combine(BaseFolder, "settings.json");
 
     public static string AlertNotifyStatePath => Path.Combine(BaseFolder, "alert_notify_state.json");
+
+    public static string NotificationsPath => Path.Combine(BaseFolder, "notifications.json");
 
     public static string LegacyCopiesFolder => Path.Combine(BaseFolder, "legacy-copies");
 

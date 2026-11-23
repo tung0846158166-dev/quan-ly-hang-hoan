@@ -130,8 +130,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IBackupController? backupController = null,
         IActivityLogProvider? activityLogProvider = null,
         IOrderExportService? orderExportService = null,
-        IDiagnosticsProvider? diagnosticsProvider = null)
+        IDiagnosticsProvider? diagnosticsProvider = null,
+        NotificationCenter? notificationCenter = null)
     {
+        _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
         _newOrderProvider = newOrderProvider;
         _archivedOrderProvider = archivedOrderProvider;
@@ -184,7 +186,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             alertInitialDelay,
             alertCheckInterval);
         _trayService.ToggleNotifyAlertsRequested += OnTrayToggleNotifyAlertsRequested;
+        _alertMonitor.NewAlerts += OnNewAlerts;
         IsDemoMode = isDemoMode;
+        NotificationsVm = new NotificationCenterViewModel(
+            _notificationCenter, returnOrderProvider.GetCurrentTime, OpenNotificationTarget, a => _dispatchToUi(a))
+        {
+            IsDemoMode = isDemoMode
+        };
+        if (isDemoMode && notificationCenter is null) SeedDemoNotifications();
 
         var resolvedScanService = scanService ?? new FakeScanService(
             isDemoMode ? returnOrderProvider.GetReturnOrders(40) : Array.Empty<Core.Models.Order>(),
@@ -478,6 +487,85 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public SettingsViewModel SettingsVm { get; }
     public ActivityLogViewModel ActivityLogVm { get; }
     public HelpViewModel HelpVm { get; }
+    public NotificationCenterViewModel NotificationsVm { get; }
+    private readonly NotificationCenter _notificationCenter;
+    private Timer? _syncHealthTimer;
+
+    /// <summary>Bấm thông báo: "search:&lt;mã&gt;" mở tìm kiếm đơn, còn lại là khóa màn hình.</summary>
+    private void OpenNotificationTarget(string target)
+    {
+        const string prefix = "search:";
+        if (target.StartsWith(prefix, StringComparison.Ordinal)) GlobalSearchText = target[prefix.Length..];
+        else NavigateByKey(target);
+    }
+
+    private void OnNewAlerts(IReadOnlyList<NewAlertItem> items, string summary)
+    {
+        if (items.Count == 0) return;
+        if (items.Count > 10)
+        {
+            var red = items.Count(i => i.Level == QuanLyHangHoan.Core.Alerts.AlertLevel.Red);
+            _notificationCenter.Add(red > 0 ? NotificationLevel.Red : NotificationLevel.Yellow, "alert", "Cảnh báo hàng hoàn", summary, "returns");
+            return;
+        }
+        foreach (var i in items)
+        {
+            var red = i.Level == QuanLyHangHoan.Core.Alerts.AlertLevel.Red;
+            _notificationCenter.Add(
+                red ? NotificationLevel.Red : NotificationLevel.Yellow, "alert:" + i.Code + (red ? ":r" : ":y"),
+                red ? "Đơn quá 24h chưa nhận" : "Đơn quá 12h chưa nhận",
+                string.IsNullOrWhiteSpace(i.Platform) ? i.Code : $"{i.Code} ({i.Platform})", "search:" + i.Code);
+        }
+    }
+
+    private void SeedDemoNotifications()
+    {
+        var c = _notificationCenter;
+        c.Add(NotificationLevel.Red, "alert:demo1:r", "Đơn quá 24h chưa nhận", "SPX-DEMO-001 (Shopee)", "search:SPX-DEMO-001");
+        c.Add(NotificationLevel.Yellow, "alert:demo2:y", "Đơn quá 12h chưa nhận", "TT-DEMO-003 (TikTok Shop)", "search:TT-DEMO-003");
+        c.Add(NotificationLevel.Success, "phone", "Điện thoại tạo đơn mới", "SPX-DEMO-NEW-01 Shopee", "search:SPX-DEMO-NEW-01");
+        c.Add(NotificationLevel.Success, "file", "Đã nạp (file Excel)", "Thêm 12, cập nhật 3", "file_import");
+        c.Add(NotificationLevel.Yellow, "file:amb", "Có 2 đơn nhập nhằng (file Excel)", "Giữ nguyên để bạn kiểm tra, chưa gộp.", "file_import");
+        c.Add(NotificationLevel.Red, "sheet:err", "Lỗi Google Sheet", "Không tải được bảng tính. Dữ liệu không bị đổi.", "google_sheet");
+        c.Add(NotificationLevel.Info, "phone", "Điện thoại cập nhật ghi chú", "SPX-DEMO-004", "search:SPX-DEMO-004");
+    }
+
+    /// <summary>Kiểm tra sức khỏe kết nối đồng bộ (gọi mỗi 30 giây ở bản thật; test gọi trực tiếp).</summary>
+    public void CheckSyncHealthOnce()
+        => _notificationCenter.ReportConnection(_syncController.SyncEnabled, _syncController.ConnectedBrokers > 0 || _syncController.NtfyConnected);
+
+    private void AddSyncNotification(SyncHandled item, bool isSuccess, bool isNewOrder)
+    {
+        var code = item.Code ?? "";
+        var stage = item.Stage ?? "";
+        var target = string.IsNullOrWhiteSpace(code) ? "phone_sync" : "search:" + code;
+        if (string.Equals(stage, "photo", StringComparison.OrdinalIgnoreCase) && !isNewOrder) return;
+        if (isSuccess && isNewOrder)
+            _notificationCenter.Add(NotificationLevel.Success, "phone", "Điện thoại tạo đơn mới", $"{code} {ExtractPlatformFromMessage(item.Message)}".Trim(), target);
+        else if (isSuccess && string.Equals(stage, "delete", StringComparison.OrdinalIgnoreCase))
+            _notificationCenter.Add(NotificationLevel.Info, "phone", "Điện thoại xóa đơn", $"{code} (khôi phục được ở màn Đã xóa)", "deleted");
+        else if (isSuccess && string.Equals(stage, "note", StringComparison.OrdinalIgnoreCase))
+            _notificationCenter.Add(NotificationLevel.Info, "phone", "Điện thoại cập nhật ghi chú", code, target);
+        else if (isSuccess && string.Equals(stage, "edit", StringComparison.OrdinalIgnoreCase))
+            _notificationCenter.Add(NotificationLevel.Info, "phone", "Điện thoại cập nhật trạng thái đơn", code, target);
+        else if (isSuccess && string.Equals(stage, "scan", StringComparison.OrdinalIgnoreCase))
+            _notificationCenter.Add(NotificationLevel.Success, "phone", "Điện thoại quét nhận kiện", code, target);
+        else if (string.Equals(item.Outcome, "duplicate", StringComparison.OrdinalIgnoreCase) && (item.Message ?? "").Contains("ĐƠN ĐÃ CÓ", StringComparison.OrdinalIgnoreCase))
+            _notificationCenter.Add(NotificationLevel.Yellow, "phone", "Điện thoại quét đơn đã có", code, target);
+        else if (!isSuccess && (string.Equals(item.Outcome, "error", StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(item.Outcome, "ambiguous", StringComparison.OrdinalIgnoreCase)))
+            _notificationCenter.Add(NotificationLevel.Yellow, "phone", "Yêu cầu từ điện thoại cần kiểm tra", $"{code}: {item.Message}".Trim(' ', ':'), "phone_sync");
+    }
+
+    private void AddImportNotification(string source, string label, string target, int added, int updated, int ambiguous)
+    {
+        _notificationCenter.Add(NotificationLevel.Success, source, $"Đã nạp ({label})", $"Thêm {added}, cập nhật {updated}", target);
+        if (ambiguous > 0)
+            _notificationCenter.Add(NotificationLevel.Yellow, source + ":amb", $"Có {ambiguous} đơn nhập nhằng ({label})", "Giữ nguyên để bạn kiểm tra, chưa gộp.", target);
+    }
+
+    private void AddImportFailure(string source, string label, string target, string? why)
+        => _notificationCenter.Add(NotificationLevel.Red, source + ":err", $"Lỗi {label}", string.IsNullOrWhiteSpace(why) ? "Không rõ nguyên nhân." : why, target);
     public ScanReceiveViewModel ScanReceiveVm { get; }
     public PhoneSyncViewModel PhoneSyncVm { get; }
     public FolderWatchViewModel FolderWatchVm { get; }
@@ -775,6 +863,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             StartPeriodicSweep(sweepInterval ?? TimeSpan.FromMinutes(10));
             _alertMonitor.Start();
+            _syncHealthTimer ??= new Timer(_ => { try { CheckSyncHealthOnce(); } catch (Exception) { } }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
         }
     }
 
@@ -872,6 +961,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var isSuccess = string.Equals(item.Outcome, "success", StringComparison.OrdinalIgnoreCase);
         var isNewOrder = string.Equals(item.Kind, "new_order", StringComparison.OrdinalIgnoreCase);
         var isPhoto = string.Equals(item.Stage, "photo", StringComparison.OrdinalIgnoreCase);
+
+        AddSyncNotification(item, isSuccess, isNewOrder);
 
         if (Sounds)
         {
@@ -991,9 +1082,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnFolderWatchCompleted(FolderWatchRunResult result)
     {
+        if (result.Ran && !result.Ok) AddImportFailure("folder", "theo dõi thư mục", "folder_watch", result.Note);
         if (!result.Ran || !result.Ok || result.Import is null) return;
         var hasChanges = result.Import.Added > 0 || result.Import.Updated > 0 || result.Import.EnrichedArchived > 0;
         if (!hasChanges) return;
+        AddImportNotification("folder", "theo dõi thư mục", "folder_watch", result.Import.Added, result.Import.Updated, result.Import.Ambiguous.Count);
 
         var filesText = result.Names.Count > 0 ? string.Join(", ", result.Names) : "file mới";
         var msg = $"Đã tự nạp {result.FilesImported} file TikTok: {filesText}";
@@ -1011,11 +1104,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnSheetSyncCompleted(SheetRunResult result)
     {
+        if (result.Ran && !result.Ok) AddImportFailure("sheet", "Google Sheet", "google_sheet", result.Note);
         if (!result.Ran || !result.Ok || result.Import is null) return;
         var added = result.Import.Added;
         var updated = result.Import.Updated;
         var enriched = result.Import.EnrichedArchived;
         if (added <= 0 && updated <= 0 && enriched <= 0) return;
+        AddImportNotification("sheet", "Google Sheet", "google_sheet", added, updated, result.Import.Ambiguous.Count);
 
         var msg = $"Đã cập nhật từ Google Sheet: thêm {added}, cập nhật {updated}";
         _dispatchToUi(() =>
@@ -1032,10 +1127,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnSaleworkCompleted(SaleworkRunResult result)
     {
+        if (result.Ran && !result.Ok && !result.Stopped)
+            AddImportFailure("salework", "Salework", "salework", result.NeedsRelogin ? "Cần đăng nhập lại Salework." : result.Error);
         if (!result.Ran || !result.Ok) return;
 
         var merged = result.Import?.SupersededMerged ?? 0;
         var ambiguous = result.Import?.SupersedeAmbiguous ?? 0;
+        _notificationCenter.Add(NotificationLevel.Success, "salework", "Đã lấy từ Salework", $"{result.RowCount} dòng" + (merged > 0 ? $", gộp {merged} dòng chờ cũ" : ""), "salework");
+        if (ambiguous > 0)
+            _notificationCenter.Add(NotificationLevel.Yellow, "salework:amb", $"Có {ambiguous} đơn nhập nhằng (Salework)", "Giữ nguyên để bạn kiểm tra, chưa gộp.", "salework");
         var msg = $"Đã lấy {result.RowCount} dòng từ Salework và nạp vào bảng"
             + (merged > 0 ? $", gộp {merged} dòng chờ cũ" : string.Empty)
             + (ambiguous > 0 ? $" — ⚠️ {ambiguous} đơn có nhiều kiện khác nhau, giữ nguyên để bạn xem" : string.Empty);
@@ -1052,6 +1152,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (!result.Ok)
         {
             var errMsg = string.IsNullOrWhiteSpace(result.Message) ? "Nạp file Excel thất bại." : result.Message;
+            AddImportFailure("file", "nạp file Excel", "file_import", errMsg);
             _dispatchToUi(() => ShowToast(errMsg, isError: true));
             return;
         }
@@ -1062,6 +1163,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        AddImportNotification("file", "file Excel", "file_import", result.Added, result.Updated, result.Ambiguous);
         var msg = $"Đã nạp file Excel: thêm {result.Added}, cập nhật {result.Updated}";
         _dispatchToUi(() =>
         {
@@ -1159,6 +1261,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _sheetSyncController.Dispose();
         _saleworkController.Dispose();
         _trayService.ToggleNotifyAlertsRequested -= OnTrayToggleNotifyAlertsRequested;
+        _syncHealthTimer?.Dispose();
         _alertMonitor.Dispose();
         _backupController.Dispose();
         _trayService.Dispose();

@@ -119,6 +119,7 @@ public sealed class FakeDataService :
     private IReadOnlyList<Order> GenerateReturnOrdersRaw(int count)
     {
         var now = _clock();
+        if (count == int.MaxValue) count = 300;   // "lấy hết": bản giả chỉ có một bộ demo 300 đơn, không sinh vô hạn
         var list = new List<Order>(Math.Max(count, 0));
         if (count <= 0) return list;
 

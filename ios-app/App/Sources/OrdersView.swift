@@ -2,16 +2,26 @@ import SwiftUI
 import ScannerCore
 
 // Các mục đầu tiên khớp đúng các tab trên máy tính (chỉ tính BẢNG CHÍNH): Bảng chính = "Tất cả các tuần",
-// Chưa nhận, Đã nhận, Quá hạn = Báo Đỏ, Sắp đến hạn = Báo Vàng. Lưu trữ / Đơn hủy là các bảng riêng trên máy tính;
+// Chưa nhận, Đã nhận, Quá hạn = Báo Đỏ, Sắp đến hạn = Báo Vàng, Hoàn một phần. Lưu trữ / Đơn hủy là các bảng riêng trên máy tính;
 // "Toàn bộ" gồm cả 3 bảng (dùng khi tìm / quét mã).
-private enum OrderFilter: String, CaseIterable {
-    case main = "Bảng chính", pending = "Chưa nhận", received = "Đã nhận", overdue = "Quá hạn", soon = "Sắp đến hạn", watch = "Đang theo dõi"
-    case cancelled = "Đơn hủy", archived = "Lưu trữ", pre = "Đặt trước", all = "Toàn bộ"
+enum OrderFilter: String, CaseIterable {
+    case main = "Bảng chính"
+    case pending = "Chưa nhận"
+    case received = "Đã nhận"
+    case overdue = "Quá hạn"
+    case soon = "Sắp đến hạn"
+    case partialReturn = "Hoàn một phần"
+    case watch = "Đang theo dõi"
+    case cancelled = "Đơn hủy"
+    case archived = "Lưu trữ"
+    case pre = "Đặt trước"
+    case all = "Toàn bộ"
 }
 
 struct OrdersView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
+    @EnvironmentObject var router: NotificationRouter
     @State private var query = ""
     @State private var filter: OrderFilter = .main
     @State private var selected: OrderRow?
@@ -38,6 +48,7 @@ struct OrdersView: View {
         case .pending: return r.pd && r.k == "m"
         case .overdue: return r.pd && r.k == "m" && r.alertLevel(now: now) == .overdue   // = tab Báo Đỏ trên PC
         case .soon: return r.pd && r.k == "m" && r.alertLevel(now: now) == .soon          // = tab Báo Vàng trên PC
+        case .partialReturn: return DashboardMetrics.isPartialReturn(r)
         case .watch: return r.wl && r.k == "m"   // giống bảng Theo Dõi trên PC: chỉ tính bảng chính
         case .received: return r.rv && r.k == "m"   // = tab Đã nhận trên PC; đơn đã sang kho lưu trữ xem ở mục Lưu trữ
         case .cancelled: return r.isCancelled
@@ -51,10 +62,11 @@ struct OrdersView: View {
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let q = query.trimmingCharacters(in: .whitespaces)
         let qc = TrackingCode.clean(q)
+        let targetPlat = platform.isEmpty ? "" : DashboardMetrics.normalizedPlatform(platform)
         var counts: [OrderFilter: Int] = [:]
         var shown: [OrderRow] = []
         for r in store.rows {
-            if !platform.isEmpty && r.p != platform { continue }
+            if !targetPlat.isEmpty && DashboardMetrics.normalizedPlatform(r.p) != targetPlat { continue }
             if !matches(r, q, qc) { continue }
             for f in OrderFilter.allCases where belongs(r, f, now: now) { counts[f, default: 0] += 1 }
             if belongs(r, filter, now: now) { shown.append(r) }
@@ -62,7 +74,25 @@ struct OrdersView: View {
         return (shown, counts)
     }
 
-    private var platforms: [String] { Array(Set(store.rows.map { $0.p }.filter { !$0.isEmpty })).sorted() }
+    private var platforms: [String] {
+        let set = Set(store.rows.map { DashboardMetrics.normalizedPlatform($0.p) }.filter { !$0.isEmpty && $0 != "Khác" })
+        return Array(set).sorted()
+    }
+
+    private func applyPendingNavigation() {
+        var changed = false
+        if let f = router.pendingOrdersFilter {
+            filter = f
+            router.pendingOrdersFilter = nil
+            changed = true
+        }
+        if let p = router.pendingOrdersPlatform {
+            platform = p
+            router.pendingOrdersPlatform = nil
+            changed = true
+        }
+        if changed { refresh() }
+    }
 
     private func refresh() {
         let d = compute()
@@ -73,37 +103,81 @@ struct OrdersView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 summary(shown: shown.count)
                 tables
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
+                    HStack(spacing: 8) {
                         ForEach(OrderFilter.allCases, id: \.self) { f in
                             Chip(title: "\(f.rawValue) (\(counts[f] ?? 0))", selected: filter == f) { filter = f }
                         }
-                    }.padding(.horizontal)
+                    }
+                    .padding(.horizontal, 14)
+                }
+                if !platform.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Đang lọc sàn:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        PlatformBadge(platform: platform)
+                        Spacer()
+                        Button("Bỏ lọc sàn") {
+                            Haptics.tap()
+                            platform = ""
+                        }
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.accent)
+                    }
+                    .padding(.horizontal, 16)
                 }
                 List(shown) { r in
-                    Button { selected = r } label: { row(r).card(padding: 10) }.buttonStyle(.plain)
-                        .listRowSeparator(.hidden).listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    Button {
+                        Haptics.tap()
+                        selected = r
+                    } label: {
+                        row(r).card(padding: 12, radius: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_500_000_000) }
+                .refreshable {
+                    Haptics.tap()
+                    engine.requestSnapshot()
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
                 .overlay {
                     if !store.hasData {
-                        VStack(spacing: 6) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "shippingbox")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
                             Text("Chưa nhận dữ liệu đơn từ máy tính").font(.headline)
                             Text("Mở app trên PC và kéo xuống để cập nhật.").font(.footnote).foregroundStyle(.secondary)
                         }
-                    } else if shown.isEmpty { Text("Không có đơn phù hợp").foregroundStyle(.secondary) }
+                        .padding()
+                    } else if shown.isEmpty {
+                        VStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                            Text("Không có đơn phù hợp").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .background(Theme.pageBackground.ignoresSafeArea())
             .searchable(text: $query, prompt: "Tìm mã, sản phẩm, màu, size, ghi chú")
             .navigationTitle("Đơn hàng")
-            .onAppear { refresh() }
+            .onAppear {
+                applyPendingNavigation()
+                refresh()
+            }
+            .onChange(of: router.pendingOrdersFilter) { _ in applyPendingNavigation() }
+            .onChange(of: router.pendingOrdersPlatform) { _ in applyPendingNavigation() }
             .onChange(of: query) { _ in refresh() }
             .onChange(of: filter) { _ in refresh() }
             .onChange(of: platform) { _ in refresh() }
@@ -120,7 +194,10 @@ struct OrdersView: View {
                     } label: {
                         Image(systemName: platform.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                     }
-                    Button { engine.requestSnapshot() } label: { Image(systemName: "arrow.clockwise") }
+                    Button {
+                        Haptics.tap()
+                        engine.requestSnapshot()
+                    } label: { Image(systemName: "arrow.clockwise") }
                 }
             }
             .sheet(item: $selected) { DetailView(row: $0) }
@@ -128,7 +205,6 @@ struct OrdersView: View {
                 ScanSearchSheet { raw in
                     query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
                     filter = .all
-                    // Quét ra đúng một đơn thì mở luôn chi tiết.
                     refresh()
                     let again = shown
                     if again.count == 1 { selected = again[0] }
@@ -137,73 +213,168 @@ struct OrdersView: View {
         }
     }
 
-    /// Lối vào Bảng đơn mới (Hộp Đơn Mới trên PC) và Bảng đơn hủy: tích chọn để đẩy ra / đánh dấu đã nhận.
+    /// Lối vào nhanh các bảng phụ: Đơn hủy, Hủy sau chuẩn bị, Hàng hoàn về.
     private var tables: some View {
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
         let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
         let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
-        return HStack(spacing: 6) {
-            // v2: không còn Hộp Đơn Mới (đơn quét từ điện thoại vào thẳng Bảng chính trên PC).
+        return HStack(spacing: 8) {
             NavigationLink { CancelledTableView() } label: {
-                VStack(spacing: 1) { Text("🚫 Đơn hủy").font(.caption.bold()); Text("chưa nhận \(cancelledPending)").font(.caption2.bold()) }
-                    .frame(maxWidth: .infinity)
+                quickTableCard(icon: "xmark.octagon.fill", title: "Đơn hủy", count: cancelledPending, sub: "chưa nhận", color: Theme.danger)
             }
-            .buttonStyle(.bordered).tint(cancelledPending == 0 ? .gray : .red)
+            .buttonStyle(.plain)
+
             NavigationLink { CancelAfterPrepView() } label: {
-                VStack(spacing: 1) { Text("📦 Hủy sau CB").font(.caption.bold()); Text("chưa nhận \(afterPrepPending)").font(.caption2.bold()) }
-                    .frame(maxWidth: .infinity)
+                quickTableCard(icon: "shippingbox.and.arrow.backward.fill", title: "Hủy sau CB", count: afterPrepPending, sub: "chưa nhận", color: .purple)
             }
-            .buttonStyle(.bordered).tint(afterPrepPending == 0 ? .gray : .purple)
+            .buttonStyle(.plain)
+
             NavigationLink { ReturnWatchView() } label: {
-                VStack(spacing: 1) { Text("🚚 Hoàn về").font(.caption.bold()); Text("đang về \(returnWatchActive)").font(.caption2.bold()) }
-                    .frame(maxWidth: .infinity)
+                quickTableCard(icon: "arrow.uturn.backward.circle.fill", title: "Hoàn về", count: returnWatchActive, sub: "đang về", color: Theme.teal)
             }
-            .buttonStyle(.bordered).tint(returnWatchActive == 0 ? .gray : .teal)
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal)
+        .padding(.horizontal, 14)
+    }
+
+    private func quickTableCard(icon: String, title: String, count: Int, sub: String, color: Color) -> some View {
+        let activeColor = count > 0 ? color : .secondary
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2.bold())
+                    .foregroundColor(activeColor)
+                Text(title)
+                    .font(.caption.bold())
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(count)")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(activeColor)
+                Text(sub)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+        .card(padding: 10, radius: 14)
     }
 
     private func summary(shown: Int) -> some View {
-        HStack {
-            Text("Hiển thị \(shown) đơn · toàn bộ \(store.rows.count)").font(.caption.bold())
+        HStack(spacing: 10) {
+            Text("Hiển thị \(shown) · tổng \(store.rows.count)")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
             Spacer()
-            // Cùng cách tính với tab Báo Đỏ / Báo Vàng của bảng chính trên PC.
-            Text("🚨 \(counts[.overdue] ?? 0)").font(.caption.bold()).foregroundColor(.red)
-            Text("⏰ \(counts[.soon] ?? 0)").font(.caption.bold()).foregroundColor(.orange)
-            if let t = store.updatedAt { Text(t.formatted(date: .omitted, time: .shortened)).font(.caption2).foregroundStyle(.secondary) }
-        }.padding(.horizontal)
+            HStack(spacing: 4) {
+                Circle().fill(Theme.danger).frame(width: 7, height: 7)
+                Text("\(counts[.overdue] ?? 0)").font(.caption.bold()).foregroundColor(Theme.danger)
+            }
+            HStack(spacing: 4) {
+                Circle().fill(Theme.warning).frame(width: 7, height: 7)
+                Text("\(counts[.soon] ?? 0)").font(.caption.bold()).foregroundColor(Theme.warning)
+            }
+            if let t = store.updatedAt {
+                Text(t.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
     }
 
-    /// Danh sách chỉ hiện mã đơn hàng và/hoặc mã vận đơn; chạm vào mới xem đủ thông tin.
+    /// Hàng đơn dạng thẻ: chấm cảnh báo, mã vận đơn/đơn hàng, huy hiệu sàn, sản phẩm (tô màu nếu hoàn một phần), hạn.
     private func row(_ r: OrderRow) -> some View {
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let level = r.pd ? r.alertLevel(now: now) : .unknown
         let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()
-        return HStack(spacing: 8) {
-            Circle().fill(r.pd ? color(level) : Color.gray.opacity(0.4)).frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 2) {
-                if !r.o.isEmpty {
-                    Text(hasBoth ? "Mã đơn: \(r.o)" : r.o).font(.system(.subheadline, design: .monospaced).bold())
+        let isPartial = DashboardMetrics.isPartialReturn(r)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
+                Circle()
+                    .fill(r.pd ? color(level) : (r.rv ? Theme.success : Color.gray.opacity(0.4)))
+                    .frame(width: 10, height: 10)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.o.isEmpty ? r.c : r.o)
+                        .font(.system(.subheadline, design: .monospaced).bold())
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    if hasBoth {
+                        Text("Vận đơn: \(r.c)")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
-                if hasBoth || r.o.isEmpty {
-                    Text(hasBoth ? "Vận đơn: \(r.c)" : r.c).font(.system(.subheadline, design: .monospaced)).foregroundColor(hasBoth ? .secondary : .primary)
+
+                Spacer(minLength: 4)
+
+                if r.wl {
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(Theme.warning)
                 }
-                // Đơn đang theo dõi: hiện nội dung theo dõi 1 dòng, dài quá thì cắt và thêm "…" ở cuối.
-                if r.wl && !r.wr.isEmpty {
-                    Text(r.wr).font(.footnote).foregroundColor(.orange).lineLimit(1).truncationMode(.tail)
+                if !r.p.isEmpty {
+                    PlatformBadge(platform: r.p)
                 }
             }
-            Spacer()
-            if r.wl { Text("⭐").font(.caption) }
-            if scanned.contains(r.c.uppercased()) { Text("✅ Đã quét").font(.caption2.bold()).foregroundColor(.green) }
-            else if r.rv { Text("Đã nhận").font(.caption2.bold()).foregroundColor(.green) }
-            if r.isCancelled { Text("Đơn hủy").font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 2).background(Color.red.opacity(0.15)).foregroundColor(.red).clipShape(Capsule()) }
-            if !r.p.isEmpty { Text(r.p == "Shopee" ? "Shopee" : (r.p.hasPrefix("TikTok") ? "TikTok" : r.p)).font(.caption2.bold()).padding(.horizontal, 7).padding(.vertical, 2).background((r.p == "Shopee" ? Color.orange : Color.primary).opacity(0.14)).foregroundColor(r.p == "Shopee" ? .orange : .primary).clipShape(Capsule()) }
+
+            if !r.n.isEmpty {
+                if isPartial {
+                    ProductLines(n: r.n, rn: r.rn)
+                } else {
+                    Text(r.n)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            if r.wl && !r.wr.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "pin.fill").font(.caption2)
+                    Text(r.wr).font(.caption).lineLimit(1).truncationMode(.tail)
+                }
+                .foregroundColor(Theme.warning)
+            }
+
+            HStack(spacing: 6) {
+                if scanned.contains(r.c.uppercased()) {
+                    StatusPill(text: "Đã quét", color: Theme.success)
+                } else if r.rv {
+                    StatusPill(text: "Đã nhận", color: Theme.success)
+                } else if r.isCancelled {
+                    StatusPill(text: "Đơn hủy", color: Theme.danger)
+                } else if !r.st.isEmpty {
+                    StatusPill(text: r.st, color: r.pd ? Theme.info : .secondary)
+                }
+
+                if isPartial {
+                    StatusPill(text: "Hoàn 1 phần", color: Theme.accent)
+                }
+
+                Spacer(minLength: 4)
+
+                if r.pd && (level == .overdue || level == .soon) {
+                    StatusPill(text: Deadline.text(due: r.due, now: now), color: color(level))
+                }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func color(_ l: DeadlineLevel) -> Color {
-        switch l { case .overdue: return .red; case .soon: return .orange; case .normal: return .green; case .unknown: return .secondary }
+        switch l {
+        case .overdue: return Theme.danger
+        case .soon: return Theme.warning
+        case .normal: return Theme.success
+        case .unknown: return .secondary
+        }
     }
 }
 
@@ -224,13 +395,17 @@ struct ScanSearchSheet: View {
                     ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
                 }
                 .frame(height: 345).background(Color.black)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.indigo, lineWidth: 2))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.accent, lineWidth: 2.5))
                 Text(hint).font(.footnote).foregroundStyle(.secondary)
                 Button { camera.setTorch(!camera.torchOn) } label: {
                     Label("Đèn", systemImage: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
-                }.buttonStyle(.borderedProminent).tint(.indigo)
-                if camera.denied { Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.").font(.footnote).foregroundColor(.red) }
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 14)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                if camera.denied { Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.").font(.footnote).foregroundColor(Theme.danger) }
                 Spacer()
             }
             .padding()
@@ -294,13 +469,14 @@ struct DetailView: View {
                     LabeledContent("Mã vận đơn", value: live.c)
                     if !live.o.isEmpty { LabeledContent("Mã đơn hàng", value: live.o) }
                     if !live.ps.isEmpty { LabeledContent("Trạng thái sàn", value: live.ps) }
-                    Button("Sao chép mã vận đơn") { UIPasteboard.general.string = live.c }
-                    if !live.o.isEmpty { Button("Sao chép mã đơn hàng") { UIPasteboard.general.string = live.o } }
+                    Button("Sao chép mã vận đơn") { Haptics.tap(); UIPasteboard.general.string = live.c }
+                    if !live.o.isEmpty { Button("Sao chép mã đơn hàng") { Haptics.tap(); UIPasteboard.general.string = live.o } }
                 }
                 Section("Theo dõi & ghi chú (đồng bộ 2 chiều với máy tính)") {
                     Toggle("Đang theo dõi", isOn: $watchOn)
                     TextField("Ghi chú / lý do theo dõi", text: $noteText, axis: .vertical).lineLimit(1...5)
                     Button(sentNote ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu & đồng bộ sang máy tính") {
+                        Haptics.medium()
                         engine.sendOrderNote(live, note: noteText, watch: watchOn)
                         sentNote = true
                     }
@@ -312,6 +488,7 @@ struct DetailView: View {
                         // v2: PC chỉ cho đổi TRẠNG THÁI từ điện thoại; sửa sản phẩm/màu/size/số lượng/loại đơn làm trên máy tính.
                         Picker("Trạng thái", selection: $editSt) { ForEach(statusChoices, id: \.self) { Text($0).tag($0) } }
                         Button(sentEdit ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu trạng thái sang máy tính") {
+                            Haptics.medium()
                             engine.sendOrderEdit(live, fields: ["st": editSt])
                             sentEdit = true
                         }
@@ -341,15 +518,16 @@ struct DetailView: View {
                     }
                 }
             }
+            .tint(Theme.accent)
             .onAppear { noteText = live.wr; watchOn = live.wl; fillEdit() }
             .onChange(of: live) { _ in fillEdit(); sentEdit = false }
             .confirmationDialog("Xóa đơn này?", isPresented: $askDelete, titleVisibility: .visible) {
                 Button("Tiếp tục xóa", role: .destructive) { confirmDelete = true }
-            } message: { Text("Đơn sẽ bị xóa khỏi bảng chính trên cả máy tính và điện thoại.") }
+            } message: { Text("Đơn vẫn khôi phục được trên máy tính.") }
             .alert("Chắc chắn xóa đơn \(live.o.isEmpty ? live.c : live.o)?", isPresented: $confirmDelete) {
                 Button("Hủy", role: .cancel) {}
                 Button("Xóa", role: .destructive) { engine.sendOrderDelete(live); dismiss() }
-            } message: { Text("Không thể hoàn tác trên điện thoại.") }
+            } message: { Text("Đơn sẽ bị gỡ khỏi bảng chính; có thể khôi phục trên máy tính.") }
             .onChange(of: live.wr) { v in noteText = v; sentNote = false }
             .onChange(of: live.wl) { v in watchOn = v }
             .navigationTitle("Chi tiết đơn")

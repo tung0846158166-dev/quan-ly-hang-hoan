@@ -472,18 +472,6 @@ final class SyncEngine: ObservableObject {
         broadcast(body, title: "Shopee Snapshot Request", room: r)
     }
 
-    /// Bảng đơn mới: đẩy các đơn đã chọn (hoặc tất cả) ra bảng chính trên PC.
-    func pushInbox(ids: [String]) {
-        guard !ids.isEmpty else { return }
-        let rid = "pushmany-\(nowMs())"
-        let body = SyncProtocol.inboxPushMany(ids: ids, room: room, requestId: rid)
-        pendingNotes[rid] = body   // giữ đến khi PC trả lời; mất kết nối thì gửi lại
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
-        broadcast(body, title: "Shopee Push", room: room)
-        snapshot.removeInboxLocal(ids: Set(ids))
-        banner = Banner(code: "\(ids.count) đơn", text: "ĐANG ĐẨY RA BẢNG CHÍNH, CHỜ PC", color: .orange)
-    }
-
     /// Bảng đơn hủy: đánh dấu đã nhận / chưa nhận các đơn đã chọn.
     func setCancelledReceived(ids: [String], received: Bool) {
         guard !ids.isEmpty else { return }
@@ -494,13 +482,6 @@ final class SyncEngine: ObservableObject {
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyCancelledReceivedLocal(ids: Set(ids), received: received)
         banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "ĐÃ GỬI: ĐÃ NHẬN, CHỜ PC" : "ĐÃ GỬI: CHƯA NHẬN, CHỜ PC", color: .orange)
-    }
-
-    func pushToMain(_ item: ScanItem) {
-        let r = room
-        let body = SyncProtocol.inboxPush(code: item.code, room: r, requestId: "push-\(nowMs())")
-        banner = Banner(code: item.code, text: "ĐANG ĐẨY RA BẢNG CHÍNH", color: .orange)
-        broadcast(body, title: "Shopee Push", room: r)
     }
 
     // MARK: thống kê & xuất

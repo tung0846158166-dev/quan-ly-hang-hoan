@@ -26,23 +26,23 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $router.tab) {
+            HomeView()
+                .tabItem { Label("Tổng quan", systemImage: "house.fill") }
+                .badge(store.alertCount)
+                .tag(NotificationRouter.homeTab)
             ScanView()
                 .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
-                .tag(0)
+                .tag(NotificationRouter.scanTab)
             OrdersView()
-                .tabItem { Label("Đơn", systemImage: "shippingbox") }
-                .tag(1)
-            NotificationsView()
-                .tabItem { Label("Thông báo", systemImage: "bell") }
-                .badge(store.alertCount)
-                .tag(2)
+                .tabItem { Label("Đơn", systemImage: "shippingbox.fill") }
+                .tag(NotificationRouter.ordersTab)
             HistoryView()
                 .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                 .badge(engine.pendingCount)
-                .tag(3)
+                .tag(NotificationRouter.historyTab)
             SettingsView()
-                .tabItem { Label("Cài đặt", systemImage: "gearshape") }
-                .tag(4)
+                .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
+                .tag(NotificationRouter.settingsTab)
         }
         .tint(Theme.accent)
     }

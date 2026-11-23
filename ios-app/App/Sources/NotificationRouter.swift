@@ -2,21 +2,36 @@ import SwiftUI
 import UserNotifications
 import ScannerCore
 
-/// Điều hướng khi bấm vào thông báo: mở tab Thông báo và hiện chi tiết đơn tương ứng.
+/// Điều hướng toàn app: tab mặc định là Tổng quan (0), nhảy lọc sang màn Đơn, và mở chi tiết từ thông báo.
 @MainActor
 final class NotificationRouter: ObservableObject {
     static let shared = NotificationRouter()
-    static let notificationsTab = 2
+    static let homeTab = 0
+    static let scanTab = 1
+    static let ordersTab = 2
+    static let historyTab = 3
+    static let settingsTab = 4
 
     @Published var tab = 0
     @Published var openRow: OrderRow?
+    @Published var showNotifications = false
+    @Published var pendingOrdersFilter: OrderFilter?
+    @Published var pendingOrdersPlatform: String?
     private var pendingRowId: String?
 
     var store: SnapshotStore? { didSet { resolvePending() } }
 
-    /// `rowId` rỗng (thông báo tóm tắt hằng ngày) thì chỉ mở tab Thông báo.
+    /// Mở tab Đơn với bộ lọc và/hoặc sàn chỉ định từ màn Tổng quan.
+    func openOrders(filter: OrderFilter, platform: String? = nil) {
+        pendingOrdersFilter = filter
+        pendingOrdersPlatform = platform
+        tab = Self.ordersTab
+    }
+
+    /// `rowId` rỗng (thông báo tóm tắt hằng ngày) thì mở màn Thông báo; có `rowId` thì mở luôn chi tiết đơn.
     func handle(rowId: String?) {
-        tab = Self.notificationsTab
+        tab = Self.homeTab
+        showNotifications = true
         pendingRowId = rowId
         resolvePending()
     }

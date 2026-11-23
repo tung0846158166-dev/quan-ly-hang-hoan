@@ -6,8 +6,6 @@ import ScannerCore
 @MainActor
 final class SnapshotStore: ObservableObject {
     @Published var rows: [OrderRow] = []
-    /// Hộp Đơn Mới trên PC (chờ đẩy ra bảng chính).
-    @Published var inbox: [InboxRow] = []
     @Published var updatedAt: Date?
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
@@ -98,7 +96,7 @@ final class SnapshotStore: ObservableObject {
                 return
             }
             let rows = d.apply(to: base)
-            let p = SnapshotPayload(time: d.time, count: rows.count, rows: rows, stats: d.stats, inbox: d.inbox, sid: sid)
+            let p = SnapshotPayload(time: d.time, count: rows.count, rows: rows, stats: d.stats, sid: sid)
             let built = Self.buildIndex(rows)
             Task { @MainActor [weak self] in
                 guard let self = self, self.baseSid == sid, d.seq > self.lastDeltaSeq else { return }
@@ -130,7 +128,6 @@ final class SnapshotStore: ObservableObject {
     private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
         rows = p.rows
         stats = p.stats
-        inbox = p.inbox   // Hộp Đơn Mới: thiếu dòng này thì chỉ thấy sau khi tắt mở lại app (đọc từ file)
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = built
         let waiting = unconfirmedReturnCodes()
@@ -164,7 +161,6 @@ final class SnapshotStore: ObservableObject {
     private func set(_ p: SnapshotPayload, save: Bool) {
         rows = p.rows
         stats = p.stats
-        inbox = p.inbox
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = Self.buildIndex(p.rows)
         recount()
@@ -180,7 +176,7 @@ final class SnapshotStore: ObservableObject {
     /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi một đơn đổi theo dõi/ghi chú.
     private func commit() {
         let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
-        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats, inbox: inbox), save: true)
+        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
         revision += 1
     }
 
@@ -206,12 +202,6 @@ final class SnapshotStore: ObservableObject {
             rows[i].rv = received
             rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất" || v == "Hư hỏng")
         }
-        commit()
-    }
-
-    /// Gỡ ngay khỏi Bảng đơn mới trên điện thoại các đơn vừa gửi lệnh đẩy (PC gửi lại danh sách chính thức sau).
-    func removeInboxLocal(ids: Set<String>) {
-        inbox.removeAll { ids.contains($0.id) }
         commit()
     }
 

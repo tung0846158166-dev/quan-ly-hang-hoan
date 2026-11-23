@@ -285,7 +285,7 @@ struct ScanView: View {
                     }
                 }
                 .labelStyle(.iconOnly)
-                .buttonBorderShape(.circle)
+                .buttonBorderShape(.capsule)   // .circle chỉ có từ iOS 17; khung 48x48 + capsule vẫn ra hình tròn
                 .tint(Theme.accent)
                 .frame(width: 48, height: 48)
 

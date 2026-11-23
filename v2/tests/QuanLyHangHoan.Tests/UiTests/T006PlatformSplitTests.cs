@@ -110,7 +110,9 @@ public class T006PlatformSplitTests
             "deleted",
             "stats",
             "legacy_import",
-            "settings"
+            "activity",
+            "settings",
+            "help"
         ], keys);
     }
 

@@ -167,7 +167,9 @@ public partial class App : Application
                 notificationService: notificationService,
                 alertNotifyStateStore: alertStateStore,
                 backupController: new SqliteBackupController(AppPaths.DatabasePath),
-                activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath));
+                activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
+                orderExportService: new OrderExportService(fileSaveService),
+                diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)));
         }
 
         _mainViewModel = mainViewModel;

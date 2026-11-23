@@ -77,7 +77,31 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
     private readonly Action<IReadOnlyList<(string OrderId, string Tracking)>>? _onOrdersDeleted;
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
+    private readonly Services.IOrderExportService? _exportService;
     private List<ArchivedOrderRowViewModel> _allRows = [];
+
+    // ---- Xuất Excel/CSV (chỉ đọc dữ liệu đơn) ----
+    [ObservableProperty] private string _exportStatus = "";
+    [ObservableProperty] private bool _exportStatusIsError;
+    [ObservableProperty] private bool _isExporting;
+
+    [RelayCommand]
+    private async Task ExportVisibleAsync(string? format)
+    {
+        if (_exportService is null || IsExporting) return;
+        IsExporting = true;
+        ExportStatus = "Đang xuất...";
+        ExportStatusIsError = false;
+        try
+        {
+            var fmt = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase) ? Services.ExportFormat.Csv : Services.ExportFormat.Xlsx;
+            var r = await _exportService.ExportAsync(VisibleOrders.Select(x => x.Source).ToList(), "Kho-luu-tru", fmt, archived: true);
+            ExportStatus = r.Message;
+            ExportStatusIsError = !r.Ok && !r.Cancelled;
+            if (!r.Cancelled) _onNotify?.Invoke(r.Message, !r.Ok);
+        }
+        finally { IsExporting = false; }
+    }
     private bool _suppressRefresh;
 
     public ArchivedOrdersViewModel(
@@ -88,9 +112,11 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         Func<Task>? onDataChangedAsync = null,
         Action<IReadOnlyList<(string OrderId, string Tracking)>>? onOrdersDeleted = null,
         Action<string, bool>? onNotify = null,
-        Action<Order>? onOpenDetail = null)
+        Action<Order>? onOpenDetail = null,
+        Services.IOrderExportService? exportService = null)
     {
         _provider = provider;
+        _exportService = exportService;
         _onOpenPhoto = onOpenPhoto;
         _editService = editService;
         _dialogService = dialogService;

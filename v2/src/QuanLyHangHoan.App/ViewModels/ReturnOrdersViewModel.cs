@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -54,6 +54,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private readonly Action<IReadOnlyList<(string OrderId, string Tracking)>>? _onOrdersDeleted;
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
+    private readonly Services.IOrderExportService? _exportService;
     private List<ReturnOrderRowViewModel> _allRows = [];
     private IReadOnlyList<ReturnOrderRowViewModel> _selectedRows = Array.Empty<ReturnOrderRowViewModel>();
     private long _lastLoadMs;
@@ -69,9 +70,11 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         Func<Task>? onDataChangedAsync = null,
         Action<IReadOnlyList<(string OrderId, string Tracking)>>? onOrdersDeleted = null,
         Action<string, bool>? onNotify = null,
-        Action<Order>? onOpenDetail = null)
+        Action<Order>? onOpenDetail = null,
+        Services.IOrderExportService? exportService = null)
     {
         _provider = provider;
+        _exportService = exportService;
         Scope = scope;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
         _onOpenPhoto = onOpenPhoto;
@@ -145,6 +148,34 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     public bool HasMultipleSelected => SelectedCount > 1;
     public bool HasAnySelected => SelectedCount > 0;
     public IReadOnlyList<ReturnOrderRowViewModel> SelectedRows => _selectedRows;
+
+    // ---- Xuất Excel/CSV (chỉ đọc dữ liệu đơn; xem OrderExportService) ----
+    [ObservableProperty] private string _exportStatus = "";
+    [ObservableProperty] private bool _exportStatusIsError;
+    [ObservableProperty] private bool _isExporting;
+
+    [RelayCommand]
+    private Task ExportVisibleAsync(string? format) => ExportAsync(VisibleOrders.Select(r => r.Source).ToList(), format);
+
+    [RelayCommand]
+    private Task ExportSelectedAsync(string? format) => ExportAsync(SelectedRows.Select(r => r.Source).ToList(), format);
+
+    private async Task ExportAsync(IReadOnlyList<Order> orders, string? format)
+    {
+        if (_exportService is null || IsExporting) return;
+        IsExporting = true;
+        ExportStatus = "Đang xuất...";
+        ExportStatusIsError = false;
+        try
+        {
+            var fmt = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase) ? Services.ExportFormat.Csv : Services.ExportFormat.Xlsx;
+            var r = await _exportService.ExportAsync(orders, SourceTableName, fmt);
+            ExportStatus = r.Message;
+            ExportStatusIsError = !r.Ok && !r.Cancelled;
+            if (!r.Cancelled) _onNotify?.Invoke(r.Message, !r.Ok);
+        }
+        finally { IsExporting = false; }
+    }
 
     public string SourceTableName => Scope switch
     {

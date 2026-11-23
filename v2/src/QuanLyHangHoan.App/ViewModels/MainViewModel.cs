@@ -31,6 +31,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly IScanSoundPlayer _soundPlayer;
     private readonly IAutoStartService _autoStartService;
     private readonly IBackupController _backupController;
+    private readonly IOrderExportService _orderExportService;
+    private readonly IActivityLogProvider _activityLogProvider;
     private readonly ITrayService _trayService;
     private readonly INotificationService _notificationService;
     private readonly AlertNotificationMonitor _alertMonitor;
@@ -126,7 +128,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TimeSpan? alertInitialDelay = null,
         TimeSpan? alertCheckInterval = null,
         IBackupController? backupController = null,
-        IActivityLogProvider? activityLogProvider = null)
+        IActivityLogProvider? activityLogProvider = null,
+        IOrderExportService? orderExportService = null,
+        IDiagnosticsProvider? diagnosticsProvider = null)
     {
         _returnOrderProvider = returnOrderProvider;
         _newOrderProvider = newOrderProvider;
@@ -169,6 +173,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _trayService = trayService ?? new FakeTrayService();
         _notificationService = notificationService ?? new FakeNotificationService(returnOrderProvider.GetCurrentTime);
         var resolvedAlertStateStore = alertNotifyStateStore ?? new InMemoryAlertNotifyStateStore();
+        _orderExportService = orderExportService ?? new FakeOrderExportService();
         _alertMonitor = new AlertNotificationMonitor(
             returnOrderProvider,
             resolvedAlertStateStore,
@@ -195,7 +200,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IsDemoMode = isDemoMode
         };
 
-        ActivityLogVm = new ActivityLogViewModel(activityLogProvider ?? new FakeActivityLogProvider(), clipboardService) { IsDemoMode = isDemoMode };
+        _activityLogProvider = activityLogProvider ?? new FakeActivityLogProvider();
+        ActivityLogVm = new ActivityLogViewModel(_activityLogProvider, clipboardService) { IsDemoMode = isDemoMode };
         _backupController = backupController ?? new FakeBackupController(returnOrderProvider.GetCurrentTime);
         SettingsVm = new SettingsViewModel(
             _backupController,
@@ -205,6 +211,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onBackgroundSettingChanged: OnSettingsBackgroundSettingChanged,
             onBackupSettingChanged: OnSettingsBackupSettingChanged,
             openPhoneSync: () => NavigateByKey("phone_sync"))
+        {
+            IsDemoMode = isDemoMode
+        };
+        HelpVm = new HelpViewModel(
+            diagnosticsProvider ?? new FakeDiagnosticsProvider(),
+            _backupController,
+            clipboardService,
+            BuildHelpStepsAsync,
+            BuildIntegrationStatusText,
+            key => NavigateByKey(key))
         {
             IsDemoMode = isDemoMode
         };
@@ -218,7 +234,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onDataChangedAsync: ReloadAllDataAsync,
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService) { IsDemoMode = isDemoMode };
         ShopeeCancelledVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.ShopeeCancelled,
@@ -228,7 +245,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onDataChangedAsync: ReloadAllDataAsync,
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService) { IsDemoMode = isDemoMode };
         TikTokReturnVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.TikTokReturn,
@@ -238,7 +256,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onDataChangedAsync: ReloadAllDataAsync,
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService) { IsDemoMode = isDemoMode };
 
         NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
         Func<string, string, bool> returnWatchConfirm = confirmationService is not null
@@ -276,7 +295,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onDataChangedAsync: ReloadAllDataAsync,
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService) { IsDemoMode = isDemoMode };
         DeletedOrdersVm = new DeletedOrdersViewModel(
             deletedOrderProvider,
             editService: _orderEditService,
@@ -338,6 +358,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["stats"] = StatisticsVm;
         _pageCache["legacy_import"] = LegacyImportVm;
         _pageCache["settings"] = SettingsVm;
+        _pageCache["help"] = HelpVm;
         _pageCache["activity"] = ActivityLogVm;
 
         _homeNavItem = new NavigationItem(
@@ -391,7 +412,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             new NavigationItem("stats", "📊", "Thống kê & báo cáo", "CHUNG", () => StatisticsVm),
             new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
             new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
-            new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm)
+            new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm),
+            new NavigationItem("help", "❓", "Trợ giúp", "CHUNG", () => HelpVm)
         ];
 
         ShopeeReturnVm.CountsUpdated += SyncSidebarKpis;
@@ -455,6 +477,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public LegacyImportViewModel LegacyImportVm { get; }
     public SettingsViewModel SettingsVm { get; }
     public ActivityLogViewModel ActivityLogVm { get; }
+    public HelpViewModel HelpVm { get; }
     public ScanReceiveViewModel ScanReceiveVm { get; }
     public PhoneSyncViewModel PhoneSyncVm { get; }
     public FolderWatchViewModel FolderWatchVm { get; }
@@ -525,6 +548,44 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _uiSettingsStore.Update(s => s.Sounds = value);
         ScanReceiveVm.IsSoundEnabled = value;
         SettingsVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
+    }
+
+    /// <summary>5 bước bắt đầu nhanh, ✓/○ tính từ trạng thái thật. Chỉ gợi ý, không làm thay người dùng.</summary>
+    private async Task<IReadOnlyList<HelpStep>> BuildHelpStepsAsync()
+    {
+        var ui = _uiSettingsStore.Load();
+        var hasOrders = ShopeeReturnVm.TotalCount + ShopeeCancelledVm.TotalCount + TikTokReturnVm.TotalCount + ArchivedOrdersVm.TotalCount > 0;
+        var importedBefore = false;
+        try { importedBefore = (await _activityLogProvider.ReadAsync(1, 0, "import", "")).Count > 0; } catch (Exception) { /* không đọc được: coi như chưa */ }
+        var autoOn = FolderWatchVm.IsEnabled || GoogleSheetVm.IsEnabled;
+        return new List<HelpStep>
+        {
+            new(1, "Nhập dữ liệu cũ từ app cũ", "Màn \"Nhập dữ liệu cũ\": chạy thử, so số liệu, rồi nhập thật. Nhập lại nhiều lần vẫn an toàn.", hasOrders, "legacy_import"),
+            new(2, "Nhập mã phòng vào app iPhone", "Lấy mã ở màn Cài đặt hoặc Đồng bộ điện thoại. Kiểm tra trên điện thoại xem danh sách đơn đã về chưa.", ui.SyncEnabled, "settings"),
+            new(3, "Thử nạp một file Excel", "Màn \"Nạp file Excel\": chọn file Shopee/TikTok đã xóa thông tin khách, xem số dòng thêm/cập nhật.", importedBefore, "file_import"),
+            new(4, "Bật nạp tự động", "Theo dõi thư mục tải về hoặc Google Sheet (Salework bấm \"Lấy ngay\" khi cần).", autoOn, "folder_watch"),
+            new(5, "Bật tự sao lưu", "Màn Cài đặt: tự sao lưu mỗi vài giờ, giữ nhiều ngày.", ui.BackupEnabled, "settings"),
+        };
+    }
+
+    /// <summary>Các câu trạng thái đang hiển thị ở từng màn nạp/đồng bộ. KHÔNG kèm địa chỉ Apps Script, token hay tên tệp khách.</summary>
+    private string BuildIntegrationStatusText()
+    {
+        string One(string name, bool? enabled, string note)
+        {
+            var on = enabled is null ? "" : (enabled.Value ? "bật; " : "tắt; ");
+            var n = string.IsNullOrWhiteSpace(note) ? "(chưa có thông tin)" : note.Trim();
+            if (n.Contains("script.google.com", StringComparison.OrdinalIgnoreCase) || n.Contains("googleusercontent", StringComparison.OrdinalIgnoreCase))
+                n = "(đã ẩn: có địa chỉ)";
+            return $"{name}: {on}{n}";
+        }
+        return string.Join(Environment.NewLine, new[]
+        {
+            One("Đồng bộ điện thoại", PhoneSyncVm.SyncEnabled, PhoneSyncVm.ConnectionStatusText),
+            One("Theo dõi thư mục", FolderWatchVm.IsEnabled, FolderWatchVm.LastNote),
+            One("Google Sheet", GoogleSheetVm.IsEnabled, GoogleSheetVm.LastNote),
+            One("Salework", null, SaleworkVm.LastNote),
+        });
     }
 
     private void OnSettingsBackupSettingChanged(bool enabled, int everyHours, int keepDays)
@@ -685,6 +746,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (item.Key.Equals("activity", StringComparison.OrdinalIgnoreCase))
             {
                 _ = ActivityLogVm.ReloadAsync();
+            }
+            if (item.Key.Equals("help", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = HelpVm.RefreshAsync();
             }
             var lastPage = item.Key.Equals("home", StringComparison.OrdinalIgnoreCase) ? "" : item.Key;
             _uiSettingsStore.Update(s => s.LastPage = lastPage);

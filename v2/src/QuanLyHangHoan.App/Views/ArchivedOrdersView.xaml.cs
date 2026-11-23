@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using QuanLyHangHoan.App.ViewModels;
@@ -48,5 +48,15 @@ public partial class ArchivedOrdersView : UserControl
         menu.DataContext = btn.DataContext;
         menu.PlacementTarget = btn;
         menu.IsOpen = true;
+    }
+
+    private void ExportButton_Click(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button b && b.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = b;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
     }
 }

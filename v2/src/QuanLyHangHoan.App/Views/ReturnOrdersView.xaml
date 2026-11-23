@@ -184,6 +184,25 @@
                             Command="{Binding ResetAllFiltersCommand}"
                             Style="{StaticResource FilterPillButtonStyle}"
                             Margin="0" />
+                    <Button DockPanel.Dock="Right"
+                            Content="⬇ Xuất file ▾"
+                            Click="ExportButton_Click"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            Margin="0,0,8,0"
+                            ToolTip="Xuất các dòng đang hiển thị ra Excel hoặc CSV (không có thông tin khách)">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Excel (.xlsx): các dòng đang hiển thị" Command="{Binding PlacementTarget.DataContext.ExportVisibleCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="xlsx" />
+                                <MenuItem Header="CSV (.csv): các dòng đang hiển thị" Command="{Binding PlacementTarget.DataContext.ExportVisibleCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="csv" />
+                                <Separator />
+                                <MenuItem Header="Excel: chỉ các dòng đã chọn" IsEnabled="{Binding PlacementTarget.DataContext.HasAnySelected, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Command="{Binding PlacementTarget.DataContext.ExportSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="xlsx" />
+                                <MenuItem Header="CSV: chỉ các dòng đã chọn" IsEnabled="{Binding PlacementTarget.DataContext.HasAnySelected, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Command="{Binding PlacementTarget.DataContext.ExportSelectedCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" CommandParameter="csv" />
+                                <Separator />
+                                <MenuItem Header="File xuất không chứa tên, SĐT, địa chỉ khách" IsEnabled="False" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+
 
                     <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="all">

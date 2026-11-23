@@ -8,7 +8,8 @@ public enum OtherWhere { Archive, Deleted }
 /// <summary>Đơn đang ở "bảng khác" (kho lưu trữ / đã xóa) khi nhập: dùng để chống tạo lại và để làm giàu dữ liệu.</summary>
 public sealed record OtherEntry(Order Order, OtherWhere Where);
 
-public sealed record AmbiguousParcel(string Platform, string OrderId, string Track, string ReturnOrderId, int Candidates);
+/// <param name="OrderConflict">true = khớp đúng MỘT kiện theo mã vận đơn nhưng kiện đó thuộc MỘT ĐƠN KHÁC (mã đơn thật khác nhau): mã dùng chung giữa nhiều đơn, không gộp, cần kiểm tra thủ công.</param>
+public sealed record AmbiguousParcel(string Platform, string OrderId, string Track, string ReturnOrderId, int Candidates, bool OrderConflict = false);
 
 public sealed class MergeOutcome
 {
@@ -32,6 +33,26 @@ public sealed class MergeOutcome
 public static class TikTokMerger
 {
     private static string Up(string? s) => (s ?? "").Trim().ToUpperInvariant();
+
+    /// <summary>Mã đơn "thật": không rỗng và KHÔNG chỉ là bản sao của mã vận đơn (đơn tạo từ máy quét điện thoại/Salework dùng mã vận đơn làm mã đơn tạm).</summary>
+    private static string RealOrderId(Order o)
+    {
+        var id = Up(o.OrderId);
+        if (id.Length == 0) return "";
+        if (id == Up(o.Track) || id == Up(o.ReturnTrack) || id == Up(o.ForwardTrack) || id == Up(o.AltTrack)) return "";
+        return id;
+    }
+
+    /// <summary>
+    /// v2 KHÁC app cũ có chủ ý (bất biến 1-3): app cũ coi hai kiện là MỘT khi cùng mã vận đơn và ghi đè mã đơn của dòng cũ,
+    /// làm một đơn thật biến mất. Nay nếu khớp theo mã nhưng hai bên có mã đơn thật KHÁC nhau thì báo xung đột và không đổi gì.
+    /// </summary>
+    private static bool OrderIdConflict(Order existing, Order incoming)
+    {
+        var a = RealOrderId(existing);
+        var b = RealOrderId(incoming);
+        return a.Length > 0 && b.Length > 0 && a != b;
+    }
 
     /// <summary>orderTrackingCodes: track, altTrack, returnTrack, trackingCodes (nguyên văn viết hoa và bản làm sạch).</summary>
     private static HashSet<string> OtherCodes(Order o)
@@ -132,6 +153,12 @@ public static class TikTokMerger
                 continue;
             }
             var existingIdx = all.Count == 1 ? all[0] : -1;
+
+            if (existingIdx != -1 && OrderIdConflict(main[existingIdx], incoming))
+            {
+                outcome.Ambiguous.Add(new AmbiguousParcel(incoming.Platform, incoming.OrderId, incoming.Track, incoming.ReturnOrderId, 1, OrderConflict: true));
+                continue;
+            }
 
             if (existingIdx == -1)
             {

@@ -30,7 +30,15 @@ while ($true) {
     Wait-AgyIdle
     $log = "tasks\reports\$next-agy-output.log"
     $prompt = "Doc AGENTS.md roi lam theo tasks/$($spec.Name). Claude co the dang sua v2/src/QuanLyHangHoan.Data/ va Core/ va cac test ngoai UiTests/: KHONG sua cac tep do. Neu thieu API o Data thi ghi vao bao cao."
-    agy -p $prompt --dangerously-skip-permissions *> $log
+    # May chu mo hinh cua agy hay bao 503 "het cong suat" (tam thoi): cho roi thu lai (toi da 8 lan, 2/4/6/8/10/12/15/15 phut) thay vi dung hang doi.
+    $waits = 2,4,6,8,10,12,15,15
+    for ($try = 0; $try -le $waits.Count; $try++) {
+        agy -p $prompt --dangerously-skip-permissions *> $log
+        if (Test-Done $next) { break }
+        $txt = (Get-Content $log -Raw -ErrorAction SilentlyContinue)
+        if ($try -lt $waits.Count -and $txt -match 'UNAVAILABLE|code 503|high traffic|No capacity') { Start-Sleep -Seconds ($waits[$try] * 60); continue }
+        break
+    }
 
     if (-not (Test-Done $next)) { "Phieu $next chua co bao cao XONG sau khi agy dung. Xem $log" | Out-File $stop -Encoding utf8; break }
 

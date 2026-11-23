@@ -488,6 +488,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ActivityLogViewModel ActivityLogVm { get; }
     public HelpViewModel HelpVm { get; }
     public NotificationCenterViewModel NotificationsVm { get; }
+
+    /// <summary>Thanh bên mặc định thu gọn (chỉ biểu tượng); rê chuột vào thì mở rộng đè lên nội dung.</summary>
+    [ObservableProperty] private bool _isSidebarExpanded;
     private readonly NotificationCenter _notificationCenter;
     private Timer? _syncHealthTimer;
 

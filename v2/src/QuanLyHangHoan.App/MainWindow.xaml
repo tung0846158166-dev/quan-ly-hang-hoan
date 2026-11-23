@@ -81,20 +81,51 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="244" />
+            <ColumnDefinition Width="60" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- Left Navigation Sidebar -->
-        <Border Grid.Column="0" Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,0,1,0">
-            <DockPanel LastChildFill="True">
+        <!-- Left Navigation Sidebar: mặc định thu gọn thành cột biểu tượng (60px); rê chuột vào thì mở rộng đè lên nội dung, rời chuột thì thu lại. -->
+        <Border x:Name="SidebarShell" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Left" Panel.ZIndex="60"
+                Background="{DynamicResource SidebarBgBrush}" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,0,1,0"
+                MouseEnter="Sidebar_MouseEnter" MouseLeave="Sidebar_MouseLeave">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Width" Value="60" />
+                    <Setter Property="Effect" Value="{x:Null}" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsSidebarExpanded}" Value="True">
+                            <Setter Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.35" Color="#000000" />
+                                </Setter.Value>
+                            </Setter>
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" To="244" Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Width" To="60" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <DockPanel LastChildFill="True" ClipToBounds="True">
                 <!-- Brand Header -->
-                <Border DockPanel.Dock="Top" Padding="14,16,14,12" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,0,0,1">
+                <Border DockPanel.Dock="Top" Padding="13,16,13,12" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Width="34" Height="34" CornerRadius="9" Background="{DynamicResource AccentOrangeBrush}" Margin="0,0,10,0">
                             <TextBlock Text="📦" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <StackPanel VerticalAlignment="Center">
+                        <StackPanel VerticalAlignment="Center" Visibility="{Binding IsSidebarExpanded, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Quản Lý Hàng Hoàn" Foreground="#FFFFFF" FontSize="14.5" FontWeight="Bold" />
                             <TextBlock Text="Phiên bản v2 • Native WPF" Foreground="{DynamicResource SidebarMutedBrush}" FontSize="11" />
                         </StackPanel>
@@ -102,7 +133,8 @@
                 </Border>
 
                 <!-- Theme Toggle + Compact KPI Summary at Bottom of Sidebar -->
-                <Border DockPanel.Dock="Bottom" Padding="10,10,10,12" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,1,0,0">
+                <Border DockPanel.Dock="Bottom" Padding="10,10,10,12" BorderBrush="{DynamicResource SidebarBorderBrush}" BorderThickness="0,1,0,0"
+                        Visibility="{Binding IsSidebarExpanded, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
                         <Button Content="{Binding ThemeToggleText}"
                                 Command="{Binding ToggleThemeCommand}"
@@ -141,16 +173,38 @@
                 </Border>
 
                 <!-- Scrollable Sidebar Navigation List -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,8">
+                <ScrollViewer Padding="0,8">
+                    <ScrollViewer.Style>
+                        <Style TargetType="ScrollViewer">
+                            <Setter Property="VerticalScrollBarVisibility" Value="Hidden" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSidebarExpanded}" Value="True">
+                                    <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ScrollViewer.Style>
                     <ItemsControl ItemsSource="{Binding NavigationItems}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel>
-                                    <Button Style="{StaticResource SidebarGroupHeaderButtonStyle}"
-                                            Visibility="{Binding ShowSectionHeader, Converter={StaticResource BoolToVis}}"
-                                            Command="{Binding DataContext.ToggleNavGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    <Button Command="{Binding DataContext.ToggleNavGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding Section}"
                                             ToolTip="Bấm để thu gọn / mở rộng nhóm">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SidebarGroupHeaderButtonStyle}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding ShowSectionHeader}" Value="True" />
+                                                            <Condition Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="True" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
                                         <DockPanel LastChildFill="True">
                                             <Border DockPanel.Dock="Right"
                                                     Background="{DynamicResource SidebarBadgeBgBrush}"
@@ -170,22 +224,36 @@
                                         </DockPanel>
                                     </Button>
 
-                                    <Button Style="{StaticResource SidebarNavButtonStyle}"
-                                            Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}"
+                                    <Button Visibility="{Binding IsVisible, Converter={StaticResource BoolToVis}}"
                                             Command="{Binding DataContext.SelectNavigationCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}">
+                                            CommandParameter="{Binding}"
+                                            ToolTip="{Binding Title}"
+                                            AutomationProperties.Name="{Binding Title}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SidebarNavButtonStyle}">
+                                                <Style.Triggers>
+                                                    <!-- Cột thu gọn: biểu tượng căn giữa, không đệm hai bên -->
+                                                    <DataTrigger Binding="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                        <Setter Property="Padding" Value="0,9" />
+                                                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
                                         <DockPanel LastChildFill="True">
-                                            <Border DockPanel.Dock="Right"
-                                                    Background="{DynamicResource SidebarBadgeBgBrush}"
-                                                    CornerRadius="10"
-                                                    Padding="7,1"
-                                                    VerticalAlignment="Center"
-                                                    Visibility="{Binding Badge, Converter={StaticResource StringNotEmptyToVis}}">
-                                                <TextBlock Text="{Binding Badge}" Foreground="{DynamicResource SidebarBadgeFgBrush}" FontSize="10.5" FontWeight="Bold" />
-                                            </Border>
+                                            <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center"
+                                                        Visibility="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
+                                                <Border Background="{DynamicResource SidebarBadgeBgBrush}"
+                                                        CornerRadius="10"
+                                                        Padding="7,1"
+                                                        Visibility="{Binding Badge, Converter={StaticResource StringNotEmptyToVis}}">
+                                                    <TextBlock Text="{Binding Badge}" Foreground="{DynamicResource SidebarBadgeFgBrush}" FontSize="10.5" FontWeight="Bold" />
+                                                </Border>
+                                            </StackPanel>
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Icon}" Width="24" FontSize="14" VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
                                             </StackPanel>
                                         </DockPanel>
                                     </Button>

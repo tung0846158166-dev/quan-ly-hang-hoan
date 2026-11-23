@@ -185,6 +185,17 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         _ => "Bảng chính"
     };
 
+    /// <summary>Giao diện nghe sự kiện này để bỏ chọn mọi dòng trên lưới (nút "Bỏ chọn", phím Esc).</summary>
+    public event Action? ClearSelectionRequested;
+
+    [RelayCommand]
+    private void ClearSelection()
+    {
+        ClearSelectionRequested?.Invoke();
+        // Không có giao diện (test/demo không hiển thị lưới): vẫn đặt lại trạng thái chọn.
+        if (ClearSelectionRequested is null) UpdateSelectedRows(null);
+    }
+
     public void UpdateSelectedRows(IEnumerable<ReturnOrderRowViewModel>? rows)
     {
         _selectedRows = rows?.ToList() ?? [];

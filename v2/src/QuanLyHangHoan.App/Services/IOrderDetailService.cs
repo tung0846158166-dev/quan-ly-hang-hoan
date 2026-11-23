@@ -49,12 +49,27 @@ public sealed class WindowsOrderDetailService : IOrderDetailService
                         .FirstOrDefault(w => w.IsActive && w is not OrderDetailWindow)
                     ?? (Application.Current?.MainWindow is not OrderDetailWindow ? Application.Current?.MainWindow : null);
 
+        // Chỉ MỘT cửa sổ chi tiết: bấm đơn khác thì đóng cửa sổ cũ rồi mở cửa sổ mới (không chồng nhiều bảng lên nhau).
+        CloseCurrent();
+
         var window = new OrderDetailWindow
         {
             DataContext = vm,
             Owner = owner
         };
+        window.Closed += (_, _) => { if (ReferenceEquals(_current, window)) _current = null; };
+        _current = window;
         window.Show();
         _ = vm.LoadAsync();
+    }
+
+    private OrderDetailWindow? _current;
+
+    private void CloseCurrent()
+    {
+        var old = _current;
+        _current = null;
+        if (old is null) return;
+        try { old.Close(); } catch (InvalidOperationException) { /* đang đóng sẵn */ }
     }
 }

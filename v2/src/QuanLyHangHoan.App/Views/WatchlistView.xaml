@@ -52,56 +52,10 @@
         <Border Grid.Row="1" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,9">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="240" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Background="{DynamicResource SearchBoxBgBrush}" BorderBrush="{DynamicResource SearchBoxBorderBrush}" BorderThickness="1.2" CornerRadius="7" Padding="8,0" Height="34" Margin="0,0,12,0">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="13" />
-                        <TextBox Grid.Column="1"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="12.5"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource InkPrimaryBrush}" />
-                        <TextBlock Grid.Column="1"
-                                   Text="Lọc nhanh theo mã đơn, mã vận đơn, sản phẩm, lý do theo dõi..."
-                                   Foreground="{DynamicResource SearchBoxPlaceholderBrush}" Opacity="0.75"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SearchText}" Value="">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <Button Grid.Column="2"
-                                Content="✕"
-                                Command="{Binding ClearSearchCommand}"
-                                Visibility="{Binding SearchText, Converter={StaticResource StringNotEmptyToVis}}"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Foreground="{DynamicResource AlertRedTextBrush}"
-                                FontWeight="Bold"
-                                Cursor="Hand"
-                                Padding="6,2"
-                                ToolTip="Xóa từ khóa lọc" />
-                    </Grid>
-                </Border>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="all">

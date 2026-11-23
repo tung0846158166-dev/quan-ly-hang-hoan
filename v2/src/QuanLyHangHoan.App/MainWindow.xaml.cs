@@ -62,6 +62,16 @@ public partial class MainWindow : Window
         PreviewKeyDown += OnMainWindowPreviewKeyDown;
     }
 
+    private void Sidebar_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.IsSidebarExpanded = true;
+    }
+
+    private void Sidebar_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.IsSidebarExpanded = false;
+    }
+
     private void OnMainWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

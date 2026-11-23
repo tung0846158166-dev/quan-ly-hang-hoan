@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -481,7 +481,7 @@ public sealed class T018OrderDetailUiTests : IDisposable
     }
 
     [Fact]
-    public void OrderDetailWindow_EscCloses_MultipleWindowsAllowed_And_DoesNotModifyDatabase()
+    public void OrderDetailWindow_EscCloses_SingleWindowOnly_And_DoesNotModifyDatabase()
     {
         var dbPath = Path.Combine(_tempRoot, "t018_readonly.db");
         AppDatabase.Initialize(dbPath);
@@ -507,12 +507,16 @@ public sealed class T018OrderDetailUiTests : IDisposable
                 new StubClipboardService(),
                 () => FixedNow);
 
+            // Yêu cầu chủ dự án: chỉ MỘT cửa sổ chi tiết; mở đơn khác thì cửa sổ cũ tự đóng, cửa sổ mới hiện ra.
             svc.ShowOrderDetail(order);
+            WpfTestHost.PumpDispatcher();
+            var first = Application.Current!.Windows.OfType<OrderDetailWindow>().Single();
             svc.ShowOrderDetail(CreateRichTikTokOrder());
             WpfTestHost.PumpDispatcher();
 
-            var openDetails = Application.Current!.Windows.OfType<OrderDetailWindow>().ToList();
-            Assert.Equal(2, openDetails.Count);
+            var openDetails = Application.Current.Windows.OfType<OrderDetailWindow>().ToList();
+            Assert.Single(openDetails);
+            Assert.NotSame(first, openDetails[0]);
 
             var escArgs = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(openDetails[0])!, 0, Key.Escape)
             {
@@ -521,8 +525,7 @@ public sealed class T018OrderDetailUiTests : IDisposable
             openDetails[0].RaiseEvent(escArgs);
             WpfTestHost.PumpDispatcher();
 
-            Assert.Single(Application.Current.Windows.OfType<OrderDetailWindow>());
-            openDetails[1].Close();
+            Assert.Empty(Application.Current.Windows.OfType<OrderDetailWindow>());
         });
 
         SqliteConnection.ClearAllPools();

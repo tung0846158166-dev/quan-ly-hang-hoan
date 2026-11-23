@@ -52,62 +52,14 @@
         </Border>
 
         <!-- Row 1: Search Box, Platform Segmented Filter, Sort -->
-        <Border Grid.Row="1" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,9">
+        <Border Grid.Row="1" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="18,9" Visibility="{Binding ShowPlatformFilter, Converter={StaticResource BoolToVis}}">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="260" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Search Input -->
-                <Border Grid.Column="0" Background="{DynamicResource SearchBoxBgBrush}" BorderBrush="{DynamicResource SearchBoxBorderBrush}" BorderThickness="1.2" CornerRadius="7" Padding="8,0" Height="34" Margin="0,0,12,0">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="🔍" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="13" />
-                        <TextBox Grid.Column="1"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 BorderThickness="0"
-                                 Background="Transparent"
-                                 VerticalContentAlignment="Center"
-                                 FontSize="12.5"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource InkPrimaryBrush}"
-                                 ToolTip="Tìm mã đơn, mã vận đơn hoàn/giao, ĐVVC, sản phẩm, ghi chú (hỗ trợ tiếng Việt không dấu)" />
-                        <TextBlock Grid.Column="1"
-                                   Text="Tìm mã đơn, mã vận đơn, sản phẩm, ĐVVC, ghi chú..."
-                                   Foreground="{DynamicResource SearchBoxPlaceholderBrush}" Opacity="0.75"
-                                   FontSize="12"
-                                   VerticalAlignment="Center"
-                                   IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding SearchText}" Value="">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <Button Grid.Column="2"
-                                Content="✕"
-                                Command="{Binding ClearSearchCommand}"
-                                Visibility="{Binding SearchText, Converter={StaticResource StringNotEmptyToVis}}"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                Foreground="{DynamicResource AlertRedTextBrush}"
-                                FontWeight="Bold"
-                                Cursor="Hand"
-                                Padding="6,2"
-                                ToolTip="Xóa từ khóa tìm kiếm" />
-                    </Grid>
-                </Border>
 
                 <!-- Platform Filter (chỉ hiện ở chế độ All; các bảng đã tách sàn sẽ ẩn) -->
                 <StackPanel Grid.Column="1"
@@ -161,17 +113,6 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Sort Selector -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Sắp xếp:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <ComboBox ItemsSource="{Binding SortOptions}"
-                              SelectedItem="{Binding SelectedSortOption}"
-                              DisplayMemberPath="Label"
-                              Width="220"
-                              Height="32"
-                              VerticalContentAlignment="Center"
-                              FontSize="12" />
-                </StackPanel>
             </Grid>
         </Border>
 
@@ -183,11 +124,13 @@
                             Content="↺ Xóa bộ lọc"
                             Command="{Binding ResetAllFiltersCommand}"
                             Style="{StaticResource FilterPillButtonStyle}"
+                            VerticalAlignment="Top"
                             Margin="0" />
                     <Button DockPanel.Dock="Right"
                             Content="⬇ Xuất file ▾"
                             Click="ExportButton_Click"
                             Style="{StaticResource FilterPillButtonStyle}"
+                            VerticalAlignment="Top"
                             Margin="0,0,8,0"
                             ToolTip="Xuất các dòng đang hiển thị ra Excel hoặc CSV (không có thông tin khách)">
                         <Button.ContextMenu>
@@ -202,6 +145,17 @@
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
+                    <!-- Sắp xếp: gom lên hàng bộ lọc (không còn hàng riêng) -->
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,-3,12,0">
+                    <TextBlock Text="Sắp xếp:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding SortOptions}"
+                              SelectedItem="{Binding SelectedSortOption}"
+                              DisplayMemberPath="Label"
+                              Width="220"
+                              Height="32"
+                              VerticalContentAlignment="Center"
+                              FontSize="12" />
+                </StackPanel>
 
 
                     <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -385,7 +339,13 @@
                 <Button Content="🗑️ Xóa"
                         Command="{Binding BulkDeleteCommand}"
                         Style="{StaticResource PrimaryActionButtonStyle}"
-                        Background="#DC2626" />
+                        Background="#DC2626"
+                        Margin="0,0,8,0" />
+                <Button Content="✕ Bỏ chọn"
+                        Command="{Binding ClearSelectionCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#64748B"
+                        ToolTip="Bỏ chọn tất cả các dòng (Esc)" />
             </StackPanel>
         </Border>
 

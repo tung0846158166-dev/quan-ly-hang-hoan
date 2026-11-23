@@ -20,6 +20,9 @@ public partial class ReturnOrdersView : UserControl
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
+        if (e.OldValue is ReturnOrdersViewModel oldVm) oldVm.ClearSelectionRequested -= OnClearSelectionRequested;
+        if (e.NewValue is ReturnOrdersViewModel newVm) newVm.ClearSelectionRequested += OnClearSelectionRequested;
+
         if (e.OldValue is INotifyPropertyChanging oldChanging)
             oldChanging.PropertyChanging -= OnVmPropertyChanging;
         if (e.OldValue is INotifyPropertyChanged oldChanged)
@@ -30,6 +33,8 @@ public partial class ReturnOrdersView : UserControl
         if (e.NewValue is INotifyPropertyChanged newChanged)
             newChanged.PropertyChanged += OnVmPropertyChanged;
     }
+
+    private void OnClearSelectionRequested() => OrdersGrid.UnselectAll();
 
     private void OnVmPropertyChanging(object? sender, PropertyChangingEventArgs e)
     {
@@ -79,6 +84,13 @@ public partial class ReturnOrdersView : UserControl
         {
             e.Handled = true;
             vm.OpenDetailCommand.Execute(vm.SelectedRow);
+            return;
+        }
+
+        if (e.Key == Key.Escape && vm.HasAnySelected)
+        {
+            e.Handled = true;
+            vm.ClearSelectionCommand.Execute(null);
             return;
         }
 

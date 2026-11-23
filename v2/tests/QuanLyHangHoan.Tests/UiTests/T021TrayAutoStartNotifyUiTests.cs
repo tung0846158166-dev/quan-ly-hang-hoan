@@ -183,8 +183,8 @@ public sealed class T021TrayAutoStartNotifyUiTests
                 Assert.False(vm.AutoStart);
                 Assert.False(autoStart.IsEnabled());
 
-                // Bật qua HomeVm (như người dùng bấm checkbox trên giao diện)
-                vm.HomeVm.AutoStart = true;
+                // Bật qua SettingsVm (như người dùng bấm checkbox trên màn Cài đặt)
+                vm.SettingsVm.AutoStart = true;
                 Assert.True(vm.AutoStart);
                 Assert.True(autoStart.IsEnabled());
                 Assert.Contains("--tray", autoStart.Entries[WindowsAutoStartService.ValueName]);
@@ -192,7 +192,7 @@ public sealed class T021TrayAutoStartNotifyUiTests
                 Assert.True(autoStart.Entries.ContainsKey("OtherApp"));
 
                 // Tắt: xóa đúng khóa của mình, không đụng khóa khác
-                vm.HomeVm.AutoStart = false;
+                vm.SettingsVm.AutoStart = false;
                 Assert.False(vm.AutoStart);
                 Assert.False(autoStart.IsEnabled());
                 Assert.False(AppSettings.LoadOrCreate(settingsPath).AutoStart);
@@ -332,7 +332,7 @@ public sealed class T021TrayAutoStartNotifyUiTests
             tray.SimulateToggleNotifyAlerts();
             WpfTestHost.PumpDispatcher();
             Assert.False(vm.NotifyAlerts);
-            Assert.False(vm.HomeVm.NotifyAlerts);
+            Assert.False(vm.SettingsVm.NotifyAlerts);
             Assert.Contains("Bật thông báo", tray.MenuItems);
 
             // Chuyển sang màn khác rồi bấm thông báo -> về Trang chủ + hiện cửa sổ
@@ -437,7 +437,7 @@ public sealed class T021TrayAutoStartNotifyUiTests
     }
 
     [Fact]
-    public void CaptureHomeBackgroundSettingsScreenshots()
+    public void CaptureSettingsScreenshots()
     {
         WpfTestHost.Run(() =>
         {
@@ -459,26 +459,24 @@ public sealed class T021TrayAutoStartNotifyUiTests
             window.Show();
             WpfTestHost.PumpDispatcher(window);
 
-            // Cuộn ScrollViewer trong HomeView xuống cuối để thấy rõ khối "Chạy nền và thông báo"
-            var homeView = FindDescendant<HomeView>(window);
-            var scrollViewer = homeView is not null ? FindDescendant<ScrollViewer>(homeView) : null;
-            scrollViewer?.ScrollToEnd();
+            // Các công tắc chạy nền nay nằm ở màn Cài đặt (không còn ở Trang chủ).
+            vm.NavigateByKey("settings");
             WpfTestHost.PumpDispatcher(window);
+            var settingsView = FindDescendant<SettingsView>(window);
+            var scrollViewer = settingsView is not null ? FindDescendant<ScrollViewer>(settingsView) : null;
 
             var outDir = Path.GetFullPath(Path.Combine(
                 AppContext.BaseDirectory,
                 "..", "..", "..", "..", "..", "..",
-                "tasks", "reports", "T021-screens"));
+                "tasks", "reports", "T022-screens"));
             Directory.CreateDirectory(outDir);
 
-            WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "01-home-background-settings-light.png"));
+            WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "01-settings-light.png"));
 
             vm.ToggleThemeCommand.Execute(null);
             WpfTestHost.PumpDispatcher(window);
-            scrollViewer?.ScrollToEnd();
-            WpfTestHost.PumpDispatcher(window);
 
-            WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "02-home-background-settings-dark.png"));
+            WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "02-settings-dark.png"));
         });
     }
 

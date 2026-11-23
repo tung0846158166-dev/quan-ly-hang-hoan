@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -64,8 +64,6 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly AlertPolicy _alertPolicy;
     private readonly Action<UrgentOrderItem>? _onOpenOrder;
     private readonly Action? _onNavigateLegacyImport;
-    private readonly Action<string, bool>? _onBackgroundSettingChanged;
-    private bool _suppressBackgroundCallback;
 
     private IReadOnlyList<Order> _orders = [];
     private DateTime _snapshotTime;
@@ -75,15 +73,13 @@ public sealed partial class HomeViewModel : ObservableObject
         IFileSaveService? fileSaveService = null,
         AlertPolicy? alertPolicy = null,
         Action<UrgentOrderItem>? onOpenOrder = null,
-        Action? onNavigateLegacyImport = null,
-        Action<string, bool>? onBackgroundSettingChanged = null)
+        Action? onNavigateLegacyImport = null)
     {
         _provider = provider;
         _fileSaveService = fileSaveService;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
         _onOpenOrder = onOpenOrder;
         _onNavigateLegacyImport = onNavigateLegacyImport;
-        _onBackgroundSettingChanged = onBackgroundSettingChanged;
 
         var now = _provider.GetCurrentTime();
         _snapshotTime = now;
@@ -144,54 +140,6 @@ public sealed partial class HomeViewModel : ObservableObject
 
     [ObservableProperty]
     private int _returnWatchOnTheWayCount;
-
-    [ObservableProperty]
-    private bool _autoStart;
-
-    [ObservableProperty]
-    private bool _minimizeToTray = true;
-
-    [ObservableProperty]
-    private bool _notifyAlerts = true;
-
-    [ObservableProperty]
-    private bool _sounds = true;
-
-    public void SyncBackgroundSettings(bool autoStart, bool minimizeToTray, bool notifyAlerts, bool sounds)
-    {
-        _suppressBackgroundCallback = true;
-        try
-        {
-            AutoStart = autoStart;
-            MinimizeToTray = minimizeToTray;
-            NotifyAlerts = notifyAlerts;
-            Sounds = sounds;
-        }
-        finally
-        {
-            _suppressBackgroundCallback = false;
-        }
-    }
-
-    partial void OnAutoStartChanged(bool value)
-    {
-        if (!_suppressBackgroundCallback) _onBackgroundSettingChanged?.Invoke(nameof(AutoStart), value);
-    }
-
-    partial void OnMinimizeToTrayChanged(bool value)
-    {
-        if (!_suppressBackgroundCallback) _onBackgroundSettingChanged?.Invoke(nameof(MinimizeToTray), value);
-    }
-
-    partial void OnNotifyAlertsChanged(bool value)
-    {
-        if (!_suppressBackgroundCallback) _onBackgroundSettingChanged?.Invoke(nameof(NotifyAlerts), value);
-    }
-
-    partial void OnSoundsChanged(bool value)
-    {
-        if (!_suppressBackgroundCallback) _onBackgroundSettingChanged?.Invoke(nameof(Sounds), value);
-    }
 
     public bool HasMissingPhotos => MissingPhotoCount > 0;
     public string MissingPhotoText => $"Ảnh mất: {MissingPhotoCount:N0}";

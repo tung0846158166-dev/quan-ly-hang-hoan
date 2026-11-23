@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -30,6 +30,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly IReturnWatchService _returnWatchService;
     private readonly IScanSoundPlayer _soundPlayer;
     private readonly IAutoStartService _autoStartService;
+    private readonly IBackupController _backupController;
     private readonly ITrayService _trayService;
     private readonly INotificationService _notificationService;
     private readonly AlertNotificationMonitor _alertMonitor;
@@ -123,7 +124,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         INotificationService? notificationService = null,
         IAlertNotifyStateStore? alertNotifyStateStore = null,
         TimeSpan? alertInitialDelay = null,
-        TimeSpan? alertCheckInterval = null)
+        TimeSpan? alertCheckInterval = null,
+        IBackupController? backupController = null)
     {
         _returnOrderProvider = returnOrderProvider;
         _newOrderProvider = newOrderProvider;
@@ -187,8 +189,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             fileSaveService,
             AlertThresholds.MainPolicy,
             onOpenOrder: OpenOrderFromDashboard,
-            onNavigateLegacyImport: () => NavigateByKey("legacy_import"),
-            onBackgroundSettingChanged: OnHomeBackgroundSettingChanged)
+            onNavigateLegacyImport: () => NavigateByKey("legacy_import"))
+        {
+            IsDemoMode = isDemoMode
+        };
+
+        _backupController = backupController ?? new FakeBackupController(returnOrderProvider.GetCurrentTime);
+        SettingsVm = new SettingsViewModel(
+            _backupController,
+            clipboardService,
+            () => _syncController.Room,
+            returnOrderProvider.GetCurrentTime,
+            onBackgroundSettingChanged: OnSettingsBackgroundSettingChanged,
+            onBackupSettingChanged: OnSettingsBackupSettingChanged,
+            openPhoneSync: () => NavigateByKey("phone_sync"))
         {
             IsDemoMode = isDemoMode
         };
@@ -321,6 +335,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["deleted"] = DeletedOrdersVm;
         _pageCache["stats"] = StatisticsVm;
         _pageCache["legacy_import"] = LegacyImportVm;
+        _pageCache["settings"] = SettingsVm;
 
         _homeNavItem = new NavigationItem(
             "home", "🏠", "Trang chủ", string.Empty, () => HomeVm);
@@ -371,7 +386,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _archiveNavItem,
             _deletedNavItem,
             new NavigationItem("stats", "📊", "Thống kê & báo cáo", "CHUNG", () => StatisticsVm),
-            new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm)
+            new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
+            new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm)
         ];
 
         ShopeeReturnVm.CountsUpdated += SyncSidebarKpis;
@@ -395,7 +411,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _sounds = uiSettings.Sounds;
         ScanReceiveVm.IsSoundEnabled = _sounds;
         _trayService.SetNotifyAlertsEnabled(_notifyAlerts);
-        HomeVm.SyncBackgroundSettings(_autoStart, _minimizeToTray, _notifyAlerts, _sounds);
+        SettingsVm.SyncBackgroundSettings(_autoStart, _minimizeToTray, _notifyAlerts, _sounds);
+        SettingsVm.SyncBackupSettings(uiSettings.BackupEnabled, uiSettings.BackupEveryHours, uiSettings.BackupKeepDays);
+        _backupController.ApplySchedule(uiSettings.BackupEnabled && !isDemoMode, uiSettings.BackupEveryHours, uiSettings.BackupKeepDays);
 
         // Khởi động vào màn hình lần trước (nếu hợp lệ), không thì về Trang chủ
         var initialKey = string.IsNullOrWhiteSpace(uiSettings.LastPage) ? "home" : uiSettings.LastPage;
@@ -431,6 +449,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public DeletedOrdersViewModel DeletedOrdersVm { get; }
     public StatisticsViewModel StatisticsVm { get; }
     public LegacyImportViewModel LegacyImportVm { get; }
+    public SettingsViewModel SettingsVm { get; }
     public ScanReceiveViewModel ScanReceiveVm { get; }
     public PhoneSyncViewModel PhoneSyncVm { get; }
     public FolderWatchViewModel FolderWatchVm { get; }
@@ -480,30 +499,36 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _autoStartService.SetEnabled(value);
         _uiSettingsStore.Update(s => s.AutoStart = value);
-        HomeVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
+        SettingsVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
     }
 
     partial void OnMinimizeToTrayChanged(bool value)
     {
         _uiSettingsStore.Update(s => s.MinimizeToTray = value);
-        HomeVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
+        SettingsVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
     }
 
     partial void OnNotifyAlertsChanged(bool value)
     {
         _uiSettingsStore.Update(s => s.NotifyAlerts = value);
         _trayService.SetNotifyAlertsEnabled(value);
-        HomeVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
+        SettingsVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
     }
 
     partial void OnSoundsChanged(bool value)
     {
         _uiSettingsStore.Update(s => s.Sounds = value);
         ScanReceiveVm.IsSoundEnabled = value;
-        HomeVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
+        SettingsVm.SyncBackgroundSettings(AutoStart, MinimizeToTray, NotifyAlerts, Sounds);
     }
 
-    private void OnHomeBackgroundSettingChanged(string propertyName, bool value)
+    private void OnSettingsBackupSettingChanged(bool enabled, int everyHours, int keepDays)
+    {
+        _uiSettingsStore.Update(s => { s.BackupEnabled = enabled; s.BackupEveryHours = everyHours; s.BackupKeepDays = keepDays; });
+        _backupController.ApplySchedule(enabled && !IsDemoMode, everyHours, keepDays);
+    }
+
+    private void OnSettingsBackgroundSettingChanged(string propertyName, bool value)
     {
         switch (propertyName)
         {
@@ -1060,6 +1085,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _saleworkController.Dispose();
         _trayService.ToggleNotifyAlertsRequested -= OnTrayToggleNotifyAlertsRequested;
         _alertMonitor.Dispose();
+        _backupController.Dispose();
         _trayService.Dispose();
         StopPeriodicSweep();
         CancelToastTimer();

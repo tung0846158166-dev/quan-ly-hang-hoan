@@ -165,7 +165,8 @@ public partial class App : Application
                 autoStartService: autoStartService,
                 trayService: trayService,
                 notificationService: notificationService,
-                alertNotifyStateStore: alertStateStore);
+                alertNotifyStateStore: alertStateStore,
+                backupController: new SqliteBackupController(AppPaths.DatabasePath));
         }
 
         _mainViewModel = mainViewModel;

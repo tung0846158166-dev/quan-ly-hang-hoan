@@ -188,7 +188,7 @@ public class ReturnOrdersViewModelTests
     {
         var mainVm = new MainViewModel(new FakeDataService(() => FixedNow));
 
-        Assert.Equal(17, mainVm.NavigationItems.Count);
+        Assert.Equal(18, mainVm.NavigationItems.Count);   // + "Cài đặt"
         Assert.IsType<HomeViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("return_watch");

@@ -441,52 +441,7 @@
                     </Border>
                 </Grid>
 
-                <!-- Section 4: Chạy nền và thông báo -->
-                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,14,0,0">
-                    <StackPanel>
-                        <DockPanel Margin="0,0,0,10">
-                            <TextBlock DockPanel.Dock="Right"
-                                       Text="Tự động lưu vào cài đặt"
-                                       FontSize="11.5"
-                                       Foreground="{DynamicResource InkMutedBrush}"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Text="⚙️ Chạy nền và thông báo"
-                                       FontSize="14"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource InkPrimaryBrush}" />
-                        </DockPanel>
 
-                        <UniformGrid Columns="2">
-                            <CheckBox Content="Tự mở cùng Windows (khởi động thu nhỏ ở khay)"
-                                      IsChecked="{Binding AutoStart}"
-                                      FontSize="12.5"
-                                      FontWeight="SemiBold"
-                                      Foreground="{DynamicResource InkPrimaryBrush}"
-                                      Margin="0,0,12,8"
-                                      Cursor="Hand" />
-                            <CheckBox Content="Thu nhỏ xuống khay khi bấm X (giữ đồng bộ chạy nền)"
-                                      IsChecked="{Binding MinimizeToTray}"
-                                      FontSize="12.5"
-                                      FontWeight="SemiBold"
-                                      Foreground="{DynamicResource InkPrimaryBrush}"
-                                      Margin="0,0,0,8"
-                                      Cursor="Hand" />
-                            <CheckBox Content="Báo vàng/đỏ bằng thông báo Windows (12h / 24h)"
-                                      IsChecked="{Binding NotifyAlerts}"
-                                      FontSize="12.5"
-                                      FontWeight="SemiBold"
-                                      Foreground="{DynamicResource InkPrimaryBrush}"
-                                      Margin="0,0,12,0"
-                                      Cursor="Hand" />
-                            <CheckBox Content="Âm thanh khi điện thoại tạo/quét đơn hoặc báo lỗi"
-                                      IsChecked="{Binding Sounds}"
-                                      FontSize="12.5"
-                                      FontWeight="SemiBold"
-                                      Foreground="{DynamicResource InkPrimaryBrush}"
-                                      Cursor="Hand" />
-                        </UniformGrid>
-                    </StackPanel>
-                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>

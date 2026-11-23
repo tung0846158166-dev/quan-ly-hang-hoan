@@ -1,0 +1,162 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <UserControl.Resources>
+        <Style x:Key="SettingsCheckStyle" TargetType="CheckBox">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style x:Key="SettingsHintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="SettingsTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⚙️ Cài đặt" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                    <Border Margin="12,0,0,0" Padding="8,2" CornerRadius="10" VerticalAlignment="Center"
+                            Background="{DynamicResource AlertYellowBadgeBgBrush}"
+                            Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource AlertYellowTextBrush}" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="Chạy nền, thông báo, đồng bộ điện thoại và sao lưu. Mọi thay đổi được lưu ngay." Style="{StaticResource SettingsHintStyle}" Margin="0,4,0,0" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16">
+            <StackPanel MaxWidth="900" HorizontalAlignment="Left">
+
+                <!-- Chạy nền và thông báo -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="🔔 Chạy nền và thông báo" Style="{StaticResource SettingsTitleStyle}" />
+                        <CheckBox Content="Tự mở cùng Windows (khởi động thu nhỏ ở khay)" IsChecked="{Binding AutoStart}" Style="{StaticResource SettingsCheckStyle}" />
+                        <CheckBox Content="Thu nhỏ xuống khay khi bấm X (giữ đồng bộ chạy nền)" IsChecked="{Binding MinimizeToTray}" Style="{StaticResource SettingsCheckStyle}" />
+                        <CheckBox Content="Báo vàng/đỏ bằng thông báo Windows (12h / 24h)" IsChecked="{Binding NotifyAlerts}" Style="{StaticResource SettingsCheckStyle}" />
+                        <CheckBox Content="Âm thanh khi điện thoại tạo/quét đơn hoặc báo lỗi" IsChecked="{Binding Sounds}" Style="{StaticResource SettingsCheckStyle}" Margin="0" />
+                        <TextBlock Style="{StaticResource SettingsHintStyle}" Margin="0,10,0,0"
+                                   Text="Muốn thoát hẳn app: chuột phải biểu tượng ở khay hệ thống và chọn &quot;Thoát hẳn&quot; (bấm X chỉ thu nhỏ khi bật tùy chọn thứ hai)." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Đồng bộ điện thoại -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="📱 Đồng bộ điện thoại" Style="{StaticResource SettingsTitleStyle}" />
+                        <TextBlock Text="Mã phòng (nhập đúng mã này vào app iPhone):" Style="{StaticResource SettingsHintStyle}" Margin="0,0,0,6" />
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Sao chép" Command="{Binding CopyRoomCommand}" Padding="14,6" Margin="8,0,0,0" Cursor="Hand" />
+                            <TextBox Text="{Binding RoomCode, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="15" FontWeight="Bold"
+                                     Padding="8,6" Background="{DynamicResource SurfaceMutedBgBrush}" Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource BorderBrushLight}" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding RoomStatus}" Style="{StaticResource SettingsHintStyle}" Margin="0,6,0,0"
+                                   Visibility="{Binding RoomStatus, Converter={StaticResource StringNotEmptyToVis}}"
+                                   Foreground="{DynamicResource AlertGreenTextBrush}" />
+                        <TextBlock Style="{StaticResource SettingsHintStyle}" Margin="0,8,0,0"
+                                   Text="Bản tin đi qua máy chủ công cộng không mã hóa: giữ bí mật mã phòng." />
+                        <Button Content="Mở màn Đồng bộ điện thoại (trạng thái kết nối, bật/tắt ntfy)" Command="{Binding OpenPhoneSyncCommand}"
+                                HorizontalAlignment="Left" Padding="12,6" Margin="0,10,0,0" Cursor="Hand" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Sao lưu -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="💾 Sao lưu dữ liệu" Style="{StaticResource SettingsTitleStyle}" />
+                        <CheckBox Content="Tự sao lưu" IsChecked="{Binding BackupEnabled}" Style="{StaticResource SettingsCheckStyle}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="Mỗi" VerticalAlignment="Center" Foreground="{DynamicResource InkPrimaryBrush}" />
+                            <ComboBox ItemsSource="{Binding EveryHoursChoices}" SelectedItem="{Binding BackupEveryHours}" Width="64" Margin="8,0,8,0" IsEnabled="{Binding BackupEnabled}" />
+                            <TextBlock Text="giờ, giữ" VerticalAlignment="Center" Foreground="{DynamicResource InkPrimaryBrush}" />
+                            <ComboBox ItemsSource="{Binding KeepDaysChoices}" SelectedItem="{Binding BackupKeepDays}" Width="64" Margin="8,0,8,0" IsEnabled="{Binding BackupEnabled}" />
+                            <TextBlock Text="ngày (luôn giữ ít nhất 3 bản mới nhất)" VerticalAlignment="Center" Style="{StaticResource SettingsHintStyle}" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding LatestBackupText}" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Sao lưu ngay" Command="{Binding BackupNowCommand}" Padding="14,6" Cursor="Hand">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Setter Property="IsEnabled" Value="True" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsBackupBusy}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Content="Mở thư mục sao lưu" Command="{Binding OpenBackupFolderCommand}" Padding="14,6" Margin="8,0,0,0" Cursor="Hand" />
+                        </StackPanel>
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" FontWeight="SemiBold"
+                                   Text="{Binding BackupStatus}"
+                                   Visibility="{Binding BackupStatus, Converter={StaticResource StringNotEmptyToVis}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding BackupStatusIsError}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Text="{Binding BackupFolderPath, StringFormat='Thư mục: {0}'}" Style="{StaticResource SettingsHintStyle}" Margin="0,10,0,6" />
+                        <Border BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="6" MaxHeight="220">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Backups}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="10,5">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="150" />
+                                                    <ColumnDefinition Width="90" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Name}" FontFamily="Consolas" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding TimeText}" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                                <TextBlock Grid.Column="2" Text="{Binding SizeText}" Foreground="{DynamicResource InkMutedBrush}" TextAlignment="Right" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+                        <TextBlock Text="{Binding RestoreHint}" Style="{StaticResource SettingsHintStyle}" Margin="0,10,0,0" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

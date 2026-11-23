@@ -38,14 +38,18 @@ enum Theme {
 }
 
 /// Rung phản hồi nhẹ khi chạm thẻ/nút (tôn trọng cài đặt "Rung khi quét").
+@MainActor
 enum Haptics {
+    /// Đọc thẳng UserDefaults (cùng khóa và mặc định bật như SyncEngine.pref) để không phụ thuộc lớp SyncEngine.
+    private static var enabled: Bool { UserDefaults.standard.object(forKey: "hapticOn") as? Bool ?? true }
+
     static func tap() {
-        guard SyncEngine.pref("hapticOn") else { return }
+        guard enabled else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     static func medium() {
-        guard SyncEngine.pref("hapticOn") else { return }
+        guard enabled else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
 }

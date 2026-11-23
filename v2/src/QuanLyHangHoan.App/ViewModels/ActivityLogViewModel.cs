@@ -77,9 +77,27 @@ public sealed partial class ActivityLogViewModel : ObservableObject
     };
 
     /// <summary>Tải lại từ đầu (đầu danh sách), giữ bộ lọc hiện tại.</summary>
-    public async Task ReloadAsync()
+    public Task ReloadAsync()
     {
-        if (IsLoading) return;
+        // Đang tải: không bỏ qua âm thầm (dữ liệu có thể đã đổi sau khi lượt đó đọc). Đánh dấu "tải lại thêm một lượt" rồi trả lại lượt đang chạy.
+        if (_reloadTask is { IsCompleted: false }) { _reloadAgain = true; return _reloadTask; }
+        return _reloadTask = ReloadLoopAsync();
+    }
+
+    private Task? _reloadTask;
+    private bool _reloadAgain;
+
+    private async Task ReloadLoopAsync()
+    {
+        do
+        {
+            _reloadAgain = false;
+            await ReloadOnceAsync();
+        } while (_reloadAgain);
+    }
+
+    private async Task ReloadOnceAsync()
+    {
         IsLoading = true;
         try
         {

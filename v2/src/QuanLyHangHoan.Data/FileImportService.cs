@@ -31,6 +31,9 @@ public static class FileImportService
         if (rows.Count == 0) return FileKind.Unknown;
         if (TikTokMapper.IsTikTokExport(rows)) return FileKind.TikTok;
         var keys = rows.Take(5).SelectMany(r => r.Keys).Select(LegacyText.Key).ToList();
+        // Chỉ file TikTok dùng "Nạp file Excel". File xuất từ Salework (có "Giá Salework" + "Loại đơn hoàn"/"Mã phiếu nhập hoàn") phải đi cùng
+        // đường như nạp tự động từ Salework, tránh cùng một đơn bị nhận nhầm là Shopee rồi trùng với dòng Salework tự lấy.
+        if (keys.Contains("giasalework") && (keys.Contains("loaidonhoan") || keys.Contains("maphieunhaphoan"))) return FileKind.TikTok;
         return keys.Any(k => k.Contains("madonhang") || k.Contains("orderid") || k.Contains("madon") || k.Contains("mavandon") || k.Contains("trackingnumber") || k.Contains("trackingid"))
             ? FileKind.Shopee : FileKind.Unknown;
     }

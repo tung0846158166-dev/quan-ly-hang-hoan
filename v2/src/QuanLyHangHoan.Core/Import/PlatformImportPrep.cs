@@ -66,7 +66,8 @@ public static class PlatformImportPrep
                 if (identity.Count > 0)
                 {
                     inheritedIdentity = identity;
-                    inheritedStatusCells = entries.Where(kv => Regex.IsMatch(Canonical(kv.Key), "status|trangthai") && (kv.Value ?? "").Trim().Length > 0).ToList();
+                    // v2: thêm cột "Loại đơn hoàn" của Salework để dòng sản phẩm phụ của đơn "Một phần" đi cùng dòng cha (app cũ không có cột này trong dữ liệu mẫu).
+                    inheritedStatusCells = entries.Where(kv => Regex.IsMatch(Canonical(kv.Key), "status|trangthai|loaidonhoan") && (kv.Value ?? "").Trim().Length > 0).ToList();
                     inheritedIdentityCells = entries.Where(kv => IdentityKeys.Contains(Canonical(kv.Key)) && (kv.Value ?? "").Trim().Length > 0).ToList();
                 }
                 else foreach (var kv in inheritedIdentity) canonical[kv.Key] = kv.Value;

@@ -157,6 +157,7 @@ public static class TikTokMapper
             new[] { "returnlogisticstrackingid", "mvdtrahang", "returntracking" });
         var saleworkReturnedKey = returnLogisticsTrackKey is not null ? null : Find(new[] { "Ngày trả hàng thành công" });
         var saleworkReturnTrackKey = returnLogisticsTrackKey is not null ? null : Find(new[] { "Mã trả hàng", "Mã vận đơn hoàn", "Mã vận đơn hoàn về" });
+        var saleworkKindKey = Find(new[] { "Loại đơn hoàn" }, new[] { "loaidonhoan" });
         var returnTypeKey = Find(new[] { "Return Type", "Cancelation/Return Type", "Loại yêu cầu", "Loại hủy" }, new[] { "returntype", "cancelationreturntype", "canceltype", "loaiyeucau" });
         var returnReasonKey = Find(new[] { "Return Reason", "Cancel Reason", "Lý do hoàn", "Lý do trả hàng", "Lý do hủy" }, new[] { "returnreason", "cancelreason", "lydohoan", "lydotrahang", "lydohuy" });
         var returnStatusKey = Find(new[] { "Return Status", "Trạng thái hoàn" }, new[] { "returnstatus", "trangthaihoan" });
@@ -297,7 +298,11 @@ public static class TikTokMapper
             var isFailedDelivery = reasonNorm.Contains("giao goi hang that bai") || reasonNorm.Contains("that bai") || reasonNorm.Contains("fail");
             var returnWords = new Regex(@"\b(?:hoan|tra|return(?:ed|ing)?|refund(?:ed|ing)?)\b", I);
             var hasReturnIdentity = rawReturnOrderId.Length > 0 || (returnLogisticsTrackKey is not null && Get(row, returnLogisticsTrackKey).Trim().Length > 0);
-            var isReturnOrRefund = returnWords.IsMatch(stNorm) || returnWords.IsMatch(subNorm) || rawRetQty > 0 || hasReturnIdentity;
+            // v2 (khác app cũ, theo yêu cầu chủ dự án): file Salework có cột "Loại đơn hoàn" = "Trả hàng hoàn tiền - Một phần", trạng thái "THÀNH CÔNG".
+            // App cũ bỏ các dòng này vì cột trạng thái không có chữ hoàn/trả; v2 nhận và gắn cờ hoàn một phần. Chỉ áp dụng khi chưa là THẤT THU.
+            var saleworkKindNorm = saleworkKindKey is not null ? LegacyText.RemoveTones(Get(row, saleworkKindKey)) : "";
+            var isSaleworkPartial = saleworkKindNorm.Contains("mot phan") && !LegacyText.RemoveTones(rawStatusText).Contains("that thu");
+            var isReturnOrRefund = returnWords.IsMatch(stNorm) || returnWords.IsMatch(subNorm) || rawRetQty > 0 || hasReturnIdentity || isSaleworkPartial;
             var isReturnOrCancel = isFailedDelivery || isCancelledWord || isReturnOrRefund || stNorm.Contains("that thu");
 
             if (!isContinuation)
@@ -386,7 +391,7 @@ public static class TikTokMapper
             if (carrier.Length == 0) carrier = carrierFromExcel;
             if (carrier.Length == 0) carrier = rawTrack.Length > 0 ? "J&T Express" : "Chờ bưu cục tiếp nhận";
 
-            var isPartial = (hasReturnQty && rawRetQty > 0 && orderedQty > rawRetQty) || typeNorm.Contains("partial") || reasonNorm.Contains("mot phan");
+            var isPartial = (hasReturnQty && rawRetQty > 0 && orderedQty > rawRetQty) || typeNorm.Contains("partial") || reasonNorm.Contains("mot phan") || isSaleworkPartial;
 
             var existedBefore = groups.ContainsKey(groupKey);
             if (!existedBefore)

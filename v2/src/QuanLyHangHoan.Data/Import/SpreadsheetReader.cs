@@ -71,6 +71,8 @@ public static class SpreadsheetReader
     {
         "tennguoimua", "nguoimua", "tennguoidungnguoimua", "tendangnhapnguoimua", "buyerusername", "buyername", "diachinhanhang",
         "diachilayhanghoantra", "tennguoinhan", "deliveryaddress", "returnaddress", "recipientname", "buyerphone",
+        // Cột cá nhân của file TikTok tiếng Anh (đã kiểm tra: importer không đọc các cột này và không lưu vào DB; bỏ ngay khi đọc cho chắc).
+        "recipient", "phone", "province", "district", "commune", "detailaddress", "additionaladdressinformation", "buyermessage",
     };
 
     public static List<Dictionary<string, string>> DropPersonalColumns(IEnumerable<Dictionary<string, string>> rows) =>

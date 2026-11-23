@@ -264,8 +264,7 @@ public sealed class ImportDuplicateScenarioTests : IDisposable
         var only = Assert.Single(Rows());                              // đơn đến trước giữ nguyên, không bị đổi mã đơn/nuốt sản phẩm
         Assert.Equal("SP1", only.Order.OrderId);
         Assert.Equal("Áo A", only.Order.Items.Single().Product);
-        Assert.Equal(1, r.Import!.Ambiguous.Count);                    // đơn kia được BÁO để kiểm tra thủ công
-        Assert.True(r.Import.Ambiguous.Single().OrderConflict);
+        Assert.True(Assert.Single(r.Import!.Ambiguous).OrderConflict);   // đơn kia được BÁO để kiểm tra thủ công
     }
 
     [Fact]

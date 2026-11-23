@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -56,6 +56,9 @@ public sealed class WatchlistRowViewModel
 
         DisplayTracking = BuildTrackingDisplay(source);
         ItemsSummary = BuildItemsSummary(source.Items, source.IsPartialReturn);
+        ItemLines = ItemDisplay.Build(source.Items);
+        PartialChip = ItemDisplay.Chip(source.Items, source.IsPartialReturn);
+        ItemsTooltip = ItemDisplay.Tooltip(source.Items, source.IsPartialReturn);
         TotalQty = source.Items.Count > 0 ? source.Items.Sum(i => Math.Max(i.Qty, 0)) : 0;
         PriceFormatted = string.Format(ViCulture, "{0:N0} đ", source.Price);
 
@@ -72,6 +75,9 @@ public sealed class WatchlistRowViewModel
     public string OrderId => Source.OrderId;
     public string DisplayTracking { get; }
     public string ItemsSummary { get; }
+    public IReadOnlyList<ItemLine> ItemLines { get; }
+    public string PartialChip { get; }
+    public string ItemsTooltip { get; }
     public int TotalQty { get; }
     public string PriceFormatted { get; }
     public string Status => Source.Status;

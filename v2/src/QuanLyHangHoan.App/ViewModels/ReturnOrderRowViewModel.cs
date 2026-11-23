@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.Core.Alerts;
 using QuanLyHangHoan.Core.Models;
@@ -55,6 +55,9 @@ public sealed class ReturnOrderRowViewModel
 
         DisplayTracking = BuildTrackingDisplay(source);
         ItemsSummary = BuildItemsSummary(source);
+        ItemLines = ItemDisplay.Build(source.Items);
+        PartialChip = ItemDisplay.Chip(source.Items, source.IsPartialReturn);
+        ItemsTooltip = ItemDisplay.Tooltip(source.Items, source.IsPartialReturn);
         TotalQty = source.Items.Count > 0 ? source.Items.Sum(i => Math.Max(i.Qty, 0)) : 0;
         PriceFormatted = string.Format(ViCulture, "{0:N0} đ", source.Price);
         PhotoIndicator = string.IsNullOrWhiteSpace(source.PhotoId) ? "—" : "📷 Có ảnh";
@@ -88,6 +91,9 @@ public sealed class ReturnOrderRowViewModel
 
     public string DisplayTracking { get; }
     public string ItemsSummary { get; }
+    public IReadOnlyList<ItemLine> ItemLines { get; }
+    public string PartialChip { get; }
+    public string ItemsTooltip { get; }
     public int TotalQty { get; }
     public string PriceFormatted { get; }
     public string PhotoId => Source.PhotoId;

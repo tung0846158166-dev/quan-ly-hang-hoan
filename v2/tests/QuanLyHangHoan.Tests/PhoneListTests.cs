@@ -252,6 +252,10 @@ public sealed class PhoneListTests : IDisposable
 
         var hu = Act(new { type = "order_edit", room = Room, requestId = "e3", code = "SPXB1", fields = new { st = "Hư hỏng" } });
         Assert.Equal("invalid", hu.Outcome);
+
+        Assert.Equal(ReceiveStatus.NotYetArrived, PhoneActions.MapStatus("Chưa về"));     // giá trị TikTok điện thoại đang hiển thị
+        Assert.Equal(ReceiveStatus.NotReturned, PhoneActions.MapStatus("Chưa nhận"));
+        Assert.Null(PhoneActions.MapStatus("Hư hỏng"));
     }
 
     [Fact]

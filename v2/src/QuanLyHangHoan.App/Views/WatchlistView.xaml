@@ -1,9 +1,10 @@
-<UserControl x:Class="QuanLyHangHoan.App.Views.WatchlistView"
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.WatchlistView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             xmlns:ctl="clr-namespace:QuanLyHangHoan.App.Controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:WatchlistViewModel}"
              UseLayoutRounding="True"
@@ -170,7 +171,7 @@
                           HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
                           BorderThickness="0"
                           Background="{DynamicResource CardBgBrush}"
-                          RowHeight="36"
+                          MinRowHeight="36"
                           EnableRowVirtualization="True"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Recycling"
@@ -259,14 +260,13 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
-                        <DataGridTextColumn Header="Sản phẩm" Binding="{Binding ItemsSummary}" Width="220">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                    <Setter Property="ToolTip" Value="{Binding ItemsSummary}" />
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Sản phẩm" Width="220" SortMemberPath="ItemsSummary">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ctl:ItemLinesTextBlock Lines="{Binding ItemLines}" Chip="{Binding PartialChip}" ToolTip="{Binding ItemsTooltip}" Margin="6,0" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
                         <DataGridTemplateColumn Header="Nhận tại kho" Width="125" SortMemberPath="Status">
                             <DataGridTemplateColumn.CellTemplate>

@@ -153,6 +153,7 @@ public static class PhoneActions
     {
         "Hàng đã trả" => ReceiveStatus.Received,
         "Chưa nhận" or "Chưa trả" => ReceiveStatus.NotReturned,
+        "Chưa về" => ReceiveStatus.NotYetArrived,   // giá trị có thật của đơn TikTok; điện thoại gửi lại đúng giá trị đang hiển thị
         "Không cần nhận" => ReceiveStatus.NotNeeded,
         "Bị mất" => ReceiveStatus.Lost,
         _ => null,

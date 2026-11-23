@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -35,6 +35,9 @@ public sealed class ReturnWatchRowViewModel
             : (!string.IsNullOrWhiteSpace(Source.Track) ? Source.Track : "Chưa có MVĐ");
 
         ItemsSummary = BuildItemsSummary(Source.Items, Source.IsPartialReturn);
+        ItemLines = ItemDisplay.Build(Source.Items);
+        PartialChip = ItemDisplay.Chip(Source.Items, Source.IsPartialReturn);
+        ItemsTooltip = ItemDisplay.Tooltip(Source.Items, Source.IsPartialReturn);
         ArrivedAtDate = AlertThresholds.TryParseVietnamDateTime(Source.ReturnedAt);
 
         var activePolicy = policy ?? AlertThresholds.MainPolicy;
@@ -96,6 +99,9 @@ public sealed class ReturnWatchRowViewModel
     public string Platform => Source.Platform;
     public string DisplayTracking { get; }
     public string ItemsSummary { get; }
+    public IReadOnlyList<ItemLine> ItemLines { get; }
+    public string PartialChip { get; }
+    public string ItemsTooltip { get; }
     public long Since { get; }
     public string SinceFormatted { get; }
     public int Stage { get; }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -18,6 +18,9 @@ public sealed class ArchivedOrderRowViewModel
         RecvDateParsed = AlertThresholds.TryParseVietnamDateTime(source.RecvDate);
         DisplayTracking = !string.IsNullOrWhiteSpace(source.ReturnTrack) ? source.ReturnTrack : source.Track;
         ItemsSummary = BuildItemsSummary(source.Items);
+        ItemLines = ItemDisplay.Build(source.Items);
+        PartialChip = ItemDisplay.Chip(source.Items, source.IsPartialReturn);
+        ItemsTooltip = ItemDisplay.Tooltip(source.Items, source.IsPartialReturn);
         TotalQty = source.Items.Count > 0 ? source.Items.Sum(i => Math.Max(i.Qty, 0)) : 0;
         PriceFormatted = string.Format(ViCulture, "{0:N0} đ", source.Price);
         PhotoIndicator = string.IsNullOrWhiteSpace(source.PhotoId) ? "—" : "📷 Có ảnh";
@@ -37,6 +40,9 @@ public sealed class ArchivedOrderRowViewModel
     public string OrderId => Source.OrderId;
     public string DisplayTracking { get; }
     public string ItemsSummary { get; }
+    public IReadOnlyList<ItemLine> ItemLines { get; }
+    public string PartialChip { get; }
+    public string ItemsTooltip { get; }
     public int TotalQty { get; }
     public string Carrier => Source.Carrier;
     public decimal Price => Source.Price;

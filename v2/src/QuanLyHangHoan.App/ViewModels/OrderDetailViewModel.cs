@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -23,7 +23,10 @@ public sealed record OrderDetailItemRow(
     int Qty,
     string Sku,
     string SkuId,
-    string ImportPricesText);
+    string ImportPricesText,
+    int ReturnedQty = 0,
+    string ReturnTag = "—",
+    ItemLineKind Kind = ItemLineKind.Neutral);
 
 public sealed record RawDetailRow(string Column, string Value);
 
@@ -182,6 +185,7 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         // 4. Sản phẩm
         var sourceItems = order.Items ?? [];
         var itemRows = new List<OrderDetailItemRow>(sourceItems.Count);
+        var mixedItems = ItemDisplay.IsMixed(sourceItems);
         var totalQty = 0;
         for (var i = 0; i < sourceItems.Count; i++)
         {
@@ -190,6 +194,7 @@ public sealed partial class OrderDetailViewModel : ObservableObject
             var pricesText = item.ImportPrices is { Count: > 0 }
                 ? string.Join(", ", item.ImportPrices.Select(kv => $"{kv.Key}: {string.Format(ViCulture, "{0:N0} đ", kv.Value)}"))
                 : "—";
+            var kind = !mixedItems ? ItemLineKind.Neutral : item.ReturnedQty > 0 ? ItemLineKind.Returned : ItemLineKind.NotReturned;
             itemRows.Add(new OrderDetailItemRow(
                 i + 1,
                 Dash(item.Product),
@@ -198,13 +203,21 @@ public sealed partial class OrderDetailViewModel : ObservableObject
                 item.Qty,
                 Dash(item.Sku),
                 Dash(item.SkuId),
-                pricesText));
+                pricesText,
+                item.ReturnedQty,
+                kind == ItemLineKind.Returned ? $"Hoàn {item.ReturnedQty}" : kind == ItemLineKind.NotReturned ? "Không hoàn" : "—",
+                kind));
         }
 
         Items = itemRows;
         TotalQty = totalQty;
         TotalQtyText = $"Tổng SL: {totalQty:N0}";
         IsPartialReturn = order.IsPartialReturn;
+        var chipText = ItemDisplay.Chip(sourceItems, order.IsPartialReturn);
+        ReturnSummary = mixedItems
+            ? $"{chipText.Replace(" SP", " sản phẩm")}: {string.Join(", ", sourceItems.Where(x => x.ReturnedQty > 0).Select(x => $"{x.Product} x{x.ReturnedQty}"))}"
+            : string.Empty;
+        HasReturnSummary = ReturnSummary.Length > 0;
         HasItemsGroup = itemRows.Count > 0 || IsPartialReturn;
 
         // 5. Ghi chú
@@ -291,6 +304,9 @@ public sealed partial class OrderDetailViewModel : ObservableObject
     public int TotalQty { get; }
     public string TotalQtyText { get; }
     public bool IsPartialReturn { get; }
+    /// <summary>Hoàn một phần có biết sản phẩm nào hoàn: "Hoàn 1/3 sản phẩm: Áo x1".</summary>
+    public string ReturnSummary { get; }
+    public bool HasReturnSummary { get; }
 
     // Ghi chú
     public bool HasNotesGroup { get; }

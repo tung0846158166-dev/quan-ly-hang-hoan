@@ -28,6 +28,10 @@
     <SolidColorBrush x:Key="InkMutedBrush" Color="#64748B" />
     <SolidColorBrush x:Key="InkSubtleBrush" Color="#94A3B8" />
     <SolidColorBrush x:Key="AccentOrangeBrush" Color="#EE4D2D" />
+    <!-- Đơn hoàn MỘT PHẦN: sản phẩm đã hoàn (nhấn) và sản phẩm không hoàn (xám, vẫn đọc được) -->
+    <SolidColorBrush x:Key="ItemReturnedBrush" Color="#C2410C" />
+    <SolidColorBrush x:Key="ItemReturnedBgBrush" Color="#FFEDD5" />
+    <SolidColorBrush x:Key="ItemNotReturnedBrush" Color="#6B7280" />
     <SolidColorBrush x:Key="AccentBlueBrush" Color="#2563EB" />
     <SolidColorBrush x:Key="AccentBarBlueBrush" Color="#3B82F6" />
 

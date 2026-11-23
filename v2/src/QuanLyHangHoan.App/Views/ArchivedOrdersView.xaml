@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             xmlns:ctl="clr-namespace:QuanLyHangHoan.App.Controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ArchivedOrdersViewModel}"
              UseLayoutRounding="True"
@@ -172,7 +173,7 @@
                           HorizontalGridLinesBrush="{DynamicResource DataGridGridLinesBrush}"
                           BorderThickness="0"
                           Background="{DynamicResource CardBgBrush}"
-                          RowHeight="36"
+                          MinRowHeight="36"
                           FrozenColumnCount="2"
                           EnableRowVirtualization="True"
                           EnableColumnVirtualization="True"
@@ -253,14 +254,13 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="Tên sản phẩm / Phân loại" Binding="{Binding ItemsSummary}" Width="245">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-                                    <Setter Property="ToolTip" Value="{Binding ItemsSummary}" />
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Tên sản phẩm / Phân loại" Width="245" SortMemberPath="ItemsSummary">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ctl:ItemLinesTextBlock Lines="{Binding ItemLines}" Chip="{Binding PartialChip}" ToolTip="{Binding ItemsTooltip}" Margin="6,0" VerticalAlignment="Center" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="SL" Binding="{Binding TotalQty}" Width="48">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">

@@ -347,6 +347,16 @@
                             <TextBlock Text="📦 Sản phẩm" Style="{StaticResource DetailSectionTitleStyle}" Margin="0" VerticalAlignment="Center" />
                         </DockPanel>
 
+                        <Border Background="{DynamicResource ItemReturnedBgBrush}"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                Margin="0,0,0,8"
+                                Visibility="{Binding HasReturnSummary, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding ReturnSummary}"
+                                       FontWeight="Bold"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ItemReturnedBrush}" />
+                        </Border>
                         <DataGrid ItemsSource="{Binding Items}"
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
@@ -360,12 +370,36 @@
                                   BorderBrush="{DynamicResource BorderBrushLight}"
                                   Background="{DynamicResource CardBgBrush}"
                                   MinRowHeight="32"
-                                  ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
-                                  CellStyle="{StaticResource ModernDataGridCellStyle}">
+                                  ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}">
+                            <DataGrid.CellStyle>
+                                <!-- Màu chữ theo Kind của dòng (kiểu ô mặc định ghi đè màu chữ của dòng nên đặt ở cấp ô) -->
+                                <Style TargetType="DataGridCell" BasedOn="{StaticResource ModernDataGridCellStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Kind}" Value="Returned">
+                                            <Setter Property="Foreground" Value="{DynamicResource ItemReturnedBrush}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="NotReturned">
+                                            <Setter Property="Foreground" Value="{DynamicResource ItemNotReturnedBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.CellStyle>
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
                                     <Setter Property="Background" Value="{DynamicResource DataGridRowBgBrush}" />
                                     <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+                                    <Style.Triggers>
+                                        <!-- Hoàn một phần: dòng đã hoàn nền nhạt + chữ nhấn; dòng không hoàn chữ xám (vẫn đọc được) -->
+                                        <DataTrigger Binding="{Binding Kind}" Value="Returned">
+                                            <Setter Property="Background" Value="{DynamicResource ItemReturnedBgBrush}" />
+                                            <Setter Property="Foreground" Value="{DynamicResource ItemReturnedBrush}" />
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Kind}" Value="NotReturned">
+                                            <Setter Property="Foreground" Value="{DynamicResource ItemNotReturnedBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
                                 </Style>
                             </DataGrid.RowStyle>
                             <DataGrid.Columns>
@@ -381,6 +415,13 @@
                                 <DataGridTextColumn Header="Màu / Phân loại" Binding="{Binding Color}" Width="110" />
                                 <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="65" />
                                 <DataGridTextColumn Header="SL" Binding="{Binding Qty}" Width="48" />
+                                <DataGridTextColumn Header="Hoàn về" Binding="{Binding ReturnTag}" Width="90">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="FontWeight" Value="Bold" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Header="SKU" Binding="{Binding Sku}" Width="110" />
                                 <DataGridTextColumn Header="SKU ID" Binding="{Binding SkuId}" Width="110" />
                                 <DataGridTextColumn Header="Giá từng ô (ImportPrices)" Binding="{Binding ImportPricesText}" Width="1.4*">

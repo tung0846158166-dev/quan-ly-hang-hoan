@@ -435,7 +435,12 @@ public sealed class FakeDataService :
                 Note = "Kiện hoàn thứ 2 của cùng đơn gốc (kiện B tách dòng riêng)",
                 UserNote = "Nhận kiện A không tự nhận kiện B",
                 IsPartialReturn = true,
-                Items = [new OrderItem { Product = "Áo Thun Cotton Cổ Tròn Demo", Color = "Trắng", Size = "L", Qty = 2 }]
+                // Hoàn một phần: 2 sản phẩm, hoàn 1
+                Items =
+                [
+                    new OrderItem { Product = "Áo Thun Cotton Cổ Tròn Demo", Color = "Trắng", Size = "L", Qty = 2, ReturnedQty = 2 },
+                    new OrderItem { Product = "Thắt Lưng Da Demo", Color = "Nâu", Size = "100", Qty = 1 }
+                ]
             },
             new Order
             {
@@ -460,9 +465,12 @@ public sealed class FakeDataService :
                 PhotoId = "demo_photo_03",
                 Items =
                 [
-                    new OrderItem { Product = "Quần Jeans Ống Suông Demo", Color = "Xanh Đen", Size = "31", Qty = 1 },
-                    new OrderItem { Product = "Sơ Mi Oxford Dài Tay Demo", Color = "Trắng", Size = "L", Qty = 1 }
-                ]
+                    // Hoàn MỘT PHẦN: gửi 3 sản phẩm, khách chỉ hoàn 1 (giữ đủ cả 3, sản phẩm hoàn khác màu)
+                    new OrderItem { Product = "Quần Jeans Ống Suông Demo", Color = "Xanh Đen", Size = "31", Qty = 1, ReturnedQty = 1 },
+                    new OrderItem { Product = "Sơ Mi Oxford Dài Tay Demo", Color = "Trắng", Size = "L", Qty = 1 },
+                    new OrderItem { Product = "Nón Lưỡi Trai Demo", Color = "Đen", Size = "Free", Qty = 1 }
+                ],
+                IsPartialReturn = true
             },
             new Order
             {

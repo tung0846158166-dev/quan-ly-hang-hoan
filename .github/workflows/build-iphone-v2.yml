@@ -50,10 +50,20 @@ jobs:
       - name: Build (không ký)
         working-directory: ios-app/App
         run: |
-          set -o pipefail
+          set +e
+          mkdir -p build
           xcodebuild -project QuetHangHoan.xcodeproj -scheme QuetHangHoan -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/build/App.xcarchive" archive \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" 2>&1 | tail -120
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" > build/xcodebuild.log 2>&1
+          status=$?
+          tail -60 build/xcodebuild.log
+          if [ $status -ne 0 ]; then
+            # Mỗi lỗi biên dịch thành một chú thích (annotation) đọc được công khai ở trang chạy, không cần đăng nhập để xem log.
+            grep -E "error:" build/xcodebuild.log | sort -u | head -40 | while IFS= read -r line; do
+              echo "::error::$(echo "$line" | sed 's#.*/ios-app/App/##' | cut -c1-400)"
+            done
+          fi
+          exit $status
 
       - name: Đóng gói IPA
         working-directory: ios-app/App/build

@@ -76,10 +76,20 @@ public struct DashboardSummary: Equatable {
     public var platforms: [PlatformSummary] = []
     public var last7Days: [DailyReceiveCount] = []
     public var maxDailyCount: Int = 0
+    public var average7Days: Double = 0
     public var has7DayData: Bool = false
     public var droppedCount: Int = 0
     public var sentMismatchCount: Int = 0
     public var discrepancyCount: Int { droppedCount + sentMismatchCount }
+
+    /// Tổng mục tiêu hôm nay (đã nhận hôm nay + còn đang chờ về).
+    public var todayTargetCount: Int { receivedTodayCount + pendingCount }
+
+    /// Tỉ lệ hoàn thành vòng tiến độ hôm nay trong khoảng 0...1 (an toàn khi rỗng, không chia cho 0).
+    public var todayProgress: Double {
+        guard todayTargetCount > 0 else { return 0 }
+        return min(1.0, Double(receivedTodayCount) / Double(todayTargetCount))
+    }
 
     public init() {}
 
@@ -94,6 +104,12 @@ public struct DashboardSummary: Equatable {
     public func dailyRatio(for day: DailyReceiveCount) -> Double {
         guard maxDailyCount > 0 else { return 0 }
         return Double(day.count) / Double(maxDailyCount)
+    }
+
+    /// Tỉ lệ đường trung bình trong biểu đồ 7 ngày (0...1, không chia cho 0).
+    public var average7DaysRatio: Double {
+        guard maxDailyCount > 0 else { return 0 }
+        return min(1.0, average7Days / Double(maxDailyCount))
     }
 }
 
@@ -138,6 +154,21 @@ public enum DashboardMetrics {
         case 7: return "T7"
         default: return ""
         }
+    }
+
+    /// Nhãn nhóm ngày cho màn Lịch sử: "Hôm nay", "Hôm qua", hoặc "dd/MM/yyyy".
+    public static func daySectionTitle(for date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+        let dayStart = calendar.startOfDay(for: date)
+        let todayStart = calendar.startOfDay(for: now)
+        if dayStart == todayStart { return "Hôm nay" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: todayStart), dayStart == yesterday {
+            return "Hôm qua"
+        }
+        let comps = calendar.dateComponents([.day, .month, .year], from: dayStart)
+        let d = comps.day ?? 1
+        let m = comps.month ?? 1
+        let y = comps.year ?? 2026
+        return String(format: "%02d/%02d/%04d", d, m, y)
     }
 
     /// Tính toàn bộ số liệu Tổng quan trong một lần duyệt dữ liệu.
@@ -264,6 +295,7 @@ public enum DashboardMetrics {
             )
         }
         summary.maxDailyCount = summary.last7Days.map { $0.count }.max() ?? 0
+        summary.average7Days = summary.last7Days.isEmpty ? 0 : Double(total7) / Double(summary.last7Days.count)
         summary.has7DayData = total7 > 0
 
         // Cảnh báo lệch số đơn với máy tính (dropped > 0 hoặc sent != rows.count).

@@ -297,10 +297,12 @@ struct CancelAfterPrepView: View {
     }
 }
 
-/// Bảng "Hàng hoàn về": theo dõi 4 chặng Đã đồng ý → Đang về → Đã về shop → Đã nhận kho.
+/// Bảng "Hàng hoàn về": đường ống 4 chặng lớn ở đầu (chạm chặng để lọc), mỗi đơn có thanh tiến trình 4 điểm.
 struct ReturnWatchView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private enum StageFilter: Int, CaseIterable {
         case active = 0
         case stage1 = 1
@@ -311,11 +313,11 @@ struct ReturnWatchView: View {
 
         var title: String {
             switch self {
-            case .active: return "Đang về"
+            case .active: return "Đang về (1–3)"
             case .stage1: return "Đã đồng ý"
-            case .stage2: return "Đang vận chuyển"
+            case .stage2: return "Đang về"
             case .stage3: return "Về shop"
-            case .stage4: return "Đã nhận"
+            case .stage4: return "Nhận kho"
             case .all: return "Tất cả"
             }
         }
@@ -345,22 +347,17 @@ struct ReturnWatchView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(StageFilter.allCases, id: \.self) { f in
-                        Chip(title: "\(f.title) (\(count(f)))", selected: filter == f) { filter = f }
-                    }
-                }
-                .padding(.horizontal, 14)
+        VStack(spacing: 12) {
+            pipelineHeader
+                .padding(.horizontal, 16)
                 .padding(.top, 6)
-            }
 
-            if let b = engine.banner { BannerStrip(banner: b).padding(.horizontal, 14) }
+            if let b = engine.banner { BannerStrip(banner: b).padding(.horizontal, 16) }
 
             List {
                 if list.isEmpty {
                     Text(store.rows.contains { $0.rw > 0 } ? "Không có đơn trong chặng này" : "Máy tính chưa gửi Bảng Hàng Hoàn Về — kéo xuống để tải lại")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -370,22 +367,99 @@ struct ReturnWatchView: View {
                         Haptics.tap()
                         detail = r
                     } label: {
-                        line(r).card(padding: 14, radius: 16)
+                        line(r).card(padding: 15, radius: 18)
                     }
                     .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
+                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                 }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
         }
         .background(Theme.pageBackground.ignoresSafeArea())
-        .navigationTitle("Hàng hoàn về (\(count(.active)))")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Hàng hoàn về")
+        .navigationBarTitleDisplayMode(.large)
         .sheet(item: $detail) { DetailView(row: $0) }
-        .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+        .refreshable {
+            guard !store.isDemoMode else { return }
+            engine.requestSnapshot()
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+        }
+    }
+
+    // MARK: - Đường ống 4 chặng lớn ở đầu (bấm chặng để lọc)
+    private var pipelineHeader: some View {
+        let stages: [(StageFilter, Int, String, Color)] = [
+            (.stage1, 1, "Đồng ý", Theme.info),
+            (.stage2, 2, "Đang về", Theme.teal),
+            (.stage3, 3, "Về shop", Theme.warning),
+            (.stage4, 4, "Nhận kho", Theme.success)
+        ]
+
+        return VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                ForEach(stages, id: \.1) { item in
+                    let selected = filter == item.0
+                    let cnt = count(item.0)
+                    Button {
+                        Haptics.tap()
+                        let next: StageFilter = selected ? .active : item.0
+                        if reduceMotion { filter = next } else { withAnimation(.easeInOut(duration: 0.18)) { filter = next } }
+                    } label: {
+                        VStack(spacing: 6) {
+                            ZStack {
+                                Circle()
+                                    .fill(selected ? item.3 : item.3.opacity(0.16))
+                                    .frame(width: 38, height: 38)
+                                Text("\(cnt)")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(selected ? .white : item.3)
+                                    .monospacedDigit()
+                            }
+                            Text(item.2)
+                                .font(.caption2.bold())
+                                .foregroundColor(selected ? item.3 : .secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(selected ? item.3.opacity(0.12) : Theme.subtleFill)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(selected ? item.3.opacity(0.6) : Color.clear, lineWidth: 1.2)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 8) {
+                quickScopePill("Đang về (\(count(.active)))", selected: filter == .active) { filter = .active }
+                quickScopePill("Tất cả (\(count(.all)))", selected: filter == .all) { filter = .all }
+                Spacer()
+            }
+        }
+        .card(padding: 14, radius: 20)
+    }
+
+    private func quickScopePill(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            Text(title)
+                .font(.caption.bold())
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(selected ? Theme.accent : Theme.subtleFill)
+                .foregroundColor(selected ? .white : .secondary)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func count(_ f: StageFilter) -> Int { all.filter { matches($0, f) }.count }
@@ -395,9 +469,9 @@ struct ReturnWatchView: View {
     }
 
     private func info(_ r: OrderRow) -> String {
-        var parts: [String] = ["Vào theo dõi: " + date(r.rw)]
+        var parts: [String] = ["Vào bảng: " + date(r.rw)]
         if r.ar > 0 { parts.append("Về shop: " + date(r.ar)) }
-        if !r.ps.isEmpty { parts.append("Sàn: " + r.ps) }
+        if !r.ps.isEmpty { parts.append(r.ps) }
         return parts.joined(separator: " · ")
     }
 
@@ -413,27 +487,42 @@ struct ReturnWatchView: View {
     private func line(_ r: OrderRow) -> some View {
         let stage = r.returnWatchStage
         let color = stageColor(stage)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text(r.o.isEmpty ? r.c : r.o)
-                    .font(.system(.subheadline, design: .monospaced).bold())
-                    .lineLimit(1)
                 if !r.p.isEmpty { PlatformBadge(platform: r.p) }
-                Spacer(minLength: 0)
+                Text(r.c.isEmpty ? r.o : r.c)
+                    .font(.system(.subheadline, design: .monospaced).bold())
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
                 StatusPill(text: OrderRow.returnWatchStageNames[stage], color: color)
             }
-            if !r.o.isEmpty && r.c.uppercased() != r.o.uppercased() {
-                Text("Vận đơn: \(r.c)").font(.caption.monospaced()).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 5) {
+
+            // Thanh tiến trình 4 điểm nối liền
+            HStack(spacing: 0) {
                 ForEach(1...4, id: \.self) { k in
-                    Capsule()
-                        .fill(k <= stage ? color : Color.gray.opacity(0.22))
-                        .frame(height: 6)
+                    Circle()
+                        .fill(k <= stage ? color : Color.gray.opacity(0.28))
+                        .frame(width: k == stage ? 11 : 8, height: k == stage ? 11 : 8)
+                    if k < 4 {
+                        Rectangle()
+                            .fill(k < stage ? color : Color.gray.opacity(0.22))
+                            .frame(height: 2.5)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
-            if !r.n.isEmpty { Text(r.n).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-            Text(info(r)).font(.caption2).foregroundStyle(.secondary)
+            .padding(.vertical, 2)
+
+            if !r.n.isEmpty {
+                Text(r.n)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Text(info(r))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
     }

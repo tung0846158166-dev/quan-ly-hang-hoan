@@ -45,5 +45,10 @@ struct ContentView: View {
                 .tag(NotificationRouter.settingsTab)
         }
         .tint(Theme.accent)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if store.isDemoMode {
+                DemoModeBanner { engine.setDemoMode(false) }
+            }
+        }
     }
 }

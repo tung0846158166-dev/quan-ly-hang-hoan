@@ -182,4 +182,23 @@ final class DashboardMetricsTests: XCTestCase {
         XCTAssertEqual(mismatch.sentMismatchCount, 3)
         XCTAssertEqual(mismatch.discrepancyCount, 4)
     }
+
+    func testTodayProgressAndAverage7DaysAndDaySectionTitle() {
+        let now = makeDate(2026, 11, 24, 14, 0)
+        let rows = [
+            makeRow(c: "R1", pd: false, rv: true, rcd: "24/11/2026 09:00"),
+            makeRow(c: "R2", pd: false, rv: true, rcd: "24/11/2026 11:00"),
+            makeRow(c: "P1", pd: true, rv: false),
+            makeRow(c: "P2", pd: true, rv: false)
+        ]
+        let res = DashboardMetrics.compute(rows: rows, now: now, calendar: cal)
+        XCTAssertEqual(res.todayTargetCount, 4)
+        XCTAssertEqual(res.todayProgress, 0.5, accuracy: 0.001)
+        XCTAssertEqual(res.average7Days, 2.0 / 7.0, accuracy: 0.001)
+        XCTAssertGreaterThan(res.average7DaysRatio, 0)
+
+        XCTAssertEqual(DashboardMetrics.daySectionTitle(for: makeDate(2026, 11, 24, 8, 0), now: now, calendar: cal), "Hôm nay")
+        XCTAssertEqual(DashboardMetrics.daySectionTitle(for: makeDate(2026, 11, 23, 22, 0), now: now, calendar: cal), "Hôm qua")
+        XCTAssertEqual(DashboardMetrics.daySectionTitle(for: makeDate(2026, 11, 20, 10, 0), now: now, calendar: cal), "20/11/2026")
+    }
 }

@@ -18,6 +18,13 @@ final class SnapshotStore: ObservableObject {
     @Published var revision = 0
     /// Thông báo đã ẩn trên điện thoại (khóa = id đơn + hạn; không đồng bộ với máy tính).
     @Published var dismissed: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "dismissedAlerts") ?? [])
+    /// Chế độ xem thử dữ liệu mẫu (chỉ trong bộ nhớ, tuyệt đối không ghi đè dữ liệu thật).
+    @Published private(set) var isDemoMode = false
+
+    private var savedRealRows: [OrderRow] = []
+    private var savedRealStats: [String: Int] = [:]
+    private var savedRealUpdatedAt: Date?
+    private var savedRealDismissed: Set<String> = []
 
     private let assembler = SnapshotAssembler()
     private let deltaAssembler = SnapshotAssembler()
@@ -46,9 +53,44 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    var hasData: Bool { updatedAt != nil }
+    var hasData: Bool { updatedAt != nil || isDemoMode }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
-    var incomplete: Bool { progressError == nil && progressTotal > 0 && progressReceived < progressTotal }
+    var incomplete: Bool { !isDemoMode && progressError == nil && progressTotal > 0 && progressReceived < progressTotal }
+
+    /// Bật/tắt chế độ xem thử với dữ liệu mẫu. Dữ liệu thật được giữ nguyên trong bộ nhớ và trên đĩa.
+    func setDemoMode(_ on: Bool) {
+        if on {
+            guard !isDemoMode else { return }
+            savedRealRows = rows
+            savedRealStats = stats
+            savedRealUpdatedAt = updatedAt
+            savedRealDismissed = dismissed
+            isDemoMode = true
+
+            let demo = DemoData.snapshot()
+            rows = demo.rows
+            stats = demo.stats
+            updatedAt = Date(timeIntervalSince1970: Double(demo.time) / 1000)
+            dismissed = []
+            index = Self.buildIndex(demo.rows)
+            recount()
+            revision += 1
+        } else {
+            guard isDemoMode else { return }
+            isDemoMode = false
+            rows = savedRealRows
+            stats = savedRealStats
+            updatedAt = savedRealUpdatedAt
+            dismissed = savedRealDismissed
+            savedRealRows = []
+            savedRealStats = [:]
+            savedRealUpdatedAt = nil
+            savedRealDismissed = []
+            index = Self.buildIndex(rows)
+            recount()
+            revision += 1
+        }
+    }
 
     func ingest(_ chunk: SnapshotChunk) {
         let asm = assembler
@@ -126,6 +168,13 @@ final class SnapshotStore: ObservableObject {
     var unconfirmedReturnCodes: () -> Set<String> = { [] }
 
     private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
+        if isDemoMode {
+            // Đang xem dữ liệu mẫu: lưu nền dữ liệu thật vừa nhận để khi tắt mẫu sẽ thấy ngay bản mới nhất.
+            savedRealRows = p.rows
+            savedRealStats = p.stats
+            savedRealUpdatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
+            return
+        }
         rows = p.rows
         stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
@@ -175,6 +224,12 @@ final class SnapshotStore: ObservableObject {
 
     /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi một đơn đổi theo dõi/ghi chú.
     private func commit() {
+        if isDemoMode {
+            index = Self.buildIndex(rows)
+            recount()
+            revision += 1
+            return
+        }
         let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
         set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
         revision += 1
@@ -263,13 +318,17 @@ final class SnapshotStore: ObservableObject {
 
     func dismissAlerts(_ list: [OrderRow]) {
         for r in list { dismissed.insert(dismissKey(r)) }
-        UserDefaults.standard.set(Array(dismissed), forKey: "dismissedAlerts")
+        if !isDemoMode {
+            UserDefaults.standard.set(Array(dismissed), forKey: "dismissedAlerts")
+        }
         recount()
     }
 
     func restoreDismissed() {
         dismissed = []
-        UserDefaults.standard.removeObject(forKey: "dismissedAlerts")
+        if !isDemoMode {
+            UserDefaults.standard.removeObject(forKey: "dismissedAlerts")
+        }
         recount()
     }
 
@@ -298,6 +357,7 @@ final class SnapshotStore: ObservableObject {
     }
 
     func scheduleNotifications() {
+        guard !isDemoMode else { return }
         let pending = rows.filter { $0.pd }
         work.async {
         let planned = NotificationPlanner.plan(rows: pending, now: Date())

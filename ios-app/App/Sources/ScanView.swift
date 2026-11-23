@@ -3,25 +3,48 @@ import ScannerCore
 
 struct ScanView: View {
     @EnvironmentObject var engine: SyncEngine
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var camera = CameraController()
     @State private var manual = ""
     @State private var zoom: CGFloat = 1
-
     @State private var detail: ScanItem?
+    @State private var showBannerCard = false
+
+    private var connectionStatus: (text: String, color: Color) {
+        if engine.isDemoMode {
+            return ("Chế độ dữ liệu mẫu", Theme.accent)
+        }
+        if engine.pcOnline {
+            return ("Đã nối PC", Theme.success)
+        }
+        if engine.channelUp {
+            return ("Đang chờ PC", Theme.warning)
+        }
+        return ("Mất kết nối PC", Theme.danger)
+    }
+
+    private var todayScannedCount: Int {
+        engine.todayStats(kind: engine.mode).total
+    }
 
     var body: some View {
-        ScrollView {
-        VStack(spacing: 8) {
-            statusBar
-            cameraFrame
-            if let b = engine.banner { bannerView(b) }
-            controls
-            recentList
+        GeometryReader { geo in
+            let camHeight = max(230, min(420, geo.size.height * 0.54))
+            ScrollView {
+                VStack(spacing: 12) {
+                    topHeader
+                    cameraSection(height: camHeight)
+                    controlsRow
+                    manualInputCard
+                    recentSection
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 8)
+                .padding(.bottom, 18)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Theme.pageBackground.ignoresSafeArea())
         }
-        .padding(.horizontal, 12).padding(.top, 4)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
             camera.onCode = { engine.handleCameraCode($0) }
@@ -33,162 +56,356 @@ struct ScanView: View {
             camera.stop()
             UIApplication.shared.isIdleTimerDisabled = false
         }
-    }
-
-    /// Khung camera nhỏ như bản web (chỉ nhận mã trong khung).
-    private var cameraFrame: some View {
-        ZStack {
-            CameraPreview(controller: camera)
-            if camera.denied {
-                VStack(spacing: 6) {
-                    Image(systemName: "camera.fill").font(.title)
-                    Text("Chưa cho phép camera").font(.headline)
-                    Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.").font(.footnote).multilineTextAlignment(.center)
-                }
-                .padding().background(.ultraThinMaterial).cornerRadius(12)
-            } else if let why = camera.restReason, !camera.running {
-                Button { camera.start() } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "pause.circle.fill").font(.system(size: 44))
-                        Text(why).font(.footnote.bold()).multilineTextAlignment(.center)
-                        Text("Chạm để quét tiếp").font(.caption.bold()).padding(.horizontal, 12).padding(.vertical, 5)
-                            .background(Color.white.opacity(0.2), in: Capsule())
-                    }
-                    .foregroundColor(.white).padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.75))
-                }
-                .buttonStyle(.plain)
+        .task(id: engine.banner) {
+            guard engine.banner != nil else {
+                showBannerCard = false
+                return
+            }
+            if reduceMotion {
+                showBannerCard = true
             } else {
-                ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
-            }
-        }
-        .frame(height: 345)
-        .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.modeColor(engine.mode), lineWidth: 3))
-        // Không đổ bóng quanh khung camera: bóng quanh hình đang chạy phải vẽ lại mọi khung hình -> nóng máy.
-    }
-
-    /// Vài lần quét gần nhất của chế độ đang chọn; chạm vào để xem chi tiết và ảnh.
-    private var recentList: some View {
-        let list = Array(engine.items.filter { $0.kind == engine.mode }.prefix(8))
-        return VStack(spacing: 0) {
-            VStack(spacing: 6) {
-                if list.isEmpty {
-                    Text("Chưa quét mã nào ở chế độ này").font(.footnote).foregroundStyle(.secondary).padding(.top, 12)
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                    showBannerCard = true
                 }
-                ForEach(list) { it in
-                    HStack(spacing: 8) {
-                        Circle().fill(scanColor(it)).frame(width: 10, height: 10)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(it.code).font(.system(.subheadline, design: .monospaced).bold())
-                            Text(scanLabel(it)).font(.caption2.bold()).foregroundColor(scanColor(it))
-                        }
-                        Spacer()
-                        Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .omitted, time: .standard))
-                            .font(.caption2).foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
-                    }
-                    .padding(10).background(Color(.secondarySystemGroupedBackground)).clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .contentShape(Rectangle())
-                    .onTapGesture { detail = it }
+            }
+            try? await Task.sleep(nanoseconds: 4_500_000_000)
+            guard !Task.isCancelled else { return }
+            if reduceMotion {
+                showBannerCard = false
+            } else {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    showBannerCard = false
                 }
             }
         }
     }
 
-    private var statusBar: some View {
-        VStack(spacing: 6) {
+    // MARK: - Thanh trên: chế độ quét + 1 chấm trạng thái + số đã quét hôm nay
+    private var topHeader: some View {
+        let st = connectionStatus
+        return VStack(spacing: 10) {
             ModePicker(mode: $engine.mode)
-            HStack(spacing: 14) {
-                statusIcon("antenna.radiowaves.left.and.right", ok: engine.channelUp)
-                statusIcon("desktopcomputer", ok: engine.pcOnline)
-                if engine.pendingCount > 0 {
-                    Label("\(engine.pendingCount)", systemImage: "tray.and.arrow.up.fill")
-                        .font(.caption.bold()).foregroundColor(.orange)
-                }
-                Spacer()
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel((engine.channelUp ? "Đã nối kênh" : "Mất kết nối") + ", " + (engine.pcOnline ? "máy tính online" : "chưa thấy máy tính"))
-        }
-        .card(padding: 10)
-    }
 
-    /// Biểu tượng nhỏ: xanh khi kết nối; mất kết nối thì xám và có gạch chéo đỏ.
-    private func statusIcon(_ name: String, ok: Bool) -> some View {
-        ZStack {
-            Image(systemName: name).font(.system(size: 15, weight: .semibold))
-                .foregroundColor(ok ? .green : .secondary)
-            if !ok {
-                Rectangle().fill(Color.red).frame(width: 22, height: 2.5).rotationEffect(.degrees(-40))
-            }
-        }
-        .frame(width: 24, height: 20)
-    }
-
-    private func pill(_ t: String, _ c: Color) -> some View {
-        Text(t).font(.caption.bold()).padding(.horizontal, 8).padding(.vertical, 3)
-            .background(c.opacity(0.85)).foregroundColor(.white).clipShape(Capsule())
-    }
-
-    private func bannerView(_ b: Banner) -> some View {
-        VStack(spacing: 2) {
-            Text(b.text).font(.headline.bold())
-            Text(b.code).font(.system(.title3, design: .monospaced).bold())
-            if !b.sub.isEmpty { Text(b.sub).font(.footnote).multilineTextAlignment(.center) }
-        }
-        .frame(maxWidth: .infinity).padding(14)
-        .background(b.color.opacity(0.92)).foregroundColor(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: b.color.opacity(0.35), radius: 8, x: 0, y: 3)
-    }
-
-    private var controls: some View {
-        VStack(spacing: 8) {
             HStack(spacing: 10) {
-                Button { camera.running ? camera.stop() : camera.start() } label: {
-                    Label(camera.running ? "Dừng" : "Bật", systemImage: camera.running ? "pause.fill" : "play.fill")
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(st.color)
+                        .frame(width: 9, height: 9)
+                    Text(st.text)
+                        .font(.footnote.bold())
+                        .foregroundColor(.primary)
                 }
-                Button { camera.setTorch(!camera.torchOn) } label: {
-                    Label("Đèn", systemImage: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
+                .accessibilityElement(children: .combine)
+
+                if engine.pendingCount > 0 && !engine.isDemoMode {
+                    StatusPill(text: "Chờ gửi \(engine.pendingCount)", color: Theme.warning)
                 }
-                Button { zoom = zoom >= 2 ? 1 : 2; camera.setZoom(zoom) } label: {
-                    Label(zoom >= 2 ? "2x" : "1x", systemImage: "plus.magnifyingglass")
+
+                Spacer(minLength: 4)
+
+                Text("Đã quét hôm nay: \(todayScannedCount)")
+                    .font(.caption.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+
+    // MARK: - Khung camera (~55% màn) + thẻ kết quả trượt từ dưới lên
+    private func cameraSection(height: CGFloat) -> some View {
+        ZStack(alignment: .bottom) {
+            ZStack {
+                CameraPreview(controller: camera)
+
+                if camera.denied {
+                    VStack(spacing: 8) {
+                        Image(systemName: "camera.fill")
+                            .font(.title)
+                            .foregroundColor(Theme.accent)
+                        Text("Chưa cho phép camera")
+                            .font(.headline)
+                        Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(18)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(16)
+                } else if let why = camera.restReason, !camera.running {
+                    Button {
+                        Haptics.tap()
+                        camera.start()
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: "pause.circle.fill")
+                                .font(.system(size: 44))
+                            Text(why)
+                                .font(.footnote.bold())
+                                .multilineTextAlignment(.center)
+                            Text("Chạm để quét tiếp")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.22), in: Capsule())
+                        }
+                        .foregroundColor(.white)
+                        .padding(20)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.75))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    ScanGuide()
+                        .stroke(Theme.modeColor(engine.mode).opacity(0.95), style: StrokeStyle(lineWidth: 3.2, lineCap: .round))
+                        .padding(22)
                 }
-                // Dán mã đã chép ở ứng dụng khác và gửi luôn (dán nhiều mã cách nhau bằng dấu cách / xuống dòng cũng được).
-                // Nút dán của hệ thống: không hiện hộp hỏi "Cho phép dán?" mỗi lần.
+            }
+            .frame(height: height)
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Theme.modeColor(engine.mode).opacity(0.65), lineWidth: 2)
+            )
+
+            // Thẻ kết quả trượt từ dưới lên
+            if showBannerCard, let b = engine.banner {
+                resultBottomCard(b)
+                    .padding(10)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
+    private func resultBottomCard(_ b: Banner) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: bannerIcon(for: b.color))
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundColor(b.color)
+                .frame(width: 42, height: 42)
+                .background(b.color.opacity(0.16))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                if !b.code.isEmpty {
+                    Text(b.code)
+                        .font(.system(.headline, design: .monospaced).bold())
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                Text(b.text)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(b.color)
+                    .lineLimit(2)
+                if !b.sub.isEmpty {
+                    Text(b.sub)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            Button {
+                showBannerCard = false
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Đóng thông báo kết quả")
+        }
+        .padding(14)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(b.color.opacity(0.45), lineWidth: 1.2)
+        )
+    }
+
+    private func bannerIcon(for color: Color) -> String {
+        if color == Theme.success || color == .green || color == Theme.teal {
+            return "checkmark.circle.fill"
+        }
+        if color == Theme.danger || color == .red {
+            return "xmark.octagon.fill"
+        }
+        return "clock.badge.exclamationmark.fill"
+    }
+
+    // MARK: - Hàng nút tròn có nhãn nhỏ (Đèn, Zoom, Dừng, Dán)
+    private var controlsRow: some View {
+        HStack(spacing: 0) {
+            roundControl(
+                title: "Đèn",
+                icon: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
+                active: camera.torchOn
+            ) {
+                Haptics.tap()
+                camera.setTorch(!camera.torchOn)
+            }
+
+            roundControl(
+                title: zoom >= 2 ? "Zoom 2x" : "Zoom 1x",
+                icon: "plus.magnifyingglass",
+                active: zoom >= 2
+            ) {
+                Haptics.tap()
+                zoom = zoom >= 2 ? 1 : 2
+                camera.setZoom(zoom)
+            }
+
+            roundControl(
+                title: camera.running ? "Tạm dừng" : "Bật quét",
+                icon: camera.running ? "pause.fill" : "play.fill",
+                active: !camera.running
+            ) {
+                Haptics.tap()
+                camera.running ? camera.stop() : camera.start()
+            }
+
+            VStack(spacing: 6) {
                 PasteButton(payloadType: String.self) { texts in
                     let codes = PasteCodes.split(texts.joined(separator: "\n"))
                     DispatchQueue.main.async {
                         if codes.isEmpty {
-                            engine.banner = Banner(code: "", text: "KHÔNG THẤY MÃ TRONG NỘI DUNG ĐÃ CHÉP", color: .orange)
+                            engine.banner = Banner(code: "", text: "Không thấy mã vận đơn trong nội dung đã sao chép", color: Theme.warning)
                         } else {
                             codes.forEach { engine.submitManual($0) }
                         }
                     }
                 }
-                .labelStyle(.titleAndIcon)
+                .labelStyle(.iconOnly)
+                .buttonBorderShape(.circle)
+                .tint(Theme.accent)
+                .frame(width: 48, height: 48)
+
+                Text("Dán mã")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Theme.accent).font(.footnote.bold())
-            HStack {
-                TextField("Nhập mã tay", text: $manual)
-                    .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func roundControl(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(active ? .white : .primary)
+                    .frame(width: 48, height: 48)
+                    .background(active ? Theme.accent : Theme.cardBackground)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(active ? Color.clear : Color.primary.opacity(0.10), lineWidth: 0.8)
+                    )
+                Text(title)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Nhập mã tay
+    private var manualInputCard: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                TextField("Nhập mã vận đơn thủ công...", text: $manual)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(.system(.subheadline, design: .monospaced))
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(Theme.subtleFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .submitLabel(.send)
                     .onSubmit(sendManual)
-                Button("Gửi", action: sendManual).buttonStyle(.borderedProminent)
+
+                Button(action: sendManual) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(manual.trimmingCharacters(in: .whitespaces).isEmpty ? .secondary : Theme.accent)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(manual.trimmingCharacters(in: .whitespaces).isEmpty)
+                .accessibilityLabel("Gửi mã thủ công")
             }
+
             if engine.mode != .returnScan {
-                TextField("Ghi chú đơn (không bắt buộc)", text: $engine.note).textFieldStyle(.roundedBorder).font(.footnote)
+                TextField("Ghi chú đơn mới (không bắt buộc)", text: $engine.note)
+                    .font(.footnote)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 38)
+                    .background(Theme.subtleFill)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
-        .card(padding: 10)
+        .card(padding: 12, radius: 18)
+    }
+
+    // MARK: - Gần đây
+    private var recentSection: some View {
+        let list = Array(engine.items.filter { $0.kind == engine.mode }.prefix(5))
+        return VStack(alignment: .leading, spacing: 8) {
+            if !list.isEmpty {
+                Text("Quét gần đây")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+
+                ForEach(list) { it in
+                    Button {
+                        Haptics.tap()
+                        detail = it
+                    } label: {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(scanColor(it))
+                                .frame(width: 9, height: 9)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(it.code)
+                                    .font(.system(.subheadline, design: .monospaced).bold())
+                                    .foregroundColor(.primary)
+                                Text(scanLabel(it))
+                                    .font(.caption2.bold())
+                                    .foregroundColor(scanColor(it))
+                            }
+                            Spacer()
+                            Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .omitted, time: .shortened))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(minHeight: 44)
+                        .card(padding: 10, radius: 14)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private func sendManual() {
         let v = manual.trimmingCharacters(in: .whitespaces)
         guard !v.isEmpty else { return }
+        Haptics.tap()
         engine.submitManual(v)
         manual = ""
     }
@@ -198,7 +415,7 @@ struct ScanView: View {
 struct ScanGuide: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
-        let l: CGFloat = 26
+        let l: CGFloat = 28
         let corners: [(CGPoint, CGFloat, CGFloat)] = [
             (CGPoint(x: r.minX, y: r.minY), 1, 1),
             (CGPoint(x: r.maxX, y: r.minY), -1, 1),
@@ -213,7 +430,6 @@ struct ScanGuide: Shape {
         return p
     }
 }
-
 
 /// Tách các mã từ nội dung đã chép (bỏ chữ thừa, mã ngắn hơn 6 ký tự, mã trùng).
 enum PasteCodes {

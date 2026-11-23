@@ -25,6 +25,9 @@ final class SyncEngine: ObservableObject {
     @Published var banner: Banner?
     @Published var mode: ScanKind = .returnScan
     @Published var note = ""
+    /// Chế độ xem thử dữ liệu mẫu (trong bộ nhớ, tuyệt đối không phát MQTT/ntfy hay ghi đè dữ liệu thật).
+    @Published private(set) var isDemoMode = false
+    private var savedRealItems: [ScanItem]?
 
     var snapshotProvider: (() -> Data?)?
     let snapshot = SnapshotStore()
@@ -58,20 +61,42 @@ final class SyncEngine: ObservableObject {
     /// Tuỳ chọn bật/tắt trong Cài đặt (mặc định bật).
     static func pref(_ key: String) -> Bool { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
 
+    /// Bật/tắt chế độ xem thử dữ liệu mẫu. Tắt sẽ khôi phục nguyên vẹn lịch sử và danh sách đơn thật.
+    func setDemoMode(_ on: Bool) {
+        if on {
+            guard !isDemoMode else { return }
+            flushPersist()
+            savedRealItems = items
+            isDemoMode = true
+            items = DemoData.scanItems()
+            snapshot.setDemoMode(true)
+            banner = nil
+        } else {
+            guard isDemoMode else { return }
+            isDemoMode = false
+            items = savedRealItems ?? []
+            savedRealItems = nil
+            snapshot.setDemoMode(false)
+            banner = nil
+        }
+    }
+
     /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
     func resend(_ requestId: String) {
+        guard !isDemoMode else { return }
         guard let i = items.firstIndex(where: { $0.requestId == requestId }) else { return }
         let it = items[i]
         if it.photoFile != nil && !it.photoConfirmed { items[i].photoAttempts = 0 }   // cho phép tự thử gửi ảnh lại
         transmit(requestId)
         if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired { transmitPhoto(requestId) }
-        banner = Banner(code: it.code, text: "ĐÃ GỬI LẠI, CHỜ PC", color: .orange)
+        banner = Banner(code: it.code, text: "Đã gửi lại, đang chờ PC xác nhận", color: Theme.warning)
     }
 
     /// Đưa tất cả lượt quét chưa được máy tính xác nhận (và ảnh chưa gửi xong) vào hàng gửi lại ngay.
     /// Mỗi nhịp app gửi tối đa 6 lượt quét + 1 ảnh nên không dồn cục; 100 đơn mất khoảng nửa phút.
     @discardableResult
     func resendAllPending(kind: ScanKind? = nil) -> Int {
+        guard !isDemoMode else { return 0 }
         var n = 0
         for i in items.indices where !items[i].isSettled && (kind == nil || items[i].kind == kind) {
             n += 1
@@ -198,6 +223,7 @@ final class SyncEngine: ObservableObject {
 
     /// Gửi một bản tin qua mọi kênh đang có. ntfy chỉ dùng khi nó đang nối, hoặc khi MQTT chưa nối được.
     private func broadcast(_ body: String, title: String, room r: String) {
+        guard !isDemoMode else { return }
         for c in mqttClients { c.publish(topic: SyncProtocol.mqttTopic(room: r), body: body) }
         if sseConnected || !mqttConnected {
             Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: title, body: body) }
@@ -290,12 +316,12 @@ final class SyncEngine: ObservableObject {
 
     private func describe(_ it: ScanItem) -> (String, Color) {
         switch it.status {
-        case .success: return (it.kind == .returnScan ? "HỢP LỆ" : "ĐÃ TẠO", .green)
-        case .duplicate: return ("QUÉT TRÙNG", .orange)
-        case .notFound: return ("KHÔNG CÓ TRÊN HỆ THỐNG", .red)
-        case .ambiguous: return ("TRÙNG NHIỀU ĐƠN, CẦN KIỂM TRA", .red)
-        case .error: return (it.scanConfirmed ? "PC TỪ CHỐI, CẦN KIỂM TRA" : "PC CHƯA LƯU, ĐANG THỬ LẠI", .red)
-        case .pending: return ("ĐANG CHỜ PC", .orange)
+        case .success: return (it.kind == .returnScan ? "Hợp lệ, PC đã ghi nhận" : "Đã tạo đơn mới trên PC", Theme.success)
+        case .duplicate: return ("Mã này đã quét trùng trước đó", Theme.warning)
+        case .notFound: return ("Không tìm thấy đơn trên hệ thống", Theme.danger)
+        case .ambiguous: return ("Trùng nhiều đơn, cần kiểm tra trên PC", Theme.danger)
+        case .error: return (it.scanConfirmed ? "PC từ chối, cần kiểm tra lại" : "PC chưa lưu được, đang tự thử lại", Theme.danger)
+        case .pending: return ("Đang chờ máy tính xác nhận", Theme.warning)
         }
     }
 
@@ -345,16 +371,56 @@ final class SyncEngine: ObservableObject {
         if rawKey == lastRawCode && now.timeIntervalSince(lastRawTime) < 1.2 { return false }
         lastRawCode = rawKey; lastRawTime = now
 
+        if isDemoMode {
+            seq += 1
+            let rid = "demo-\(seq)-\(nowMs() % 100000)"
+            var item = ScanItem(requestId: rid, code: code, kind: kind, time: nowMs(), photoFile: nil)
+            let hint = localHint(code: code, kind: kind)
+            if kind == .returnScan, let r = snapshot.lookup(code) {
+                if r.rv {
+                    item.status = .duplicate
+                    item.scanConfirmed = true
+                    item.detail = "Dữ liệu mẫu: đơn này đã nhận hoàn kho trước đó."
+                    banner = Banner(code: code, text: "Đơn đã nhận hoàn kho trước đó", color: Theme.warning, sub: hint)
+                } else if r.pd {
+                    snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"])
+                    item.status = .success
+                    item.scanConfirmed = true
+                    item.orderNum = r.o
+                    item.detail = "Dữ liệu mẫu: đã nhận hoàn kho cục bộ."
+                    banner = Banner(code: code, text: "Đã nhận hoàn kho (dữ liệu mẫu)", color: Theme.success, sub: hint)
+                } else {
+                    item.status = .notFound
+                    item.scanConfirmed = true
+                    item.detail = "Dữ liệu mẫu: đơn không ở trạng thái chờ hoàn."
+                    banner = Banner(code: code, text: "Đơn không ở trạng thái chờ hoàn", color: Theme.warning, sub: hint)
+                }
+            } else if kind == .newOrder {
+                item.status = .success
+                item.scanConfirmed = true
+                item.detail = "Dữ liệu mẫu: đã ghi nhận đơn mới cục bộ."
+                banner = Banner(code: code, text: "Đã tạo đơn mẫu cục bộ", color: Theme.teal, sub: "Không gửi gì lên máy tính")
+            } else {
+                item.status = .notFound
+                item.scanConfirmed = true
+                item.detail = "Dữ liệu mẫu: chưa thấy mã này trong danh sách mẫu."
+                banner = Banner(code: code, text: "Chưa thấy mã này trong dữ liệu mẫu", color: Theme.danger, sub: "Thử quét hoặc nhập mã bắt đầu bằng DEMO-")
+            }
+            items.insert(item, at: 0)
+            if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+            return true
+        }
+
         if let existing = items.first(where: { $0.code == code && $0.kind == kind && !$0.scanConfirmed }) {
-            banner = Banner(code: code, text: "ĐANG THỬ LẠI, CHỜ PC", color: .orange)
+            banner = Banner(code: code, text: "Đang gửi lại, chờ PC xác nhận", color: Theme.warning)
             transmit(existing.requestId)
             return true
         }
 
         // Tạo đơn mới / đơn hủy: đơn đã có trên điện thoại (bảng chính, kho lưu trữ hoặc bảng đơn hủy) thì báo luôn, không tạo lại.
         if kind != .returnScan, snapshot.hasData, let r = snapshot.lookup(code) {
-            let where_ = r.k == "a" ? "KHO LƯU TRỮ" : (r.k == "c" ? "BẢNG ĐƠN HỦY" : "BẢNG CHÍNH")
-            banner = Banner(code: code, text: "ĐƠN ĐÃ CÓ Ở \(where_), KHÔNG TẠO LẠI", color: .orange, sub: r.n)
+            let where_ = r.k == "a" ? "Kho lưu trữ" : (r.k == "c" ? "Bảng đơn hủy" : "Bảng chính")
+            banner = Banner(code: code, text: "Đơn đã có ở \(where_), không tạo lại", color: Theme.warning, sub: r.n)
             if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
             return false
         }
@@ -378,12 +444,12 @@ final class SyncEngine: ObservableObject {
         // lệnh quét vẫn nằm trong hàng chờ và tự gửi sang máy tính khi máy tính bật. Chưa có đơn trên điện thoại thì chờ máy tính xác nhận.
         let hint = localHint(code: code, kind: kind)
         if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
-            banner = Banner(code: code, text: "TRÙNG: ĐÃ NHẬN HOÀN KHO TRƯỚC ĐÓ", color: .red, sub: hint)
+            banner = Banner(code: code, text: "Quét trùng: đơn đã nhận hoàn kho trước đó", color: Theme.danger, sub: hint)
         } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.pd {
             snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"])
-            banner = Banner(code: code, text: "ĐÃ NHẬN HOÀN KHO, CHỜ PC GHI NHẬN", color: .green, sub: hint)
+            banner = Banner(code: code, text: "Đã nhận hoàn kho, chờ PC ghi nhận", color: Theme.success, sub: hint)
         } else {
-            banner = Banner(code: code, text: "CHƯA CÓ TRÊN ĐIỆN THOẠI, CHỜ PC XÁC NHẬN", color: .orange, sub: hint)
+            banner = Banner(code: code, text: "Chưa có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)
         }
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         transmit(rid)
@@ -409,28 +475,43 @@ final class SyncEngine: ObservableObject {
 
     func sendOrderNote(_ row: OrderRow, note: String, watch: Bool = true) {
         let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isDemoMode {
+            snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
+            banner = Banner(code: row.c, text: watch ? "Đã lưu theo dõi (dữ liệu mẫu)" : "Đã bỏ theo dõi (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
         let rid = "note-\(nowMs())"
         let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, watch: watch, room: room, requestId: rid)
         pendingNotes[rid] = body
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Note", room: room)
         snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
-        banner = Banner(code: row.c, text: "ĐÃ GỬI GHI CHÚ, CHỜ PC", color: .orange)
+        banner = Banner(code: row.c, text: "Đã gửi ghi chú, chờ PC xác nhận", color: Theme.warning)
     }
 
     func sendOrderEdit(_ row: OrderRow, fields: [String: Any]) {
+        if isDemoMode {
+            snapshot.applyLocalEdit(rowId: row.id, fields: fields)
+            banner = Banner(code: row.c, text: "Đã cập nhật trạng thái (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
         let rid = "edit-\(nowMs())"
         let body = SyncProtocol.orderEdit(code: row.c, orderId: row.o, fields: fields, room: room, requestId: rid)
         pendingNotes[rid] = body
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyLocalEdit(rowId: row.id, fields: fields)
-        banner = Banner(code: row.c, text: "ĐÃ GỬI SỬA ĐƠN, CHỜ PC", color: .orange)
+        banner = Banner(code: row.c, text: "Đã gửi cập nhật đơn, chờ PC xác nhận", color: Theme.warning)
     }
 
     /// Sửa cùng lúc nhiều đơn (vd đánh dấu đã nhận các đơn Huỷ sau chuẩn bị). Mỗi đơn 1 mã yêu cầu riêng.
     func sendOrderEdits(_ rows: [OrderRow], fields: [String: Any]) {
         guard !rows.isEmpty else { return }
+        if isDemoMode {
+            for row in rows { snapshot.applyLocalEdit(rowId: row.id, fields: fields) }
+            banner = Banner(code: "\(rows.count) đơn", text: "Đã cập nhật cục bộ (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
         let base = nowMs()
         for (i, row) in rows.enumerated() {
             let rid = "edit-\(base)-\(i)"
@@ -440,26 +521,33 @@ final class SyncEngine: ObservableObject {
             snapshot.applyLocalEdit(rowId: row.id, fields: fields)
         }
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
-        banner = Banner(code: "\(rows.count) đơn", text: "ĐÃ GỬI SỬA ĐƠN, CHỜ PC", color: .orange)
+        banner = Banner(code: "\(rows.count) đơn", text: "Đã gửi cập nhật đơn, chờ PC xác nhận", color: Theme.warning)
     }
 
     func sendOrderDelete(_ row: OrderRow) {
+        if isDemoMode {
+            snapshot.removeLocal(rowId: row.id)
+            banner = Banner(code: row.c, text: "Đã xóa cục bộ (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
         let rid = "del-\(nowMs())"
         let body = SyncProtocol.orderDelete(code: row.c, orderId: row.o, room: room, requestId: rid)
         pendingNotes[rid] = body
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Delete", room: room)
         snapshot.removeLocal(rowId: row.id)
-        banner = Banner(code: row.c, text: "ĐÃ GỬI XÓA ĐƠN, CHỜ PC", color: .orange)
+        banner = Banner(code: row.c, text: "Đã gửi xóa đơn, chờ PC xác nhận", color: Theme.warning)
     }
 
     private func resendPendingNotes() {
+        guard !isDemoMode else { return }
         for b in pendingNotes.values { broadcast(b, title: "Shopee Note", room: room) }
     }
 
     /// Gói thay đổi không khớp bản gốc: xin danh sách đầy đủ, nhưng không quá 1 lần mỗi 45 giây và không khi đang ghép dở.
     private var lastFullRequestAt = Date.distantPast
     private func requestFullIfNeeded() {
+        if isDemoMode { return }
         if snapshot.incomplete { return }
         if Date().timeIntervalSince(lastFullRequestAt) < 45 { return }
         lastFullRequestAt = Date()
@@ -467,6 +555,7 @@ final class SyncEngine: ObservableObject {
     }
 
     func requestSnapshot() {
+        guard !isDemoMode else { return }
         let r = room
         let body = SyncProtocol.snapshotRequest(room: r, now: nowMs())
         broadcast(body, title: "Shopee Snapshot Request", room: r)
@@ -475,13 +564,18 @@ final class SyncEngine: ObservableObject {
     /// Bảng đơn hủy: đánh dấu đã nhận / chưa nhận các đơn đã chọn.
     func setCancelledReceived(ids: [String], received: Bool) {
         guard !ids.isEmpty else { return }
+        if isDemoMode {
+            snapshot.applyCancelledReceivedLocal(ids: Set(ids), received: received)
+            banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "Đã đánh dấu đã nhận (dữ liệu mẫu)" : "Đã đánh dấu chưa nhận (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
         let rid = "cxl-\(nowMs())"
         let body = SyncProtocol.cancelReceive(ids: ids, received: received, room: room, requestId: rid)
         pendingNotes[rid] = body
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyCancelledReceivedLocal(ids: Set(ids), received: received)
-        banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "ĐÃ GỬI: ĐÃ NHẬN, CHỜ PC" : "ĐÃ GỬI: CHƯA NHẬN, CHỜ PC", color: .orange)
+        banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "Đã gửi đánh dấu đã nhận, chờ PC" : "Đã gửi đánh dấu chưa nhận, chờ PC", color: Theme.warning)
     }
 
     // MARK: thống kê & xuất
@@ -505,6 +599,7 @@ final class SyncEngine: ObservableObject {
 
     // MARK: gửi
     private func transmit(_ id: String) {
+        guard !isDemoMode else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }) else { return }
         items[i].lastSendAt = nowMs()
         items[i].attempts += 1
@@ -517,6 +612,7 @@ final class SyncEngine: ObservableObject {
     }
 
     private func transmitPhoto(_ id: String) {
+        guard !isDemoMode else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }), let file = items[i].photoFile else { return }
         items[i].photoSentAt = nowMs()
         items[i].photoAttempts += 1
@@ -557,6 +653,7 @@ final class SyncEngine: ObservableObject {
     private func tick() async {
         tickCount += 1
         if tickCount % 30 == 0 { snapshot.recount() }   // quá hạn/sắp đến hạn đổi theo thời gian
+        if isDemoMode { return }
         if snapshotChunksSeen != chunkCounter { snapshotChunksSeen = chunkCounter }
         // Danh sách đơn ghép dở và đã 10 giây không có mảnh mới: xin PC gửi lại (tối đa 4 lần mỗi đợt).
         if snapshot.incomplete, let t = snapshotLastChunkAt, Date().timeIntervalSince(t) > 10, snapshotRetries < 4 {
@@ -593,13 +690,13 @@ final class SyncEngine: ObservableObject {
 
     // MARK: lịch sử
     func delete(_ item: ScanItem) {
-        removePhoto(item)
+        if !isDemoMode { removePhoto(item) }
         items.removeAll { $0.requestId == item.requestId }
         persist()
     }
 
     func clear(kind: ScanKind) {
-        items.filter { $0.kind == kind }.forEach(removePhoto)
+        if !isDemoMode { items.filter { $0.kind == kind }.forEach(removePhoto) }
         items.removeAll { $0.kind == kind }
         persist()
     }
@@ -622,6 +719,7 @@ final class SyncEngine: ObservableObject {
     private let persistQueue = DispatchQueue(label: "items.persist", qos: .utility)
 
     private func persist() {
+        guard !isDemoMode else { return }
         guard !persistScheduled else { return }
         persistScheduled = true
         Task { @MainActor [weak self] in
@@ -632,6 +730,7 @@ final class SyncEngine: ObservableObject {
 
     /// Ghi ngay (gọi khi app chuyển nền để không mất lượt quét cuối).
     func flushPersist() {
+        guard !isDemoMode else { return }
         persistScheduled = false
         let snapshot = items, url = storeURL
         persistQueue.async {

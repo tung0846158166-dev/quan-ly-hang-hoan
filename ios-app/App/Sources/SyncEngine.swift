@@ -294,7 +294,7 @@ final class SyncEngine: ObservableObject {
         case .duplicate: return ("QUÉT TRÙNG", .orange)
         case .notFound: return ("KHÔNG CÓ TRÊN HỆ THỐNG", .red)
         case .ambiguous: return ("TRÙNG NHIỀU ĐƠN, CẦN KIỂM TRA", .red)
-        case .error: return ("PC CHƯA LƯU, ĐANG THỬ LẠI", .red)
+        case .error: return (it.scanConfirmed ? "PC TỪ CHỐI, CẦN KIỂM TRA" : "PC CHƯA LƯU, ĐANG THỬ LẠI", .red)
         case .pending: return ("ĐANG CHỜ PC", .orange)
         }
     }

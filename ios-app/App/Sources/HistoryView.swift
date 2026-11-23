@@ -130,9 +130,9 @@ struct HistoryView: View {
                 }
                 Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .abbreviated, time: .standard))
                     .font(.caption2).foregroundStyle(.secondary)
-                if it.kind == .newOrder && it.scanConfirmed {
-                    if it.pushed { Text("✅ Đã đẩy ra bảng chính").font(.caption2.bold()).foregroundColor(.green) }
-                    else { Button("⬆️ Đẩy ra bảng chính") { engine.pushToMain(it) }.font(.caption.bold()).buttonStyle(.bordered) }
+                // v2: PC tạo đơn thẳng vào Bảng chính khi nhận lượt quét "Đơn mới", không còn bước "Đẩy ra bảng chính".
+                if it.kind == .newOrder && it.scanConfirmed && it.status == .success {
+                    Text("✅ Đã tạo ở Bảng chính trên máy tính").font(.caption2.bold()).foregroundColor(.green)
                 }
             }
         }

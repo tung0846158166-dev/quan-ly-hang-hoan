@@ -59,9 +59,6 @@ struct ScanDetailView: View {
                         if !it.isSettled || it.status == .error {
                             Button("Gửi lại cho máy tính") { engine.resend(it.requestId) }
                         }
-                        if it.kind == .newOrder && it.scanConfirmed && !it.pushed {
-                            Button("Đẩy ra bảng chính") { engine.pushToMain(it) }
-                        }
                         Button("Xóa khỏi lịch sử", role: .destructive) { engine.delete(it); dismiss() }
                     }
                 }

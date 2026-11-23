@@ -41,6 +41,19 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(p.rows[0].ps, "Huỷ sau chuẩn bị · Đã huỷ")
     }
 
+    /// Dòng đúng hình dạng PC v2 (PhoneSnapshot.cs) gửi: hoàn MỘT PHẦN có `rn` (tên sản phẩm đã hoàn), `n` vẫn đủ mọi sản phẩm.
+    func testPcV2PartialReturnRowKeepsAllProductsAndMarksReturnedOnes() throws {
+        let json = #"{"time":1,"sid":"snap_1","count":2,"rows":[{"k":"m","c":"TTVNFAKE00201","o":"5789FAKE000201","p":"TikTok Shop","n":"Quần Jeans | Sơ Mi | Nón","co":"Xanh | Trắng | Đen","sz":"31 | L | Free","q":3,"rd":"21/11/2026","due":1795000000000,"lv":2,"st":"Chưa trả","ty":"THẤT THOÁT","x":"JT88FAKE00201","rn":"Quần Jeans"},{"k":"m","c":"SPX2","o":"O2","p":"Shopee","n":"Áo","q":1,"st":"Chưa trả"}],"stats":{"m_total":2,"sent":2,"dropped":0},"inbox":[]}"#
+        let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
+        XCTAssertEqual(p.rows[0].rn, "Quần Jeans")
+        XCTAssertEqual(p.rows[0].n.components(separatedBy: " | ").count, 3)   // giữ đủ 3 sản phẩm
+        XCTAssertEqual(p.rows[1].rn, "")                                       // không hoàn một phần: không phân biệt
+        XCTAssertEqual(p.stats["dropped"], 0)
+        XCTAssertTrue(p.inbox.isEmpty)                                         // v2 không có Hộp Đơn Mới
+        let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
+        XCTAssertEqual(again.rows[0].rn, "Quần Jeans")
+    }
+
     func testReturnWatchFields() throws {
         let json = #"{"time":1,"count":3,"rows":[{"k":"m","c":"W1","rw":1795000000000,"rws":3,"ar":1794990000000},{"k":"m","c":"W2","rw":1795000000001,"rws":1,"rv":true},{"k":"m","c":"N1"}]}"#
         let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))

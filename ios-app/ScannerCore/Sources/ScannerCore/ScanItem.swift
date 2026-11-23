@@ -42,10 +42,19 @@ public struct ScanItem: Codable, Identifiable, Equatable {
     @discardableResult
     public mutating func apply(_ ack: PcAck) -> Bool {
         guard ack.requestId == requestId, ack.code == code else { return false }
-        guard ["success", "duplicate", "not_found", "ambiguous", "error"].contains(ack.outcome) else { return false }
+        guard ["success", "duplicate", "not_found", "ambiguous", "error", "invalid", "locked"].contains(ack.outcome) else { return false }
         let isPhoto = ack.ackStage == "photo"
         if (isPhoto || ack.captureId != nil) && ack.captureId != captureId { return false }
         if reviewRequired { return false }
+        // v2: PC TỪ CHỐI dứt khoát (yêu cầu không hợp lệ / đơn đang khóa): thôi gửi lại, báo lý do, người dùng kiểm tra thủ công.
+        if ack.outcome == "invalid" || ack.outcome == "locked" {
+            if isPhoto { return false }
+            scanConfirmed = true
+            reviewRequired = true
+            status = .error
+            if let extra = ack.extra, !extra.isEmpty { detail = extra } else { detail = "PC từ chối yêu cầu này; cần kiểm tra trên máy tính." }
+            return true
+        }
         let unmatched = ack.outcome == "not_found" || ack.outcome == "ambiguous"
 
         if ack.outcome == "error" {

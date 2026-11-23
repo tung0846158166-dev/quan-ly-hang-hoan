@@ -17,6 +17,7 @@ public static class AuditLogReader
         "archive" => "Dời lưu trữ",
         "delete" => "Xóa đơn",
         "restore" => "Khôi phục đơn",
+        "return_watch" => "Hàng hoàn về",
         "" => "Khác",
         _ => type,
     };

@@ -125,7 +125,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IAlertNotifyStateStore? alertNotifyStateStore = null,
         TimeSpan? alertInitialDelay = null,
         TimeSpan? alertCheckInterval = null,
-        IBackupController? backupController = null)
+        IBackupController? backupController = null,
+        IActivityLogProvider? activityLogProvider = null)
     {
         _returnOrderProvider = returnOrderProvider;
         _newOrderProvider = newOrderProvider;
@@ -194,6 +195,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IsDemoMode = isDemoMode
         };
 
+        ActivityLogVm = new ActivityLogViewModel(activityLogProvider ?? new FakeActivityLogProvider(), clipboardService) { IsDemoMode = isDemoMode };
         _backupController = backupController ?? new FakeBackupController(returnOrderProvider.GetCurrentTime);
         SettingsVm = new SettingsViewModel(
             _backupController,
@@ -336,6 +338,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["stats"] = StatisticsVm;
         _pageCache["legacy_import"] = LegacyImportVm;
         _pageCache["settings"] = SettingsVm;
+        _pageCache["activity"] = ActivityLogVm;
 
         _homeNavItem = new NavigationItem(
             "home", "🏠", "Trang chủ", string.Empty, () => HomeVm);
@@ -387,6 +390,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _deletedNavItem,
             new NavigationItem("stats", "📊", "Thống kê & báo cáo", "CHUNG", () => StatisticsVm),
             new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
+            new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
             new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm)
         ];
 
@@ -450,6 +454,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public StatisticsViewModel StatisticsVm { get; }
     public LegacyImportViewModel LegacyImportVm { get; }
     public SettingsViewModel SettingsVm { get; }
+    public ActivityLogViewModel ActivityLogVm { get; }
     public ScanReceiveViewModel ScanReceiveVm { get; }
     public PhoneSyncViewModel PhoneSyncVm { get; }
     public FolderWatchViewModel FolderWatchVm { get; }
@@ -676,6 +681,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (item.Key.Equals("return_watch", StringComparison.OrdinalIgnoreCase))
             {
                 _ = ReturnWatchVm.RefreshAsync();
+            }
+            if (item.Key.Equals("activity", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = ActivityLogVm.ReloadAsync();
             }
             var lastPage = item.Key.Equals("home", StringComparison.OrdinalIgnoreCase) ? "" : item.Key;
             _uiSettingsStore.Update(s => s.LastPage = lastPage);
@@ -1026,6 +1035,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task ReloadAllDataAsync()
     {
+        if (ReferenceEquals(CurrentPage, ActivityLogVm)) _ = ActivityLogVm.RefreshQuietlyAsync();   // có hoạt động mới: làm mới nhẹ nếu đang xem nhật ký
         var now = _returnOrderProvider.GetCurrentTime();
         var returnOrdersTask = _returnOrderProvider.GetReturnOrdersAsync();
         var archivedOrdersTask = Task.Run(() => _archivedOrderProvider.GetArchivedOrders());

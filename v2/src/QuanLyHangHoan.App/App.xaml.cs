@@ -166,7 +166,8 @@ public partial class App : Application
                 trayService: trayService,
                 notificationService: notificationService,
                 alertNotifyStateStore: alertStateStore,
-                backupController: new SqliteBackupController(AppPaths.DatabasePath));
+                backupController: new SqliteBackupController(AppPaths.DatabasePath),
+                activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath));
         }
 
         _mainViewModel = mainViewModel;

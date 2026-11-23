@@ -1,0 +1,108 @@
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.ActivityLogView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ActivityLogViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🧾 Nhật ký hoạt động" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                    <Border Margin="12,0,0,0" Padding="8,2" CornerRadius="10" VerticalAlignment="Center"
+                            Background="{DynamicResource AlertYellowBadgeBgBrush}"
+                            Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource AlertYellowTextBrush}" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Margin="0,4,0,0" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap"
+                           Text="Mọi thay đổi dữ liệu đều được ghi lại: nạp đơn, sửa, quét nhận kiện, xóa, đơn từ điện thoại, Salework. Chỉ để xem, không sửa được." />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Padding="20,10" Background="{DynamicResource AppBgBrush}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Làm mới" Command="{Binding RefreshCommand}" Padding="14,5" Margin="8,0,0,0" Cursor="Hand" />
+                <ComboBox DockPanel.Dock="Left" Width="190" ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding SelectedType}" DisplayMemberPath="Label" Margin="0,0,10,0" />
+                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="8,5" ToolTip="Lọc theo chữ trong chi tiết (ví dụ mã vận đơn)" />
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="2" Margin="20,0,20,0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="8">
+            <Grid>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Entries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="14,8" Background="Transparent"
+                                        Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Sao chép dòng này"
+                                                      Command="{Binding PlacementTarget.Tag.CopyDetailCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                      CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="180" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Top" />
+                                        <TextBlock Grid.Column="1" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" VerticalAlignment="Top">
+                                            <Run Text="{Binding Icon, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding TypeLabel, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Text="Chưa có hoạt động nào" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"
+                           Foreground="{DynamicResource InkMutedBrush}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="20,8,20,12">
+            <Button DockPanel.Dock="Right" Content="Tải thêm 200 dòng" Command="{Binding LoadMoreCommand}" Padding="14,5" Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasMore}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <TextBlock Text="{Binding ShownText}" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" />
+        </DockPanel>
+    </Grid>
+</UserControl>

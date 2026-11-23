@@ -16,12 +16,33 @@ public partial class ReturnOrdersView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += (_, _) => TryReveal();
+    }
+
+    private void OnRevealRequested(ReturnOrderRowViewModel row)
+    {
+        // Gọi trễ một nhịp để bảng kịp dựng xong (trang vừa được mở) rồi mới cuộn tới.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(TryReveal));
+    }
+
+    /// <summary>Cuộn tới dòng được chọn bằng lệnh, chọn đúng dòng đó và đưa tiêu điểm vào bảng để thấy rõ nó được tô chọn.</summary>
+    private void TryReveal()
+    {
+        if (DataContext is not ReturnOrdersViewModel vm || vm.PendingReveal is not { } row || !OrdersGrid.IsLoaded) return;
+        if (!vm.VisibleOrders.Contains(row)) { vm.PendingReveal = null; return; }
+        vm.PendingReveal = null;
+        GridReveal.Perform(OrdersGrid, row);
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.OldValue is ReturnOrdersViewModel oldVm) oldVm.ClearSelectionRequested -= OnClearSelectionRequested;
-        if (e.NewValue is ReturnOrdersViewModel newVm) newVm.ClearSelectionRequested += OnClearSelectionRequested;
+        if (e.OldValue is ReturnOrdersViewModel oldVm) { oldVm.ClearSelectionRequested -= OnClearSelectionRequested; oldVm.RevealRequested -= OnRevealRequested; }
+        if (e.NewValue is ReturnOrdersViewModel newVm)
+        {
+            newVm.ClearSelectionRequested += OnClearSelectionRequested;
+            newVm.RevealRequested += OnRevealRequested;
+            if (newVm.PendingReveal is not null) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(TryReveal));
+        }
 
         if (e.OldValue is INotifyPropertyChanging oldChanging)
             oldChanging.PropertyChanging -= OnVmPropertyChanging;

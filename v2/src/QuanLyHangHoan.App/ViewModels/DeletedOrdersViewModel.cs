@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -297,8 +297,16 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
 
         if (match is null) return false;
         SelectedRow = match;
+        PendingReveal = match;
+        RevealRequested?.Invoke(match);
         return true;
     }
+
+    /// <summary>Dòng vừa được chọn bằng lệnh mà giao diện chưa cuộn tới (View xử lý rồi xóa).</summary>
+    public DeletedOrderRowViewModel? PendingReveal { get; set; }
+
+    /// <summary>Yêu cầu giao diện cuộn tới và làm nổi bật dòng này.</summary>
+    public event Action<DeletedOrderRowViewModel>? RevealRequested;
 
     [RelayCommand]
     public void OpenDetail(DeletedOrderRowViewModel? row = null)

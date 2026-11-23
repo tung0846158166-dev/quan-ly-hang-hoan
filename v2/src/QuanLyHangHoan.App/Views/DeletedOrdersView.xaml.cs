@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using QuanLyHangHoan.App.ViewModels;
@@ -10,6 +10,27 @@ public partial class DeletedOrdersView : UserControl
     public DeletedOrdersView()
     {
         InitializeComponent();
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is DeletedOrdersViewModel o) o.RevealRequested -= OnRevealRequested;
+            if (e.NewValue is DeletedOrdersViewModel n)
+            {
+                n.RevealRequested += OnRevealRequested;
+                if (n.PendingReveal is not null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(TryReveal));
+            }
+        };
+        Loaded += (_, _) => TryReveal();
+    }
+
+    private void OnRevealRequested(DeletedOrderRowViewModel row) =>
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(TryReveal));
+
+    private void TryReveal()
+    {
+        if (DataContext is not DeletedOrdersViewModel vm || vm.PendingReveal is not { } row || !DeletedGrid.IsLoaded) return;
+        vm.PendingReveal = null;
+        if (!vm.VisibleOrders.Contains(row)) return;
+        GridReveal.Perform(DeletedGrid, row);
     }
 
     private void DeletedGrid_PreviewKeyDown(object sender, KeyEventArgs e)

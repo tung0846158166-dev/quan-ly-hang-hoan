@@ -10,6 +10,27 @@ public partial class ArchivedOrdersView : UserControl
     public ArchivedOrdersView()
     {
         InitializeComponent();
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is ArchivedOrdersViewModel o) o.RevealRequested -= OnRevealRequested;
+            if (e.NewValue is ArchivedOrdersViewModel n)
+            {
+                n.RevealRequested += OnRevealRequested;
+                if (n.PendingReveal is not null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(TryReveal));
+            }
+        };
+        Loaded += (_, _) => TryReveal();
+    }
+
+    private void OnRevealRequested(ArchivedOrderRowViewModel row) =>
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(TryReveal));
+
+    private void TryReveal()
+    {
+        if (DataContext is not ArchivedOrdersViewModel vm || vm.PendingReveal is not { } row || !ArchivedGrid.IsLoaded) return;
+        vm.PendingReveal = null;
+        if (!vm.VisibleOrders.Contains(row)) return;
+        GridReveal.Perform(ArchivedGrid, row);
     }
 
     private async void ArchivedGrid_PreviewKeyDown(object sender, KeyEventArgs e)

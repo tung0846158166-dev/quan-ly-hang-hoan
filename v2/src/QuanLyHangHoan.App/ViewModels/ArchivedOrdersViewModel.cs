@@ -330,8 +330,16 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
 
         if (match is null) return false;
         SelectedRow = match;
+        PendingReveal = match;
+        RevealRequested?.Invoke(match);
         return true;
     }
+
+    /// <summary>Dòng vừa được chọn bằng lệnh mà giao diện chưa cuộn tới (View xử lý rồi xóa).</summary>
+    public ArchivedOrderRowViewModel? PendingReveal { get; set; }
+
+    /// <summary>Yêu cầu giao diện cuộn tới và làm nổi bật dòng này.</summary>
+    public event Action<ArchivedOrderRowViewModel>? RevealRequested;
 
     [RelayCommand]
     public async Task UnarchiveRowAsync(ArchivedOrderRowViewModel? row = null)

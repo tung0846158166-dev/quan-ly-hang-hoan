@@ -365,8 +365,16 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
         if (match is null) return false;
         SelectedRow = match;
+        PendingReveal = match;
+        RevealRequested?.Invoke(match);
         return true;
     }
+
+    /// <summary>Dòng vừa được chọn bằng lệnh (từ Trang chủ/tìm kiếm) mà giao diện chưa cuộn tới. View xử lý rồi xóa.</summary>
+    public ReturnOrderRowViewModel? PendingReveal { get; set; }
+
+    /// <summary>Yêu cầu giao diện cuộn tới, đưa tiêu điểm và làm nổi bật dòng này.</summary>
+    public event Action<ReturnOrderRowViewModel>? RevealRequested;
 
     [RelayCommand]
     private void SetPlatformFilter(string platform)

@@ -56,11 +56,17 @@ struct SettingsView: View {
                     }
                     .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                 }
-                Section("Mã phòng (giống mã trên PC)") {
-                    TextField("SHP-2026", text: $roomText)
+                Section {
+                    TextField("Dán mã phòng từ app PC v2", text: $roomText)
                         .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                        .onSubmit { engine.setRoom(roomText) }
-                    Button("Lưu mã phòng") { engine.setRoom(roomText) }
+                        .onSubmit { if SyncProtocol.isValidRoom(roomText) { engine.setRoom(roomText) } }
+                    Button("Lưu mã phòng") { if SyncProtocol.isValidRoom(roomText) { engine.setRoom(roomText) } }
+                        .disabled(!SyncProtocol.isValidRoom(roomText))
+                    if !roomText.isEmpty && !SyncProtocol.isValidRoom(roomText) {
+                        Text("Mã phòng quá ngắn (cần ít nhất 12 ký tự). Lấy mã ở màn \"Đồng bộ điện thoại\" của app PC v2.").font(.footnote).foregroundColor(.red)
+                    }
+                } header: { Text("Mã phòng (giống mã trên PC v2)") } footer: {
+                    Text("Mã phòng của app PC v2 là chuỗi dài ngẫu nhiên, khác mã SHP-2026 của app cũ. Giữ bí mật mã này.")
                 }
                 Section("Trạng thái") {
                     LabeledContent("Kênh ntfy", value: engine.sseConnected ? "Đã nối" : "Mất kết nối")

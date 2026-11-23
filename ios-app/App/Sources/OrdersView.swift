@@ -143,11 +143,7 @@ struct OrdersView: View {
         let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
         let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
         return HStack(spacing: 6) {
-            NavigationLink { InboxView() } label: {
-                VStack(spacing: 1) { Text("📥 Đơn mới").font(.caption.bold()); Text("\(store.inbox.count)").font(.subheadline.bold()) }
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered).tint(store.inbox.isEmpty ? .gray : .blue)
+            // v2: không còn Hộp Đơn Mới (đơn quét từ điện thoại vào thẳng Bảng chính trên PC).
             NavigationLink { CancelledTableView() } label: {
                 VStack(spacing: 1) { Text("🚫 Đơn hủy").font(.caption.bold()); Text("chưa nhận \(cancelledPending)").font(.caption2.bold()) }
                     .frame(maxWidth: .infinity)
@@ -273,7 +269,8 @@ struct DetailView: View {
     @State private var askDelete = false
     @State private var confirmDelete = false
 
-    private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất", "Hư hỏng"]
+    // v2: PC chỉ nhận 4 trạng thái này ("Hư hỏng" không có ở v2); "Chưa nhận" PC hiểu là "Chưa trả".
+    private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất"]
     private static let types = ["Giao không thành công", "Trả hàng/Hoàn tiền", "Đơn hủy", "THẤT THU"]
     private var statusChoices: [String] { Self.statuses.contains(editSt) || editSt.isEmpty ? Self.statuses : Self.statuses + [editSt] }
     private var typeChoices: [String] { Self.types.contains(editTy) || editTy.isEmpty ? Self.types : Self.types + [editTy] }
@@ -311,15 +308,11 @@ struct DetailView: View {
                     if !live.nt.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Ghi chú đơn trên máy tính").font(.caption).foregroundStyle(.secondary); Text(live.nt) } }
                 }
                 if live.k == "m" {
-                    Section("Sửa thông tin đơn (đồng bộ 2 chiều với máy tính)") {
-                        TextField("Sản phẩm", text: $editN, axis: .vertical).lineLimit(1...3)
-                        TextField("Màu", text: $editCo)
-                        TextField("Size", text: $editSz)
-                        Stepper("Số lượng: \(editQ)", value: $editQ, in: 1...999)
+                    Section("Đổi trạng thái nhận kho (đồng bộ với máy tính)") {
+                        // v2: PC chỉ cho đổi TRẠNG THÁI từ điện thoại; sửa sản phẩm/màu/size/số lượng/loại đơn làm trên máy tính.
                         Picker("Trạng thái", selection: $editSt) { ForEach(statusChoices, id: \.self) { Text($0).tag($0) } }
-                        Picker("Loại đơn", selection: $editTy) { ForEach(typeChoices, id: \.self) { Text($0).tag($0) } }
-                        Button(sentEdit ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu thay đổi sang máy tính") {
-                            engine.sendOrderEdit(live, fields: ["n": editN, "co": editCo, "sz": editSz, "q": editQ, "st": editSt, "ty": editTy])
+                        Button(sentEdit ? "✓ Đã gửi, đang đồng bộ với máy tính" : "Lưu trạng thái sang máy tính") {
+                            engine.sendOrderEdit(live, fields: ["st": editSt])
                             sentEdit = true
                         }
                         Button("Xóa đơn này", role: .destructive) { askDelete = true }
@@ -330,7 +323,10 @@ struct DetailView: View {
                     LabeledContent("Sàn", value: live.p.isEmpty ? "—" : live.p)
                     if !live.ty.isEmpty { LabeledContent("Loại đơn", value: live.ty) }
                     if live.pre { LabeledContent("Hàng đặt trước", value: "Có") }
-                    LabeledContent("Sản phẩm", value: live.n.isEmpty ? "—" : live.n)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sản phẩm").font(.caption).foregroundStyle(.secondary)
+                        if live.n.isEmpty { Text("—") } else { ProductLines(n: live.n, rn: live.rn) }
+                    }
                     LabeledContent("Màu", value: live.co.isEmpty ? "—" : live.co)
                     LabeledContent("Size", value: live.sz.isEmpty ? "—" : live.sz)
                     LabeledContent("Số lượng", value: "\(live.q)")

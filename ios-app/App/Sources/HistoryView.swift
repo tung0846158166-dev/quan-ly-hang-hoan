@@ -35,7 +35,6 @@ struct HistoryView: View {
                 Picker("Loại", selection: $kind) {
                     Text("Quét hoàn kho").tag(ScanKind.returnScan)
                     Text("Đơn mới").tag(ScanKind.newOrder)
-                    Text("Đơn hủy").tag(ScanKind.cancelOrder)
                 }
                 .pickerStyle(.segmented).padding(.horizontal)
                 statsLine

@@ -43,9 +43,14 @@ public enum SyncProtocol {
         return "agy_shopee_" + clean
     }
 
+    /// v2: không còn mã phòng mặc định (app cũ dùng SHP-2026, ai cũng đoán được). Rỗng = chưa cài.
     public static func normalizeRoom(_ raw: String) -> String {
-        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        return t.isEmpty ? "SHP-2026" : t
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+
+    /// Mã phòng của PC v2 là chuỗi ngẫu nhiên dài (>= 16 ký tự); chấp nhận từ 12 ký tự để không chặn nhầm.
+    public static func isValidRoom(_ raw: String) -> Bool {
+        normalizeRoom(raw).count >= 12
     }
 
     public static func json(_ obj: [String: Any]) -> String {

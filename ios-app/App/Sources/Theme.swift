@@ -70,9 +70,8 @@ struct ModePicker: View {
     @Binding var mode: ScanKind
     private let items: [(ScanKind, String, String)] = [
         (.returnScan, "Hoàn kho", "shippingbox.fill"),
-        (.newOrder, "Đơn mới", "plus.circle.fill"),
-        (.cancelOrder, "Đơn hủy", "xmark.circle.fill")
-    ]
+        (.newOrder, "Đơn mới", "plus.circle.fill")
+    ]   // v2: BỎ tạo đơn hủy từ điện thoại (PC v2 từ chối); giá trị enum .cancelOrder vẫn giữ để đọc được lịch sử quét cũ
     var body: some View {
         HStack(spacing: 6) {
             ForEach(items, id: \.0) { item in

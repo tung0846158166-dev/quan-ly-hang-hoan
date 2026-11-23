@@ -48,7 +48,7 @@ final class SyncEngine: ObservableObject {
     private var photosDir: URL { docs.appendingPathComponent("photos", isDirectory: true) }
 
     init() {
-        room = SyncProtocol.normalizeRoom(UserDefaults.standard.string(forKey: "room") ?? "SHP-2026")
+        room = SyncProtocol.normalizeRoom(UserDefaults.standard.string(forKey: "room") ?? "")   // v2: không có mã phòng mặc định
         try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
         if let data = try? Data(contentsOf: storeURL), let list = try? JSONDecoder().decode([ScanItem].self, from: data) {
             items = list
@@ -132,6 +132,7 @@ final class SyncEngine: ObservableObject {
     }
 
     private func startSSE() {
+        if room.isEmpty { return }   // v2: chưa cài mã phòng thì không nối
         let watching = room
         sseTask = Task { [weak self] in
             var backoff = 1.0
@@ -160,6 +161,7 @@ final class SyncEngine: ObservableObject {
         brokerUp = []
         mqttGeneration += 1
         let gen = mqttGeneration
+        if room.isEmpty { return }   // v2: chưa cài mã phòng thì không nối (không có mã phòng mặc định)
         let topic = SyncProtocol.mqttTopic(room: room)
         for b in SyncProtocol.mqttBrokers {
             let c = MQTTClient(name: b.name, url: b.url)

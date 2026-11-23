@@ -5,8 +5,15 @@ final class ProtocolTests: XCTestCase {
     func testTopicAndRoom() {
         XCTAssertEqual(SyncProtocol.topic(room: "SHP-2026"), "agy_shopee_shp-2026")
         XCTAssertEqual(SyncProtocol.topic(room: "A B!c"), "agy_shopee_abc")
-        XCTAssertEqual(SyncProtocol.normalizeRoom("  "), "SHP-2026")
+        XCTAssertEqual(SyncProtocol.normalizeRoom("  "), "")          // v2: không còn mã phòng mặc định
         XCTAssertEqual(SyncProtocol.normalizeRoom(" shp-1 "), "SHP-1")
+    }
+
+    func testRoomValidationRejectsShortAndDefaultCodes() {
+        XCTAssertFalse(SyncProtocol.isValidRoom(""))
+        XCTAssertFalse(SyncProtocol.isValidRoom("SHP-2026"))           // mã mặc định của app cũ: quá ngắn
+        XCTAssertFalse(SyncProtocol.isValidRoom("  abc  "))
+        XCTAssertTrue(SyncProtocol.isValidRoom("k7Qp-2xMa-9TzW-4bYc-Lr3H"))
     }
 
     func testScanPayloads() {

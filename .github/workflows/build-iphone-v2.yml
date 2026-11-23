@@ -78,12 +78,15 @@ jobs:
           name: QuetHangHoan-v2-v${{ env.VERSION }}
           path: ios-app/App/build/*.ipa
 
+      # Mỗi lần đẩy nhánh (không phải PR) đăng IPA lên mục Releases dạng "bản thử" để tải thẳng không cần vào Artifacts (zip, buộc đăng nhập).
       - name: Phát hành
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ios-v2-v${{ env.VERSION }}
-          name: "App iPhone v2 Quét Hàng Hoàn v${{ env.VERSION }} (IPA chưa ký)"
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('ios-v2-v{0}', env.VERSION) || format('ios-v2-build-{0}', github.run_number) }}
+          name: "App iPhone v2 Quét Hàng Hoàn v${{ env.VERSION }} (bản dựng ${{ github.run_number }}, IPA chưa ký)"
+          prerelease: ${{ github.event_name != 'workflow_dispatch' }}
+          target_commitish: ${{ github.sha }}
           make_latest: "false"
           files: ios-app/App/build/*.ipa
           body: |

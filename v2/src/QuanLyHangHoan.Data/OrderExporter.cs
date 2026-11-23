@@ -17,8 +17,16 @@ public static class OrderExporter
     {
         "STT", "Sàn", "Loại đơn", "Mã đơn hàng", "Mã vận đơn", "Mã vận đơn hoàn", "Mã yêu cầu hoàn", "Trạng thái kiện (sàn)", "Nhận tại kho",
         "Ngày giao", "Ngày hoàn/hủy", "Giờ hàng về shop", "Ngày nhận kho", "ĐVVC", "Sản phẩm", "Phân loại", "SL", "Giá trị",
-        "Ghi chú / Lý do", "Ghi chú của tôi", "Đang theo dõi", "Lý do theo dõi", "Vị trí",
+        "Ghi chú / Lý do", "Ghi chú của tôi", "Đang theo dõi", "Lý do theo dõi", "Vị trí", "Sản phẩm đã hoàn",
     };
+
+    /// <summary>Đơn có CẢ sản phẩm đã hoàn lẫn chưa hoàn (hoàn một phần): trả danh sách sản phẩm đã hoàn kèm số lượng; ngược lại rỗng.</summary>
+    public static string ReturnedItemsText(Order o)
+    {
+        var returned = o.Items.Where(i => i.ReturnedQty > 0).ToList();
+        if (returned.Count == 0 || returned.Count == o.Items.Count) return "";
+        return string.Join(" | ", returned.Select(i => $"{i.Product} x{i.ReturnedQty}"));
+    }
 
     public static string LocationOf(StoredOrder s) => s.IsDeleted ? "Đã xóa" : s.IsArchived ? "Kho lưu trữ" : "Bảng chính";
 
@@ -32,7 +40,7 @@ public static class OrderExporter
             o.ShipDate, o.ReturnDate, o.ReturnedAt, o.RecvDate, o.Carrier,
             string.Join(" | ", items.Select(i => i.Product)), string.Join(" | ", items.Select(i => string.Join(", ", new[] { i.Color, i.Size }.Where(x => !string.IsNullOrEmpty(x))))),
             items.Count == 0 ? 0 : items.Sum(i => i.Qty), o.Price,
-            o.Note, o.UserNote, o.IsWatchlist ? "Có" : "", o.WatchlistReason, LocationOf(s),
+            o.Note, o.UserNote, o.IsWatchlist ? "Có" : "", o.WatchlistReason, LocationOf(s), ReturnedItemsText(o),
         };
     }
 

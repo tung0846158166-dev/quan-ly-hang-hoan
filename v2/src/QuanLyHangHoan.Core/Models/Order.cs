@@ -16,6 +16,12 @@ public sealed class OrderItem
     public string Color { get; set; } = "";
     public string Size { get; set; } = "";
     public int Qty { get; set; }
+    /// <summary>
+    /// Số lượng của mặt hàng NÀY đã được khách hoàn (từ file/Sheet hoàn hàng). 0 = chưa biết hoặc không nằm trong yêu cầu hoàn.
+    /// Dùng để hiển thị: đơn gửi 3 sản phẩm mà chỉ hoàn 1 thì vẫn giữ đủ 3 dòng, dòng được hoàn (ReturnedQty &gt; 0) khác màu.
+    /// Nếu KHÔNG dòng nào có ReturnedQty &gt; 0 thì giao diện không phân biệt (dữ liệu cũ/không rõ).
+    /// </summary>
+    public int ReturnedQty { get; set; }
     public string? Sku { get; set; }
     public string? SkuId { get; set; }
     /// <summary>Giá theo từng ô nguồn khi nhập (unitReturn, discounted, originalUnit, subtotal, saleworkUnit...). null nếu không có.</summary>

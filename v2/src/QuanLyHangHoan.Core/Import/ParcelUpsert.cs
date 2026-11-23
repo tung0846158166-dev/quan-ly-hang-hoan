@@ -64,7 +64,7 @@ public static class ParcelUpsert
 
         // Sản phẩm: THAY bằng danh sách nhập (không cộng dồn) nếu file có sản phẩm.
         if (n.Items.Count > 0) t.Items = n.Items.Select(i => new OrderItem
-        { Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, Sku = i.Sku, SkuId = i.SkuId }).ToList();
+        { Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, Sku = i.Sku, SkuId = i.SkuId }).ToList();
 
         // Giữ mã lịch sử: hợp mã riêng cũ + mới, không mất mã nào.
         if (TrackingResolver.Normalize(n.Track) != TrackingResolver.Normalize(t.Track) && n.Track.Length > 0

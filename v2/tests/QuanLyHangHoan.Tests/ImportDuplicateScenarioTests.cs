@@ -140,6 +140,89 @@ public sealed class ImportDuplicateScenarioTests : IDisposable
         Assert.Equal("Shirt", rows.Single(r => r.Order.OrderId == "T1").Order.Items.Single().Product);
     }
 
+    // ================= HOÀN MỘT PHẦN: giữ đủ sản phẩm, đánh dấu sản phẩm đã hoàn =================
+    private const string TikHead2 = "Order ID,Return Order ID,Tracking ID,Return Logistics Tracking ID,Product Name,Quantity,Return Quantity,Return Status\n";
+    private const string Sent3 = "A,,B,,Ao,1,,Delivered\nA,,B,,Quan,1,,Delivered\nA,,B,,Non,1,,Delivered\n";
+    private const string Return1 = "A,R1,B,C,Ao,3,1,In Process\n";
+
+    private FileImportResult ImportTo(string db, ImportProductMode mode, string name, string csv, bool onlyReturns) =>
+        FileImportService.Import(db, new[] { (name, B(csv)) }, new TikTokMapOptions { Today = Now, OnlyReturns = onlyReturns }, mode, Now);
+
+    [Fact]
+    public void Partial_return_keeps_all_three_products_and_marks_only_the_returned_one()
+    {
+        ImportTo(Db, ImportProductMode.Supplement, "f1.csv", TikHead2 + Sent3, onlyReturns: false);
+        var sentOnly = Assert.Single(Rows()).Order;
+        Assert.Equal(3, sentOnly.Items.Count);
+        Assert.All(sentOnly.Items, i => Assert.Equal(0, i.ReturnedQty));          // mới gửi đi: chưa có gì "đã hoàn"
+
+        var r = ImportTo(Db, ImportProductMode.Supplement, "f2.csv", TikHead2 + Return1, onlyReturns: true);
+        Assert.Equal(1, r.Updated);
+        var o = Assert.Single(Rows()).Order;                                       // cùng một kiện, không tạo dòng mới
+        Assert.Equal("C", o.ReturnTrack); Assert.Equal("B", o.ForwardTrack); Assert.True(o.IsPartialReturn);
+        Assert.Equal(3, o.Items.Count);                                            // GIỮ ĐỦ 3 sản phẩm
+        Assert.Equal(1, o.Items.Single(i => i.Product == "Ao").ReturnedQty);       // sản phẩm đã hoàn
+        Assert.Equal(0, o.Items.Single(i => i.Product == "Quan").ReturnedQty);     // hai sản phẩm còn lại không hoàn
+        Assert.Equal(0, o.Items.Single(i => i.Product == "Non").ReturnedQty);
+
+        ImportTo(Db, ImportProductMode.Supplement, "f2.csv", TikHead2 + Return1, onlyReturns: true);   // nạp lại: không đổi gì
+        var again = Assert.Single(Rows()).Order;
+        Assert.Equal(3, again.Items.Count);
+        Assert.Equal(1, again.Items.Single(i => i.Product == "Ao").ReturnedQty);
+    }
+
+    [Fact]
+    public void Partial_return_is_visible_in_export_and_phone_list_but_not_for_full_or_unknown_returns()
+    {
+        ImportTo(Db, ImportProductMode.Supplement, "f1.csv", TikHead2 + Sent3, onlyReturns: false);
+        var unknown = Assert.Single(Rows());
+        Assert.Equal("", QuanLyHangHoan.Data.OrderExporter.ReturnedItemsText(unknown.Order));          // chưa biết: không đánh dấu
+
+        ImportTo(Db, ImportProductMode.Supplement, "f2.csv", TikHead2 + Return1, onlyReturns: true);
+        var partial = Assert.Single(Rows());
+        Assert.Equal("Ao x1", QuanLyHangHoan.Data.OrderExporter.ReturnedItemsText(partial.Order));
+        var rows = OrderRepository.Load(Db);
+        var phone = QuanLyHangHoan.Data.Sync.PhoneSnapshot.BuildRow(partial, Now);
+        Assert.Equal("Ao", phone["rn"]);
+        Assert.Contains("Quan", (string)phone["n"]);                                                    // danh sách đầy đủ vẫn còn đủ 3 sản phẩm
+        var xlsx = QuanLyHangHoan.Data.Import.SpreadsheetReader.Read("x.xlsx", QuanLyHangHoan.Data.OrderExporter.ToXlsx(rows));
+        Assert.Equal("Ao x1", xlsx.Single()["Sản phẩm đã hoàn"]);
+
+        var db2 = Path.Combine(_dir, "full.db"); AppDatabase.Initialize(db2);
+        ImportTo(db2, ImportProductMode.Supplement, "f.csv", TikHead2 + "A,R1,B,C,Ao,1,1,In Process\nA,R1,B,C,Quan,1,1,In Process\n", onlyReturns: true);
+        var full = Assert.Single(OrderRepository.Load(db2));
+        Assert.Equal("", QuanLyHangHoan.Data.OrderExporter.ReturnedItemsText(full.Order));            // hoàn đủ: không cần phân biệt
+        Assert.False(QuanLyHangHoan.Data.Sync.PhoneSnapshot.BuildRow(full, Now).ContainsKey("rn"));
+    }
+
+    [Fact]
+    public void Replace_mode_still_means_only_the_returned_product_remains()
+    {
+        var db = Path.Combine(_dir, "replace.db"); AppDatabase.Initialize(db);
+        ImportTo(db, ImportProductMode.Replace, "f1.csv", TikHead2 + Sent3, onlyReturns: false);
+        ImportTo(db, ImportProductMode.Replace, "f2.csv", TikHead2 + Return1, onlyReturns: true);
+        var o = Assert.Single(OrderRepository.Load(db)).Order;
+        var only = Assert.Single(o.Items);
+        Assert.Equal("Ao", only.Product); Assert.Equal(1, only.ReturnedQty);
+    }
+
+    [Fact]
+    public void Full_return_marks_every_product_as_returned()
+    {
+        ImportTo(Db, ImportProductMode.Supplement, "f.csv", TikHead2 + "A,R1,B,C,Ao,1,1,In Process\nA,R1,B,C,Quan,1,1,In Process\n", onlyReturns: true);
+        var o = Assert.Single(Rows()).Order;
+        Assert.Equal(2, o.Items.Count);
+        Assert.All(o.Items, i => Assert.Equal(1, i.ReturnedQty));
+    }
+
+    [Fact]
+    public void Shopee_return_rows_are_marked_returned_and_survive_reload_from_the_database()
+    {
+        Import(("a.csv", ShopeeHead + Sp("SP1", "RR1", "SPXVN0000000001", "Ao A", "2")));
+        var o = Assert.Single(Rows()).Order;
+        Assert.Equal(2, o.Items.Single().ReturnedQty);
+    }
+
     // ================= GOOGLE SHEET =================
     private const string SheetHead = "Mã,Mã đơn,Loại,Mã vận đơn,Trạng thái về,Về shop lúc,Hạn khiếu nại,Hàng,SL,Tiền,Lý do,Ngày,Cập nhật\n";
     private static string SheetRow(string claim, string order, string track, string updated = "22/11/2026", string product = "Áo") =>

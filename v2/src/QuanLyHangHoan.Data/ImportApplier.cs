@@ -151,7 +151,7 @@ public static class ImportApplier
         ReturnDate = o.ReturnDate, RecvDate = o.RecvDate, ReturnedAt = o.ReturnedAt, Deadline = o.Deadline, Price = o.Price,
         Note = o.Note, BuyerNote = o.BuyerNote, UserNote = o.UserNote, ImportWeek = o.ImportWeek, ImportedAt = o.ImportedAt,
         IsWatchlist = o.IsWatchlist, WatchlistReason = o.WatchlistReason, IsPartialReturn = o.IsPartialReturn, PhotoId = o.PhotoId,
-        Items = o.Items.Select(i => new OrderItem { Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, Sku = i.Sku, SkuId = i.SkuId }).ToList(),
+        Items = o.Items.Select(i => new OrderItem { Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, Sku = i.Sku, SkuId = i.SkuId }).ToList(),
         ExtraJson = o.ExtraJson,
     };
 

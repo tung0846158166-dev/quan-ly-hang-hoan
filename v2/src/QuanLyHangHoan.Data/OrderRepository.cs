@@ -22,13 +22,16 @@ public static class OrderRepository
         {
             // DB phiên bản < 3 chưa có cột import_prices (chỉ mở chỉ-đọc, chưa nâng cấp): đọc được cả hai dạng.
             var hasPrices = false;
+            var hasReturned = false;
             using (var pc = conn.CreateCommand())
             {
                 pc.CommandText = "SELECT COUNT(*) FROM pragma_table_info('order_items') WHERE name='import_prices'";
                 hasPrices = Convert.ToInt32(pc.ExecuteScalar()) > 0;
+                pc.CommandText = "SELECT COUNT(*) FROM pragma_table_info('order_items') WHERE name='returned_qty'";
+                hasReturned = Convert.ToInt32(pc.ExecuteScalar()) > 0;
             }
             ic.CommandText = "SELECT source_key, product, color, size, qty, sku, sku_id, " + (hasPrices ? "import_prices" : "NULL") +
-                             " FROM order_items ORDER BY source_key, line_no";
+                             ", " + (hasReturned ? "returned_qty" : "0") + " FROM order_items ORDER BY source_key, line_no";
             using var r = ic.ExecuteReader();
             while (r.Read())
             {
@@ -39,6 +42,7 @@ public static class OrderRepository
                     Product = r.GetString(1), Color = r.GetString(2), Size = r.GetString(3), Qty = r.GetInt32(4),
                     Sku = r.IsDBNull(5) ? null : r.GetString(5), SkuId = r.IsDBNull(6) ? null : r.GetString(6),
                     ImportPrices = r.IsDBNull(7) ? null : ReadPrices(r.GetString(7)),
+                    ReturnedQty = r.IsDBNull(8) ? 0 : r.GetInt32(8),
                 });
             }
         }

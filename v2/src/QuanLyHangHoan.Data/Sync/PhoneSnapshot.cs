@@ -78,6 +78,10 @@ public static class PhoneSnapshot
             ["st"] = kind == "c" ? CancelType : (o.Status ?? ""),
         };
 
+        // Hoàn một phần: tên các sản phẩm ĐÃ HOÀN (điện thoại tô màu các sản phẩm này trong danh sách `n`). Chỉ khi có cả hoàn lẫn không hoàn.
+        var returnedNames = items.Where(i => i.ReturnedQty > 0).Select(i => Clip(i.Product, 70)).Where(n => n.Length > 0).ToList();
+        if (returnedNames.Count > 0 && returnedNames.Count < items.Count) row["rn"] = Join(returnedNames, 160);
+
         long due = 0;
         var lv = 0;
         if (pending && arrived is { } a)

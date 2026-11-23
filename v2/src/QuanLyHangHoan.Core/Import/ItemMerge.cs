@@ -35,7 +35,7 @@ public static class ItemMerge
 
     public static OrderItem Copy(OrderItem i) => new()
     {
-        Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, Sku = i.Sku, SkuId = i.SkuId,
+        Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, Sku = i.Sku, SkuId = i.SkuId,
         ImportPrices = i.ImportPrices is null ? null : new(i.ImportPrices),
     };
 
@@ -61,6 +61,7 @@ public static class ItemMerge
                 if (m is not null)
                 {
                     m.Qty = Math.Max(m.Qty, qty);
+                    m.It.ReturnedQty = Math.Max(m.It.ReturnedQty, x.It.ReturnedQty);
                     if (x.Name.Length > m.Name.Length) { m.It.Product = x.It.Product; m.Name = x.Name; }
                     if (m.It.ImportPrices is null && x.It.ImportPrices is not null) m.It.ImportPrices = x.It.ImportPrices;
                     continue;

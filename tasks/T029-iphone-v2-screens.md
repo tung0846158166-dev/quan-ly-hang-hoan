@@ -12,6 +12,7 @@ GIỚI HẠN THẬT như T028: không có Swift trên máy này, KHÔNG biên d�
 6. **Thông báo hạn**: lên lịch thông báo cục bộ "sắp đến hạn"/"đã đến hạn" từ `due` của đơn chưa nhận (như bản cũ), xin quyền thông báo lần đầu, hủy/đổi lịch khi đơn đã nhận, không quá giới hạn 64 thông báo lịch của iOS (ưu tiên đơn gần hạn nhất).
 7. **Lịch sử quét** (các lần quét và kết quả, tối đa 500, lưu giữa các lần mở) và **Cài đặt** (mã phòng có nút dán/sao chép, bật/tắt MQTT/ntfy, trạng thái kết nối từng đường, "Xin lại danh sách từ máy tính" gửi `snapshot_request`, hiển thị "PC đang online/offline" từ `pc_hello`/`pc_heartbeat` quá 45 giây là offline, phiên bản app).
 8. Đồng bộ trạng thái PC: nhận `watch_sync` cập nhật theo dõi; xử lý `snapshot_delta` chỉ áp khi `base` khớp bản gốc đang giữ (nếu không khớp thì gửi `snapshot_request`).
+8b. **Hoàn một phần** (yêu cầu của chủ dự án): mỗi dòng PC có thể gửi thêm trường `rn` = tên các sản phẩm ĐÃ HOÀN, cách nhau " | " (chỉ khi đơn có cả sản phẩm hoàn lẫn không hoàn; `n` vẫn chứa ĐỦ mọi sản phẩm). Trong danh sách và màn Chi tiết đơn: giữ đủ sản phẩm trong `n`, sản phẩm có tên nằm trong `rn` hiển thị khác màu (đậm + nhãn "Hoàn"), các sản phẩm còn lại xám nhạt + nhãn "Không hoàn"; không có `rn` thì không phân biệt. Thêm `rn` vào `OrderRow` (mặc định rỗng, đọc dạng "dễ tính" như các trường khác) và vào test lõi.
 9. Giao diện thống nhất tông app PC v2, chế độ tối, chữ lớn dễ đọc ngoài kho, dùng một tay được.
 
 ## Tiêu chí hoàn thành

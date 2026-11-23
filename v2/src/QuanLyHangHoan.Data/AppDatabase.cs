@@ -10,8 +10,8 @@ namespace QuanLyHangHoan.Data;
 public static class AppDatabase
 {
     /// <summary>1 = bảng đơn/ảnh/nhật ký; 2 = thêm sync_inbox (đồng bộ điện thoại); 3 = thêm order_items.import_prices (nạp file sàn);
-    /// 4 = thêm orders.v2_modified (bảo vệ khi nhập lại dữ liệu cũ); 5 = thêm bảng return_watch (Bảng Hàng Hoàn Về).</summary>
-    public const int SchemaVersion = 5;
+    /// 4 = thêm orders.v2_modified (bảo vệ khi nhập lại dữ liệu cũ); 5 = thêm bảng return_watch (Bảng Hàng Hoàn Về); 6 = thêm order_items.returned_qty (sản phẩm nào đã hoàn).</summary>
+    public const int SchemaVersion = 6;
 
     public static void Initialize(string dbPath)
     {
@@ -39,6 +39,11 @@ public static class AppDatabase
             var hasModified = Convert.ToInt32(ScalarTx(conn, tx, "SELECT COUNT(*) FROM pragma_table_info('orders') WHERE name='v2_modified'")) > 0;
             if (!hasModified)
                 using (var c = conn.CreateCommand()) { c.Transaction = tx; c.CommandText = "ALTER TABLE orders ADD COLUMN v2_modified INTEGER NOT NULL DEFAULT 0"; c.ExecuteNonQuery(); }
+
+            // Phiên bản 6: order_items.returned_qty (số lượng đã hoàn của từng sản phẩm). Chỉ THÊM cột, dòng cũ = 0 (chưa biết).
+            var hasReturnedQty = Convert.ToInt32(ScalarTx(conn, tx, "SELECT COUNT(*) FROM pragma_table_info('order_items') WHERE name='returned_qty'")) > 0;
+            if (!hasReturnedQty)
+                using (var c = conn.CreateCommand()) { c.Transaction = tx; c.CommandText = "ALTER TABLE order_items ADD COLUMN returned_qty INTEGER NOT NULL DEFAULT 0"; c.ExecuteNonQuery(); }
 
             // Phiên bản 5: bảng return_watch (Bảng Hàng Hoàn Về). Chỉ THÊM bảng.
             using (var c = conn.CreateCommand()) { c.Transaction = tx; c.CommandText = ReturnWatchService.TableSql; c.ExecuteNonQuery(); }

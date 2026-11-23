@@ -432,7 +432,7 @@ public static class ShopeeMapper
                 var sku = rawSellerSku.Length > 0 ? rawSellerSku : skuIdKey is not null ? Get(row, skuIdKey).Trim() : "";
                 long? lineAmount = chosen is not null && chosen.Kind != PriceKind.Order && Has(row, chosen.Key)
                     ? LegacyText.ParseMoney(Get(row, chosen.Key)) * (chosen.Kind == PriceKind.Unit ? rawQty : 1) : null;
-                p.Items.Add(new ImportedItem { Product = cleanProd, SellerSku = sku, SkuId = null, ImportLineAmount = lineAmount, Color = color, Size = size, Qty = rawQty });
+                p.Items.Add(new ImportedItem { Product = cleanProd, SellerSku = sku, SkuId = null, ImportLineAmount = lineAmount, Color = color, Size = size, Qty = rawQty, ReturnedQty = rawQty });   // mọi dòng file Shopee là dòng của yêu cầu hoàn/hủy
             }
         }
 

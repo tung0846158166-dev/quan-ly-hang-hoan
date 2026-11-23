@@ -8,6 +8,8 @@ public sealed class ImportedItem
     public string Color { get; set; } = "";
     public string Size { get; set; } = "";
     public int Qty { get; set; } = 1;
+    /// <summary>Số lượng đã hoàn của mặt hàng này (xem <c>OrderItem.ReturnedQty</c>); 0 = không rõ/không thuộc yêu cầu hoàn.</summary>
+    public int ReturnedQty { get; set; }
     /// <summary>Giá theo từng ô nguồn (unitReturn, discounted, originalUnit, subtotal, saleworkUnit...). null = dòng trống tự thêm.</summary>
     public Dictionary<string, long>? ImportPrices { get; set; }
     public string? SellerSku { get; set; }
@@ -66,7 +68,7 @@ public sealed class ImportedParcel
         PriceModeFlags = new(PriceModeFlags), Status = Status, Photo = Photo, Note = Note, BuyerNote = BuyerNote,
         Items = Items.Select(i => new ImportedItem
         {
-            Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, SellerSku = i.SellerSku, SkuId = i.SkuId,
+            Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, SellerSku = i.SellerSku, SkuId = i.SkuId,
             ImportPrices = i.ImportPrices is null ? null : new(i.ImportPrices), ImportLineAmount = i.ImportLineAmount,
         }).ToList(),
     };
@@ -457,6 +459,8 @@ public static class TikTokMapper
                 p.Items.Add(new ImportedItem
                 {
                     Product = pv.Product, Color = pv.Color, Size = pv.Size, Qty = rawQty, ImportPrices = lineMoney,
+                    // Dòng thuộc một YÊU CẦU HOÀN (có mã yêu cầu hoàn hoặc mã vận đơn hoàn) thì số lượng là số đã hoàn; dòng chỉ có mã giao thì chưa biết.
+                    ReturnedQty = (p.ReturnOrderId.Length > 0 || p.ReturnTrack.Length > 0) ? rawQty : 0,
                     SellerSku = rawSellerSku.Length > 0 ? rawSellerSku : null,
                     SkuId = skuIdKey is not null && Has(row, skuIdKey) ? Get(row, skuIdKey).Trim() : null,
                 });

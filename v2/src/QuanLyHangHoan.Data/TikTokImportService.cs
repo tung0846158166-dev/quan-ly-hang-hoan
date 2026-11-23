@@ -151,8 +151,8 @@ internal static class OrderStore
     {
         Exec(conn, tx, "DELETE FROM order_items WHERE source_key=$k", ("$k", key));
         for (var i = 0; i < items.Count; i++)
-            Exec(conn, tx, "INSERT INTO order_items (source_key, line_no, product, color, size, qty, sku, sku_id, import_prices) VALUES ($k,$n,$p,$c,$s,$q,$sku,$skuid,$ip)",
-                ("$k", key), ("$n", i), ("$p", items[i].Product), ("$c", items[i].Color), ("$s", items[i].Size), ("$q", items[i].Qty),
+            Exec(conn, tx, "INSERT INTO order_items (source_key, line_no, product, color, size, qty, sku, sku_id, import_prices, returned_qty) VALUES ($k,$n,$p,$c,$s,$q,$sku,$skuid,$ip,$rq)",
+                ("$k", key), ("$n", i), ("$p", items[i].Product), ("$c", items[i].Color), ("$s", items[i].Size), ("$q", items[i].Qty), ("$rq", items[i].ReturnedQty),
                 ("$sku", items[i].Sku), ("$skuid", items[i].SkuId),
                 ("$ip", items[i].ImportPrices is { Count: > 0 } ? JsonSerializer.Serialize(items[i].ImportPrices) : null));
     }

@@ -35,7 +35,7 @@ public static class ParcelMerge
             Status = p.Status, Note = p.Note, BuyerNote = p.BuyerNote,
             Items = p.Items.Select(i => new OrderItem
             {
-                Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, Sku = i.SellerSku, SkuId = i.SkuId,
+                Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, Sku = i.SellerSku, SkuId = i.SkuId,
                 ImportPrices = i.ImportPrices is null ? null : new(i.ImportPrices),
             }).ToList(),
             Import = new ImportMeta
@@ -100,7 +100,7 @@ public static class ParcelMerge
             !order.Items.Any(i => i.Product.Length > 0 && !Regex.IsMatch(i.Product, "Sản phẩm mới|Chưa rõ sản phẩm")))
             order.Items = match.Items.Select(i => new OrderItem
             {
-                Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, Sku = i.SellerSku, SkuId = i.SkuId,
+                Product = i.Product, Color = i.Color, Size = i.Size, Qty = i.Qty, ReturnedQty = i.ReturnedQty, Sku = i.SellerSku, SkuId = i.SkuId,
                 ImportPrices = i.ImportPrices is null ? null : new(i.ImportPrices),
             }).ToList();
     }

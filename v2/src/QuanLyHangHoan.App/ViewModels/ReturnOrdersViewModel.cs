@@ -954,6 +954,14 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
+        // Đang chọn nhiều dòng và bấm "Theo dõi" trên một dòng trong số đó: áp dụng cho TẤT CẢ dòng đang chọn
+        // (trước đây chỉ dòng được bấm chuột phải được thêm, các dòng còn lại bị bỏ sót).
+        if (HasMultipleSelected && _selectedRows.Contains(target))
+        {
+            await BulkWatchlistAsync();
+            return;
+        }
+
         var edited = _dialogService.PromptWatchlist(
             target.OrderId,
             target.DisplayTracking,
@@ -1063,6 +1071,36 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             r => _editService.ArchiveAsync(r.Source.Id),
             _onDataChangedAsync,
             _onNotify);
+    }
+
+    /// <summary>Thêm (hoặc bỏ) theo dõi cho TẤT CẢ các dòng đang chọn, hỏi lý do một lần.</summary>
+    [RelayCommand]
+    public async Task BulkWatchlistAsync()
+    {
+        var targets = GetBulkTargets();
+        if (targets.Count == 0 || _editService is null || _dialogService is null) return;
+
+        var edited = _dialogService.PromptWatchlist($"{targets.Count:N0} đơn đang chọn", "", true, "");
+        if (edited is null) return;
+        var newFlag = edited.Value.IsWatchlist ? "1" : "0";
+        var reason = edited.Value.Reason;
+
+        var (saved, _, _) = await OrderEditHelper.RunBulkAsync(
+            targets,
+            async r =>
+            {
+                var f = await _editService.SetFieldAsync(r.Source.Id, EditField.IsWatchlist, newFlag, expectedOld: r.IsWatchlist ? "1" : "0");
+                if (f.Kind is not (EditKind.Saved or EditKind.NoChange)) return f;
+                var rr = await _editService.SetFieldAsync(r.Source.Id, EditField.WatchlistReason, reason, expectedOld: r.Source.WatchlistReason);
+                return rr.Kind == EditKind.NoChange ? f : rr;
+            },
+            _onDataChangedAsync,
+            _onNotify);
+
+        if (saved > 0)
+            _onNotify?.Invoke(edited.Value.IsWatchlist
+                ? $"Đã thêm {saved:N0} đơn vào mục ⭐ Đang theo dõi (thanh bên trái)."
+                : $"Đã bỏ theo dõi {saved:N0} đơn.", false);
     }
 
     [RelayCommand]

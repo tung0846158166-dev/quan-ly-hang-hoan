@@ -77,6 +77,32 @@ public sealed class T013ManualActionsUiTests : IDisposable
     }
 
     [Fact]
+    public async Task BulkWatchlist_AddsAllSelectedRows_AndTheyAppearInWatchlistPage()
+    {
+        var dbPath = CreateFakeDb();
+        var dialog = new StubDialogService { NextWatchlist = (true, "Khách hay khiếu nại") };
+        using var vm = CreateRealMainVm(dbPath, dialog);
+        var table = vm.ShopeeReturnVm;
+        Assert.True(table.VisibleOrders.Count >= 3);
+        Assert.Equal(0, vm.WatchlistVm.ActiveWatchlistCount);
+
+        // Chọn 3 dòng rồi bấm "Theo dõi" ở thanh thao tác nhiều dòng.
+        table.UpdateSelectedRows(table.VisibleOrders.Take(3));
+        Assert.True(table.HasMultipleSelected);
+        await table.BulkWatchlistCommand.ExecuteAsync(null);
+
+        Assert.Equal(3, vm.WatchlistVm.ActiveWatchlistCount);
+        Assert.Equal(3, vm.WatchlistVm.Pager.All.Count);                       // cả 3 đơn xuất hiện ở "Đang theo dõi"
+        Assert.All(vm.WatchlistVm.Pager.All, r => Assert.Equal("Khách hay khiếu nại", r.Source.WatchlistReason));
+
+        // Bấm "Bật/tắt theo dõi" (menu chuột phải) trên một dòng khi đang chọn nhiều dòng: áp dụng cho TẤT CẢ dòng chọn.
+        dialog.NextWatchlist = (false, "");
+        table.UpdateSelectedRows(table.VisibleOrders.Take(3));
+        await table.ToggleWatchlistCommand.ExecuteAsync(table.VisibleOrders[1]);
+        Assert.Equal(0, vm.WatchlistVm.ActiveWatchlistCount);
+    }
+
+    [Fact]
     public async Task EditStatusNoteWatchlist_SavesAndReloads_WithHistoryNewestFirst()
     {
         var dbPath = CreateFakeDb();

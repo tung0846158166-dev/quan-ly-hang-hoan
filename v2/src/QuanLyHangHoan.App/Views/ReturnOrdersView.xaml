@@ -377,6 +377,12 @@
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#2563EB"
                         Margin="0,0,8,0" />
+                <Button Content="⭐ Theo dõi"
+                        Command="{Binding BulkWatchlistCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#D97706"
+                        Margin="0,0,8,0"
+                        ToolTip="Thêm tất cả các dòng đang chọn vào mục Đang theo dõi" />
                 <Button Content="🗑️ Xóa"
                         Command="{Binding BulkDeleteCommand}"
                         Style="{StaticResource PrimaryActionButtonStyle}"

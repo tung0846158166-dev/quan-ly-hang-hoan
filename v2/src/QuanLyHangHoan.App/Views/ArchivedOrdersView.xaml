@@ -258,7 +258,7 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTemplateColumn Header="Ảnh" Width="86" SortMemberPath="HasPhoto">
+                        <DataGridTemplateColumn Visibility="Collapsed" Header="Ảnh" Width="86" SortMemberPath="HasPhoto">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">

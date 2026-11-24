@@ -335,7 +335,7 @@
                     <TextBox Text="{Binding ProductFilter, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="190" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" ToolTip="Gõ một phần tên sản phẩm (không cần dấu)" />
                     <TextBlock Text="ĐVVC:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <ComboBox ItemsSource="{Binding CarrierOptions}" SelectedItem="{Binding CarrierFilter}" Width="150" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
-                    <ComboBox ItemsSource="{Binding PhotoOptions}" SelectedItem="{Binding PhotoOption}" Width="130" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
+                    <ComboBox Visibility="Collapsed" ItemsSource="{Binding PhotoOptions}" SelectedItem="{Binding PhotoOption}" Width="130" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
                     <TextBlock Text="Ngày hoàn từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <DatePicker SelectedDate="{Binding DateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" />
                     <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
@@ -644,7 +644,7 @@
                         </DataGridTextColumn>
 
                         <!-- 16. Ảnh -->
-                        <DataGridTemplateColumn Header="Ảnh" Width="86" SortMemberPath="HasPhoto">
+                        <DataGridTemplateColumn Visibility="Collapsed" Header="Ảnh" Width="86" SortMemberPath="HasPhoto">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Grid HorizontalAlignment="Center" VerticalAlignment="Center">

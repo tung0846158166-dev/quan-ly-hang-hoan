@@ -475,7 +475,7 @@
                 </Border>
 
                 <!-- 6. Ảnh -->
-                <Border Style="{StaticResource DetailSectionCardStyle}">
+                <Border Style="{StaticResource DetailSectionCardStyle}" Visibility="Collapsed">
                     <StackPanel>
                         <DockPanel Margin="0,0,0,8">
                             <Button DockPanel.Dock="Right"

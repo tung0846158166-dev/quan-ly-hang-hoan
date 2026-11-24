@@ -26,15 +26,41 @@ public static class GridReveal
     private static bool Flash(DataGrid grid, object row)
     {
         if (grid.ItemContainerGenerator.ContainerFromItem(row) is not DataGridRow container) return false;
-        var brush = new SolidColorBrush(Color.FromRgb(0xFA, 0xCC, 0x15)); // vàng đậm
-        container.Background = brush;
-        var anim = new ColorAnimation(Color.FromRgb(0xFA, 0xCC, 0x15), Color.FromArgb(0, 0xFA, 0xCC, 0x15), new Duration(TimeSpan.FromSeconds(3.5)))
+        // Các ô của dòng tự tô nền (màu "đang chọn") đè lên nền dòng, nên phải nháy ngay trên từng ô.
+        var cells = new List<DataGridCell>();
+        CollectCells(container, cells);
+        if (cells.Count == 0) return false;
+
+        var strong = Color.FromRgb(0xFA, 0xCC, 0x15);   // vàng đậm
+        var soft = Color.FromRgb(0xFE, 0xF3, 0xC7);     // vàng nhạt
+        var brush = new SolidColorBrush(strong);
+        // Nháy vàng đậm ↔ nhạt 3 lần (khoảng 2,4 giây) rồi mờ dần về màu "đang chọn".
+        var anim = new ColorAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(3.4) };
+        double t = 0;
+        anim.KeyFrames.Add(new DiscreteColorKeyFrame(strong, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(t))));
+        for (var i = 0; i < 3; i++)
         {
-            BeginTime = TimeSpan.FromSeconds(1.2) // giữ vàng đậm 1,2 giây rồi mờ dần
+            t += 0.4; anim.KeyFrames.Add(new LinearColorKeyFrame(soft, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(t))));
+            t += 0.4; anim.KeyFrames.Add(new LinearColorKeyFrame(strong, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(t))));
+        }
+        anim.KeyFrames.Add(new LinearColorKeyFrame(Color.FromArgb(0, 0xFA, 0xCC, 0x15), KeyTime.FromTimeSpan(TimeSpan.FromSeconds(3.4))));
+        anim.Completed += (_, _) =>
+        {
+            foreach (var c in cells) c.ClearValue(Control.BackgroundProperty);
         };
-        anim.Completed += (_, _) => container.ClearValue(Control.BackgroundProperty);
+        foreach (var c in cells) c.Background = brush;
         brush.BeginAnimation(SolidColorBrush.ColorProperty, anim);
         container.BringIntoView();
         return true;
+    }
+
+    private static void CollectCells(DependencyObject root, List<DataGridCell> cells)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is DataGridCell cell) cells.Add(cell);
+            else CollectCells(child, cells);
+        }
     }
 }

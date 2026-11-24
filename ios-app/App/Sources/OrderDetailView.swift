@@ -631,7 +631,7 @@ struct DetailView: View {
                 }
             }
 
-            if live.ar > 0 || !live.rcd.isEmpty {
+            if live.ar > 0 || receivedTimeText != nil {
                 VStack(alignment: .leading, spacing: 4) {
                     if live.ar > 0 {
                         HStack(spacing: 6) {
@@ -643,12 +643,12 @@ struct DetailView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    if !live.rcd.isEmpty {
+                    if let receivedText = receivedTimeText {
                         HStack(spacing: 6) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.caption2)
                                 .foregroundColor(Theme.success)
-                            Text("Nhận kho lúc \(live.rcd)")
+                            Text("Nhận kho lúc \(receivedText)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -768,6 +768,19 @@ struct DetailView: View {
         let value: String
         let detail: String?
         let color: Color
+        let isMuted: Bool
+    }
+
+    private var resolvedReceivedDisplay: ReceivedTimeDisplay {
+        let localScanMs = engine.localReturnScanTimeMs(for: live)
+        return live.resolvedReceivedTime(localScanTimeMs: localScanMs)
+    }
+
+    private var receivedTimeText: String? {
+        if case .received(let text, _) = resolvedReceivedDisplay {
+            return text
+        }
+        return nil
     }
 
     private var timelineEntries: [TimelineEntry] {
@@ -776,9 +789,10 @@ struct DetailView: View {
             list.append(TimelineEntry(
                 id: "rd",
                 title: live.isCancelled ? "Ngày hủy đơn" : "Ngày hoàn / hủy",
-                value: live.rd,
+                value: formatRawDate(live.rd),
                 detail: nil,
-                color: Theme.info
+                color: Theme.info,
+                isMuted: false
             ))
         }
         if live.rw > 0 {
@@ -787,7 +801,8 @@ struct DetailView: View {
                 title: "Bắt đầu theo dõi hoàn về",
                 value: formatEpochMs(live.rw),
                 detail: nil,
-                color: Theme.teal
+                color: Theme.teal,
+                isMuted: false
             ))
         }
         if live.ar > 0 {
@@ -796,16 +811,38 @@ struct DetailView: View {
                 title: "Hàng về shop",
                 value: formatEpochMs(live.ar),
                 detail: nil,
-                color: Theme.warning
+                color: Theme.warning,
+                isMuted: false
             ))
         }
-        if !live.rcd.isEmpty {
+        // Luôn hiển thị dòng "Đã nhận tại kho" trong mục Thời gian (chưa nhận hiện "Chưa nhận" màu phụ).
+        switch resolvedReceivedDisplay {
+        case .received(let text, let fromLocalScan):
             list.append(TimelineEntry(
                 id: "rcd",
                 title: "Đã nhận tại kho",
-                value: live.rcd,
+                value: text,
+                detail: fromLocalScan ? "Quét trên máy này" : nil,
+                color: Theme.success,
+                isMuted: false
+            ))
+        case .receivedUnknownTime:
+            list.append(TimelineEntry(
+                id: "rcd",
+                title: "Đã nhận tại kho",
+                value: "Đã nhận (chưa rõ giờ)",
                 detail: nil,
-                color: Theme.success
+                color: Theme.success.opacity(0.65),
+                isMuted: true
+            ))
+        case .notReceived:
+            list.append(TimelineEntry(
+                id: "rcd",
+                title: "Đã nhận tại kho",
+                value: "Chưa nhận",
+                detail: nil,
+                color: Color.secondary.opacity(0.45),
+                isMuted: true
             ))
         }
         if live.due > 0 {
@@ -815,7 +852,8 @@ struct DetailView: View {
                 title: "Hạn xử lý",
                 value: formatEpochMs(live.due),
                 detail: live.pd ? Deadline.text(due: live.due, now: nowMs) : nil,
-                color: c
+                color: c,
+                isMuted: false
             ))
         }
         return list
@@ -855,8 +893,8 @@ struct DetailView: View {
                                         .foregroundStyle(.secondary)
                                     HStack(spacing: 8) {
                                         Text(item.value)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundColor(.primary)
+                                            .font(item.isMuted ? Theme.Typography.primary : Theme.Typography.primaryBold)
+                                            .foregroundColor(item.isMuted ? .secondary : .primary)
                                         if let detail = item.detail {
                                             StatusPill(text: detail, color: item.color)
                                         }
@@ -1072,6 +1110,12 @@ struct DetailView: View {
 
     private func formatEpochMs(_ ms: Int) -> String {
         let d = Date(timeIntervalSince1970: Double(ms) / 1000)
-        return d.formatted(date: .abbreviated, time: .shortened)
+        return OrderRow.formatDisplayDate(d, includeTime: true)
+    }
+
+    private func formatRawDate(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let parsed = OrderStats.parseDate(trimmed) else { return trimmed }
+        return OrderRow.formatDisplayDate(parsed, includeTime: trimmed.contains(":"))
     }
 }

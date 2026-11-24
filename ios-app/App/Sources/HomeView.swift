@@ -13,21 +13,39 @@ struct HomeView: View {
 
     @State private var summary = DashboardSummary()
     @State private var productStats = ProductStatsSummary()
+    @State private var productDateRange: ProductDateRange = .all
+    @State private var productFilteredRows: [OrderRow] = []
+    @State private var hasProductDates = false
     @State private var selectedRow: OrderRow?
     @State private var showAllProductStats = false
     @State private var selectedProductStat: ProductStatItem?
     @State private var showSelectedProductStat = false
 
+    private static let homeProductRanges: [ProductDateRange] = [.today, .days7, .days30, .thisMonth, .all]
+
     private func recompute() {
         let next = DashboardMetrics.compute(rows: store.rows, stats: store.stats, now: Date(), urgentLimit: 3)
-        let nextProducts = ProductMetrics.compute(rows: store.rows)
+        let datesAvailable = ProductMetrics.hasAnyDate(rows: store.rows)
+        let activeRange: ProductDateRange = datesAvailable ? productDateRange : .all
+        let filteredProducts = ProductMetrics.filter(
+            rows: store.rows,
+            platform: .all,
+            dateRange: activeRange,
+            dateBasis: .returnDate,
+            now: Date()
+        )
+        let nextProducts = ProductMetrics.compute(rows: filteredProducts)
         if reduceMotion {
             summary = next
             productStats = nextProducts
+            productFilteredRows = filteredProducts
+            hasProductDates = datesAvailable
         } else {
             withAnimation(.easeOut(duration: 0.20)) {
                 summary = next
                 productStats = nextProducts
+                productFilteredRows = filteredProducts
+                hasProductDates = datesAvailable
             }
         }
     }
@@ -218,15 +236,16 @@ struct HomeView: View {
                 NotificationsView()
             }
             .navigationDestination(isPresented: $showAllProductStats) {
-                ProductStatsView()
+                ProductStatsView(initialDateRange: productDateRange)
             }
             .navigationDestination(isPresented: $showSelectedProductStat) {
                 if let stat = selectedProductStat {
-                    ProductStatDetailView(stat: stat, sourceRows: store.rows)
+                    ProductStatDetailView(stat: stat, sourceRows: productFilteredRows)
                 }
             }
             .sheet(item: $selectedRow) { DetailView(row: $0) }
             .onAppear { recompute() }
+            .onChange(of: productDateRange) { _ in recompute() }
             .onChange(of: store.updatedAt) { _ in recompute() }
             .onChange(of: store.revision) { _ in recompute() }
             .onChange(of: store.rows.count) { _ in recompute() }
@@ -439,7 +458,30 @@ struct HomeView: View {
                 .buttonStyle(.plain)
             }
 
-            if top3.isEmpty {
+            if store.hasData && hasProductDates {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(Self.homeProductRanges) { range in
+                            let on = productDateRange == range
+                            Button {
+                                Haptics.tap()
+                                productDateRange = range
+                            } label: {
+                                Text(range.rawValue)
+                                    .font(on ? Theme.Typography.microBold : Theme.Typography.micro.weight(.semibold))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(on ? Theme.accent : Theme.subtleFill)
+                                    .foregroundColor(on ? .white : .secondary)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            if !store.hasData {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Chưa có dữ liệu sản phẩm. Kết nối máy tính hoặc bật dữ liệu mẫu để xem")
                         .font(Theme.Typography.caption)
@@ -460,8 +502,24 @@ struct HomeView: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
                     }
                 }
+            } else if top3.isEmpty {
+                HStack(spacing: 8) {
+                    Text("Chưa có sản phẩm hoàn trong khoảng này")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    if productDateRange != .all {
+                        Button("Tất cả") {
+                            Haptics.tap()
+                            productDateRange = .all
+                        }
+                        .font(Theme.Typography.microBold)
+                        .foregroundColor(Theme.accent)
+                        .buttonStyle(.plain)
+                    }
+                }
             } else {
-                Text(productStats.summaryLine)
+                Text("\(ProductMetrics.rangeSummaryText(for: productStats)) · Theo ngày hoàn")
                     .font(Theme.Typography.micro)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

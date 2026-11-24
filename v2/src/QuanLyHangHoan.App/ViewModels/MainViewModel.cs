@@ -1437,34 +1437,40 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OpenOrderFromDashboard(UrgentOrderItem item)
     {
-        NavigateByKey(item.TargetNavKey);
-        var targetVm = item.TargetNavKey switch
+        var source = _searchActiveOrders.FirstOrDefault(o => o.OrderId.Equals(item.OrderId, StringComparison.OrdinalIgnoreCase)
+            && (o.Track.Equals(item.Track, StringComparison.OrdinalIgnoreCase) || o.ReturnTrack.Equals(item.Track, StringComparison.OrdinalIgnoreCase)))
+            ?? _searchActiveOrders.FirstOrDefault(o => o.OrderId.Equals(item.OrderId, StringComparison.OrdinalIgnoreCase));
+        RevealInTables(item.OrderId, item.Track, item.TargetNavKey, source);
+    }
+
+    /// <summary>
+    /// Mở bảng chứa đơn và chọn đúng dòng. Thử bảng dự kiến trước, nếu đơn không nằm ở đó (loại đơn lạ, đơn mới tạo...) thì tìm ở các bảng còn lại.
+    /// Không bảng nào có thì mở cửa sổ chi tiết đơn và báo rõ, để người dùng không bị đưa tới một bảng "trống rỗng".
+    /// </summary>
+    private bool RevealInTables(string orderId, string track, string preferredKey, Core.Models.Order? source)
+    {
+        var tables = new (string Key, ReturnOrdersViewModel Vm)[]
         {
-            "shopee_return" => ShopeeReturnVm,
-            "shopee_cancelled" => ShopeeCancelledVm,
-            "tiktok_return" => TikTokReturnVm,
-            _ => null
+            ("shopee_return", ShopeeReturnVm), ("shopee_cancelled", ShopeeCancelledVm),
+            ("tiktok_return", TikTokReturnVm), ("new_orders", NewCreatedVm),
         };
-        targetVm?.SelectOrder(item.OrderId, item.Track);
+        foreach (var t in tables.OrderBy(t => t.Key == preferredKey ? 0 : 1))
+        {
+            if (!t.Vm.HasRow(orderId, track)) continue;
+            NavigateByKey(t.Key);
+            if (t.Vm.SelectOrder(orderId, track)) return true;
+        }
+        NavigateByKey(preferredKey);
+        ShowToast($"Không thấy đơn {orderId} trong các bảng — đang mở chi tiết đơn.", false, true);
+        if (source is not null) OpenOrderDetail(source);
+        return false;
     }
 
     private void GoToMainTableFromOrder(Core.Models.Order order)
     {
         var (label, targetNavKey) = GlobalSearchService.ResolveLocation(order, isArchived: false, isDeleted: false);
-        NavigateByKey(targetNavKey);
         var tracking = !string.IsNullOrWhiteSpace(order.ReturnTrack) ? order.ReturnTrack : order.Track;
-        switch (targetNavKey)
-        {
-            case "shopee_return":
-                ShopeeReturnVm.SelectOrder(order.Id, tracking);
-                break;
-            case "shopee_cancelled":
-                ShopeeCancelledVm.SelectOrder(order.Id, tracking);
-                break;
-            case "tiktok_return":
-                TikTokReturnVm.SelectOrder(order.Id, tracking);
-                break;
-        }
+        RevealInTables(order.OrderId, tracking, targetNavKey, order);
     }
 
     private void SyncSidebarKpis()
@@ -1649,7 +1655,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var target = item ?? SelectedGlobalSearchResult;
         if (target is null) return;
 
-        NavigateByKey(target.TargetNavKey);
         var tracking = !string.IsNullOrWhiteSpace(target.Source.ReturnTrack)
             ? target.Source.ReturnTrack
             : target.Source.Track;
@@ -1657,18 +1662,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         switch (target.TargetNavKey)
         {
             case "shopee_return":
-                ShopeeReturnVm.SelectOrder(target.OrderId, tracking);
-                break;
             case "shopee_cancelled":
-                ShopeeCancelledVm.SelectOrder(target.OrderId, tracking);
-                break;
             case "tiktok_return":
-                TikTokReturnVm.SelectOrder(target.OrderId, tracking);
+                RevealInTables(target.OrderId, tracking, target.TargetNavKey, target.Source);
                 break;
             case "archive":
+                NavigateByKey(target.TargetNavKey);
                 ArchivedOrdersVm.SelectOrder(target.OrderId, tracking);
                 break;
             case "deleted":
+                NavigateByKey(target.TargetNavKey);
                 DeletedOrdersVm.SelectOrder(target.OrderId, tracking);
                 break;
         }

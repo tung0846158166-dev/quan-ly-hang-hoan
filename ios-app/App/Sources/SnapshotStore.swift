@@ -166,6 +166,15 @@ final class SnapshotStore: ObservableObject {
 
     /// Các mã đã quét hoàn kho trên điện thoại mà PC chưa xác nhận: danh sách mới từ PC chưa có lượt quét này nên không được ghi đè.
     var unconfirmedReturnCodes: () -> Set<String> = { [] }
+    /// Thời điểm quét (ms epoch) theo mã vận đơn cho các lượt quét chưa được PC xác nhận để điền giờ nhận tại kho tức thì.
+    var unconfirmedReturnScanTimes: () -> [String: Int] = { [:] }
+
+    private static func formatLocalTimestamp(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        return f.string(from: date)
+    }
 
     private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
         if isDemoMode {
@@ -179,11 +188,19 @@ final class SnapshotStore: ObservableObject {
         stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
         index = built
-        let waiting = unconfirmedReturnCodes()
+        let waitingTimes = unconfirmedReturnScanTimes()
+        let waiting = waitingTimes.isEmpty ? unconfirmedReturnCodes() : Set(waitingTimes.keys)
         if !waiting.isEmpty {
             var touched = false
-            for i in rows.indices where rows[i].pd && rows[i].lookupCodes.contains(where: { waiting.contains($0) }) {
-                rows[i].st = "Hàng đã trả"; rows[i].rv = true; rows[i].pd = false; touched = true
+            for i in rows.indices where rows[i].pd {
+                if let matched = rows[i].lookupCodes.first(where: { waiting.contains($0) }) {
+                    rows[i].st = "Hàng đã trả"; rows[i].rv = true; rows[i].pd = false
+                    if rows[i].rcd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       let ms = waitingTimes[matched], ms > 0 {
+                        rows[i].rcd = Self.formatLocalTimestamp(Date(timeIntervalSince1970: Double(ms) / 1000))
+                    }
+                    touched = true
+                }
             }
             if touched { index = Self.buildIndex(rows) }
         }
@@ -244,7 +261,7 @@ final class SnapshotStore: ObservableObject {
     }
 
     /// Sửa đơn ngay trên điện thoại (n, co, sz, q, st, ty); PC làm theo rồi gửi lại danh sách chính thức.
-    func applyLocalEdit(rowId: String, fields: [String: Any]) {
+    func applyLocalEdit(rowId: String, fields: [String: Any], receivedAt: Date = Date()) {
         guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
         if let v = fields["n"] as? String { rows[i].n = v }
         if let v = fields["co"] as? String { rows[i].co = v }
@@ -256,6 +273,13 @@ final class SnapshotStore: ObservableObject {
             let received = v == "Hàng đã trả" || v == "Đã nhận"
             rows[i].rv = received
             rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất" || v == "Hư hỏng")
+            if received {
+                if rows[i].rcd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    rows[i].rcd = Self.formatLocalTimestamp(receivedAt)
+                }
+            } else {
+                rows[i].rcd = ""
+            }
         }
         commit()
     }
@@ -263,12 +287,12 @@ final class SnapshotStore: ObservableObject {
     /// Đánh dấu đã nhận / chưa nhận ngay trên điện thoại cho các đơn hủy đã chọn.
     func applyCancelledReceivedLocal(ids: Set<String>, received: Bool) {
         var changed = false
-        let f = DateFormatter(); f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        let stamp = Self.formatLocalTimestamp(Date())
         for i in rows.indices where rows[i].k == "c" && ids.contains(rows[i].ci) && rows[i].rv != received {
             rows[i].rv = received
             rows[i].pd = !received
             rows[i].lv = 0
-            rows[i].rcd = received ? f.string(from: Date()) : ""
+            rows[i].rcd = received ? stamp : ""
             changed = true
         }
         if changed { commit() }

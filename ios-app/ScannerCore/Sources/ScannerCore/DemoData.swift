@@ -122,6 +122,7 @@ public enum DemoData {
             "Khách không còn nhu cầu",
             "Hàng lỗi nhẹ đường may"
         ]
+        let overdueRdOffsets = [-5, -4, -4, -3, -3, -2, -2]
         for (i, s) in overdueSpecs.enumerated() {
             let isPrem = (i == 0 || i == 6)
             let name = s.6 ? "\(s.7) | \(prod(i + 2)) | \(prod(i + 4))" : prod(i, premium: isPrem)
@@ -130,7 +131,7 @@ public enum DemoData {
             var r = OrderRow(
                 k: "m", c: s.0, o: s.1, p: s.2, n: name,
                 co: colorStr, sz: sizeStr, q: s.6 ? 3 : (i == 0 ? 2 : 1),
-                rd: formatDate(dateOffset(-4, hour: 9 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(overdueRdOffsets[i], hour: 9 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs - s.3 * hourMs,
                 st: "Chưa trả"
             )
@@ -162,6 +163,7 @@ public enum DemoData {
             ("DEMO-LZ-1014", "DHM-1014", "Lazada", 18, false, "", "", 1),
             ("DEMO-TT-1015", "DHM-1015", "TikTok", 21, false, "", "", 2)
         ]
+        let soonRdOffsets = [-3, -2, -2, -1, -1, -1, 0, 0]
         for (i, s) in soonSpecs.enumerated() {
             let isPartial = !s.6.isEmpty
             let isPrem = (i == 0)
@@ -171,7 +173,7 @@ public enum DemoData {
             var r = OrderRow(
                 k: "m", c: s.0, o: s.1, p: s.2, n: name,
                 co: colorStr, sz: sizeStr, q: isPartial ? 2 : 1,
-                rd: formatDate(dateOffset(-2, hour: 10 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(soonRdOffsets[i], hour: 10 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs + s.3 * hourMs,
                 st: "Chưa trả"
             )
@@ -189,8 +191,9 @@ public enum DemoData {
             rows.append(r)
         }
 
-        // 3. 11 đơn ĐANG CHỜ bình thường (lv = 0) — gồm đủ chặng 1, 2 của Hàng hoàn về + hoàn một phần + đặt trước
+        // 3. 11 đơn ĐANG CHỜ bình thường (lv = 0) — rải nhiều ngày để kiểm thử bộ lọc Hôm nay / 7 ngày / 30 ngày / Tháng này
         let normalPlatforms = ["Shopee", "TikTok", "Lazada", "Shopee", "TikTok", "Shopee", "Lazada", "TikTok", "Shopee", "TikTok", "Lazada"]
+        let normalRdOffsets = [0, 0, 0, -1, -1, -2, -3, -5, -8, -11, -15]
         for i in 0..<11 {
             let num = 1016 + i
             let plat = normalPlatforms[i]
@@ -204,7 +207,7 @@ public enum DemoData {
             var r = OrderRow(
                 k: "m", c: "\(prefix)-\(num)", o: "DHM-\(num)", p: plat, n: name,
                 co: colorStr, sz: sizeStr, q: isPartial ? 3 : 1,
-                rd: formatDate(dateOffset(-1, hour: 8 + (i % 8), from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(normalRdOffsets[i], hour: 8 + (i % 8), from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs + (36 + i * 6) * hourMs,
                 st: "Chưa trả"
             )
@@ -246,7 +249,7 @@ public enum DemoData {
             var r = OrderRow(
                 k: "m", c: "\(prefix)-\(num)", o: "DHM-\(num)", p: plat, n: name,
                 co: colorStr, sz: sizeStr, q: isPartial ? 2 : (i % 4 == 0 ? 2 : 1),
-                rd: formatDate(dateOffset(dayOff - 2, hour: 10, from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(dayOff - (i % 3), hour: 10, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: 0,
                 st: "Hàng đã trả"
             )
@@ -265,7 +268,8 @@ public enum DemoData {
             rows.append(r)
         }
 
-        // 5. 8 đơn HỦY (k == "c"): 5 chưa nhận, 3 đã nhận
+        // 5. 8 đơn HỦY (k == "c"): 5 chưa nhận, 3 đã nhận rải nhiều ngày
+        let cancelRdOffsets = [0, -1, -2, -3, -5, -7, -10, -14]
         for i in 0..<8 {
             let num = 3001 + i
             let plat = i % 2 == 0 ? "Shopee" : "TikTok"
@@ -273,7 +277,7 @@ public enum DemoData {
             var r = OrderRow(
                 k: "c", c: "DEMO-CXL-\(num)", o: "DHM-\(num)", p: plat, n: prod(i + 4, premium: i == 2),
                 co: col(i), sz: sz(i), q: 1,
-                rd: formatDate(dateOffset(-(i % 4), hour: 11, from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(cancelRdOffsets[i], hour: 11, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: 0,
                 st: received ? "Đã nhận" : "Chưa nhận"
             )
@@ -281,25 +285,28 @@ public enum DemoData {
             r.ci = "demo-cxl-id-\(num)"
             r.pd = !received; r.rv = received; r.lv = 0
             if received {
-                r.rcd = formatDate(dateOffset(-1, hour: 14 + i, from: now, calendar: calendar), withTime: true, calendar: calendar)
+                let recvOff = -(i - 4) // -1, -2, -3 ngày trước (không đổi receivedTodayCount)
+                r.rcd = formatDate(dateOffset(recvOff, hour: 10 + i, minute: (i * 11) % 60, from: now, calendar: calendar), withTime: true, calendar: calendar)
             }
             rows.append(r)
         }
 
-        // 6. 6 đơn ĐÃ LƯU TRỮ (k == "a", đã nhận trước đó)
+        // 6. 6 đơn ĐÃ LƯU TRỮ (k == "a", đã nhận trước đó, trải rộng qua 30 ngày để phân biệt 30 ngày vs Tất cả)
+        let archRdOffsets = [-12, -16, -21, -28, -35, -42]
+        let archRcdOffsets = [-10, -14, -18, -25, -32, -38]
         for i in 0..<6 {
             let num = 4001 + i
             let plat = recvPlatforms[i % recvPlatforms.count]
             var r = OrderRow(
                 k: "a", c: "DEMO-ARC-\(num)", o: "DHM-\(num)", p: plat, n: prod(i + 2),
                 co: col(i + 3), sz: sz(i), q: 1,
-                rd: formatDate(dateOffset(-12 - i, hour: 9, from: now, calendar: calendar), withTime: false, calendar: calendar),
+                rd: formatDate(dateOffset(archRdOffsets[i], hour: 9, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: 0,
                 st: "Hàng đã trả"
             )
             r.ty = "Trả hàng/Hoàn tiền"
             r.pd = false; r.rv = true; r.lv = 0
-            r.rcd = formatDate(dateOffset(-9 - i, hour: 15, from: now, calendar: calendar), withTime: true, calendar: calendar)
+            r.rcd = formatDate(dateOffset(archRcdOffsets[i], hour: 14 + (i % 5), minute: (i * 13) % 60, from: now, calendar: calendar), withTime: true, calendar: calendar)
             rows.append(r)
         }
 

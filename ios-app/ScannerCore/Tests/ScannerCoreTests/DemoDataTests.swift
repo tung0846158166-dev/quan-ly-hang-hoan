@@ -102,4 +102,33 @@ final class DemoDataTests: XCTestCase {
         XCTAssertTrue(titles.contains("Hôm nay"))
         XCTAssertTrue(titles.contains("Hôm qua"))
     }
+
+    func testDemoDataHasReceivedDatesAndSpansMultipleDays() {
+        let now = fixedNow()
+        let snap = DemoData.snapshot(now: now, calendar: cal)
+
+        // Mọi đơn đã nhận đều có ngày giờ nhận kho (`rcd`) hợp lệ
+        let receivedRows = snap.rows.filter { $0.rv }
+        XCTAssertGreaterThanOrEqual(receivedRows.count, 25)
+        for r in receivedRows {
+            XCTAssertFalse(r.rcd.isEmpty, "Đơn mẫu đã nhận phải có rcd: \(r.c)")
+            XCTAssertNotNil(OrderStats.parseDate(r.rcd, calendar: cal))
+        }
+
+        // Trải nhiều ngày cho cả ngày hoàn lẫn ngày nhận kho
+        let returnDays = ProductMetrics.groupByDay(rows: snap.rows, dateBasis: .returnDate, calendar: cal)
+        let recvDays = ProductMetrics.groupByDay(rows: snap.rows, dateBasis: .receivedDate, calendar: cal)
+        XCTAssertGreaterThanOrEqual(returnDays.count, 10)
+        XCTAssertGreaterThanOrEqual(recvDays.count, 8)
+
+        // Các mốc Hôm nay < 7 ngày < 30 ngày < Tất cả đều có dữ liệu tăng dần rõ rệt
+        let uToday = ProductMetrics.compute(rows: snap.rows, platform: .all, dateRange: .today, now: now, calendar: cal).totalUnits
+        let u7 = ProductMetrics.compute(rows: snap.rows, platform: .all, dateRange: .days7, now: now, calendar: cal).totalUnits
+        let u30 = ProductMetrics.compute(rows: snap.rows, platform: .all, dateRange: .days30, now: now, calendar: cal).totalUnits
+        let uAll = ProductMetrics.compute(rows: snap.rows, platform: .all, dateRange: .all, now: now, calendar: cal).totalUnits
+        XCTAssertGreaterThan(uToday, 0)
+        XCTAssertGreaterThan(u7, uToday)
+        XCTAssertGreaterThan(u30, u7)
+        XCTAssertGreaterThan(uAll, u30)
+    }
 }

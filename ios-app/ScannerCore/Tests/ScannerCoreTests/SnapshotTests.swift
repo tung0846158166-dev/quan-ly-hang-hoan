@@ -252,3 +252,41 @@ final class DeltaSyncTests: XCTestCase {
         XCTAssertEqual(SyncProtocol.parseMessage(m, room: "R"), .snapshotDelta(SnapshotChunk(snapshotId: "delta_5", idx: 0, total: 1, chunk: "x")))
     }
 }
+
+final class ReceivedTimeDisplayTests: XCTestCase {
+    func testResolvedReceivedTimeCoversPcDateLocalScanAndUnreceived() throws {
+        let vnCal = ProductMetrics.vietnamCalendar
+
+        // 1. Chưa nhận -> luôn trả .notReceived (kể cả nếu còn rcd cũ sót lại)
+        var pending = OrderRow(k: "m", c: "DEMO-R1", o: "DHM-R1", p: "Shopee", n: "Áo", co: "", sz: "", q: 1, rd: "20/11/2026", due: 0, st: "Chưa nhận")
+        pending.rv = false
+        pending.rcd = "21/11/2026 08:00:00"
+        XCTAssertEqual(pending.resolvedReceivedTime(localScanTimeMs: 1_795_400_000_000, calendar: vnCal), .notReceived)
+
+        // 2. Đã nhận có rcd đầy đủ giờ từ PC -> định dạng dd/MM/yyyy HH:mm
+        var fromPc = pending
+        fromPc.rv = true
+        fromPc.rcd = "24/11/2026 14:35:20"
+        XCTAssertEqual(fromPc.resolvedReceivedTime(calendar: vnCal), .received(text: "24/11/2026 14:35", fromLocalScan: false))
+
+        // 3. Đã nhận có rcd chỉ gồm ngày -> định dạng dd/MM/yyyy
+        var dateOnly = pending
+        dateOnly.rv = true
+        dateOnly.rcd = "2026-11-24"
+        XCTAssertEqual(dateOnly.resolvedReceivedTime(calendar: vnCal), .received(text: "24/11/2026", fromLocalScan: false))
+
+        // 4. Vừa quét nhận trên chính điện thoại (rcd trống) -> lấy giờ quét theo lịch Việt Nam
+        var scannedLocal = pending
+        scannedLocal.rv = true
+        scannedLocal.rcd = ""
+        var comps = DateComponents()
+        comps.timeZone = vnCal.timeZone
+        comps.year = 2026; comps.month = 11; comps.day = 24; comps.hour = 0; comps.minute = 30
+        let scanDate = try XCTUnwrap(vnCal.date(from: comps))
+        let scanMs = Int(scanDate.timeIntervalSince1970 * 1000)
+        XCTAssertEqual(scannedLocal.resolvedReceivedTime(localScanTimeMs: scanMs, calendar: vnCal), .received(text: "24/11/2026 00:30", fromLocalScan: true))
+
+        // 5. Đã nhận nhưng không có rcd và không có giờ quét cục bộ -> .receivedUnknownTime
+        XCTAssertEqual(scannedLocal.resolvedReceivedTime(localScanTimeMs: nil, calendar: vnCal), .receivedUnknownTime)
+    }
+}

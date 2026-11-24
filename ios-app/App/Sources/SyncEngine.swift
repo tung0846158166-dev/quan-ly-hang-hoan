@@ -135,6 +135,17 @@ final class SyncEngine: ObservableObject {
         Set(items.filter { $0.kind == .returnScan && $0.scanConfirmed && ($0.status == .success || $0.status == .duplicate) }.map { $0.code.uppercased() })
     }
 
+    /// Giờ quét hoàn kho gần nhất trên chính điện thoại này cho một đơn (ms epoch), dùng khi `rcd` từ PC chưa có.
+    func localReturnScanTimeMs(for row: OrderRow) -> Int? {
+        let codes = Set(row.lookupCodes)
+        guard !codes.isEmpty else { return nil }
+        return items.first(where: {
+            $0.kind == .returnScan
+                && ($0.status == .success || $0.status == .pending)
+                && codes.contains($0.code.uppercased())
+        })?.time
+    }
+
     var mqttConnected: Bool { !brokerUp.isEmpty }
     var channelUp: Bool { sseConnected || mqttConnected }
     var pendingCount: Int { items.filter { !$0.isSettled }.count }
@@ -154,6 +165,14 @@ final class SyncEngine: ObservableObject {
         snapshot.onNeedFull = { [weak self] in self?.requestFullIfNeeded() }
         snapshot.unconfirmedReturnCodes = { [weak self] in
             Set((self?.items ?? []).filter { $0.kind == .returnScan && !$0.scanConfirmed }.map { $0.code.uppercased() })
+        }
+        snapshot.unconfirmedReturnScanTimes = { [weak self] in
+            var map: [String: Int] = [:]
+            for it in (self?.items ?? []) where it.kind == .returnScan && !it.scanConfirmed {
+                let key = it.code.uppercased()
+                if map[key] == nil { map[key] = it.time }
+            }
+            return map
         }
         guard sseTask == nil else { return }
         startSSE()
@@ -410,8 +429,10 @@ final class SyncEngine: ObservableObject {
 
         if isDemoMode {
             seq += 1
-            let rid = "demo-\(seq)-\(nowMs() % 100000)"
-            var item = ScanItem(requestId: rid, code: code, kind: kind, time: nowMs(), photoFile: nil)
+            let scanMs = nowMs()
+            let scanDate = Date(timeIntervalSince1970: Double(scanMs) / 1000)
+            let rid = "demo-\(seq)-\(scanMs % 100000)"
+            var item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: nil)
             let hint = localHint(code: code, kind: kind)
             if kind == .returnScan, let r = snapshot.lookup(code) {
                 if r.rv {
@@ -420,7 +441,7 @@ final class SyncEngine: ObservableObject {
                     item.detail = "Dữ liệu mẫu: đơn này đã nhận hoàn kho trước đó."
                     banner = Banner(code: code, text: "Đơn đã nhận hoàn kho trước đó", color: Theme.warning, sub: hint)
                 } else if r.pd {
-                    snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"])
+                    snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"], receivedAt: scanDate)
                     item.status = .success
                     item.scanConfirmed = true
                     item.orderNum = r.o
@@ -473,7 +494,9 @@ final class SyncEngine: ObservableObject {
             // File ảnh phải có trước khi gửi: ghi ngay (vài chục KB, nhanh) nhưng không mã hóa/ghi cả danh sách ở đây nữa.
             try? d.write(to: photosDir.appendingPathComponent(file!))
         }
-        let item = ScanItem(requestId: rid, code: code, kind: kind, time: nowMs(), photoFile: file)
+        let scanMs = nowMs()
+        let scanDate = Date(timeIntervalSince1970: Double(scanMs) / 1000)
+        let item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: file)
         items.insert(item, at: 0)
         trimHistory()
         persist()
@@ -483,7 +506,7 @@ final class SyncEngine: ObservableObject {
         if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
             banner = Banner(code: code, text: "Quét trùng: đơn đã nhận hoàn kho trước đó", color: Theme.danger, sub: hint)
         } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.pd {
-            snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"])
+            snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"], receivedAt: scanDate)
             banner = Banner(code: code, text: "Đã nhận hoàn kho, chờ PC ghi nhận", color: Theme.success, sub: hint)
         } else {
             banner = Banner(code: code, text: "Chưa có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)

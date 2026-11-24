@@ -505,15 +505,30 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         CountsUpdated?.Invoke();
     }
 
+    /// <summary>Tìm dòng theo mã đơn + mã vận đơn (hoặc mã nội bộ); nếu mã vận đơn lệch thì nhận khi mã đơn chỉ có một dòng.</summary>
+    public static ReturnOrderRowViewModel? FindRow(IEnumerable<ReturnOrderRowViewModel> rows, string orderId, string track)
+    {
+        var list = rows as IReadOnlyList<ReturnOrderRowViewModel> ?? rows.ToList();
+        bool TrackMatches(ReturnOrderRowViewModel r) =>
+            string.IsNullOrWhiteSpace(track)
+            || r.Source.Track.Equals(track, StringComparison.OrdinalIgnoreCase)
+            || r.Source.ReturnTrack.Equals(track, StringComparison.OrdinalIgnoreCase)
+            || r.Source.ForwardTrack.Equals(track, StringComparison.OrdinalIgnoreCase)
+            || r.Source.AltTrack.Equals(track, StringComparison.OrdinalIgnoreCase);
+        var sameOrder = list.Where(r => r.OrderId.Equals(orderId, StringComparison.OrdinalIgnoreCase)).ToList();
+        return sameOrder.FirstOrDefault(TrackMatches)
+               ?? list.FirstOrDefault(r => r.Source.Id.Equals(orderId, StringComparison.OrdinalIgnoreCase))
+               ?? (sameOrder.Count == 1 ? sameOrder[0] : null);
+    }
+
+    /// <summary>Bảng này có chứa đơn đó không (không đổi bộ lọc, không chọn).</summary>
+    public bool HasRow(string orderId, string track) => FindRow(_allRows, orderId, track) is not null;
+
     public bool SelectOrder(string orderId, string track)
     {
         ResetAllFilters();
 
-        var match = VisibleOrders.FirstOrDefault(r =>
-            r.OrderId.Equals(orderId, StringComparison.OrdinalIgnoreCase)
-            && (string.IsNullOrWhiteSpace(track)
-                || r.Source.Track.Equals(track, StringComparison.OrdinalIgnoreCase)
-                || r.Source.ReturnTrack.Equals(track, StringComparison.OrdinalIgnoreCase)));
+        var match = FindRow(VisibleOrders, orderId, track);
 
         if (match is null) return false;
         SelectedRow = match;

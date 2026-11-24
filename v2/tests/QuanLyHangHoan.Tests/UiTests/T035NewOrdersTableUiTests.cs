@@ -198,6 +198,18 @@ public sealed class T035NewOrdersTableUiTests
         Assert.True(File.Exists(Path.Combine(outDir, "05-settings-file-import-tab.png")));
     }
 
+    private static System.Windows.Controls.DataGrid FindGrid(DependencyObject root)
+    {
+        var q = new Queue<DependencyObject>(); q.Enqueue(root);
+        while (q.Count > 0)
+        {
+            var d = q.Dequeue();
+            if (d is System.Windows.Controls.DataGrid g && g.IsVisible && g.Name == "OrdersGrid") return g;
+            for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++) q.Enqueue(System.Windows.Media.VisualTreeHelper.GetChild(d, i));
+        }
+        throw new InvalidOperationException("không thấy OrdersGrid");
+    }
+
     [Fact]
     public void RenderScreenshots_UrgentClickReveal_ToReportsFolder()
     {
@@ -218,10 +230,23 @@ public sealed class T035NewOrdersTableUiTests
                 window.Show();
                 WpfTestHost.PumpDispatcher();
                 r.Vm.SetTheme(ThemeService.LightTheme);
+                // Luồng thật: người dùng đã từng mở bảng đó và cuộn xuống cuối, rồi quay lại Trang chủ.
+                r.Vm.NavigateByKey("shopee_cancelled");
+                WpfTestHost.PumpDispatcher();
+                var grid = FindGrid(window);
+                grid.ScrollIntoView(grid.Items[grid.Items.Count - 1]);
+                WpfTestHost.PumpDispatcher();
+                r.Vm.NavigateByKey("home");
+                WpfTestHost.PumpDispatcher();
                 var item = r.Vm.HomeVm.UrgentItems.First(u => u.AlertLevel == QuanLyHangHoan.Core.Alerts.AlertLevel.Red);
                 r.Vm.HomeVm.OpenUrgentOrderCommand.Execute(item);
                 WpfTestHost.PumpDispatcher();
                 WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "06-urgent-click-reveal.png"));
+                Assert.Equal(item.OrderId, r.Vm.ShopeeCancelledVm.SelectedRow?.OrderId);
+                var g2 = FindGrid(window);
+                Assert.True(g2.SelectedItem is not null, "bảng không có dòng nào được chọn");
+                var cont = g2.ItemContainerGenerator.ContainerFromItem(g2.SelectedItem);
+                Assert.NotNull(cont);   // dòng được chọn phải đang hiện trên màn hình (không bị cuộn đi mất)
             }
             finally { window.Close(); WpfTestHost.PumpDispatcher(); }
         });

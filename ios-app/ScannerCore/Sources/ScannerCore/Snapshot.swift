@@ -53,12 +53,64 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
 }
 
 /// Một đơn trong Hộp Đơn Mới trên PC (chờ đẩy ra bảng chính).
+/// Trạng thái hiển thị thời điểm "Đã nhận tại kho" của một đơn hàng.
+public enum ReceivedTimeDisplay: Equatable {
+    case received(text: String, fromLocalScan: Bool)
+    case receivedUnknownTime
+    case notReceived
+}
+
 extension OrderRow {
     /// Đơn "Huỷ sau chuẩn bị": shop đã đóng gói rồi đơn mới bị huỷ (theo cột Trạng thái sàn).
     public var isCancelAfterPrep: Bool {
         let t = ps.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
             .replacingOccurrences(of: "đ", with: "d").lowercased()
         return t.contains("huy sau chuan bi")
+    }
+
+    /// Định dạng ngày (và giờ nếu cần) đồng nhất kiểu Việt Nam `dd/MM/yyyy` hoặc `dd/MM/yyyy HH:mm`.
+    public static func formatDisplayDate(_ date: Date, includeTime: Bool, calendar: Calendar = .current) -> String {
+        let comps = calendar.dateComponents([.day, .month, .year, .hour, .minute], from: date)
+        let d = comps.day ?? 1
+        let m = comps.month ?? 1
+        let y = comps.year ?? 2026
+        if includeTime {
+            let h = comps.hour ?? 0
+            let min = comps.minute ?? 0
+            return String(format: "%02d/%02d/%04d %02d:%02d", d, m, y, h, min)
+        }
+        return String(format: "%02d/%02d/%04d", d, m, y)
+    }
+
+    /// Xác định thời điểm "Đã nhận tại kho" hiển thị trên màn Chi tiết đơn:
+    /// - Chưa nhận (`rv == false`) -> `.notReceived`
+    /// - Đã nhận có `rcd` từ PC hoặc điền cục bộ -> định dạng chuẩn `dd/MM/yyyy HH:mm` (hoặc `dd/MM/yyyy`)
+    /// - Đã nhận nhưng `rcd` trống và vừa quét nhận trên chính điện thoại (`localScanTimeMs`) -> dùng giờ quét
+    /// - Đã nhận nhưng chưa có cả hai -> `.receivedUnknownTime`
+    public func resolvedReceivedTime(
+        localScanTimeMs: Int? = nil,
+        calendar: Calendar = .current
+    ) -> ReceivedTimeDisplay {
+        guard rv else { return .notReceived }
+        let trimmed = rcd.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            if let parsed = OrderStats.parseDate(trimmed, calendar: calendar) {
+                let hasTime = trimmed.contains(":")
+                return .received(
+                    text: Self.formatDisplayDate(parsed, includeTime: hasTime, calendar: calendar),
+                    fromLocalScan: false
+                )
+            }
+            return .received(text: trimmed, fromLocalScan: false)
+        }
+        if let ms = localScanTimeMs, ms > 0 {
+            let d = Date(timeIntervalSince1970: Double(ms) / 1000)
+            return .received(
+                text: Self.formatDisplayDate(d, includeTime: true, calendar: calendar),
+                fromLocalScan: true
+            )
+        }
+        return .receivedUnknownTime
     }
 }
 

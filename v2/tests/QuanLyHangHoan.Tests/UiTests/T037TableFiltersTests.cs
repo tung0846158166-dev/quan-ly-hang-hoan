@@ -133,4 +133,23 @@ public class T037TableFiltersTests
         Assert.Equal(["a", "b"], HomeViewModel.FilterByPeriod(all, "7d", now).Select(o => o.OrderId));
         Assert.Equal(["a", "b", "c", "d"], HomeViewModel.FilterByPeriod(all, "all", now).Select(o => o.OrderId));
     }
+
+    [Fact]
+    public void FindRow_MatchesByOrderIdTrackOrInternalId_AndHasRowReportsPresence()
+    {
+        var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now));
+        vm.LoadOrders(
+        [
+            new Order { Id = "guid-1", OrderId = "OD1", Track = "TA", ReturnTrack = "RA", Platform = "Shopee", OrderType = "Đơn hủy" },
+            new Order { Id = "guid-2", OrderId = "OD2", Track = "TB", Platform = "Shopee", OrderType = "Đơn hủy" },
+            new Order { Id = "guid-3", OrderId = "OD2", Track = "TC", Platform = "Shopee", OrderType = "Đơn hủy" }
+        ], Now);
+        Assert.True(vm.HasRow("OD1", "RA"));
+        Assert.True(vm.HasRow("OD1", "SAI-MA"));          // mã vận đơn lệch nhưng mã đơn chỉ có một dòng
+        Assert.False(vm.HasRow("OD2", "SAI-MA"));         // nhiều dòng cùng mã đơn: không đoán (quy tắc bất biến)
+        Assert.True(vm.HasRow("guid-2", ""));             // mã nội bộ (từ tìm kiếm tổng)
+        Assert.False(vm.HasRow("KHONG-CO", "TA"));
+        Assert.True(vm.SelectOrder("OD2", "TC"));
+        Assert.Equal("guid-3", vm.SelectedRow!.Source.Id);
+    }
 }

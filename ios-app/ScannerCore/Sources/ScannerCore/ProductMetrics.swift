@@ -110,11 +110,53 @@ public enum ProductPlatformFilter: String, CaseIterable, Identifiable {
 
 /// Bộ lọc khoảng thời gian cho màn Thống kê sản phẩm.
 public enum ProductDateRange: String, CaseIterable, Identifiable {
+    case today = "Hôm nay"
     case days7 = "7 ngày"
     case days30 = "30 ngày"
+    case thisMonth = "Tháng này"
     case all = "Tất cả"
+    case custom = "Chọn ngày"
 
     public var id: String { rawValue }
+}
+
+/// Căn cứ ngày dùng để lọc khoảng thời gian và gom theo ngày (mặc định là ngày hoàn).
+public enum ProductDateBasis: String, CaseIterable, Identifiable {
+    case returnDate = "Ngày hoàn"
+    case receivedDate = "Ngày nhận kho"
+
+    public var id: String { rawValue }
+}
+
+/// Thống kê sản phẩm gom gọn theo từng ngày (dùng cho chế độ xem "Theo ngày", mới nhất trước).
+public struct DailyProductBucket: Identifiable, Equatable, Hashable {
+    public var day: Date
+    public var totalUnits: Int
+    public var ordersWithItems: Int
+    public var productCount: Int
+    public var topProductName: String
+    public var topProductUnits: Int
+    public var unknownUnits: Int
+
+    public var id: Date { day }
+
+    public init(
+        day: Date,
+        totalUnits: Int,
+        ordersWithItems: Int,
+        productCount: Int,
+        topProductName: String,
+        topProductUnits: Int,
+        unknownUnits: Int = 0
+    ) {
+        self.day = day
+        self.totalUnits = totalUnits
+        self.ordersWithItems = ordersWithItems
+        self.productCount = productCount
+        self.topProductName = topProductName
+        self.topProductUnits = topProductUnits
+        self.unknownUnits = unknownUnits
+    }
 }
 
 /// Một dòng sản phẩm đã tách từ `OrderRow` để hiển thị trên màn Chi tiết đơn.
@@ -185,6 +227,32 @@ public enum ProductMetrics {
         return text
     }
 
+    /// Dòng tóm tắt gọn theo khoảng thời gian: "N sản phẩm • M cái trong khoảng này".
+    public static func rangeSummaryText(
+        for summary: ProductStatsSummary,
+        scopeLabel: String = "trong khoảng này"
+    ) -> String {
+        if summary.totalUnits == 0 {
+            return "Chưa có sản phẩm nào \(scopeLabel)."
+        }
+        var text = "\(summary.products.count) sản phẩm • \(summary.totalUnits) cái \(scopeLabel)"
+        if summary.unknownUnits > 0 {
+            text += " • \(summary.unknownUnits) chưa rõ"
+        }
+        return text
+    }
+
+    /// Lịch chuẩn múi giờ Việt Nam (Asia/Ho_Chi_Minh, UTC+7), tuần bắt đầu từ Thứ 2.
+    public static var vietnamCalendar: Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")
+            ?? TimeZone(secondsFromGMT: 7 * 3600)
+            ?? .current
+        cal.locale = Locale(identifier: "vi_VN")
+        cal.firstWeekday = 2
+        return cal
+    }
+
     /// Regex khớp đuôi "- Premium Cao Cấp" / "Premium" ở cuối tên sản phẩm (tương đương PC `ProductStatistics.PremiumTail`).
     private static let premiumTailRegex: NSRegularExpression? = try? NSRegularExpression(
         pattern: #"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*$"#,
@@ -249,33 +317,89 @@ public enum ProductMetrics {
         }
     }
 
+    /// Ngày dùng để lọc/gom nhóm cho một đơn theo căn cứ ngày (`Ngày hoàn` mặc định hoặc `Ngày nhận kho`).
+    public static func effectiveDate(
+        for row: OrderRow,
+        basis: ProductDateBasis = .returnDate,
+        calendar: Calendar = .current
+    ) -> Date? {
+        switch basis {
+        case .returnDate:
+            return OrderStats.parseDate(row.rd, calendar: calendar)
+        case .receivedDate:
+            guard row.rv else { return nil }
+            return OrderStats.parseDate(row.rcd, calendar: calendar)
+        }
+    }
+
     /// Kiểm tra danh sách đơn có ít nhất một dòng đọc được ngày (`rd` hoặc `rcd`) hay không.
-    public static func hasAnyDate(rows: [OrderRow], calendar: Calendar = .current) -> Bool {
+    public static func hasAnyDate(
+        rows: [OrderRow],
+        basis: ProductDateBasis? = nil,
+        calendar: Calendar = .current
+    ) -> Bool {
         for r in rows {
-            if OrderStats.parseDate(r.rd, calendar: calendar) != nil { return true }
-            if OrderStats.parseDate(r.rcd, calendar: calendar) != nil { return true }
+            if let b = basis {
+                if effectiveDate(for: r, basis: b, calendar: calendar) != nil { return true }
+            } else {
+                if OrderStats.parseDate(r.rd, calendar: calendar) != nil { return true }
+                if OrderStats.parseDate(r.rcd, calendar: calendar) != nil { return true }
+            }
         }
         return false
     }
 
-    /// Lọc danh sách đơn theo sàn và khoảng thời gian (7 ngày / 30 ngày / Tất cả).
+    /// Trả về cặp mốc ngày đầu/cuối (`startOfDay` bao gồm cả hai đầu) cho một `ProductDateRange`; `.all` trả `nil`.
+    public static func dateBounds(
+        for dateRange: ProductDateRange,
+        customFrom: Date? = nil,
+        customTo: Date? = nil,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> (start: Date, end: Date)? {
+        let todayStart = calendar.startOfDay(for: now)
+        switch dateRange {
+        case .all:
+            return nil
+        case .today:
+            return (todayStart, todayStart)
+        case .days7:
+            let start = calendar.date(byAdding: .day, value: -6, to: todayStart) ?? todayStart
+            return (start, todayStart)
+        case .days30:
+            let start = calendar.date(byAdding: .day, value: -29, to: todayStart) ?? todayStart
+            return (start, todayStart)
+        case .thisMonth:
+            let comps = calendar.dateComponents([.year, .month], from: todayStart)
+            let monthStart = calendar.date(from: comps) ?? todayStart
+            let monthEnd = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: monthStart) ?? todayStart
+            return (monthStart, monthEnd)
+        case .custom:
+            let a = calendar.startOfDay(for: customFrom ?? todayStart)
+            let b = calendar.startOfDay(for: customTo ?? customFrom ?? todayStart)
+            return a <= b ? (a, b) : (b, a)
+        }
+    }
+
+    /// Lọc danh sách đơn theo sàn, khoảng thời gian (Hôm nay / 7 ngày / 30 ngày / Tháng này / Tất cả / Chọn ngày)
+    /// và căn cứ ngày (mặc định ngày hoàn `rd`). Đơn không có ngày hợp lệ chỉ được tính ở `.all`.
     public static func filter(
         rows: [OrderRow],
         platform: ProductPlatformFilter = .all,
         dateRange: ProductDateRange = .all,
+        customFrom: Date? = nil,
+        customTo: Date? = nil,
+        dateBasis: ProductDateBasis = .returnDate,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [OrderRow] {
-        let todayStart = calendar.startOfDay(for: now)
-        let cutoff: Date?
-        switch dateRange {
-        case .all:
-            cutoff = nil
-        case .days7:
-            cutoff = calendar.date(byAdding: .day, value: -6, to: todayStart)
-        case .days30:
-            cutoff = calendar.date(byAdding: .day, value: -29, to: todayStart)
-        }
+        let bounds = dateBounds(
+            for: dateRange,
+            customFrom: customFrom,
+            customTo: customTo,
+            now: now,
+            calendar: calendar
+        )
 
         return rows.filter { row in
             if platform != .all {
@@ -283,28 +407,92 @@ public enum ProductMetrics {
                     return false
                 }
             }
-            if let cutoff = cutoff {
-                guard let d = OrderStats.parseDate(row.rd, calendar: calendar)
-                    ?? OrderStats.parseDate(row.rcd, calendar: calendar) else {
+            if let bounds = bounds {
+                guard let d = effectiveDate(for: row, basis: dateBasis, calendar: calendar) else {
                     return false
                 }
                 let day = calendar.startOfDay(for: d)
-                if day < cutoff { return false }
+                if day < bounds.start || day > bounds.end { return false }
             }
             return true
         }
     }
 
-    /// Tính thống kê sản phẩm sau khi áp bộ lọc sàn và khoảng thời gian.
+    /// Lọc danh sách đơn đúng một ngày cụ thể (khi người dùng bấm vào một ngày trong chế độ "Theo ngày").
+    public static func filter(
+        rows: [OrderRow],
+        onDay day: Date,
+        platform: ProductPlatformFilter = .all,
+        dateBasis: ProductDateBasis = .returnDate,
+        calendar: Calendar = .current
+    ) -> [OrderRow] {
+        filter(
+            rows: rows,
+            platform: platform,
+            dateRange: .custom,
+            customFrom: day,
+            customTo: day,
+            dateBasis: dateBasis,
+            now: day,
+            calendar: calendar
+        )
+    }
+
+    /// Tính thống kê sản phẩm sau khi áp bộ lọc sàn, khoảng thời gian và căn cứ ngày.
     public static func compute(
         rows: [OrderRow],
         platform: ProductPlatformFilter,
         dateRange: ProductDateRange,
+        customFrom: Date? = nil,
+        customTo: Date? = nil,
+        dateBasis: ProductDateBasis = .returnDate,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> ProductStatsSummary {
-        let filtered = filter(rows: rows, platform: platform, dateRange: dateRange, now: now, calendar: calendar)
+        let filtered = filter(
+            rows: rows,
+            platform: platform,
+            dateRange: dateRange,
+            customFrom: customFrom,
+            customTo: customTo,
+            dateBasis: dateBasis,
+            now: now,
+            calendar: calendar
+        )
         return compute(rows: filtered)
+    }
+
+    /// Gom thống kê sản phẩm theo từng ngày (mới nhất trước).
+    /// Đơn không đọc được ngày theo `dateBasis` không xuất hiện trong danh sách ngày (chỉ tính ở "Tất cả").
+    public static func groupByDay(
+        rows: [OrderRow],
+        dateBasis: ProductDateBasis = .returnDate,
+        calendar: Calendar = .current
+    ) -> [DailyProductBucket] {
+        var byDay: [Date: [OrderRow]] = [:]
+        for row in rows {
+            guard let d = effectiveDate(for: row, basis: dateBasis, calendar: calendar) else { continue }
+            let dayStart = calendar.startOfDay(for: d)
+            byDay[dayStart, default: []].append(row)
+        }
+
+        return byDay.keys
+            .sorted(by: >)
+            .compactMap { dayStart in
+                guard let dayRows = byDay[dayStart] else { return nil }
+                let summary = compute(rows: dayRows)
+                guard summary.totalUnits > 0 else { return nil }
+                let top = summary.products.first
+                return DailyProductBucket(
+                    day: dayStart,
+                    totalUnits: summary.totalUnits,
+                    ordersWithItems: summary.ordersWithItems,
+                    productCount: summary.products.count,
+                    topProductName: top?.name ?? "",
+                    topProductUnits: top?.units ?? 0,
+                    unknownUnits: summary.unknownUnits
+                )
+            }
     }
 
     /// Tính thống kê sản phẩm thuần từ danh sách `OrderRow`.

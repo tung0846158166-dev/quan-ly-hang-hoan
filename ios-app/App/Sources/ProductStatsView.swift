@@ -2,122 +2,476 @@ import SwiftUI
 import ScannerCore
 
 /// Màn Thống kê sản phẩm đầy đủ: xếp hạng sản phẩm bị hoàn nhiều nhất,
-/// lọc nhanh theo sàn (Tất cả / Shopee / TikTok / Lazada) và khoảng thời gian (7 ngày / 30 ngày / Tất cả).
+/// lọc nhanh theo sàn (Tất cả / Shopee / TikTok / Lazada), khoảng thời gian dạng chip gọn
+/// (Hôm nay / 7 ngày / 30 ngày / Tháng này / Tất cả / Chọn ngày từ–đến), căn cứ ngày (Ngày hoàn / Ngày nhận kho),
+/// và chế độ xem "Theo ngày" bấm vào từng ngày để lọc sản phẩm của ngày đó.
 struct ProductStatsView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private enum ViewMode: String, CaseIterable, Identifiable {
+        case ranking = "Xếp hạng"
+        case byDay = "Theo ngày"
+        var id: String { rawValue }
+    }
+
+    @State private var viewMode: ViewMode = .ranking
     @State private var platformFilter: ProductPlatformFilter = .all
-    @State private var dateRange: ProductDateRange = .all
+    @State private var dateRange: ProductDateRange
+    @State private var dateBasis: ProductDateBasis
+    @State private var customFrom: Date
+    @State private var customTo: Date
+    @State private var selectedDay: Date? = nil
     @State private var summary = ProductStatsSummary()
     @State private var filteredRows: [OrderRow] = []
+    @State private var dailyBuckets: [DailyProductBucket] = []
     @State private var hasDates = false
+
+    init(
+        initialDateRange: ProductDateRange = .all,
+        initialDateBasis: ProductDateBasis = .returnDate
+    ) {
+        let now = Date()
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -6, to: now) ?? now
+        _dateRange = State(initialValue: initialDateRange)
+        _dateBasis = State(initialValue: initialDateBasis)
+        _customFrom = State(initialValue: weekAgo)
+        _customTo = State(initialValue: now)
+    }
 
     private func recompute() {
         let all = store.rows
         let datesAvailable = ProductMetrics.hasAnyDate(rows: all)
         hasDates = datesAvailable
         let activeRange: ProductDateRange = datesAvailable ? dateRange : .all
-        let rows = ProductMetrics.filter(rows: all, platform: platformFilter, dateRange: activeRange, now: Date())
-        filteredRows = rows
-        summary = ProductMetrics.compute(rows: rows)
+
+        let rangeRows = ProductMetrics.filter(
+            rows: all,
+            platform: platformFilter,
+            dateRange: activeRange,
+            customFrom: customFrom,
+            customTo: customTo,
+            dateBasis: dateBasis,
+            now: Date()
+        )
+        dailyBuckets = ProductMetrics.groupByDay(rows: rangeRows, dateBasis: dateBasis)
+
+        let effectiveRows: [OrderRow]
+        if let day = selectedDay {
+            effectiveRows = ProductMetrics.filter(
+                rows: all,
+                onDay: day,
+                platform: platformFilter,
+                dateBasis: dateBasis
+            )
+        } else {
+            effectiveRows = rangeRows
+        }
+        filteredRows = effectiveRows
+        summary = ProductMetrics.compute(rows: effectiveRows)
+    }
+
+    private var activeRangeDescription: String {
+        if let day = selectedDay {
+            return "Ngày \(OrderRow.formatDisplayDate(day, includeTime: false))"
+        }
+        if dateRange == .custom {
+            let a = min(customFrom, customTo)
+            let b = max(customFrom, customTo)
+            let fa = OrderRow.formatDisplayDate(a, includeTime: false)
+            let fb = OrderRow.formatDisplayDate(b, includeTime: false)
+            return fa == fb ? "Ngày \(fa)" : "\(fa) – \(fb)"
+        }
+        return dateRange.rawValue
+    }
+
+    private var activeSummaryLine: String {
+        if let day = selectedDay {
+            let label = "trong ngày \(OrderRow.formatDisplayDate(day, includeTime: false))"
+            return ProductMetrics.rangeSummaryText(for: summary, scopeLabel: label)
+        }
+        return ProductMetrics.rangeSummaryText(for: summary)
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: Theme.sectionSpacing) {
                 if !store.hasData {
                     emptyNoDataCard
                 } else {
                     filterControls
+
+                    if let day = selectedDay {
+                        selectedDayBanner(day)
+                    }
+
                     overviewCard
 
-                    if summary.products.isEmpty {
+                    if viewMode == .byDay {
+                        if dailyBuckets.isEmpty {
+                            emptyDailyCard
+                        } else {
+                            dailyList
+                        }
+                    } else if summary.products.isEmpty {
                         emptyFilterCard
                     } else {
                         rankingList
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 28)
+            .padding(.horizontal, Theme.screenPadding)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
         .background(Theme.pageBackground.ignoresSafeArea())
         .navigationTitle("Thống kê sản phẩm")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear { recompute() }
         .onChange(of: platformFilter) { _ in recompute() }
         .onChange(of: dateRange) { _ in recompute() }
+        .onChange(of: dateBasis) { _ in recompute() }
+        .onChange(of: customFrom) { _ in recompute() }
+        .onChange(of: customTo) { _ in recompute() }
+        .onChange(of: selectedDay) { _ in recompute() }
         .onChange(of: store.updatedAt) { _ in recompute() }
         .onChange(of: store.revision) { _ in recompute() }
         .onChange(of: store.rows.count) { _ in recompute() }
         .onChange(of: store.isDemoMode) { _ in recompute() }
     }
 
-    // MARK: - Bộ lọc sàn & thời gian
+    // MARK: - Bộ lọc chế độ xem, khoảng thời gian, căn cứ ngày & sàn
     private var filterControls: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
+            if hasDates {
+                Picker("Chế độ xem", selection: $viewMode) {
+                    ForEach(ViewMode.allCases) { m in
+                        Text(m.rawValue).tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewMode) { newMode in
+                    Haptics.tap()
+                    if newMode == .byDay {
+                        selectedDay = nil
+                    }
+                }
+
+                // Hàng chip khoảng thời gian gọn: Hôm nay / 7 ngày / 30 ngày / Tháng này / Tất cả / Chọn ngày
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(ProductDateRange.allCases) { range in
+                            let isSelected = selectedDay == nil && dateRange == range
+                            compactFilterChip(
+                                title: range.rawValue,
+                                icon: range == .custom ? "calendar" : nil,
+                                selected: isSelected,
+                                accent: Theme.accent
+                            ) {
+                                selectedDay = nil
+                                dateRange = range
+                            }
+                        }
+                    }
+                }
+
+                // Bộ chọn ngày từ – đến khi chọn "Chọn ngày"
+                if dateRange == .custom && selectedDay == nil {
+                    customDatePickerCard
+                }
+
+                // Hàng chọn căn cứ ngày (mặc định Ngày hoàn, có thể đổi sang Ngày nhận kho)
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.secondary)
+                    Text("Tính theo:")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+
+                    ForEach(ProductDateBasis.allCases) { basis in
+                        let on = dateBasis == basis
+                        Button {
+                            Haptics.tap()
+                            if reduceMotion {
+                                dateBasis = basis
+                            } else {
+                                withAnimation(.easeInOut(duration: 0.16)) { dateBasis = basis }
+                            }
+                        } label: {
+                            Text(basis.rawValue)
+                                .font(Theme.Typography.microBold)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(on ? Theme.teal : Theme.subtleFill)
+                                .foregroundColor(on ? .white : .secondary)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+
+            // Hàng lọc theo sàn
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     ForEach(ProductPlatformFilter.allCases) { plat in
-                        Chip(title: plat.rawValue, selected: platformFilter == plat) {
+                        compactFilterChip(
+                            title: plat.rawValue,
+                            icon: nil,
+                            selected: platformFilter == plat,
+                            accent: Theme.info
+                        ) {
                             platformFilter = plat
                         }
                     }
                 }
             }
-
-            if hasDates {
-                Picker("Khoảng thời gian", selection: $dateRange) {
-                    ForEach(ProductDateRange.allCases) { r in
-                        Text(r.rawValue).tag(r)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: dateRange) { _ in Haptics.tap() }
-            }
         }
+    }
+
+    private func compactFilterChip(
+        title: String,
+        icon: String?,
+        selected: Bool,
+        accent: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.tap()
+            if reduceMotion {
+                action()
+            } else {
+                withAnimation(.easeInOut(duration: 0.16)) { action() }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                Text(title)
+                    .font(selected ? Theme.Typography.captionBold : Theme.Typography.caption.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(selected ? accent : Theme.cardBackground)
+            .foregroundColor(selected ? .white : .primary)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(selected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 0.7)
+            )
+            .frame(minHeight: Theme.minTapTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var customDatePickerCard: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Từ ngày")
+                    .font(Theme.Typography.microBold)
+                    .foregroundStyle(.secondary)
+                DatePicker("Từ ngày", selection: $customFrom, displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .environment(\.locale, Locale(identifier: "vi_VN"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "arrow.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Đến ngày")
+                    .font(Theme.Typography.microBold)
+                    .foregroundStyle(.secondary)
+                DatePicker("Đến ngày", selection: $customTo, displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .environment(\.locale, Locale(identifier: "vi_VN"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .card(padding: 10, radius: Theme.cardRadius)
+    }
+
+    private func selectedDayBanner(_ day: Date) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .font(.caption.bold())
+                .foregroundColor(Theme.accent)
+            Text("Đang lọc: \(formatDayTitle(day))")
+                .font(Theme.Typography.captionBold)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            Button {
+                Haptics.tap()
+                selectedDay = nil
+                viewMode = .byDay
+            } label: {
+                Text("Theo ngày")
+                    .font(Theme.Typography.microBold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.subtleFill)
+                    .foregroundColor(.primary)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Haptics.tap()
+                selectedDay = nil
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.accent)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Bỏ lọc ngày")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Theme.accent.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
+                .stroke(Theme.accent.opacity(0.28), lineWidth: 0.7)
+        )
     }
 
     // MARK: - Thẻ tóm tắt tổng quan
     private var overviewCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(summary.summaryLine)
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(activeSummaryLine)
+                    .font(Theme.Typography.primaryBold)
+                    .foregroundColor(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 10) {
+                if hasDates {
+                    Text("Theo \(dateBasis.rawValue.lowercased()) · \(activeRangeDescription)")
+                        .font(Theme.Typography.micro)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: 8) {
                 summaryMetric(title: "Tổng cái hoàn", value: summary.totalUnits, color: Theme.accent)
                 summaryMetric(title: "Số đơn", value: summary.ordersWithItems, color: Theme.info)
                 summaryMetric(title: "Mặt hàng", value: summary.products.count, color: Theme.teal)
             }
         }
-        .card(padding: 14, radius: 18)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     private func summaryMetric(title: String, value: Int, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             AnimatedCounter(
                 value: value,
-                font: .system(size: 24, weight: .bold, design: .rounded),
+                font: .system(size: 20, weight: .bold, design: .rounded),
                 color: value > 0 ? color : .secondary
             )
             Text(title)
-                .font(.caption2.weight(.medium))
+                .font(Theme.Typography.micro)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .padding(8)
         .background(Theme.subtleFill)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
+    }
+
+    // MARK: - Chế độ xem "Theo ngày" (mới nhất trước, mỗi ngày 1 dòng gọn)
+    private var dailyList: some View {
+        LazyVStack(spacing: Theme.cardSpacing) {
+            ForEach(dailyBuckets) { bucket in
+                Button {
+                    Haptics.tap()
+                    selectedDay = bucket.day
+                    viewMode = .ranking
+                } label: {
+                    dailyRowCard(bucket)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func dailyRowCard(_ bucket: DailyProductBucket) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(formatDayTitle(bucket.day))
+                        .font(Theme.Typography.primaryBold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    Text("· \(bucket.productCount) SP")
+                        .font(Theme.Typography.micro)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                if !bucket.topProductName.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 9))
+                            .foregroundColor(Theme.warning)
+                        Text("\(bucket.topProductName) (\(bucket.topProductUnits))")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                }
+            }
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 3) {
+                Text("\(bucket.totalUnits)")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.accent)
+                    .monospacedDigit()
+                Text("cái")
+                    .font(Theme.Typography.micro)
+                    .foregroundStyle(.secondary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget, alignment: .leading)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+    }
+
+    private func formatDayTitle(_ day: Date) -> String {
+        let cal = Calendar.current
+        let base = DashboardMetrics.daySectionTitle(for: day, now: Date(), calendar: cal)
+        let shortDate = OrderRow.formatDisplayDate(day, includeTime: false, calendar: cal)
+        if base == "Hôm nay" || base == "Hôm qua" {
+            let comps = cal.dateComponents([.day, .month], from: day)
+            return "\(base) · \(String(format: "%02d/%02d", comps.day ?? 1, comps.month ?? 1))"
+        }
+        let wd = DashboardMetrics.shortWeekdayLabel(for: day, calendar: cal)
+        return wd.isEmpty ? shortDate : "\(wd), \(shortDate)"
     }
 
     // MARK: - Danh sách xếp hạng sản phẩm
     private var rankingList: some View {
-        LazyVStack(spacing: 10) {
+        LazyVStack(spacing: Theme.cardSpacing) {
             ForEach(Array(summary.products.enumerated()), id: \.element.id) { idx, item in
                 NavigationLink {
                     ProductStatDetailView(stat: item, sourceRows: filteredRows)
@@ -133,30 +487,30 @@ struct ProductStatsView: View {
         let rankColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : (rank == 3 ? Theme.teal : .secondary))
         let pct = Int((item.share * 100).rounded())
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
                 Text("\(rank)")
                     .font(.system(.caption, design: .rounded).bold())
                     .foregroundColor(rank <= 3 ? .white : .secondary)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 24, height: 24)
                     .background(rank <= 3 ? rankColor : Theme.subtleFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(item.name)
-                        .font(.subheadline.bold())
+                        .font(Theme.Typography.primaryBold)
                         .foregroundColor(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
                         Text("\(item.orders) đơn")
-                            .font(.caption)
+                            .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                         Text("·")
                             .foregroundStyle(.tertiary)
                         Text("\(pct)% tỷ trọng")
-                            .font(.caption.weight(.semibold))
+                            .font(Theme.Typography.captionBold)
                             .foregroundColor(Theme.accent)
                     }
 
@@ -166,7 +520,7 @@ struct ProductStatsView: View {
                                 .font(.caption2.bold())
                                 .foregroundColor(Theme.warning)
                             Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
-                                .font(.caption2.weight(.semibold))
+                                .font(Theme.Typography.microBold)
                                 .foregroundColor(Theme.warning)
                                 .monospacedDigit()
                         }
@@ -175,20 +529,20 @@ struct ProductStatsView: View {
 
                 Spacer(minLength: 4)
 
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: .trailing, spacing: 1) {
                     Text("\(item.units)")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
                         .monospacedDigit()
                     Text("cái")
-                        .font(.caption2)
+                        .font(Theme.Typography.micro)
                         .foregroundStyle(.secondary)
                 }
 
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
                     .foregroundStyle(.tertiary)
-                    .padding(.top, 6)
+                    .padding(.top, 5)
             }
 
             // Thanh tỷ trọng ngang
@@ -207,7 +561,7 @@ struct ProductStatsView: View {
                         .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
                 }
             }
-            .frame(height: 7)
+            .frame(height: 6)
 
             if !item.topReason.isEmpty {
                 HStack(spacing: 5) {
@@ -215,24 +569,24 @@ struct ProductStatsView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     Text(item.topReason)
-                        .font(.caption2)
+                        .font(Theme.Typography.micro)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 14, radius: 16)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     // MARK: - Trạng thái trống
     private var emptyNoDataCard: some View {
-        VStack(spacing: 14) {
-            IconTile(systemName: "chart.bar.doc.horizontal.fill", color: Theme.accent, size: 50, cornerRadius: 14)
+        VStack(spacing: 12) {
+            IconTile(systemName: "chart.bar.doc.horizontal.fill", color: Theme.accent, size: 46, cornerRadius: 13)
             Text("Chưa có dữ liệu sản phẩm")
-                .font(.headline.bold())
+                .font(Theme.Typography.navTitle)
             Text("Kết nối máy tính hoặc bật dữ liệu mẫu để xem bảng xếp hạng sản phẩm bị hoàn.")
-                .font(.footnote)
+                .font(Theme.Typography.secondary)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button {
@@ -240,15 +594,15 @@ struct ProductStatsView: View {
                 engine.setDemoMode(true)
             } label: {
                 Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(.subheadline.bold())
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
+                    .font(Theme.Typography.primaryBold)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: Theme.minTapTarget)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
         }
         .frame(maxWidth: .infinity)
-        .card(padding: 22, radius: 20)
+        .card(padding: 20, radius: Theme.cardRadius)
     }
 
     private var emptyFilterCard: some View {
@@ -257,11 +611,39 @@ struct ProductStatsView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
             Text("Không có sản phẩm phù hợp bộ lọc")
-                .font(.subheadline.weight(.medium))
+                .font(Theme.Typography.secondaryBold)
                 .foregroundStyle(.secondary)
+            if selectedDay != nil || dateRange != .all {
+                Button("Xem tất cả thời gian") {
+                    Haptics.tap()
+                    selectedDay = nil
+                    dateRange = .all
+                }
+                .font(Theme.Typography.captionBold)
+                .foregroundColor(Theme.accent)
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity)
-        .card(padding: 24, radius: 18)
+        .card(padding: 20, radius: Theme.cardRadius)
+    }
+
+    private var emptyDailyCard: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text("Chưa có đơn có \(dateBasis.rawValue.lowercased()) trong khoảng này")
+                .font(Theme.Typography.secondaryBold)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text("Đơn không có ngày chỉ được tính khi xem ở mục \"Tất cả\".")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .card(padding: 20, radius: Theme.cardRadius)
     }
 }
 

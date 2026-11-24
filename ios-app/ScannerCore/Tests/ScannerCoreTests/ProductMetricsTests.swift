@@ -307,4 +307,124 @@ final class ProductMetricsTests: XCTestCase {
         let jeans = result.products.first { $0.name == "Quần bò" }
         XCTAssertEqual(jeans?.variants, [ProductVariantStat(color: "Đen", size: "", units: 1)])
     }
+
+    // MARK: - T037: lọc theo ngày, ranh giới múi giờ Việt Nam, gom theo ngày & căn cứ ngày
+
+    func testDateRangesRespectVietnamMidnightBoundariesAndMissingDatesOnlyInAll() throws {
+        let vnCal = ProductMetrics.vietnamCalendar
+        // 00:30 ngày 24/11/2026 giờ Việt Nam (tức 17:30 ngày 23/11/2026 giờ UTC — kiểm chứng không lệch ngày theo UTC)
+        var comps = DateComponents()
+        comps.timeZone = vnCal.timeZone
+        comps.year = 2026; comps.month = 11; comps.day = 24
+        comps.hour = 0; comps.minute = 30; comps.second = 0
+        let now = try XCTUnwrap(vnCal.date(from: comps))
+
+        let rows = [
+            makeRow(c: "VN-T1", p: "Shopee", n: "Áo Polo - Premium Cao Cấp", q: 2, rd: "24/11/2026 00:00:00"),
+            makeRow(c: "VN-T2", p: "TikTok", n: "Áo Polo", q: 1, rd: "24/11/2026 23:59:59"),
+            makeRow(c: "VN-D1", p: "Shopee", n: "Quần Jean", q: 3, rd: "23/11/2026 23:59:59"),
+            makeRow(c: "VN-D6", p: "Lazada", n: "Váy Midi", q: 1, rd: "18/11/2026 00:00:00"),      // đúng biên 7 ngày
+            makeRow(c: "VN-D7", p: "Shopee", n: "Váy Midi", q: 4, rd: "17/11/2026 23:59:59"),      // ngoài 7 ngày 1 giây
+            makeRow(c: "VN-M1", p: "TikTok", n: "Áo Sơ Mi", q: 2, rd: "01/11/2026 00:00:00"),      // đúng đầu tháng 11
+            makeRow(c: "VN-PM", p: "Shopee", n: "Áo Khoác", q: 5, rd: "31/10/2026 23:59:59"),      // tháng trước, vẫn trong 30 ngày (từ 26/10)
+            makeRow(c: "VN-OLD", p: "Shopee", n: "Mũ Lưỡi Trai", q: 6, rd: "25/10/2026 23:59:59"), // ngoài 30 ngày 1 giây
+            makeRow(c: "VN-ND", p: "Shopee", n: "Túi Tote", q: 7, rd: "")                          // không có ngày: chỉ tính ở Tất cả
+        ]
+
+        let today = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .today, now: now, calendar: vnCal)
+        XCTAssertEqual(today.totalUnits, 3)
+        XCTAssertEqual(today.products.count, 1)
+        let poloToday = try XCTUnwrap(today.products.first)
+        XCTAssertEqual(poloToday.name, "Áo Polo")
+        XCTAssertEqual(poloToday.premiumUnits, 2)
+        XCTAssertEqual(poloToday.standardUnits, 1)
+        XCTAssertEqual(poloToday.share, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(ProductMetrics.rangeSummaryText(for: today), "1 sản phẩm • 3 cái trong khoảng này")
+
+        let days7 = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .days7, now: now, calendar: vnCal)
+        XCTAssertEqual(days7.totalUnits, 7) // 2 + 1 + 3 + 1
+
+        let thisMonth = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .thisMonth, now: now, calendar: vnCal)
+        XCTAssertEqual(thisMonth.totalUnits, 13) // 2 + 1 + 3 + 1 + 4 + 2 (không gồm 31/10, 25/10 và không có ngày)
+
+        let days30 = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .days30, now: now, calendar: vnCal)
+        XCTAssertEqual(days30.totalUnits, 18) // gồm thêm 31/10 (5), không gồm 25/10 và không có ngày
+
+        let all = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .all, now: now, calendar: vnCal)
+        XCTAssertEqual(all.totalUnits, 31) // gồm cả 25/10 (6) và không có ngày (7)
+
+        // Chọn ngày tùy chỉnh (kể cả khi truyền ngược from > to vẫn chuẩn hóa đúng)
+        let dFrom = try XCTUnwrap(OrderStats.parseDate("17/11/2026", calendar: vnCal))
+        let dTo = try XCTUnwrap(OrderStats.parseDate("23/11/2026", calendar: vnCal))
+        let custom = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .custom, customFrom: dFrom, customTo: dTo, now: now, calendar: vnCal)
+        XCTAssertEqual(custom.totalUnits, 8) // VN-D1 (3) + VN-D6 (1) + VN-D7 (4)
+        let customReversed = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .custom, customFrom: dTo, customTo: dFrom, now: now, calendar: vnCal)
+        XCTAssertEqual(customReversed.totalUnits, 8)
+    }
+
+    func testGroupByDayNewestFirstAndSingleDayFilter() throws {
+        let vnCal = ProductMetrics.vietnamCalendar
+        let rows = [
+            makeRow(c: "DAY-1", p: "Shopee", n: "Áo Len - Premium Cao Cấp", q: 2, rd: "22/11/2026 09:00"),
+            makeRow(c: "DAY-2", p: "TikTok", n: "Áo Len", q: 1, rd: "22/11/2026 18:30"),
+            makeRow(c: "DAY-3", p: "Shopee", n: "Quần Kaki", q: 2, rd: "22/11/2026 20:00"),
+            makeRow(c: "DAY-4", p: "TikTok", n: "Váy Midi | Mũ Vải", q: 2, rd: "24/11/2026 10:00", rn: "Váy Midi"),
+            makeRow(c: "DAY-5", p: "Shopee", n: "Áo Sơ Mi", q: 4, rd: "23/11/2026"),
+            makeRow(c: "DAY-NO", p: "Shopee", n: "Túi Xách", q: 9, rd: "")
+        ]
+
+        let buckets = ProductMetrics.groupByDay(rows: rows, dateBasis: .returnDate, calendar: vnCal)
+        XCTAssertEqual(buckets.count, 3)
+
+        // Mới nhất trước: 24/11 -> 23/11 -> 22/11
+        XCTAssertEqual(OrderRow.formatDisplayDate(buckets[0].day, includeTime: false, calendar: vnCal), "24/11/2026")
+        XCTAssertEqual(buckets[0].totalUnits, 1) // hoàn một phần chỉ tính Váy Midi
+        XCTAssertEqual(buckets[0].topProductName, "Váy Midi")
+        XCTAssertEqual(buckets[0].topProductUnits, 1)
+
+        XCTAssertEqual(OrderRow.formatDisplayDate(buckets[1].day, includeTime: false, calendar: vnCal), "23/11/2026")
+        XCTAssertEqual(buckets[1].totalUnits, 4)
+        XCTAssertEqual(buckets[1].topProductName, "Áo Sơ Mi")
+
+        XCTAssertEqual(OrderRow.formatDisplayDate(buckets[2].day, includeTime: false, calendar: vnCal), "22/11/2026")
+        XCTAssertEqual(buckets[2].totalUnits, 5) // Áo Len (3) + Quần Kaki (2)
+        XCTAssertEqual(buckets[2].productCount, 2)
+        XCTAssertEqual(buckets[2].topProductName, "Áo Len")
+        XCTAssertEqual(buckets[2].topProductUnits, 3)
+
+        // Bấm vào ngày 22/11 lọc đúng các đơn ngày 22/11
+        let day22Rows = ProductMetrics.filter(rows: rows, onDay: buckets[2].day, dateBasis: .returnDate, calendar: vnCal)
+        XCTAssertEqual(day22Rows.map { $0.c }, ["DAY-1", "DAY-2", "DAY-3"])
+        let day22Summary = ProductMetrics.compute(rows: day22Rows)
+        XCTAssertEqual(day22Summary.products.first?.premiumUnits, 2)
+        XCTAssertEqual(day22Summary.products.first?.standardUnits, 1)
+    }
+
+    func testDateBasisSwitchesBetweenReturnDateAndReceivedDate() throws {
+        let vnCal = ProductMetrics.vietnamCalendar
+        var comps = DateComponents()
+        comps.timeZone = vnCal.timeZone
+        comps.year = 2026; comps.month = 11; comps.day = 24; comps.hour = 15
+        let now = try XCTUnwrap(vnCal.date(from: comps))
+
+        var recvToday = makeRow(c: "B-1", p: "Shopee", n: "Áo Khoác", q: 2, rd: "10/11/2026")
+        recvToday.rv = true
+        recvToday.pd = false
+        recvToday.rcd = "24/11/2026 09:15:00"
+
+        let retToday = makeRow(c: "B-2", p: "TikTok", n: "Quần Short", q: 3, rd: "24/11/2026")
+
+        let rows = [recvToday, retToday]
+
+        let byReturnToday = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .today, dateBasis: .returnDate, now: now, calendar: vnCal)
+        XCTAssertEqual(byReturnToday.totalUnits, 3)
+        XCTAssertEqual(byReturnToday.products.first?.name, "Quần Short")
+
+        let byRecvToday = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .today, dateBasis: .receivedDate, now: now, calendar: vnCal)
+        XCTAssertEqual(byRecvToday.totalUnits, 2)
+        XCTAssertEqual(byRecvToday.products.first?.name, "Áo Khoác")
+
+        let byRecvAll = ProductMetrics.compute(rows: rows, platform: .all, dateRange: .all, dateBasis: .receivedDate, now: now, calendar: vnCal)
+        XCTAssertEqual(byRecvAll.totalUnits, 5) // Tất cả gồm cả đơn chưa có ngày nhận
+    }
 }

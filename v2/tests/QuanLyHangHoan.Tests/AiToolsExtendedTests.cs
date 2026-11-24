@@ -171,4 +171,16 @@ public sealed class AiToolsExtendedTests
         }
         Assert.Contains("Đang chờ", AiOrderTools.DefinitionsJson);   // chữ có dấu không bị mã hóa thành \u
     }
+
+    [Fact]
+    public void Phone_rows_carry_price_and_carrier_for_the_phone_ai()
+    {
+        var o = O("9", "VN009", "Chưa trả", 123_456, carrier: "SPX Express", arrived: "25/11/2026 10:00:00");
+        var row = QuanLyHangHoan.Data.Sync.PhoneSnapshot.BuildRow(S(o), Now);
+        Assert.Equal(123_456L, row["pr"]);
+        Assert.Equal("SPX Express", row["cr"]);
+        var free = QuanLyHangHoan.Data.Sync.PhoneSnapshot.BuildRow(S(O("10", "VN010", "Chưa trả", 0, carrier: "")), Now);
+        Assert.False(free.ContainsKey("pr"));
+        Assert.False(free.ContainsKey("cr"));
+    }
 }

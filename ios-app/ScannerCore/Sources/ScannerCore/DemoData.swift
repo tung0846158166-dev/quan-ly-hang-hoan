@@ -112,11 +112,20 @@ public enum DemoData {
             ("DEMO-SPX-1006", "DHM-1006", "Shopee", 3, false, "", true, "Quần short kaki nam", 2),
             ("DEMO-LZ-1007", "DHM-1007", "Lazada", 2, false, "", false, "", 0)
         ]
+        let sampleReasons = [
+            "Khách đặt nhầm size",
+            "Giao không thành công - không nghe máy",
+            "Đổi sang màu khác",
+            "Khách không còn nhu cầu",
+            "Hàng lỗi nhẹ đường may"
+        ]
         for (i, s) in overdueSpecs.enumerated() {
             let name = s.6 ? "\(s.7) | \(prod(i + 2)) | \(prod(i + 4))" : prod(i)
+            let colorStr = s.6 ? "\(col(i)) | \(col(i + 1)) | \(col(i + 2))" : col(i)
+            let sizeStr = s.6 ? "\(sz(i)) | \(sz(i + 1)) | \(sz(i + 2))" : sz(i)
             var r = OrderRow(
                 k: "m", c: s.0, o: s.1, p: s.2, n: name,
-                co: col(i), sz: sz(i), q: s.6 ? 3 : 1,
+                co: colorStr, sz: sizeStr, q: s.6 ? 3 : (i == 0 ? 2 : 1),
                 rd: formatDate(dateOffset(-4, hour: 9 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs - s.3 * hourMs,
                 st: "Chưa trả"
@@ -124,7 +133,11 @@ public enum DemoData {
             r.ty = i % 2 == 0 ? "Trả hàng/Hoàn tiền" : "Giao không thành công"
             r.pd = true; r.rv = false; r.lv = 2
             r.wl = s.4; r.wr = s.5
+            r.nt = sampleReasons[i % sampleReasons.count]
             r.rn = s.7
+            if i < 4 {
+                r.x = "DEMO-RET-900\(i + 1) DEMO-REQ-800\(i + 1)"
+            }
             if s.8 > 0 {
                 r.rw = nowMs - 4 * dayMs
                 r.rws = s.8
@@ -148,9 +161,11 @@ public enum DemoData {
         for (i, s) in soonSpecs.enumerated() {
             let isPartial = !s.6.isEmpty
             let name = isPartial ? "\(s.6) | \(prod(i + 3))" : prod(i + 1)
+            let colorStr = isPartial ? "\(col(i + 2)) | \(col(i + 3))" : col(i + 2)
+            let sizeStr = isPartial ? "\(sz(i + 1)) | \(sz(i + 2))" : sz(i + 1)
             var r = OrderRow(
                 k: "m", c: s.0, o: s.1, p: s.2, n: name,
-                co: col(i + 2), sz: sz(i + 1), q: isPartial ? 2 : 1,
+                co: colorStr, sz: sizeStr, q: isPartial ? 2 : 1,
                 rd: formatDate(dateOffset(-2, hour: 10 + i, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs + s.3 * hourMs,
                 st: "Chưa trả"
@@ -158,6 +173,8 @@ public enum DemoData {
             r.ty = "Trả hàng/Hoàn tiền"
             r.pd = true; r.rv = false; r.lv = 1
             r.wl = s.4; r.wr = s.5
+            if i % 2 == 0 { r.nt = sampleReasons[(i + 1) % sampleReasons.count] }
+            if i < 3 { r.x = "DEMO-RET-910\(i + 1)" }
             r.rn = s.6
             r.rw = nowMs - 2 * dayMs
             r.rws = s.7
@@ -176,9 +193,11 @@ public enum DemoData {
             let isPartial = (i == 1 || i == 6)
             let p1 = prod(i + 3)
             let name = isPartial ? "\(p1) | \(prod(i + 5)) | \(prod(i + 7))" : p1
+            let colorStr = isPartial ? "\(col(i)) | \(col(i + 1)) | \(col(i + 2))" : col(i)
+            let sizeStr = isPartial ? "\(sz(i)) | \(sz(i + 1)) | \(sz(i + 2))" : sz(i)
             var r = OrderRow(
                 k: "m", c: "\(prefix)-\(num)", o: "DHM-\(num)", p: plat, n: name,
-                co: col(i), sz: sz(i), q: isPartial ? 3 : 1,
+                co: colorStr, sz: sizeStr, q: isPartial ? 3 : 1,
                 rd: formatDate(dateOffset(-1, hour: 8 + (i % 8), from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: nowMs + (36 + i * 6) * hourMs,
                 st: "Chưa trả"
@@ -191,6 +210,7 @@ public enum DemoData {
                 r.wl = true
                 r.wr = "Khách đổi ý sau khi nhận"
             }
+            if i % 3 == 0 { r.nt = sampleReasons[(i + 2) % sampleReasons.count] }
             if i < 4 {
                 r.rw = nowMs - dayMs
                 r.rws = 1
@@ -214,9 +234,11 @@ public enum DemoData {
             let isPartial = (i == 0 || i == 7)
             let p1 = prod(i)
             let name = isPartial ? "\(p1) | \(prod(i + 2))" : p1
+            let colorStr = isPartial ? "\(col(i + 1)) | \(col(i + 2))" : col(i + 1)
+            let sizeStr = isPartial ? "\(sz(i + 2)) | \(sz(i + 3))" : sz(i + 2)
             var r = OrderRow(
                 k: "m", c: "\(prefix)-\(num)", o: "DHM-\(num)", p: plat, n: name,
-                co: col(i + 1), sz: sz(i + 2), q: isPartial ? 2 : 1,
+                co: colorStr, sz: sizeStr, q: isPartial ? 2 : (i % 4 == 0 ? 2 : 1),
                 rd: formatDate(dateOffset(dayOff - 2, hour: 10, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: 0,
                 st: "Hàng đã trả"
@@ -225,11 +247,13 @@ public enum DemoData {
             r.pd = false; r.rv = true; r.lv = 0
             r.rcd = formatDate(recvDate, withTime: true, calendar: calendar)
             r.rn = isPartial ? p1 : ""
+            if i % 3 == 0 { r.nt = sampleReasons[i % sampleReasons.count] }
             if i < 6 {
                 // Chặng 4 (Đã nhận kho) trong Bảng Hàng Hoàn Về
                 r.rw = nowMs - (3 + i % 3) * dayMs
                 r.rws = 4
                 r.ar = nowMs - (1 + i % 2) * dayMs
+                r.x = "DEMO-RET-920\(i + 1)"
             }
             rows.append(r)
         }

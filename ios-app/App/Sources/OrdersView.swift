@@ -37,6 +37,7 @@ struct OrdersView: View {
     @State private var shown: [OrderRow] = []
     @State private var counts: [OrderFilter: Int] = [:]
     @State private var scanned: Set<String> = []
+    @State private var productCount = 0
 
     private func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
         if q.isEmpty { return true }
@@ -104,6 +105,7 @@ struct OrdersView: View {
         shown = d.shown
         counts = d.counts
         scanned = engine.scannedReturnCodes
+        productCount = ProductMetrics.compute(rows: store.rows).products.count
     }
 
     var body: some View {
@@ -212,29 +214,36 @@ struct OrdersView: View {
         }
     }
 
-    // MARK: - Lối tắt bảng phụ (biểu tượng + số, gọn)
+    // MARK: - Lối tắt bảng phụ & Thống kê sản phẩm (biểu tượng + số, gọn)
     private var shortcutRow: some View {
         let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
         let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
 
-        return HStack(spacing: 10) {
-            NavigationLink { ReturnWatchView() } label: {
-                shortcutPill(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
-            }
-            .buttonStyle(.plain)
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                NavigationLink { ReturnWatchView() } label: {
+                    shortcutPill(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
+                }
+                .buttonStyle(.plain)
 
-            NavigationLink { CancelledTableView() } label: {
-                shortcutPill(icon: "xmark", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
-            }
-            .buttonStyle(.plain)
+                NavigationLink { ProductStatsView() } label: {
+                    shortcutPill(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent)
+                }
+                .buttonStyle(.plain)
 
-            NavigationLink { CancelAfterPrepView() } label: {
-                shortcutPill(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
+                NavigationLink { CancelledTableView() } label: {
+                    shortcutPill(icon: "xmark", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink { CancelAfterPrepView() } label: {
+                    shortcutPill(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
     }
 
     private func shortcutPill(icon: String, title: String, count: Int, color: Color) -> some View {
@@ -250,9 +259,8 @@ struct OrdersView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 46)
+        .frame(minWidth: 102, minHeight: 46, alignment: .leading)
         .card(padding: 8, radius: 14)
     }
 
@@ -484,119 +492,6 @@ struct ScanSearchSheet: View {
                 camera.start()
             }
             .onDisappear { camera.stop() }
-        }
-    }
-}
-
-struct DetailView: View {
-    let row: OrderRow
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var engine: SyncEngine
-    @EnvironmentObject var store: SnapshotStore
-    @State private var noteText = ""
-    @State private var watchOn = false
-    @State private var sentNote = false
-    @State private var editN = ""
-    @State private var editCo = ""
-    @State private var editSz = ""
-    @State private var editQ = 1
-    @State private var editSt = ""
-    @State private var editTy = ""
-    @State private var sentEdit = false
-    @State private var askDelete = false
-    @State private var confirmDelete = false
-
-    private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất"]
-    private static let types = ["Giao không thành công", "Trả hàng/Hoàn tiền", "Đơn hủy", "THẤT THU"]
-    private var statusChoices: [String] { Self.statuses.contains(editSt) || editSt.isEmpty ? Self.statuses : Self.statuses + [editSt] }
-
-    private func fillEdit() {
-        editN = live.n; editCo = live.co; editSz = live.sz; editQ = live.q; editSt = live.st; editTy = live.ty
-    }
-
-    private var live: OrderRow { store.rows.first(where: { $0.id == row.id }) ?? row }
-
-    private var source: String {
-        if live.isArchived { return "Kho lưu trữ" }
-        return live.k == "c" ? "Bảng đơn hủy" : "Bảng chính"
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                if store.isDemoMode {
-                    Section {
-                        Label("Dữ liệu mẫu: thay đổi chỉ áp dụng cục bộ, không gửi lên máy tính.", systemImage: "sparkles")
-                            .font(.caption.bold())
-                            .foregroundColor(Theme.accent)
-                    }
-                }
-                Section("Mã") {
-                    LabeledContent("Mã vận đơn", value: live.c)
-                    if !live.o.isEmpty { LabeledContent("Mã đơn hàng", value: live.o) }
-                    if !live.ps.isEmpty { LabeledContent("Trạng thái sàn", value: live.ps) }
-                    Button("Sao chép mã vận đơn") { Haptics.tap(); UIPasteboard.general.string = live.c }
-                    if !live.o.isEmpty { Button("Sao chép mã đơn hàng") { Haptics.tap(); UIPasteboard.general.string = live.o } }
-                }
-                Section(store.isDemoMode ? "Theo dõi & ghi chú (dữ liệu mẫu)" : "Theo dõi & ghi chú (đồng bộ 2 chiều với máy tính)") {
-                    Toggle("Đang theo dõi", isOn: $watchOn)
-                    TextField("Ghi chú / lý do theo dõi", text: $noteText, axis: .vertical).lineLimit(1...5)
-                    Button(sentNote ? "✓ Đã lưu" : (store.isDemoMode ? "Lưu cục bộ (dữ liệu mẫu)" : "Lưu & đồng bộ sang máy tính")) {
-                        Haptics.medium()
-                        engine.sendOrderNote(live, note: noteText, watch: watchOn)
-                        sentNote = true
-                    }
-                    if live.k != "m" { Text("Chỉ đơn ở bảng chính mới đồng bộ theo dõi/ghi chú với máy tính.").font(.caption).foregroundStyle(.secondary) }
-                    if !live.nt.isEmpty { VStack(alignment: .leading, spacing: 2) { Text("Ghi chú đơn trên máy tính").font(.caption).foregroundStyle(.secondary); Text(live.nt) } }
-                }
-                if live.k == "m" {
-                    Section(store.isDemoMode ? "Đổi trạng thái (dữ liệu mẫu)" : "Đổi trạng thái nhận kho (đồng bộ với máy tính)") {
-                        Picker("Trạng thái", selection: $editSt) { ForEach(statusChoices, id: \.self) { Text($0).tag($0) } }
-                        Button(sentEdit ? "✓ Đã cập nhật" : (store.isDemoMode ? "Lưu trạng thái cục bộ" : "Lưu trạng thái sang máy tính")) {
-                            Haptics.medium()
-                            engine.sendOrderEdit(live, fields: ["st": editSt])
-                            sentEdit = true
-                        }
-                        Button("Xóa đơn này", role: .destructive) { askDelete = true }
-                    }
-                }
-                Section("Đơn") {
-                    LabeledContent("Nằm ở", value: source)
-                    LabeledContent("Sàn", value: live.p.isEmpty ? "—" : live.p)
-                    if !live.ty.isEmpty { LabeledContent("Loại đơn", value: live.ty) }
-                    if live.pre { LabeledContent("Hàng đặt trước", value: "Có") }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Sản phẩm").font(.caption).foregroundStyle(.secondary)
-                        if live.n.isEmpty { Text("—") } else { ProductLines(n: live.n, rn: live.rn) }
-                    }
-                    LabeledContent("Màu", value: live.co.isEmpty ? "—" : live.co)
-                    LabeledContent("Size", value: live.sz.isEmpty ? "—" : live.sz)
-                    LabeledContent("Số lượng", value: "\(live.q)")
-                    LabeledContent("Trạng thái", value: live.st.isEmpty ? "—" : live.st)
-                    LabeledContent("Đã nhận hoàn kho", value: live.rv ? "Rồi" : "Chưa")
-                }
-                if live.pd {
-                    Section("Hạn xử lý") {
-                        LabeledContent("Ngày hủy/hoàn", value: live.rd.isEmpty ? "—" : live.rd)
-                        LabeledContent("Hạn", value: live.due > 0 ? Date(timeIntervalSince1970: Double(live.due) / 1000).formatted(date: .abbreviated, time: .shortened) : "Chưa có")
-                        LabeledContent("Còn lại", value: Deadline.text(due: live.due, now: Int(Date().timeIntervalSince1970 * 1000)))
-                    }
-                }
-            }
-            .tint(Theme.accent)
-            .onAppear { noteText = live.wr; watchOn = live.wl; fillEdit() }
-            .onChange(of: live) { _ in fillEdit(); sentEdit = false }
-            .confirmationDialog("Xóa đơn này?", isPresented: $askDelete, titleVisibility: .visible) {
-                Button("Tiếp tục xóa", role: .destructive) { confirmDelete = true }
-            } message: { Text(store.isDemoMode ? "Chỉ xóa trên dữ liệu mẫu." : "Đơn vẫn khôi phục được trên máy tính.") }
-            .alert("Chắc chắn xóa đơn \(live.o.isEmpty ? live.c : live.o)?", isPresented: $confirmDelete) {
-                Button("Hủy", role: .cancel) {}
-                Button("Xóa", role: .destructive) { engine.sendOrderDelete(live); dismiss() }
-            } message: { Text(store.isDemoMode ? "Tắt rồi bật lại dữ liệu mẫu sẽ khôi phục đơn này." : "Đơn sẽ bị gỡ khỏi bảng chính; có thể khôi phục trên máy tính.") }
-            .onChange(of: live.wr) { v in noteText = v; sentNote = false }
-            .onChange(of: live.wl) { v in watchOn = v }
-            .navigationTitle("Chi tiết đơn")
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
         }
     }
 }

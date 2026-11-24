@@ -12,14 +12,23 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var scheme
 
     @State private var summary = DashboardSummary()
+    @State private var productStats = ProductStatsSummary()
     @State private var selectedRow: OrderRow?
+    @State private var showAllProductStats = false
+    @State private var selectedProductStat: ProductStatItem?
+    @State private var showSelectedProductStat = false
 
     private func recompute() {
         let next = DashboardMetrics.compute(rows: store.rows, stats: store.stats, now: Date())
+        let nextProducts = ProductMetrics.compute(rows: store.rows)
         if reduceMotion {
             summary = next
+            productStats = nextProducts
         } else {
-            withAnimation(.easeOut(duration: 0.22)) { summary = next }
+            withAnimation(.easeOut(duration: 0.22)) {
+                summary = next
+                productStats = nextProducts
+            }
         }
     }
 
@@ -114,6 +123,13 @@ struct HomeView: View {
                             .listRowSeparator(.hidden)
                     }
 
+                    if !productStats.products.isEmpty {
+                        topProductsCard
+                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 10, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+
                     statsShortcutCard
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
                         .listRowBackground(Color.clear)
@@ -160,6 +176,14 @@ struct HomeView: View {
             }
             .navigationDestination(isPresented: $router.showNotifications) {
                 NotificationsView()
+            }
+            .navigationDestination(isPresented: $showAllProductStats) {
+                ProductStatsView()
+            }
+            .navigationDestination(isPresented: $showSelectedProductStat) {
+                if let stat = selectedProductStat {
+                    ProductStatDetailView(stat: stat, sourceRows: store.rows)
+                }
             }
             .sheet(item: $selectedRow) { DetailView(row: $0) }
             .onAppear { recompute() }
@@ -795,6 +819,84 @@ struct HomeView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    // MARK: - Top 5 Sản phẩm hoàn nhiều nhất
+    private var topProductsCard: some View {
+        let top5 = Array(productStats.products.prefix(5))
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionTitleRow(
+                    title: "Sản phẩm hoàn nhiều nhất",
+                    icon: "tshirt.fill",
+                    iconColor: Theme.accent
+                )
+                Button {
+                    Haptics.tap()
+                    showAllProductStats = true
+                } label: {
+                    Text("Xem tất cả")
+                        .font(.caption.bold())
+                        .foregroundColor(Theme.accent)
+                }
+                .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 10) {
+                ForEach(Array(top5.enumerated()), id: \.element.id) { idx, item in
+                    let rank = idx + 1
+                    let barColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : (rank == 3 ? Theme.teal : Theme.info))
+                    let pct = Int((item.share * 100).rounded())
+
+                    Button {
+                        Haptics.tap()
+                        selectedProductStat = item
+                        showSelectedProductStat = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 8) {
+                                Text("\(rank)")
+                                    .font(.system(.caption2, design: .rounded).bold())
+                                    .foregroundColor(rank <= 3 ? .white : .secondary)
+                                    .frame(width: 20, height: 20)
+                                    .background(rank <= 3 ? barColor : Theme.subtleFill)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                                Text(item.name)
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+
+                                Spacer(minLength: 4)
+
+                                Text("\(item.units) cái")
+                                    .font(.system(.caption, design: .rounded).bold())
+                                    .foregroundColor(.primary)
+                                    .monospacedDigit()
+
+                                Text("(\(pct)%)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Theme.subtleFill)
+                                    Capsule()
+                                        .fill(barColor.opacity(0.85))
+                                        .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
+                                }
+                            }
+                            .frame(height: 6)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .card(padding: 16)
     }
 
     // MARK: - Lối tắt thống kê

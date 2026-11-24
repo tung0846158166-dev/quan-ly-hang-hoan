@@ -10,6 +10,18 @@ struct Banner: Equatable {
     var sub: String = ""
 }
 
+enum OrderActionState: Equatable {
+    case pending
+    case confirmed
+    case failed
+}
+
+struct OrderActionFeedback: Equatable {
+    var requestId: String
+    var state: OrderActionState
+    var message: String
+}
+
 @MainActor
 final class SyncEngine: ObservableObject {
     @Published var items: [ScanItem] = []
@@ -23,6 +35,7 @@ final class SyncEngine: ObservableObject {
     private var chunkPublishedAt = Date.distantPast
     @Published var pcLastSeen: Date?
     @Published var banner: Banner?
+    @Published var orderActionFeedback: [String: OrderActionFeedback] = [:]
     @Published var mode: ScanKind = .returnScan
     @Published var note = ""
     /// Chế độ xem thử dữ liệu mẫu (trong bộ nhớ, tuyệt đối không phát MQTT/ntfy hay ghi đè dữ liệu thật).
@@ -71,6 +84,7 @@ final class SyncEngine: ObservableObject {
             items = DemoData.scanItems()
             snapshot.setDemoMode(true)
             banner = nil
+            orderActionFeedback = [:]
         } else {
             guard isDemoMode else { return }
             isDemoMode = false
@@ -78,7 +92,14 @@ final class SyncEngine: ObservableObject {
             savedRealItems = nil
             snapshot.setDemoMode(false)
             banner = nil
+            orderActionFeedback = [:]
         }
+    }
+
+    func actionFeedback(for row: OrderRow) -> OrderActionFeedback? {
+        if !row.c.isEmpty, let fb = orderActionFeedback[row.c.uppercased()] { return fb }
+        if !row.o.isEmpty, let fb = orderActionFeedback[row.o.uppercased()] { return fb }
+        return nil
     }
 
     /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
@@ -288,7 +309,23 @@ final class SyncEngine: ObservableObject {
             pendingNotes[ack.requestId] = nil
             UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
             let ok = ack.outcome == "success" || ack.outcome == "duplicate"
-            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "PC đã cập nhật" : "PC không thực hiện được"), color: ok ? .green : .red)
+            let msg = ack.extra ?? (ok ? "PC đã cập nhật" : "PC không thực hiện được")
+            banner = Banner(code: ack.code, text: msg, color: ok ? .green : .red)
+            let codeKey = ack.code.uppercased()
+            if !codeKey.isEmpty {
+                orderActionFeedback[codeKey] = OrderActionFeedback(
+                    requestId: ack.requestId,
+                    state: ok ? .confirmed : .failed,
+                    message: msg
+                )
+            }
+            for (k, v) in orderActionFeedback where v.requestId == ack.requestId {
+                orderActionFeedback[k] = OrderActionFeedback(
+                    requestId: ack.requestId,
+                    state: ok ? .confirmed : .failed,
+                    message: msg
+                )
+            }
             if !ok { requestSnapshot() }   // lấy lại bản đúng từ PC nếu PC từ chối
 
         case .ack(let ack) where ack.ackStage == "push":
@@ -473,11 +510,19 @@ final class SyncEngine: ObservableObject {
     private var pendingNotes: [String: String] = UserDefaults.standard.dictionary(forKey: "pendingNotes") as? [String: String] ?? [:]
     var pendingNoteCount: Int { pendingNotes.count }
 
+    private func setOrderFeedback(for row: OrderRow, requestId: String, state: OrderActionState, message: String) {
+        let fb = OrderActionFeedback(requestId: requestId, state: state, message: message)
+        if !row.c.isEmpty { orderActionFeedback[row.c.uppercased()] = fb }
+        if !row.o.isEmpty { orderActionFeedback[row.o.uppercased()] = fb }
+    }
+
     func sendOrderNote(_ row: OrderRow, note: String, watch: Bool = true) {
         let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if isDemoMode {
             snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
-            banner = Banner(code: row.c, text: watch ? "Đã lưu theo dõi (dữ liệu mẫu)" : "Đã bỏ theo dõi (dữ liệu mẫu)", color: Theme.accent)
+            let msg = watch ? "Đã lưu theo dõi (dữ liệu mẫu)" : "Đã bỏ theo dõi (dữ liệu mẫu)"
+            banner = Banner(code: row.c, text: msg, color: Theme.accent)
+            setOrderFeedback(for: row, requestId: "demo-note-\(nowMs())", state: .confirmed, message: msg)
             return
         }
         let rid = "note-\(nowMs())"
@@ -486,13 +531,17 @@ final class SyncEngine: ObservableObject {
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Note", room: room)
         snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
+        let msg = "Đang chờ máy tính xác nhận ghi chú..."
         banner = Banner(code: row.c, text: "Đã gửi ghi chú, chờ PC xác nhận", color: Theme.warning)
+        setOrderFeedback(for: row, requestId: rid, state: .pending, message: msg)
     }
 
     func sendOrderEdit(_ row: OrderRow, fields: [String: Any]) {
         if isDemoMode {
             snapshot.applyLocalEdit(rowId: row.id, fields: fields)
-            banner = Banner(code: row.c, text: "Đã cập nhật trạng thái (dữ liệu mẫu)", color: Theme.accent)
+            let msg = "Đã cập nhật trạng thái (dữ liệu mẫu)"
+            banner = Banner(code: row.c, text: msg, color: Theme.accent)
+            setOrderFeedback(for: row, requestId: "demo-edit-\(nowMs())", state: .confirmed, message: msg)
             return
         }
         let rid = "edit-\(nowMs())"
@@ -501,7 +550,9 @@ final class SyncEngine: ObservableObject {
         UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyLocalEdit(rowId: row.id, fields: fields)
+        let msg = "Đang chờ máy tính xác nhận đổi trạng thái..."
         banner = Banner(code: row.c, text: "Đã gửi cập nhật đơn, chờ PC xác nhận", color: Theme.warning)
+        setOrderFeedback(for: row, requestId: rid, state: .pending, message: msg)
     }
 
     /// Sửa cùng lúc nhiều đơn (vd đánh dấu đã nhận các đơn Huỷ sau chuẩn bị). Mỗi đơn 1 mã yêu cầu riêng.
@@ -537,6 +588,7 @@ final class SyncEngine: ObservableObject {
         broadcast(body, title: "Shopee Delete", room: room)
         snapshot.removeLocal(rowId: row.id)
         banner = Banner(code: row.c, text: "Đã gửi xóa đơn, chờ PC xác nhận", color: Theme.warning)
+        setOrderFeedback(for: row, requestId: rid, state: .pending, message: "Đang chờ máy tính xác nhận xóa đơn...")
     }
 
     private func resendPendingNotes() {

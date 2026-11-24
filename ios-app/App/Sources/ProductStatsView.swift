@@ -83,21 +83,15 @@ struct ProductStatsView: View {
     // MARK: - Thẻ tóm tắt tổng quan
     private var overviewCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text(summary.summaryLine)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
             HStack(spacing: 10) {
                 summaryMetric(title: "Tổng cái hoàn", value: summary.totalUnits, color: Theme.accent)
                 summaryMetric(title: "Số đơn", value: summary.ordersWithItems, color: Theme.info)
                 summaryMetric(title: "Mặt hàng", value: summary.products.count, color: Theme.teal)
-            }
-
-            if summary.unknownUnits > 0 {
-                HStack(spacing: 6) {
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(Theme.warning)
-                    Text("Chưa rõ sản phẩm: \(summary.unknownUnits) cái (không tính vào bảng xếp hạng)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .card(padding: 14, radius: 18)

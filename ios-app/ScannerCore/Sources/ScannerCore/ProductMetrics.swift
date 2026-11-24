@@ -80,6 +80,11 @@ public struct ProductStatsSummary: Equatable {
     public var ordersWithItems: Int = 0
     public var unknownUnits: Int = 0
 
+    /// Dòng tóm tắt đầu trang giống bản máy tính: "N sản phẩm • M cái bị hoàn trong K đơn".
+    public var summaryLine: String {
+        ProductMetrics.summaryText(for: self)
+    }
+
     public init(
         products: [ProductStatItem] = [],
         totalUnits: Int = 0,
@@ -162,11 +167,22 @@ public enum ProductMetrics {
         return out
     }
 
-    /// Tách chuỗi nhiều giá trị phân cách bởi `" | "` (giữ nguyên vị trí phần tử).
+    /// Tách chuỗi nhiều giá trị phân cách bởi `" | "` (giữ nguyên vị trí phần tử, kể cả ô đầu/cuối rỗng như `" | Đen"`).
     public static func splitPipe(_ raw: String) -> [String] {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return [] }
-        return trimmed.components(separatedBy: " | ").map { clean($0) }
+        if raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return [] }
+        return raw.components(separatedBy: " | ").map { clean($0) }
+    }
+
+    /// Dòng tóm tắt đầu trang giống bản PC (`StatisticsViewModel.ProductSummaryText`).
+    public static func summaryText(for summary: ProductStatsSummary) -> String {
+        if summary.totalUnits == 0 {
+            return "Chưa có sản phẩm nào trong bộ lọc hiện tại."
+        }
+        var text = "\(summary.products.count) sản phẩm • \(summary.totalUnits) cái bị hoàn trong \(summary.ordersWithItems) đơn"
+        if summary.unknownUnits > 0 {
+            text += " • \(summary.unknownUnits) cái chưa rõ sản phẩm (không tính)"
+        }
+        return text
     }
 
     /// Regex khớp đuôi "- Premium Cao Cấp" / "Premium" ở cuối tên sản phẩm (tương đương PC `ProductStatistics.PremiumTail`).

@@ -261,11 +261,50 @@ final class ProductMetricsTests: XCTestCase {
         XCTAssertGreaterThan(summary.totalUnits, 0)
         XCTAssertEqual(summary.unknownUnits, 0)
         XCTAssertTrue(summary.products.contains { $0.premiumUnits > 0 && $0.standardUnits > 0 })
+        XCTAssertTrue(summary.summaryLine.contains("sản phẩm •"))
+        XCTAssertTrue(summary.summaryLine.contains("cái bị hoàn trong"))
         for p in summary.products {
             XCTAssertGreaterThan(p.units, 0)
             XCTAssertGreaterThan(p.orders, 0)
             XCTAssertEqual(p.premiumUnits + p.standardUnits, p.units)
             XCTAssertFalse(p.share.isNaN)
         }
+    }
+
+    func testSummaryLineMatchesPcFormat() {
+        let empty = ProductMetrics.compute(rows: [])
+        XCTAssertEqual(empty.summaryLine, "Chưa có sản phẩm nào trong bộ lọc hiện tại.")
+
+        let rows = [
+            makeRow(c: "DEMO-S1", p: "Shopee", n: "Áo sơ mi", q: 2),
+            makeRow(c: "DEMO-S2", p: "TikTok", n: "Quần tây", q: 1)
+        ]
+        let normal = ProductMetrics.compute(rows: rows)
+        XCTAssertEqual(normal.summaryLine, "2 sản phẩm • 3 cái bị hoàn trong 2 đơn")
+
+        let withUnknown = ProductMetrics.compute(rows: rows + [makeRow(c: "DEMO-S3", n: "Chưa rõ sản phẩm", q: 4)])
+        XCTAssertEqual(
+            withUnknown.summaryLine,
+            "2 sản phẩm • 3 cái bị hoàn trong 2 đơn • 4 cái chưa rõ sản phẩm (không tính)"
+        )
+    }
+
+    func testSplitPipePreservesEmptyLeadingOrTrailingColorAndSize() {
+        let rows = [
+            makeRow(
+                c: "DEMO-SP1",
+                p: "Shopee",
+                n: "Áo len | Quần bò",
+                co: " | Đen",
+                sz: "L | ",
+                q: 2
+            )
+        ]
+        let result = ProductMetrics.compute(rows: rows)
+        XCTAssertEqual(result.products.count, 2)
+        let shirt = result.products.first { $0.name == "Áo len" }
+        XCTAssertEqual(shirt?.variants, [ProductVariantStat(color: "", size: "L", units: 1)])
+        let jeans = result.products.first { $0.name == "Quần bò" }
+        XCTAssertEqual(jeans?.variants, [ProductVariantStat(color: "Đen", size: "", units: 1)])
     }
 }

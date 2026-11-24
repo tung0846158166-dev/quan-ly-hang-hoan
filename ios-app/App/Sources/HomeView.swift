@@ -58,7 +58,12 @@ struct HomeView: View {
             List {
                 if !store.hasData {
                     emptyStateSection
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+
+                    topProductsCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 16, trailing: 16))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 } else {
@@ -73,6 +78,11 @@ struct HomeView: View {
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
+
+                    topProductsCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
 
                     horizontalDeck
                         .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 10, trailing: 0))
@@ -119,13 +129,6 @@ struct HomeView: View {
                     if summary.has7DayData {
                         last7DaysCard
                             .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 10, trailing: 16))
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                    }
-
-                    if !productStats.products.isEmpty {
-                        topProductsCard
-                            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 10, trailing: 16))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
@@ -821,11 +824,11 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Top 5 Sản phẩm hoàn nhiều nhất
+    // MARK: - Top 5 Sản phẩm hoàn nhiều nhất (luôn hiển thị, không ẩn khi trống)
     private var topProductsCard: some View {
         let top5 = Array(productStats.products.prefix(5))
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 8) {
                 SectionTitleRow(
                     title: "Sản phẩm hoàn nhiều nhất",
                     icon: "tshirt.fill",
@@ -835,74 +838,110 @@ struct HomeView: View {
                     Haptics.tap()
                     showAllProductStats = true
                 } label: {
-                    Text("Xem tất cả")
-                        .font(.caption.bold())
-                        .foregroundColor(Theme.accent)
+                    HStack(spacing: 4) {
+                        Text("Xem tất cả")
+                            .font(.caption.bold())
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.bold())
+                    }
+                    .foregroundColor(Theme.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.accent.opacity(0.14))
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
 
-            VStack(spacing: 10) {
-                ForEach(Array(top5.enumerated()), id: \.element.id) { idx, item in
-                    let rank = idx + 1
-                    let barColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : (rank == 3 ? Theme.teal : Theme.info))
-                    let pct = Int((item.share * 100).rounded())
+            if top5.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Chưa có dữ liệu sản phẩm. Kết nối máy tính hoặc bật dữ liệu mẫu để xem")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    Button {
-                        Haptics.tap()
-                        selectedProductStat = item
-                        showSelectedProductStat = true
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(alignment: .top, spacing: 8) {
-                                Text("\(rank)")
-                                    .font(.system(.caption2, design: .rounded).bold())
-                                    .foregroundColor(rank <= 3 ? .white : .secondary)
-                                    .frame(width: 20, height: 20)
-                                    .background(rank <= 3 ? barColor : Theme.subtleFill)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    if !store.isDemoMode {
+                        Button {
+                            Haptics.medium()
+                            engine.setDemoMode(true)
+                        } label: {
+                            Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+            } else {
+                Text(productStats.summaryLine)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name)
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
+                VStack(spacing: 10) {
+                    ForEach(Array(top5.enumerated()), id: \.element.id) { idx, item in
+                        let rank = idx + 1
+                        let barColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : (rank == 3 ? Theme.teal : Theme.info))
+                        let pct = Int((item.share * 100).rounded())
 
-                                    if item.premiumUnits > 0 {
-                                        Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundColor(Theme.warning)
-                                            .monospacedDigit()
+                        Button {
+                            Haptics.tap()
+                            selectedProductStat = item
+                            showSelectedProductStat = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("\(rank)")
+                                        .font(.system(.caption2, design: .rounded).bold())
+                                        .foregroundColor(rank <= 3 ? .white : .secondary)
+                                        .frame(width: 20, height: 20)
+                                        .background(rank <= 3 ? barColor : Theme.subtleFill)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.name)
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundColor(.primary)
                                             .lineLimit(1)
+
+                                        if item.premiumUnits > 0 {
+                                            Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
+                                                .font(.caption2.weight(.semibold))
+                                                .foregroundColor(Theme.warning)
+                                                .monospacedDigit()
+                                                .lineLimit(1)
+                                        }
+                                    }
+
+                                    Spacer(minLength: 4)
+
+                                    Text("\(item.units) cái")
+                                        .font(.system(.caption, design: .rounded).bold())
+                                        .foregroundColor(.primary)
+                                        .monospacedDigit()
+
+                                    Text("(\(pct)%)")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+                                }
+
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Capsule().fill(Theme.subtleFill)
+                                        Capsule()
+                                            .fill(barColor.opacity(0.85))
+                                            .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
                                     }
                                 }
-
-                                Spacer(minLength: 4)
-
-                                Text("\(item.units) cái")
-                                    .font(.system(.caption, design: .rounded).bold())
-                                    .foregroundColor(.primary)
-                                    .monospacedDigit()
-
-                                Text("(\(pct)%)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
+                                .frame(height: 6)
                             }
-
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Theme.subtleFill)
-                                    Capsule()
-                                        .fill(barColor.opacity(0.85))
-                                        .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
-                                }
-                            }
-                            .frame(height: 6)
+                            .frame(minHeight: 44)
                         }
-                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

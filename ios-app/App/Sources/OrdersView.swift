@@ -111,8 +111,8 @@ struct OrdersView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
+                shortcutRow
                 if store.hasData {
-                    shortcutRow
                     filterBar
                     if !platform.isEmpty {
                         activePlatformStrip
@@ -228,7 +228,7 @@ struct OrdersView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink { ProductStatsView() } label: {
-                    shortcutPill(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent)
+                    shortcutPill(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent, alwaysTint: true)
                 }
                 .buttonStyle(.plain)
 
@@ -246,13 +246,13 @@ struct OrdersView: View {
         }
     }
 
-    private func shortcutPill(icon: String, title: String, count: Int, color: Color) -> some View {
+    private func shortcutPill(icon: String, title: String, count: Int, color: Color, alwaysTint: Bool = false) -> some View {
         HStack(spacing: 8) {
-            IconTile(systemName: icon, color: count > 0 ? color : .secondary, size: 28, cornerRadius: 8)
+            IconTile(systemName: icon, color: (count > 0 || alwaysTint) ? color : .secondary, size: 28, cornerRadius: 8)
             VStack(alignment: .leading, spacing: 0) {
                 Text("\(count)")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor(count > 0 ? .primary : .secondary)
+                    .foregroundColor((count > 0 || alwaysTint) ? .primary : .secondary)
                     .monospacedDigit()
                 Text(title)
                     .font(.caption2.weight(.medium))

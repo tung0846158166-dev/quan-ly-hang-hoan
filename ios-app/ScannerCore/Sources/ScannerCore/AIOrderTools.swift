@@ -127,7 +127,7 @@ public final class AIOrderTools {
                  ["code": prop("string", "Mã đơn hoặc mã vận đơn (khớp một phần)."), "id": prop("string", "Mã nội bộ của đơn (từ list_orders/find_order).")]),
             tool("product_stats", "Thống kê sản phẩm: số lượng và số đơn theo từng sản phẩm, giảm dần (tối đa 20). Dùng cho 'sản phẩm nào ... nhiều nhất'.", filterProps(withProduct: false)),
         ]
-        let tools: [[String: Any]] = baseTools + extraTools()
+        let tools: [[String: Any]] = baseTools + extraTools() + extra2Tools()
         guard JSONSerialization.isValidJSONObject(tools),
               let data = try? JSONSerialization.data(withJSONObject: tools, options: [.withoutEscapingSlashes]),
               let s = String(data: data, encoding: .utf8) else { return "[]" }
@@ -150,6 +150,10 @@ public final class AIOrderTools {
         switch name {
         case "overview": return overview()
         case "compare_periods": return comparePeriods(args)
+        case "search_orders": return searchOrders(args)
+        case "turnaround_stats": return turnaroundStats(args)
+        case "data_health": return dataHealth(args)
+        case "duplicates": return duplicatesTool(args)
         case "order_groups": return orderGroups(args)
         case "return_watch": return returnWatch(args)
         case "scan_history": return scanHistoryTool(args)
@@ -458,7 +462,7 @@ public final class AIOrderTools {
             case "day": key = dayKey(r, f.dateField, "yyyy-MM-dd")
             case "week": key = weekKey(r, f.dateField)
             case "month": key = dayKey(r, f.dateField, "yyyy-MM")
-            case "weekday", "arrival_hour", "waiting_age", "watching", "price_range", "return_stage": key = extraGroupKey(groupBy, r)
+            case "weekday", "arrival_hour", "waiting_age", "watching", "watch_reason", "price_range", "return_stage": key = extraGroupKey(groupBy, r)
             default: key = "tất cả"
             }
             buckets[key, default: []].append(r)
@@ -620,10 +624,10 @@ public final class AIOrderTools {
 
     static let aggregateGroups: [String] = [
         "none", "status", "platform", "carrier", "order_type", "platform_status", "product", "day", "week", "month", "alert",
-        "weekday", "arrival_hour", "waiting_age", "watching", "price_range", "return_stage",
+        "weekday", "arrival_hour", "waiting_age", "watching", "watch_reason", "price_range", "return_stage",
     ]
 
-    static let groupByHelp = "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, day/week/month (theo date_field), alert (mức cảnh báo), weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), watching (có/không theo dõi), price_range (khoảng giá trị), return_stage (chặng trong bảng Hàng hoàn về), none (chỉ tổng)."
+    static let groupByHelp = "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, day/week/month (theo date_field), alert (mức cảnh báo), weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), watching (có/không theo dõi), watch_reason (lý do theo dõi), price_range (khoảng giá trị), return_stage (chặng trong bảng Hàng hoàn về), none (chỉ tổng)."
 
     private static let weekdayNames = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"]
 
@@ -687,6 +691,10 @@ public final class AIOrderTools {
             return h < 72 ? "48-72h" : ">72h"
         case "watching":
             return r.wl ? "đang theo dõi" : "không theo dõi"
+        case "watch_reason":
+            if !r.wl { return "(không theo dõi)" }
+            let why = Self.maskPhones(r.wr.trimmingCharacters(in: .whitespacesAndNewlines))
+            return why.isEmpty ? "(không ghi lý do)" : String(why.prefix(60))
         case "price_range":
             if r.pr <= 0 { return "(chưa có giá)" }
             if r.pr < 100_000 { return "dưới 100k" }
@@ -944,5 +952,218 @@ public final class AIOrderTools {
         if hits.isEmpty { return Self.error("Chưa có hướng dẫn cho chủ đề này. Gọi app_guide không có topic để xem danh sách.") }
         let arr: [[String: Any]] = hits.prefix(3).map { ["topic": $0.key, "title": $0.title, "guide": $0.text] }
         return AIToolResult(json: Self.json(["matches": arr]))
+    }
+
+    // MARK: đợt công cụ ngầm thứ hai
+
+    private static func extra2Tools() -> [[String: Any]] {
+        var search = filterProps()
+        search["query"] = prop("string", "Từ khóa tìm (nhiều từ = phải khớp tất cả): mã đơn, mã vận đơn, tên/màu/size sản phẩm, ghi chú, đơn vị vận chuyển, trạng thái.")
+        search["limit"] = prop("integer", "Số dòng tối đa, mặc định 20, tối đa 50.")
+
+        var turn = filterProps()
+        turn["group_by"] = prop("string", "Tách theo: none, platform, carrier, order_type, status, day, week, month, weekday.",
+                                ["none", "platform", "carrier", "order_type", "status", "day", "week", "month", "weekday"])
+
+        let healthProps: [String: Any] = [
+            "scope": prop("string", "active (mặc định), archived, all.", ["active", "archived", "all"]),
+        ]
+        let dupProps: [String: Any] = [
+            "scope": prop("string", "active (mặc định), archived, all.", ["active", "archived", "all"]),
+            "limit": prop("integer", "Số nhóm trùng tối đa, mặc định 15, tối đa 30."),
+        ]
+
+        return [
+            tool("search_orders", "Tìm kiếm tự do: nhiều từ khóa cùng lúc trên mã đơn, mã vận đơn, sản phẩm, ghi chú, đơn vị vận chuyển... kết hợp với các bộ lọc khác. Danh sách đơn chạm được.", search, required: ["query"]),
+            tool("turnaround_stats", "Thống kê THỜI GIAN XỬ LÝ từ lúc hàng về shop tới lúc nhận tại kho: trung bình, trung vị, p90, nhanh nhất, chậm nhất (giờ), tỷ lệ nhận trong 12 giờ / 24 giờ, đơn chậm nhất. Dùng cho 'kho xử lý nhanh hay chậm', 'trung bình bao lâu thì nhận'.", turn),
+            tool("data_health", "Kiểm tra chất lượng dữ liệu: đơn thiếu giá trị, thiếu đơn vị vận chuyển, đang chờ mà chưa có giờ hàng về, đã nhận mà thiếu ngày nhận, ngày nhận trước giờ hàng về, không có sản phẩm, thiếu mã đơn, mã trùng. Mỗi mục kèm số lượng và vài đơn ví dụ.", healthProps),
+            tool("duplicates", "Tìm mã vận đơn bị TRÙNG giữa nhiều dòng khác nhau (thường là lỗi nhập liệu). Các kiện A/B/C của cùng mã đơn có mã vận đơn riêng nên không tính là trùng.", dupProps),
+        ]
+    }
+
+    private static func blob(_ r: OrderRow) -> String {
+        [r.o, r.c, r.x, r.p, r.cr, r.ty, r.ps, r.st, r.n, r.co, r.sz, r.nt, r.wr].joined(separator: " ").lowercased()
+    }
+
+    private func searchOrders(_ a: [String: Any]) -> AIToolResult {
+        guard let q = str(a, "query"), q.count >= 2 else { return Self.error("Từ khóa quá ngắn (tối thiểu 2 ký tự).") }
+        let tokens = q.lowercased().split(separator: " ").map(String.init)
+        let limit = max(1, min(50, int(a, "limit") ?? 20))
+        let rows = select(readFilter(a)).filter { r in
+            let b = Self.blob(r)
+            return tokens.allSatisfy { b.contains($0) }
+        }
+        return rowsResult(rows, limit: limit, detailed: false)
+    }
+
+    private static func timingStats(_ hours: [Double]) -> [String: Any] {
+        var o: [String: Any] = ["samples": hours.count]
+        if hours.isEmpty { return o }
+        let s = hours.sorted()
+        func pick(_ p: Double) -> Double {
+            let idx = Int((p * Double(s.count)).rounded(.up)) - 1
+            return s[max(0, min(s.count - 1, idx))]
+        }
+        func r1(_ d: Double) -> Double { (d * 10).rounded() / 10 }
+        let n = Double(s.count)
+        o["avgHours"] = r1(s.reduce(0, +) / n)
+        o["medianHours"] = r1(pick(0.5))
+        o["p90Hours"] = r1(pick(0.9))
+        o["minHours"] = r1(s[0])
+        o["maxHours"] = r1(s[s.count - 1])
+        o["within12hPercent"] = r1(Double(s.filter { $0 <= 12 }.count) * 100 / n)
+        o["within24hPercent"] = r1(Double(s.filter { $0 <= 24 }.count) * 100 / n)
+        return o
+    }
+
+    private func receiptMs(_ r: OrderRow) -> Int? {
+        guard r.rv, let d = OrderStats.parseDate(r.rcd, calendar: calendar) else { return nil }
+        return Int(d.timeIntervalSince1970 * 1000)
+    }
+
+    private func turnaroundKey(_ g: String, _ r: OrderRow, _ f: Filter) -> String {
+        switch g {
+        case "platform": return Self.label(r.p)
+        case "carrier": return Self.label(r.cr)
+        case "order_type": return Self.label(r.ty)
+        case "status": return Self.statusText(r)
+        case "day": return dayKey(r, f.dateField, "yyyy-MM-dd")
+        case "week": return weekKey(r, f.dateField)
+        case "month": return dayKey(r, f.dateField, "yyyy-MM")
+        case "weekday": return extraGroupKey("weekday", r)
+        default: return "tất cả"
+        }
+    }
+
+    private func turnaroundStats(_ a: [String: Any]) -> AIToolResult {
+        let f = readFilter(a)
+        let rows = select(f)
+        let groupBy = (str(a, "group_by") ?? "none").lowercased()
+        var samples: [(OrderRow, Double)] = []
+        for r in rows {
+            guard let from = r.ar > 0 ? r.ar : nil, let to = receiptMs(r) else { continue }
+            let h = Double(to - from) / 3_600_000
+            if h >= 0 { samples.append((r, h)) }
+        }
+        var res: [String: Any] = [:]
+        res["metric"] = "arrival_to_receipt"
+        res["ordersConsidered"] = rows.count
+        res["overall"] = Self.timingStats(samples.map { $0.1 })
+        if groupBy != "none" {
+            var buckets: [String: [Double]] = [:]
+            for (r, h) in samples { buckets[turnaroundKey(groupBy, r, f), default: []].append(h) }
+            let ordered = buckets.sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }.prefix(20)
+            var arr: [[String: Any]] = []
+            for (key, hours) in ordered {
+                var st = Self.timingStats(hours)
+                st["group"] = Self.maskPhones(key)
+                arr.append(st)
+            }
+            res["groups"] = arr
+        }
+        let slowest = samples.sorted { $0.1 > $1.1 }.prefix(5)
+        var refs: [AIOrderRef] = []
+        var slow: [[String: Any]] = []
+        for (r, h) in slowest {
+            seen[r.id] = r
+            refs.append(AIOrderRef(id: r.id, orderCode: r.o, track: r.c, status: Self.statusText(r)))
+            var o: [String: Any] = [:]
+            o["id"] = r.id
+            o["orderCode"] = r.o
+            o["track"] = r.c
+            o["carrier"] = r.cr
+            o["hours"] = (h * 10).rounded() / 10
+            slow.append(o)
+        }
+        res["slowest"] = slow
+        return AIToolResult(json: Self.json(res), refs: refs)
+    }
+
+    private func dataHealth(_ a: [String: Any]) -> AIToolResult {
+        var f = readFilter(a)
+        f.status = nil
+        f.from = nil
+        f.to = nil
+        let rows = select(f)
+        var refs: [AIOrderRef] = []
+        func check(_ label: String, _ bad: (OrderRow) -> Bool) -> [String: Any] {
+            let hit = rows.filter(bad)
+            var ex: [[String: Any]] = []
+            for r in hit.prefix(3) {
+                seen[r.id] = r
+                if refs.count < 30 { refs.append(AIOrderRef(id: r.id, orderCode: r.o, track: r.c, status: Self.statusText(r))) }
+                var e: [String: Any] = [:]
+                e["id"] = r.id
+                e["orderCode"] = r.o
+                e["track"] = r.c
+                e["status"] = Self.statusText(r)
+                ex.append(e)
+            }
+            var c: [String: Any] = [:]
+            c["issue"] = label
+            c["count"] = hit.count
+            c["examples"] = ex
+            return c
+        }
+        var counts: [String: Int] = [:]
+        for r in rows where !r.c.isEmpty { counts[r.c.trimmingCharacters(in: .whitespaces).uppercased(), default: 0] += 1 }
+        let dupCodes = Set(counts.filter { $0.value > 1 }.map { $0.key })
+        var checks: [[String: Any]] = []
+        checks.append(check("Thiếu giá trị đơn") { $0.pr <= 0 })
+        checks.append(check("Thiếu đơn vị vận chuyển") { $0.cr.isEmpty })
+        checks.append(check("Đang chờ nhưng chưa có giờ hàng về") { Self.isWaiting($0) && self.arrivedMs($0) == nil })
+        checks.append(check("Đã nhận nhưng thiếu ngày nhận") { $0.rv && $0.rcd.trimmingCharacters(in: .whitespaces).isEmpty })
+        checks.append(check("Ngày nhận trước giờ hàng về") { r in
+            guard r.rv, r.ar > 0, let rc = self.receiptMs(r) else { return false }
+            return rc < r.ar
+        })
+        checks.append(check("Không có sản phẩm") { $0.n.trimmingCharacters(in: .whitespaces).isEmpty })
+        checks.append(check("Thiếu mã đơn") { $0.o.isEmpty })
+        checks.append(check("Mã vận đơn trùng giữa nhiều dòng") { dupCodes.contains($0.c.trimmingCharacters(in: .whitespaces).uppercased()) })
+        var res: [String: Any] = [:]
+        res["ordersChecked"] = rows.count
+        res["checks"] = checks
+        return AIToolResult(json: Self.json(res), refs: refs)
+    }
+
+    private func duplicatesTool(_ a: [String: Any]) -> AIToolResult {
+        var f = readFilter(a)
+        f.status = nil
+        f.from = nil
+        f.to = nil
+        let limit = max(1, min(30, int(a, "limit") ?? 15))
+        var buckets: [String: [OrderRow]] = [:]
+        for r in select(f) where !r.c.trimmingCharacters(in: .whitespaces).isEmpty {
+            buckets[r.c.trimmingCharacters(in: .whitespaces).uppercased(), default: []].append(r)
+        }
+        let groups = buckets.filter { $0.value.count > 1 }
+            .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
+        var arr: [[String: Any]] = []
+        var refs: [AIOrderRef] = []
+        for (code, rows) in groups.prefix(limit) {
+            var items: [[String: Any]] = []
+            for r in rows {
+                seen[r.id] = r
+                if refs.count < 50 { refs.append(AIOrderRef(id: r.id, orderCode: r.o, track: r.c, status: Self.statusText(r))) }
+                var it: [String: Any] = [:]
+                it["id"] = r.id
+                it["orderCode"] = r.o
+                it["status"] = Self.statusText(r)
+                it["platform"] = r.p
+                it["value"] = r.pr
+                items.append(it)
+            }
+            var g: [String: Any] = [:]
+            g["code"] = code
+            g["rows"] = rows.count
+            g["items"] = items
+            arr.append(g)
+        }
+        var res: [String: Any] = [:]
+        res["duplicateGroups"] = groups.count
+        res["shown"] = arr.count
+        res["truncated"] = groups.count > arr.count
+        res["groups"] = arr
+        return AIToolResult(json: Self.json(res), refs: refs)
     }
 }

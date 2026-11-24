@@ -137,7 +137,8 @@ final class AIToolsExtendedTests: XCTestCase {
         }
         let names = arr.compactMap { ($0["function"] as? [String: Any])?["name"] as? String }
         XCTAssertEqual(Set(names), ["overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats",
-                                   "compare_periods", "order_groups", "return_watch", "scan_history", "system_status", "app_guide"])
+                                   "compare_periods", "order_groups", "return_watch", "scan_history", "system_status", "app_guide",
+                                   "search_orders", "turnaround_stats", "data_health", "duplicates"])
         XCTAssertTrue(AIOrderTools.definitionsJSON.contains("Đang chờ"))
     }
 
@@ -260,5 +261,83 @@ final class AIToolsExtendedTests: XCTestCase {
         XCTAssertTrue(ages.contains("<12h"))
         XCTAssertNotNil(first("weekday"))
         XCTAssertNotNil(first("arrival_hour"))
+    }
+
+    // MARK: đợt công cụ ngầm thứ hai
+
+    func testSearchMatchesAllKeywordsAndRejectsShortQueries() {
+        let t = tools()
+        let r = t.execute(name: "search_orders", argsJSON: #"{"query":"áo thun spx"}"#)
+        XCTAssertEqual(r.refs.map { $0.track }.sorted(), ["VN001", "VN005"])
+        XCTAssertEqual(t.execute(name: "search_orders", argsJSON: #"{"query":"vn004 váy"}"#).refs.count, 1)
+        XCTAssertEqual(t.execute(name: "search_orders", argsJSON: #"{"query":"váy vn001"}"#).refs.count, 0)
+        XCTAssertTrue(t.execute(name: "search_orders", argsJSON: #"{"query":"a"}"#).json.contains("error"))
+    }
+
+    func testTurnaroundComputesAverageMedianP90AndPercentByCarrier() {
+        let rows = [
+            row("T1", st: "Hàng đã trả", rv: true, pr: 10_000, ar: ms(24, 8), rcd: "24/11/2026 10:00:00"),                 // 2 giờ
+            row("T2", st: "Hàng đã trả", rv: true, pr: 10_000, cr: "GHN", ar: ms(24, 8), rcd: "24/11/2026 18:00:00"),       // 10 giờ
+            row("T3", st: "Hàng đã trả", rv: true, pr: 10_000, ar: ms(24, 8), rcd: "25/11/2026 14:00:00"),                 // 30 giờ
+            row("T4", st: "Chưa trả", rv: false, pr: 5_000),                                                                // chưa nhận: không tính
+        ]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let j = obj(t.execute(name: "turnaround_stats", argsJSON: #"{"scope":"all"}"#).json)
+        let o = j["overall"] as? [String: Any]
+        XCTAssertEqual(o?["samples"] as? Int, 3)
+        XCTAssertEqual(o?["avgHours"] as? Double, 14.0)
+        XCTAssertEqual(o?["medianHours"] as? Double, 10.0)
+        XCTAssertEqual(o?["p90Hours"] as? Double, 30.0)
+        XCTAssertEqual(o?["minHours"] as? Double, 2.0)
+        XCTAssertEqual(o?["within24hPercent"] as? Double, 66.7)
+        let g = obj(t.execute(name: "turnaround_stats", argsJSON: #"{"scope":"all","group_by":"carrier"}"#).json)["groups"] as? [[String: Any]]
+        XCTAssertEqual(g?.first?["group"] as? String, "SPX Express")
+        XCTAssertEqual(g?.first?["avgHours"] as? Double, 16.0)
+        XCTAssertEqual(t.execute(name: "turnaround_stats", argsJSON: #"{"scope":"all"}"#).refs.first?.track, "T3")
+    }
+
+    func testDataHealthReportsEachIssueWithExamples() {
+        let bad = row("H1", st: "Hàng đã trả", rv: true, pr: 0, cr: "")                   // thiếu giá, vận chuyển, ngày nhận
+        let dupA = row("SAMETRACK", st: "Chưa trả", rv: false, pr: 1_000, ar: ms(25, 10))
+        let dupB = row("sametrack", st: "Chưa trả", rv: false, pr: 1_000, ar: ms(25, 10))
+        let noItems = row("H4", st: "Chưa trả", rv: false, pr: 1_000, n: "", ar: ms(25, 10))
+        let rows = [bad, dupA, dupB, noItems]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let r = t.execute(name: "data_health", argsJSON: "{}")
+        var counts: [String: Int] = [:]
+        for c in (obj(r.json)["checks"] as? [[String: Any]]) ?? [] {
+            if let k = c["issue"] as? String, let n = c["count"] as? Int { counts[k] = n }
+        }
+        XCTAssertEqual(counts["Thiếu giá trị đơn"], 1)
+        XCTAssertEqual(counts["Thiếu đơn vị vận chuyển"], 1)
+        XCTAssertEqual(counts["Đã nhận nhưng thiếu ngày nhận"], 1)
+        XCTAssertEqual(counts["Không có sản phẩm"], 1)
+        XCTAssertEqual(counts["Mã vận đơn trùng giữa nhiều dòng"], 2)
+        XCTAssertEqual(counts["Đang chờ nhưng chưa có giờ hàng về"], 0)
+        XCTAssertFalse(r.refs.isEmpty)
+    }
+
+    func testDuplicatesFindsSameTrackAcrossRows() {
+        let rows = [
+            row("DUP1", st: "Chưa trả", rv: false, pr: 1_000),
+            row("dup1 ", st: "Chưa trả", rv: false, pr: 2_000),
+            row("OTHER", st: "Chưa trả", rv: false, pr: 3_000),
+        ]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let r = t.execute(name: "duplicates", argsJSON: "{}")
+        let j = obj(r.json)
+        XCTAssertEqual(j["duplicateGroups"] as? Int, 1)
+        XCTAssertEqual((j["groups"] as? [[String: Any]])?.first?["code"] as? String, "DUP1")
+        XCTAssertEqual(r.refs.count, 2)
+    }
+
+    func testWatchReasonGroupingMasksPhones() {
+        var a = row("W1", st: "Chưa trả", rv: false, pr: 1_000, wl: true)
+        a.wr = "khách báo gọi 0987654321"
+        let rows = [a]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let raw = t.execute(name: "aggregate", argsJSON: #"{"group_by":"watch_reason"}"#).json
+        XCTAssertFalse(raw.contains("0987654321"))
+        XCTAssertTrue(raw.contains("ẩn SĐT"))
     }
 }

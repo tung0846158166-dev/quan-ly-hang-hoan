@@ -88,4 +88,36 @@ public class T037TableFiltersTests
         sw.Stop();
         Assert.True(sw.ElapsedMilliseconds < 3000, $"quá chậm: {sw.ElapsedMilliseconds} ms");
     }
+
+    [Fact]
+    public void ArchivedAndDeleted_AdvancedFilters_ProductAndDate()
+    {
+        var provider = new FakeDataService(() => Now);
+        var arc = new ArchivedOrdersViewModel(provider);
+        arc.LoadOrders(
+        [
+            new Order { OrderId = "R1", Track = "T1", Platform = "Shopee", RecvDate = "20/11/2026 10:00", Items = [new OrderItem { Product = "Áo Len", Qty = 1 }] },
+            new Order { OrderId = "R2", Track = "T2", Platform = "Shopee", RecvDate = "22/11/2026 10:00", Items = [new OrderItem { Product = "Quần Kaki", Qty = 1 }] }
+        ]);
+        arc.Filters.ProductFilter = "ao len";
+        Assert.Equal("R1", arc.VisibleOrders.Single().OrderId);
+        arc.Filters.ProductFilter = "";
+        arc.Filters.DateFrom = new DateTime(2026, 11, 21);
+        Assert.Equal("R2", arc.VisibleOrders.Single().OrderId);
+        arc.ResetAllFiltersCommand.Execute(null);
+        Assert.Equal(2, arc.VisibleOrders.Count);
+        Assert.Equal(0, arc.Filters.Count);
+
+        var del = new DeletedOrdersViewModel(provider);
+        del.LoadOrders(
+        [
+            new DeletedOrderRecord { OrderId = "D1", Track = "T1", Platform = "Shopee", DeletedFrom = "Bảng chính", DeletedAt = "20/11/2026 09:00", Items = [new OrderItem { Product = "Váy Midi", Qty = 1 }] },
+            new DeletedOrderRecord { OrderId = "D2", Track = "T2", Platform = "Shopee", DeletedFrom = "Bảng chính", DeletedAt = "23/11/2026 09:00", Items = [new OrderItem { Product = "Áo Khoác", Qty = 1 }] }
+        ]);
+        del.Filters.DateTo = new DateTime(2026, 11, 21);
+        Assert.Equal("D1", del.VisibleOrders.Single().OrderId);
+        del.Filters.DateTo = null;
+        del.Filters.ProductFilter = "khoac";
+        Assert.Equal("D2", del.VisibleOrders.Single().OrderId);
+    }
 }

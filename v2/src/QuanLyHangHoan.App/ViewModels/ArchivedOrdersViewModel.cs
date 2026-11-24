@@ -53,6 +53,7 @@ public sealed class ArchivedOrderRowViewModel
     public bool HasPhoto => !string.IsNullOrWhiteSpace(Source.PhotoId);
     public string PhotoIndicator { get; }
     public string SearchBlob { get; }
+    public string ItemsBlob => AlertThresholds.NormalizeForSearch(ItemsSummary);
 
     private static string BuildItemsSummary(IReadOnlyList<OrderItem> items)
     {
@@ -132,9 +133,12 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
             new SortOptionItem("price_desc", "Giá trị (Cao → Thấp)")
         ];
         _selectedSortOption = SortOptions[0];
+        Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
         LoadOrders(_provider.GetArchivedOrders());
     }
+
+    public TableFilterState Filters { get; } = new("Ngày về kho");
 
     public IReadOnlyList<SortOptionItem> SortOptions { get; }
 
@@ -248,6 +252,7 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         {
             PlatformFilter = "all";
             SearchText = string.Empty;
+            Filters.ResetSilently();
             SelectedSortOption = SortOptions[0];
         }
         finally
@@ -277,6 +282,7 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
             {
                 continue;
             }
+            if (!Filters.Matches(row.ItemsBlob, row.RecvDateParsed)) continue;
 
             filtered.Add(row);
             totalVal += row.Price;

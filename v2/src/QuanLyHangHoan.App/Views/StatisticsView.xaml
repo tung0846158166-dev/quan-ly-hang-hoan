@@ -372,6 +372,7 @@
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="Số đơn" Binding="{Binding Orders, StringFormat='{}{0:N0}'}" Width="70" />
+                                <DataGridTextColumn Header="Premium / Thường" Binding="{Binding PremiumText}" Width="150" />
                                 <DataGridTextColumn Header="Sàn" Binding="{Binding PlatformText}" Width="150" />
                                 <DataGridTextColumn Header="Lý do hay gặp" Binding="{Binding TopReason}" Width="170">
                                     <DataGridTextColumn.ElementStyle>

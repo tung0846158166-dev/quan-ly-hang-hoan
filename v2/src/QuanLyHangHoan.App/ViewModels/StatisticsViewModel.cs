@@ -32,7 +32,7 @@ public sealed record OrderTypeStatRow(
     string PercentText,
     string TotalValueFormatted);
 
-public sealed record ProductRowVm(int Rank, string Name, int Units, int Orders, string ShareText, double SharePercent, string TopReason, string PlatformText, string VariantText, ProductStat Source);
+public sealed record ProductRowVm(int Rank, string Name, int Units, int Orders, string ShareText, double SharePercent, string TopReason, string PlatformText, string VariantText, string PremiumText, ProductStat Source);
 
 public sealed record VariantRowVm(string Variant, int Units, string ShareText, double SharePercent);
 
@@ -244,12 +244,15 @@ public sealed partial class StatisticsViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasSelectedProduct));
         if (value is null) { VariantRows = Array.Empty<VariantRowVm>(); VariantTitle = ""; return; }
-        VariantTitle = $"Màu / size của: {value.Name}";
+        VariantTitle = value.PremiumText.Length == 0 ? $"Màu / size của: {value.Name}" : $"Màu / size của: {value.Name}{Environment.NewLine}{value.PremiumText}";
         VariantRows = value.Source.Variants.Select(v => new VariantRowVm(
             VariantLabel(v), v.Units,
             (value.Units == 0 ? 0 : (double)v.Units / value.Units).ToString("P0", ViCulture),
             value.Units == 0 ? 0 : 100.0 * v.Units / value.Units)).ToList();
     }
+
+    /// <summary>"Premium 76 • Thường 76"; để trống khi sản phẩm không có bản Premium nào.</summary>
+    private static string PremiumLabel(ProductStat p) => p.PremiumUnits == 0 ? "" : $"Premium {p.PremiumUnits:N0} • Thường {p.StandardUnits:N0}";
 
     private static string VariantLabel(VariantStat v)
     {
@@ -266,6 +269,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
             p.Share.ToString("P1", ViCulture), p.Share * 100, string.IsNullOrWhiteSpace(p.TopReason) ? "—" : p.TopReason,
             p.ShopeeUnits > 0 && p.TikTokUnits > 0 ? $"Shopee {p.ShopeeUnits:N0} • TikTok {p.TikTokUnits:N0}" : p.ShopeeUnits > 0 ? "Shopee" : p.TikTokUnits > 0 ? "TikTok" : "—",
             string.Join(" · ", p.Variants.Take(3).Select(v => $"{VariantLabel(v)} ×{v.Units:N0}")),
+            PremiumLabel(p),
             p)).ToList();
         ProductRows = rows;
         ProductSummaryText = result.TotalUnits == 0

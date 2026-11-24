@@ -1,3 +1,4 @@
+﻿using System.Text.RegularExpressions;
 using QuanLyHangHoan.Core.Import;
 using QuanLyHangHoan.Core.Models;
 
@@ -13,7 +14,9 @@ public sealed record ProductStat(
     string TopReason,
     int ShopeeUnits,
     int TikTokUnits,
-    IReadOnlyList<VariantStat> Variants);
+    IReadOnlyList<VariantStat> Variants,
+    int PremiumUnits = 0,
+    int StandardUnits = 0);
 
 public sealed record ProductStatsResult(
     IReadOnlyList<ProductStat> Products,
@@ -45,13 +48,15 @@ public static class ProductStatistics
             {
                 if (mixed && item.ReturnedQty <= 0) continue;           // sản phẩm KHÔNG hoàn của đơn hoàn một phần
                 var units = mixed ? item.ReturnedQty : (item.Qty > 0 ? item.Qty : 1);
-                var name = Clean(item.Product);
+                var rawName = Clean(item.Product);
+                var premium = IsPremium(rawName, item);
+                var name = StripPremium(rawName);
                 if (name.Length == 0 || name.StartsWith("Chưa rõ sản phẩm", StringComparison.OrdinalIgnoreCase)) { unknown += units; continue; }
 
                 var key = LegacyText.Key(name);
                 if (key.Length == 0) { unknown += units; continue; }
                 if (!groups.TryGetValue(key, out var acc)) groups[key] = acc = new Acc(name);
-                acc.Add(name, units, order, item);
+                acc.Add(name, units, order, item, premium);
                 totalUnits += units;
                 counted = true;
             }
@@ -65,6 +70,21 @@ public static class ProductStatistics
         return new ProductStatsResult(products, totalUnits, ordersWithItems, unknown);
     }
 
+    private static readonly Regex PremiumTail = new(@"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>Premium = có chữ "Premium" ở tên, màu hoặc size. Chỉ là phân loại BÊN TRONG cùng một mẫu, không phải mẫu khác.</summary>
+    private static bool IsPremium(string name, OrderItem item) =>
+        name.Contains("premium", StringComparison.OrdinalIgnoreCase)
+        || (item.Size ?? "").Contains("premium", StringComparison.OrdinalIgnoreCase)
+        || (item.Color ?? "").Contains("premium", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Bỏ đuôi "- Premium Cao Cấp" để hai bản của cùng một mẫu gộp thành một dòng.</summary>
+    private static string StripPremium(string name)
+    {
+        var stripped = PremiumTail.Replace(name, "").Trim();
+        return stripped.Length == 0 ? name : stripped;
+    }
+
     private static string Clean(string? s) => string.Join(' ', (s ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private sealed class Acc
@@ -73,14 +93,15 @@ public static class ProductStatistics
         private readonly HashSet<string> _orderIds = new(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _reasons = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<(string, string), int> _variants = new();
-        private int _units, _shopee, _tiktok;
+        private int _units, _shopee, _tiktok, _premium;
 
         public Acc(string first) => _spellings[first] = 0;
 
-        public void Add(string spelling, int units, Order order, OrderItem item)
+        public void Add(string spelling, int units, Order order, OrderItem item, bool premium)
         {
             _spellings[spelling] = (_spellings.TryGetValue(spelling, out var s) ? s : 0) + 1;
             _units += units;
+            if (premium) _premium += units;
             _orderIds.Add(order.Id);
             var reason = Clean(order.Note);
             if (reason.Length > 0 && reason.Length <= 120) _reasons[reason] = (_reasons.TryGetValue(reason, out var r) ? r : 0) + 1;
@@ -97,7 +118,7 @@ public static class ProductStatistics
             var variants = _variants
                 .OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key.Item1, StringComparer.CurrentCultureIgnoreCase).ThenBy(kv => kv.Key.Item2, StringComparer.CurrentCultureIgnoreCase)
                 .Select(kv => new VariantStat(kv.Key.Item1, kv.Key.Item2, kv.Value)).ToList();
-            return new ProductStat(name, _units, _orderIds.Count, totalUnits == 0 ? 0 : (double)_units / totalUnits, reason, _shopee, _tiktok, variants);
+            return new ProductStat(name, _units, _orderIds.Count, totalUnits == 0 ? 0 : (double)_units / totalUnits, reason, _shopee, _tiktok, variants, _premium, _units - _premium);
         }
     }
 }

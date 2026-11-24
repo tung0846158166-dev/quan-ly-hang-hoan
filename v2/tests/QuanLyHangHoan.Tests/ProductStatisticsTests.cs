@@ -1,4 +1,4 @@
-using QuanLyHangHoan.Core.Models;
+﻿using QuanLyHangHoan.Core.Models;
 using QuanLyHangHoan.Core.Stats;
 
 namespace QuanLyHangHoan.Tests;
@@ -86,6 +86,39 @@ public sealed class ProductStatisticsTests
         var one = ProductStatistics.Compute(new[] { O("1", "Shopee", "", I("Áo", "", "", 0)) });
         Assert.Equal(1, one.Products[0].Units);
         Assert.Equal(1.0, one.Products[0].Share, 3);
+    }
+
+    [Fact]
+    public void Premium_and_standard_versions_of_the_same_model_merge_into_one_row_with_a_split()
+    {
+        var r = ProductStatistics.Compute(new[]
+        {
+            O("1", "TikTok Shop", "", I("Áo Polo Len Lavi / STRIPES Nam Nữ Unisex - Premium Cao Cấp", "Nâu", "L", 2)),
+            O("2", "TikTok Shop", "", I("Áo Polo Len Lavi / STRIPES Nam Nữ Unisex", "Nâu", "L", 3)),
+            O("3", "TikTok Shop", "", I("Áo Polo Len Lavi / STRIPES Nam Nữ Unisex Premium Cao Cấp", "Xám", "M", 1)),
+            O("4", "TikTok Shop", "", I("Áo Sweater Ronan", "Nâu", "L", 1)),
+        });
+        Assert.Equal(2, r.Products.Count);
+        var polo = r.Products[0];
+        Assert.Equal("Áo Polo Len Lavi / STRIPES Nam Nữ Unisex", polo.Name);                  // tên gọn, không còn đuôi Premium
+        Assert.Equal((6, 3, 3), (polo.Units, polo.PremiumUnits, polo.StandardUnits));
+        Assert.Equal(("Nâu", "L", 5), (polo.Variants[0].Color, polo.Variants[0].Size, polo.Variants[0].Units));
+        Assert.Equal((0, 1), (r.Products[1].PremiumUnits, r.Products[1].StandardUnits));
+    }
+
+    [Fact]
+    public void Premium_marked_in_the_size_or_color_counts_as_premium_without_changing_the_name()
+    {
+        var r = ProductStatistics.Compute(new[] { O("1", "TikTok Shop", "", I("Áo Len", "Nâu", "L - Premium", 2), I("Áo Len", "Nâu", "L", 1)) });
+        var only = Assert.Single(r.Products);
+        Assert.Equal(("Áo Len", 3, 2, 1), (only.Name, only.Units, only.PremiumUnits, only.StandardUnits));
+    }
+
+    [Fact]
+    public void A_name_that_is_only_the_word_premium_is_kept_and_never_becomes_empty()
+    {
+        var r = ProductStatistics.Compute(new[] { O("1", "Shopee", "", I("Premium", "", "", 1)) });
+        Assert.Equal("Premium", Assert.Single(r.Products).Name);
     }
 
     [Fact]

@@ -35,12 +35,14 @@ public partial class AiChatView : UserControl
     {
         if (DataContext is not AiChatViewModel vm) return;
         var key = KeyBox.Password;
+        var gKey = GeminiKeyBox.Password;
+        GeminiKeyBox.Clear();
         KeyBox.Clear();
-        await vm.SaveSettingsAsync(key);
+        await vm.SaveSettingsAsync(key, gKey);
     }
 
     private void ForgetKey_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is AiChatViewModel vm) vm.ForgetKey();
+        if (DataContext is AiChatViewModel vm) vm.ForgetKeys();
     }
 }

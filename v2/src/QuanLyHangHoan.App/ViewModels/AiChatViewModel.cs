@@ -16,7 +16,8 @@ public sealed record AiChatMessage(bool IsUser, string Text, IReadOnlyList<AiOrd
 }
 
 /// <summary>
-/// Màn "Hỏi AI": hỏi đáp về dữ liệu đơn hàng bằng Groq. AI chỉ gọi công cụ CHỈ ĐỌC (số liệu do mã tính), dữ liệu gửi đi đã ẩn tên/SĐT/địa chỉ người nhận.
+/// Màn "Hỏi AI": hỏi đáp về dữ liệu đơn hàng. AI chỉ gọi công cụ CHỈ ĐỌC (số liệu do mã tính), dữ liệu gửi đi đã ẩn tên/SĐT/địa chỉ người nhận.
+/// Dùng nhiều mô hình miễn phí theo thứ tự (Groq rồi Google Gemini), hết hạn mức mô hình này thì tự chuyển sang mô hình kế tiếp.
 /// Khóa API mã hóa DPAPI. Đơn trong câu trả lời bấm được để mở cửa sổ chi tiết đơn.
 /// </summary>
 public sealed partial class AiChatViewModel : ObservableObject
@@ -27,7 +28,7 @@ public sealed partial class AiChatViewModel : ObservableObject
     private readonly Func<IReadOnlyList<StoredOrder>>? _loader;
     private readonly Func<DateTime> _clock;
     private readonly Action<Order> _openOrder;
-    private readonly Func<string, string, IAiChat>? _chatFactory;
+    private readonly Func<IReadOnlyList<AiEndpoint>, IAiChat>? _chatFactory;
     private IAiChat? _chat;
     private CancellationTokenSource? _cts;
 
@@ -36,7 +37,7 @@ public sealed partial class AiChatViewModel : ObservableObject
         Func<IReadOnlyList<StoredOrder>>? loader,
         Func<DateTime> clock,
         Action<Order> openOrder,
-        Func<string, string, IAiChat>? chatFactory = null)
+        Func<IReadOnlyList<AiEndpoint>, IAiChat>? chatFactory = null)
     {
         _store = store;
         _loader = loader;
@@ -44,11 +45,12 @@ public sealed partial class AiChatViewModel : ObservableObject
         _openOrder = openOrder;
         _chatFactory = chatFactory;
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
-        Model = store?.LoadModel() ?? AiChatService.DefaultModel;
+        GroqModels = store?.LoadModel(AiSettingsStore.Groq) ?? AiChatService.DefaultGroqModels;
+        GeminiModels = store?.LoadModel(AiSettingsStore.Gemini) ?? AiChatService.DefaultGeminiModels;
         HasKey = store?.HasKey ?? false;
         Available = store is not null && (loader is not null || chatFactory is not null);
         StatusText = Available
-            ? (HasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API Groq. Nhập khóa ở khung bên dưới để bắt đầu.")
+            ? (HasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Bấm ⚙ Khóa API để nhập khóa Groq và/hoặc Google.")
             : "Chế độ demo: trợ lý AI chỉ hoạt động với dữ liệu thật.";
     }
 
@@ -67,7 +69,8 @@ public sealed partial class AiChatViewModel : ObservableObject
     ];
 
     [ObservableProperty] private string _input = string.Empty;
-    [ObservableProperty] private string _model = AiChatService.DefaultModel;
+    [ObservableProperty] private string _groqModels = AiChatService.DefaultGroqModels;
+    [ObservableProperty] private string _geminiModels = AiChatService.DefaultGeminiModels;
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _hasKey;
@@ -82,11 +85,11 @@ public sealed partial class AiChatViewModel : ObservableObject
     private IAiChat? EnsureChat()
     {
         if (_chat is not null) return _chat;
-        var key = _store?.LoadKey();
-        if (string.IsNullOrEmpty(key)) return null;
+        var endpoints = _store?.BuildEndpoints();
+        if (endpoints is null || endpoints.Count == 0) return null;
         _chat = _chatFactory is not null
-            ? _chatFactory(key, Model)
-            : new AiChatService(SharedHttp, key, Model, new AiOrderTools(_loader!, _clock), _clock);
+            ? _chatFactory(endpoints)
+            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock), _clock);
         return _chat;
     }
 
@@ -152,35 +155,39 @@ public sealed partial class AiChatViewModel : ObservableObject
         _openOrder(order);
     }
 
-    /// <summary>Lưu khóa (nếu nhập) và tên mô hình, rồi thử kết nối thật. Khóa không bao giờ hiện lại trên màn hình.</summary>
-    public async Task SaveSettingsAsync(string? newKey)
+    /// <summary>Lưu khóa (nếu nhập) và danh sách mô hình, rồi thử kết nối thật từng mô hình. Khóa không bao giờ hiện lại trên màn hình.</summary>
+    public async Task SaveSettingsAsync(string? groqKey, string? geminiKey)
     {
         if (_store is null) return;
-        if (!string.IsNullOrWhiteSpace(newKey)) _store.SaveKey(newKey);
-        _store.SaveModel(Model);
+        if (!string.IsNullOrWhiteSpace(groqKey)) _store.SaveKey(AiSettingsStore.Groq, groqKey);
+        if (!string.IsNullOrWhiteSpace(geminiKey)) _store.SaveKey(AiSettingsStore.Gemini, geminiKey);
+        _store.SaveModel(AiSettingsStore.Groq, GroqModels);
+        _store.SaveModel(AiSettingsStore.Gemini, GeminiModels);
+        GroqModels = _store.LoadModel(AiSettingsStore.Groq);
+        GeminiModels = _store.LoadModel(AiSettingsStore.Gemini);
         _chat = null;
         HasKey = _store.HasKey;
         if (!HasKey) { StatusText = "Chưa có khóa API."; return; }
         IsBusy = true;
-        StatusText = "Đang thử kết nối Groq...";
+        StatusText = "Đang thử kết nối từng mô hình...";
         try
         {
-            var key = _store.LoadKey()!;
-            var svc = new AiChatService(SharedHttp, key, Model, new AiOrderTools(() => Array.Empty<StoredOrder>(), _clock), _clock);
-            await Task.Run(() => svc.TestConnectionAsync());
-            StatusText = "Kết nối thành công. Hãy hỏi về đơn hàng của bạn.";
-            ShowSettings = false;
+            var svc = new AiChatService(SharedHttp, _store.BuildEndpoints(), new AiOrderTools(() => Array.Empty<StoredOrder>(), _clock), _clock);
+            var results = await Task.Run(() => svc.TestAllAsync());
+            var ok = results.Count(r => r.Error is null);
+            var lines = results.Select(r => (r.Error is null ? "✓ " : "✗ ") + r.Label + (r.Error is null ? "" : ": " + r.Error));
+            StatusText = (ok > 0 ? $"Dùng được {ok}/{results.Count} mô hình. " : "Không mô hình nào dùng được. ") + "\n" + string.Join("\n", lines);
+            if (ok > 0) ShowSettings = false;
         }
-        catch (AiException ex) { StatusText = "Không dùng được: " + ex.Message; }
         catch (Exception ex) { StatusText = "Không dùng được: " + ex.Message; }
         finally { IsBusy = false; }
     }
 
-    public void ForgetKey()
+    public void ForgetKeys()
     {
-        _store?.ClearKey();
+        _store?.ClearAllKeys();
         _chat = null;
         HasKey = false;
-        StatusText = "Đã xóa khóa API khỏi máy này.";
+        StatusText = "Đã xóa các khóa API khỏi máy này.";
     }
 }

@@ -33,7 +33,7 @@ public sealed class T041AiChatUiTests
             new[] { "count_orders({\"from\":\"today\"})" })),
             new() { ["a1"] = o1, ["a2"] = o2 });
         var opened = new List<Order>();
-        var vm = new AiChatViewModel(store, () => Array.Empty<StoredOrder>(), () => new DateTime(2026, 11, 25, 14, 0, 0), opened.Add, (_, _) => chat);
+        var vm = new AiChatViewModel(store, () => Array.Empty<StoredOrder>(), () => new DateTime(2026, 11, 25, 14, 0, 0), opened.Add, _ => chat);
         return (vm, chat, opened, dir);
     }
 

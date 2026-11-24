@@ -161,7 +161,8 @@ public sealed class AiChatTests
         var ans = await Service(fake, Tools(Sample)).AskAsync("hôm nay có bao nhiêu đơn về?");
         Assert.Equal("Hôm nay có 2 kiện về.", ans.Text);
         Assert.Equal(2, ans.Refs.Count);
-        Assert.Single(ans.Trace);
+        Assert.Equal(2, ans.Trace.Count);
+        Assert.StartsWith("Mô hình: ", ans.Trace[0]);
         Assert.Equal("Bearer gsk_test_key", fake.AuthHeader);
         Assert.Equal(AiChatService.DefaultModel, fake.Requests[0]["model"]!.GetValue<string>());
         Assert.Contains("2026-11-25", fake.Requests[0]["messages"]![0]!["content"]!.GetValue<string>());
@@ -188,7 +189,7 @@ public sealed class AiChatTests
     public async Task Http_errors_become_clear_vietnamese_messages(HttpStatusCode code, string expected)
     {
         var fake = new FakeGroq(_ => (code, """{"error":{"message":"x"}}"""));
-        var ex = await Assert.ThrowsAsync<AiException>(() => Service(fake, Tools(Sample)).AskAsync("hi"));
+        var ex = await Assert.ThrowsAnyAsync<AiException>(() => Service(fake, Tools(Sample)).AskAsync("hi"));
         Assert.Contains(expected, ex.Message);
         Assert.DoesNotContain("gsk_test_key", ex.Message);
     }
@@ -197,7 +198,7 @@ public sealed class AiChatTests
     public async Task Endless_tool_calls_are_stopped()
     {
         var fake = new FakeGroq(_ => (HttpStatusCode.OK, ToolCall("count_orders", "{}")));
-        await Assert.ThrowsAsync<AiException>(() => Service(fake, Tools(Sample)).AskAsync("loop"));
+        await Assert.ThrowsAnyAsync<AiException>(() => Service(fake, Tools(Sample)).AskAsync("loop"));
         Assert.True(fake.Requests.Count <= 6);
     }
 

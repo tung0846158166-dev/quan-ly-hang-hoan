@@ -195,4 +195,86 @@ final class AIChatTests: XCTestCase {
         XCTAssertEqual(AIEndpoint.splitModels("a, b\nb;c", fallback: "x"), ["a", "b", "c"])
         XCTAssertEqual(AIEndpoint.splitModels("  ", fallback: "x"), ["x"])
     }
+
+    // MARK: gói miễn phí giới hạn token: yêu cầu phải nhỏ
+
+    private func toolNames(_ json: String) -> Set<String> {
+        guard let arr = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String: Any]] else { return [] }
+        return Set(arr.compactMap { ($0["function"] as? [String: Any])?["name"] as? String })
+    }
+
+    func testOnlyRelevantToolsAreSentAndPayloadStaysSmall() {
+        let today = AIOrderTools.definitionsFor("hôm nay có bao nhiêu đơn về?")
+        XCTAssertTrue(toolNames(today).contains("count_orders"))
+        XCTAssertTrue(toolNames(today).contains("overview"))
+        XCTAssertLessThan(today.count, 7600)
+        XCTAssertLessThan(AIOrderTools.definitionsFor("giá trị chưa về và sản phẩm nào nhiều nhất").count, 8200)
+        XCTAssertTrue(toolNames(AIOrderTools.definitionsFor("so với hôm qua thì sao")).contains("compare_periods"))
+        XCTAssertTrue(toolNames(AIOrderTools.definitionsFor("làm sao để quét")).contains("app_guide"))
+        XCTAssertTrue(toolNames(AIOrderTools.definitionsFor("kho xử lý trung bình bao lâu")).contains("turnaround_stats"))
+        XCTAssertTrue(toolNames(AIOrderTools.definitionsFor("tìm đơn 2611ABC123XYZ")).contains("find_order"))
+        XCTAssertTrue(toolNames(AIOrderTools.definitionsFor("có mã nào bị trùng không")).contains("duplicates"))
+        XCTAssertFalse(toolNames(AIOrderTools.definitionsFor("bao nhiêu đơn shopee hôm nay")).contains("app_guide"))
+        let odd = toolNames(AIOrderTools.definitionsFor("xyz"))
+        XCTAssertTrue(odd.isSuperset(of: ["count_orders", "aggregate", "list_orders"]))
+        XCTAssertGreaterThanOrEqual(toolNames(AIOrderTools.definitionsJSON).count, 17)
+    }
+
+    func testTypicalRequestIsWellUnderTheFreeTierLimit() async throws {
+        var sizes: [Int] = []
+        let f = Fake { _, _, req in
+            sizes.append(AIChatService.estimateTokens(req))
+            return (200, self.ok("xong"))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m")]
+        _ = try await service(f, one).ask("giá trị chưa về đang là bao nhiêu tiền và sản phẩm nào chưa về nhiều nhất")
+        XCTAssertLessThan(sizes.first ?? 99999, 4500)
+    }
+
+    func testLongHistoryIsTrimmed() async throws {
+        let long = String(repeating: "x", count: 3000)
+        var lastCount = 0
+        var lastTokens = 0
+        let f = Fake { _, _, req in
+            lastCount = (req["messages"] as? [[String: Any]])?.count ?? 0
+            lastTokens = AIChatService.estimateTokens(req)
+            return (200, self.ok(long))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m")]
+        let svc = service(f, one)
+        for i in 0..<10 { _ = try await svc.ask("câu hỏi số \(i)") }
+        XCTAssertLessThanOrEqual(lastCount, 8)
+        XCTAssertLessThan(lastTokens, 4500)
+    }
+
+    func testHTTP413RetriesSameModelWithCoreToolsOnly() async throws {
+        var toolCounts: [Int] = []
+        var models: [String] = []
+        let f = Fake { _, m, req in
+            let n = (req["tools"] as? [[String: Any]])?.count ?? 0
+            toolCounts.append(n)
+            models.append(m)
+            return n > 3 ? (413, #"{"error":{"message":"Request too large for model"}}"#) : (200, self.ok("trả lời gọn"))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "openai/gpt-oss-120b")]
+        let a = try await service(f, one).ask("so với hôm qua tình hình hôm nay thế nào")
+        XCTAssertEqual(a.text, "trả lời gọn")
+        XCTAssertEqual(toolCounts.count, 2)
+        XCTAssertGreaterThan(toolCounts[0], 3)
+        XCTAssertEqual(toolCounts[1], 3)
+        XCTAssertEqual(models[0], models[1])
+    }
+
+    func testListRowsAreCompactNoEmptyFields() {
+        var r = OrderRow(k: "m", c: "T1", o: "O1", p: "Shopee", n: "Áo", co: "", sz: "", q: 1, rd: "", due: 0, st: "Chưa trả")
+        r.pr = 1000
+        r.nt = "ghi chú 0987654321"
+        let t = AIOrderTools(rows: { [r] }, now: { self.now }, calendar: cal)
+        let json = t.execute(name: "list_orders", argsJSON: "{}").json
+        let row = (obj(json)["orders"] as? [[String: Any]])?.first ?? [:]
+        XCTAssertNil(row["carrier"])
+        XCTAssertNil(row["watching"])
+        XCTAssertNil(row["qty"])
+        XCTAssertFalse(json.contains("0987654321"))
+    }
 }

@@ -49,8 +49,11 @@ public sealed class AiChatService : IAiChat
     public const string DefaultGroqModels = "openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b";
     public const string DefaultGeminiModels = "gemini-2.5-flash, gemini-2.5-flash-lite";
     private const int MaxRounds = 6;
-    private const int MaxToolChars = 14000;
-    private const int MaxHistoryMessages = 12;
+    private const int MaxToolChars = 6000;
+    private const int MaxHistoryMessages = 6;
+    private const int MaxHistoryChars = 500;
+    /// <summary>Ngân sách ước lượng cho MỘT yêu cầu (token). Gói miễn phí Groq giới hạn 7.000-8.000 token mỗi yêu cầu/phút, nên giữ dưới mức này.</summary>
+    private const int TokenBudget = 4500;
 
     private readonly HttpClient _http;
     private readonly IReadOnlyList<AiEndpoint> _endpoints;
@@ -93,23 +96,16 @@ public sealed class AiChatService : IAiChat
     private string SystemPrompt()
     {
         var now = _clock();
-        return "Bạn là trợ lý AI tích hợp trong phần mềm 'Quản lý hàng hoàn' của một shop bán hàng trên Shopee, TikTok Shop, Lazada. " +
-               "Khi được hỏi bạn là ai, hãy nói bạn là trợ lý AI của phần mềm này (đừng nhận là ChatGPT, Llama hay tên mô hình nào). Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng.\n" +
+        return "Bạn là trợ lý AI của phần mềm 'Quản lý hàng hoàn' (Shopee, TikTok Shop, Lazada). Khi được hỏi bạn là ai: trợ lý AI của phần mềm này (đừng nhận là ChatGPT, Llama hay tên mô hình). Trả lời tiếng Việt, ngắn gọn.\n" +
                $"Bây giờ là {now:dd/MM/yyyy HH:mm} ({new[] { "Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy" }[(int)now.DayOfWeek]}), hôm nay là {now:yyyy-MM-dd}.\n" +
-               "CÁCH LÀM VIỆC:\n" +
-               "- Bạn có công cụ truy vấn dữ liệu thật của phần mềm: overview (tổng quan), count_orders (đếm + tổng tiền), aggregate (gom nhóm theo trạng thái/sàn/đơn vị vận chuyển/loại đơn/sản phẩm/ngày/tuần/tháng/mức cảnh báo/lý do/thời gian chờ/khoảng giá..., theo số kiện, tổng tiền hoặc số lượng), compare_periods (so sánh hai kỳ), list_orders (danh sách), find_order (tìm theo mã), order_detail (chi tiết một đơn), order_groups (mã đơn nhiều kiện A/B/C), return_watch (bảng Hàng hoàn về theo 4 chặng), product_stats (sản phẩm), recent_activity (nhật ký hoạt động), system_status (kết nối điện thoại, sao lưu, số đơn từng nơi), search_orders (tìm tự do nhiều từ khóa), turnaround_stats (thời gian xử lý: trung bình, p90, đơn chậm nhất, theo đơn vị vận chuyển/sàn), data_health (kiểm tra dữ liệu thiếu/sai), duplicates (mã vận đơn trùng), activity_stats (thống kê hoạt động theo ngày/loại), notifications (thông báo), app_guide (hướng dẫn dùng phần mềm).\n" +
-               "- Khi người dùng hỏi cách dùng phần mềm ('làm sao', 'ở đâu', 'có tính năng gì') thì gọi app_guide và chỉ nói những gì hướng dẫn có, không bịa tính năng.\n" +
-               "- Câu hỏi cần số liệu thì GỌI CÔNG CỤ NGAY, không hỏi lại 'bạn có muốn tôi làm không'. Câu hỏi nhiều phần (ví dụ 'giá trị chưa về và sản phẩm nào nhiều nhất') thì gọi nhiều công cụ liên tiếp rồi trả lời đủ mọi phần trong MỘT câu trả lời.\n" +
-               "- Mọi con số và danh sách đơn PHẢI lấy từ công cụ. Tuyệt đối không bịa, không đoán, không tự tính nhẩm khi công cụ đã cho số.\n" +
-               "- Từ ngữ: 'chưa về', 'chưa nhận', 'đang chờ' đều là đơn chưa nhận hàng về kho (status 'Đang chờ'). 'Đã về', 'đã nhận' là 'Đã nhận'. 'Giá trị', 'tiền', 'doanh thu hoàn' là giá trị đơn (đồng), trường 'value'/'totalValue'. 'Quá hạn' / 'báo đỏ' là chờ quá 24 giờ kể từ lúc hàng về, 'báo vàng' là quá 12 giờ.\n" +
-               "- Tiền viết dạng 1.234.567 đ. Số kiện/số lượng viết rõ đơn vị.\n" +
-               "- Một mã đơn có thể có nhiều kiện hoàn (A/B/C), mỗi kiện một dòng riêng với mã vận đơn riêng. Đếm theo KIỆN (dòng), nói rõ 'kiện' hoặc 'dòng'.\n" +
-               "- 'Hôm nay có bao nhiêu đơn về' nghĩa là status 'Đã nhận' với ngày nhận tại kho là hôm nay (date_field recv).\n" +
-               "- Khi liệt kê đơn, ghi mã đơn và mã vận đơn; người dùng có thể bấm vào đơn bên dưới để xem chi tiết. Nếu kết quả bị cắt (truncated) hãy nói rõ còn bao nhiêu.\n" +
-               "- Câu hỏi mơ hồ (ví dụ không rõ ngày nào): chọn cách hiểu hợp lý nhất và làm luôn, nói rõ bạn đã hiểu thế nào. Chỉ hỏi lại khi thật sự không thể đoán.\n" +
-               "- Bạn chỉ ĐỌC dữ liệu. Không thể sửa, xóa, nhận hàng hay gửi gì ra ngoài. Yêu cầu thay đổi dữ liệu thì hướng dẫn người dùng tự làm trong phần mềm.\n" +
-               "- Dữ liệu không có tên, số điện thoại, địa chỉ người nhận (đã được ẩn). Nếu được hỏi, nói rằng thông tin đó đã bị ẩn.\n" +
-               "- Nếu công cụ báo lỗi hoặc không có dữ liệu cho câu hỏi, nói thẳng điều đó và gợi ý cách hỏi khác dùng được.";
+               "QUY TẮC:\n" +
+               "- Số liệu và danh sách đơn PHẢI lấy từ công cụ, không bịa, không nhẩm. Cần số liệu thì gọi công cụ ngay, đừng hỏi lại; câu nhiều phần thì gọi nhiều công cụ rồi trả lời đủ trong MỘT lần.\n" +
+               "- 'chưa về/chưa nhận/đang chờ' = status 'Đang chờ'; 'đã về/đã nhận' = 'Đã nhận'. 'tiền/giá trị' = value (đồng, viết 1.234.567 đ). 'quá hạn/báo đỏ' = chờ quá 24 giờ kể từ lúc hàng về, 'báo vàng' = quá 12 giờ.\n" +
+               "- Đếm theo KIỆN (dòng); một mã đơn có thể có nhiều kiện A/B/C riêng. 'Về hôm nay' = Đã nhận có ngày nhận kho hôm nay (date_field recv).\n" +
+               "- Liệt kê đơn: ghi mã đơn + mã vận đơn (người dùng bấm được bên dưới); kết quả bị cắt (truncated) thì nói rõ.\n" +
+               "- Câu mơ hồ: chọn cách hiểu hợp lý, làm luôn, nói rõ đã hiểu thế nào.\n" +
+               "- Hỏi cách dùng phần mềm: gọi app_guide, không bịa tính năng. Bạn chỉ ĐỌC dữ liệu, không sửa/xóa/nhận hàng.\n" +
+               "- Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.";
     }
 
     public async Task<AiAnswer> AskAsync(string question, CancellationToken ct = default)
@@ -120,7 +116,7 @@ public sealed class AiChatService : IAiChat
 
         var refs = new List<AiOrderRef>();
         var trace = new List<string>();
-        var tools = JsonNode.Parse(AiOrderTools.DefinitionsJson)!;
+        var tools = JsonNode.Parse(AiOrderTools.DefinitionsFor(question))!;
         var usedModels = new List<string>();
 
         try
@@ -134,6 +130,7 @@ public sealed class AiChatService : IAiChat
                     ["tool_choice"] = "auto",
                     ["temperature"] = 0.1,
                 };
+                ShrinkToBudget(body);
                 var (message, used) = await PostWithFallbackAsync(body, ct).ConfigureAwait(false);
                 if (!usedModels.Contains(used.Label)) usedModels.Add(used.Label);
                 var calls = message["tool_calls"] as JsonArray;
@@ -168,8 +165,29 @@ public sealed class AiChatService : IAiChat
         finally { _tools.ReleaseCache(); }
     }
 
+    /// <summary>Ước lượng số token của yêu cầu (chữ Việt ~ 2,8 ký tự/token).</summary>
+    internal static int EstimateTokens(JsonObject body) => (int)(body.ToJsonString(AiOrderTools.Json).Length / 2.8);
+
+    /// <summary>Nếu yêu cầu quá lớn: bỏ bớt lịch sử cũ, rồi chỉ giữ 3 công cụ cốt lõi. Không bao giờ bỏ câu hỏi hiện tại.</summary>
+    private static void ShrinkToBudget(JsonObject body)
+    {
+        if (EstimateTokens(body) <= TokenBudget) return;
+        var msgs = (JsonArray)body["messages"]!;
+        // 1. bỏ lịch sử cũ (giữ system + vài tin cuối, kể cả tin công cụ của lượt hiện tại)
+        while (EstimateTokens(body) > TokenBudget && msgs.Count > 3 && msgs[1]!["role"]!.GetValue<string>() is "user" or "assistant")
+            msgs.RemoveAt(1);
+        if (EstimateTokens(body) <= TokenBudget) return;
+        // 2. chỉ giữ công cụ cốt lõi
+        if (body["tools"] is JsonArray tools)
+        {
+            for (var i = tools.Count - 1; i >= 0; i--)
+                if (tools[i]!["function"]!["name"]!.GetValue<string>() is not ("count_orders" or "aggregate" or "list_orders")) tools.RemoveAt(i);
+        }
+    }
+
     private void Remember(string question, string answer)
     {
+        if (answer.Length > MaxHistoryChars) answer = answer[..MaxHistoryChars] + "…";
         _history.Add(new JsonObject { ["role"] = "user", ["content"] = question });
         _history.Add(new JsonObject { ["role"] = "assistant", ["content"] = answer });
         while (_history.Count > MaxHistoryMessages) _history.RemoveAt(0);
@@ -210,26 +228,37 @@ public sealed class AiChatService : IAiChat
             if (_restUntil.TryGetValue(ep.Label, out var until) && until > Now()) continue;
             var attempt = (JsonObject)body.DeepClone();
             attempt["model"] = ep.Model;
-            try
+            for (var pass = 0; pass < 2; pass++)
             {
-                var msg = await PostAsync(ep, attempt, ct).ConfigureAwait(false);
-                return (msg, ep);
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (AiHttpException ex) when (ShouldFallback(ex))
-            {
-                _restUntil[ep.Label] = Now() + RestTime(ex);
-                errors.Add((ep, ex));
-            }
-            catch (AiTimeoutException ex)
-            {
-                _restUntil[ep.Label] = Now() + TimeSpan.FromMinutes(2);   // treo/chậm: cho nghỉ để câu hỏi sau không chờ lại vô ích
-                errors.Add((ep, ex));
-            }
-            catch (AiException ex) when (ex is not AiHttpException)
-            {
-                // Lỗi mạng/định dạng: thử mô hình kế tiếp nhưng không bắt nghỉ.
-                errors.Add((ep, ex));
+                try
+                {
+                    var msg = await PostAsync(ep, attempt, ct).ConfigureAwait(false);
+                    return (msg, ep);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (AiHttpException ex) when (ex.Code == HttpStatusCode.RequestEntityTooLarge && pass == 0 && KeepCoreToolsOnly(attempt))
+                {
+                    // 413: yêu cầu vượt giới hạn kích thước của mô hình này: thử lại NGAY với chỉ các công cụ cốt lõi trước khi bỏ sang mô hình khác.
+                    continue;
+                }
+                catch (AiHttpException ex) when (ShouldFallback(ex))
+                {
+                    _restUntil[ep.Label] = Now() + RestTime(ex);
+                    errors.Add((ep, ex));
+                    break;
+                }
+                catch (AiTimeoutException ex)
+                {
+                    _restUntil[ep.Label] = Now() + TimeSpan.FromMinutes(2);   // treo/chậm: cho nghỉ để câu hỏi sau không chờ lại vô ích
+                    errors.Add((ep, ex));
+                    break;
+                }
+                catch (AiException ex) when (ex is not AiHttpException)
+                {
+                    // Lỗi mạng/định dạng: thử mô hình kế tiếp nhưng không bắt nghỉ.
+                    errors.Add((ep, ex));
+                    break;
+                }
             }
         }
 
@@ -243,6 +272,16 @@ public sealed class AiChatService : IAiChat
         var sb = new StringBuilder($"Cả {_endpoints.Count} mô hình đều không dùng được lúc này:");
         foreach (var (ep, ex) in errors) sb.Append("\n• ").Append(ep.Label).Append(": ").Append(ex.Message);
         throw new AiException(sb.ToString());
+    }
+
+    /// <summary>Chỉ giữ 3 công cụ cốt lõi. Trả true nếu đã bỏ bớt công cụ (đáng thử lại).</summary>
+    private static bool KeepCoreToolsOnly(JsonObject body)
+    {
+        if (body["tools"] is not JsonArray tools) return false;
+        var removed = false;
+        for (var i = tools.Count - 1; i >= 0; i--)
+            if (tools[i]!["function"]!["name"]!.GetValue<string>() is not ("count_orders" or "aggregate" or "list_orders")) { tools.RemoveAt(i); removed = true; }
+        return removed;
     }
 
     private static bool ShouldFallback(AiHttpException ex) =>

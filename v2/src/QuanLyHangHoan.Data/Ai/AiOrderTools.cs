@@ -83,35 +83,107 @@ public sealed partial class AiOrderTools
         return p;
     }
 
-    /// <summary>Bộ lọc dùng chung cho mọi công cụ truy vấn đơn.</summary>
+    /// <summary>Bộ lọc dùng chung cho mọi công cụ truy vấn đơn. Mô tả CỐ Ý ngắn: gói miễn phí của Groq giới hạn 7.000-8.000 token mỗi yêu cầu.</summary>
     private static JsonObject FilterProps(bool withProduct = true)
     {
         var o = new JsonObject
         {
-            ["status"] = Prop("string",
-                "Trạng thái nhận hàng. 'Đang chờ' = chưa nhận hàng về kho (gồm cả 'Chưa trả' và 'Chưa về'; người dùng nói 'chưa về', 'chưa nhận', 'đang chờ' đều là đây). " +
-                "'Đã nhận' = hàng đã về và đã nhận tại kho ('Hàng đã trả'). Còn lại: 'Không cần nhận', 'Bị mất'.",
-                "Đang chờ", "Đã nhận", "Không cần nhận", "Bị mất"),
-            ["date_field"] = Prop("string",
-                "Ngày dùng để lọc/gom theo ngày: recv = ngày nhận tại kho (mặc định), return = ngày khách hoàn, ship = ngày giao đi, imported = ngày nạp vào phần mềm, arrived = giờ hàng về shop.",
-                "recv", "return", "ship", "imported", "arrived"),
-            ["from"] = Prop("string", "Từ ngày (gồm), dạng yyyy-MM-dd hoặc today/yesterday."),
-            ["to"] = Prop("string", "Đến ngày (gồm), dạng yyyy-MM-dd hoặc today/yesterday."),
-            ["platform"] = Prop("string", "Sàn: Shopee, TikTok Shop, Lazada (khớp một phần)."),
-            ["carrier"] = Prop("string", "Đơn vị vận chuyển, ví dụ SPX Express, GHN (khớp một phần)."),
-            ["order_type"] = Prop("string", "Loại đơn, ví dụ 'Trả hàng/Hoàn tiền', 'Giao không thành công', 'Đơn hủy' (khớp một phần)."),
-            ["platform_status"] = Prop("string", "Trạng thái trên sàn, ví dụ 'Đã hoàn tiền' (khớp một phần)."),
-            ["alert"] = Prop("string", "Mức cảnh báo cho đơn đang chờ: 'yellow' = quá 12 giờ kể từ lúc hàng về, 'red' = quá 24 giờ, 'warning' = vàng hoặc đỏ, 'safe' = chưa tới 12 giờ.",
-                "yellow", "red", "warning", "safe"),
-            ["watching"] = Prop("boolean", "true = chỉ đơn đang theo dõi (có gắn sao)."),
-            ["partial_return"] = Prop("boolean", "true = chỉ đơn hoàn một phần."),
-            ["min_value"] = Prop("number", "Giá trị đơn tối thiểu (đồng)."),
-            ["max_value"] = Prop("number", "Giá trị đơn tối đa (đồng)."),
-            ["text"] = Prop("string", "Tìm trong ghi chú / lý do hoàn (khớp một phần)."),
-            ["scope"] = Prop("string", "active = đang xử lý (mặc định), archived = kho lưu trữ, deleted = đã xóa, all = tất cả.", "active", "archived", "deleted", "all"),
+            ["status"] = Prop("string", "Đang chờ=chưa nhận/chưa về; Đã nhận=đã về kho", "Đang chờ", "Đã nhận", "Không cần nhận", "Bị mất"),
+            ["date_field"] = Prop("string", "recv=ngày nhận (mặc định), return=ngày hoàn, ship=ngày giao, imported=ngày nạp, arrived=giờ hàng về", "recv", "return", "ship", "imported", "arrived"),
+            ["from"] = Prop("string", "yyyy-MM-dd|today|yesterday"),
+            ["to"] = Prop("string", "yyyy-MM-dd|today|yesterday"),
+            ["platform"] = Prop("string", "Shopee|TikTok Shop|Lazada"),
+            ["carrier"] = Prop("string", "SPX, GHN..."),
+            ["order_type"] = Prop("string", "loại đơn"),
+            ["platform_status"] = Prop("string", "trạng thái trên sàn"),
+            ["alert"] = Prop("string", "đơn chờ: yellow>12h, red>24h, warning=vàng+đỏ, safe", "yellow", "red", "warning", "safe"),
+            ["watching"] = Prop("boolean", "chỉ đơn theo dõi"),
+            ["partial_return"] = Prop("boolean", "chỉ hoàn một phần"),
+            ["min_value"] = Prop("number", "đồng"),
+            ["max_value"] = Prop("number", "đồng"),
+            ["text"] = Prop("string", "trong ghi chú"),
+            ["scope"] = Prop("string", "mặc định active", "active", "archived", "deleted", "all"),
         };
-        if (withProduct) o["product"] = Prop("string", "Tên sản phẩm hoặc SKU (khớp một phần).");
+        if (withProduct) o["product"] = Prop("string", "tên hoặc SKU");
         return o;
+    }
+
+    private static Dictionary<string, string> ShortDescriptions => new()   // thuộc tính (không phải trường static): tránh phụ thuộc thứ tự khởi tạo
+    {
+        ["overview"] = "Tổng quan: đơn đang chờ + tiền, cảnh báo vàng/đỏ, nhận hôm nay/hôm qua, đang theo dõi.",
+        ["count_orders"] = "Đếm kiện + tổng tiền + số lượng theo bộ lọc. 'Đơn về hôm nay' = status Đã nhận, date_field recv, from=to=today.",
+        ["aggregate"] = "Gom nhóm: số kiện/tiền/số lượng theo sàn, vận chuyển, sản phẩm, ngày, tuần, tháng, cảnh báo... Cho 'tổng tiền', 'nhiều nhất', 'theo ...'.",
+        ["list_orders"] = "Liệt kê kiện (tối đa 30) kèm tiền, giờ hàng về, cảnh báo. Đơn bấm được.",
+        ["find_order"] = "Tìm kiện theo mã đơn/mã vận đơn (khớp một phần).",
+        ["order_detail"] = "Chi tiết đầy đủ MỘT đơn: sản phẩm, mã, mốc thời gian, ghi chú.",
+        ["product_stats"] = "Sản phẩm: số lượng + số đơn, giảm dần.",
+        ["recent_activity"] = "Nhật ký hoạt động gần đây (nạp, quét, sửa, xóa).",
+        ["compare_periods"] = "So sánh hai kỳ (hôm nay/hôm qua, tuần, tháng...) theo số kiện, tiền, % thay đổi.",
+        ["order_groups"] = "Mã đơn có nhiều kiện A/B/C, liệt kê từng kiện.",
+        ["return_watch"] = "Bảng Hàng hoàn về theo 4 chặng: số đơn + danh sách.",
+        ["system_status"] = "Tình trạng: kết nối điện thoại, sao lưu, thông báo, số đơn.",
+        ["app_guide"] = "Hướng dẫn dùng phần mềm theo chủ đề (không bịa tính năng).",
+        ["search_orders"] = "Tìm tự do nhiều từ khóa (mã, sản phẩm, ghi chú...).",
+        ["turnaround_stats"] = "Thời gian xử lý (giờ): TB, trung vị, p90, % trong 12h/24h, đơn chậm nhất; tách theo sàn/vận chuyển.",
+        ["data_health"] = "Kiểm tra dữ liệu thiếu/sai (thiếu giá, ngày nhận, mã trùng...).",
+        ["duplicates"] = "Mã vận đơn bị trùng giữa các dòng.",
+        ["activity_stats"] = "Đếm hoạt động theo loại/ngày từ nhật ký.",
+        ["notifications"] = "Thông báo trong chuông (chưa đọc, mức, nội dung).",
+    };
+
+    /// <summary>Rút gọn mô tả công cụ và thuộc tính để mỗi yêu cầu gửi AI nhỏ (token ít).</summary>
+    private static void Compact(JsonArray tools)
+    {
+        foreach (var t in tools)
+        {
+            var fn = t!["function"]!.AsObject();
+            var name = fn["name"]!.GetValue<string>();
+            if (ShortDescriptions.TryGetValue(name, out var d)) fn["description"] = d;
+            if (fn["parameters"]?["properties"] is JsonObject props)
+                foreach (var kv in props)
+                    if (kv.Value is JsonObject p && p["description"] is JsonValue dv && dv.GetValue<string>() is { Length: > 80 } longText)
+                        p["description"] = longText[..80];
+        }
+    }
+
+    /// <summary>Chọn các công cụ liên quan tới câu hỏi (theo từ khóa, không phân biệt dấu) để mỗi yêu cầu chỉ gửi vài công cụ thay vì tất cả.</summary>
+    public static string DefinitionsFor(string question)
+    {
+        var all = JsonNode.Parse(DefinitionsJson)!.AsArray();
+        var q = Fold(question);
+        var want = new HashSet<string>(StringComparer.Ordinal) { "count_orders", "aggregate", "list_orders" };
+        void Add(params string[] names) { foreach (var n in names) want.Add(n); }
+        bool Has(params string[] keys) => keys.Any(q.Contains);
+        var codeLike = System.Text.RegularExpressions.Regex.IsMatch(question ?? "", @"\b(?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9-]{6,}\b|\b\d{6,}\b");
+        if (codeLike || Has("tim ", "chi tiet", "van don", "ma don", "ma van", "don nao", "tracking")) Add("find_order", "order_detail", "search_orders");
+        if (Has("tinh hinh", "tong quan", "can xu ly", "co gi", "hom nay co")) Add("overview");
+        if (Has("san pham", "mau ", "size", "sku", "ao ", "quan ")) Add("product_stats");
+        if (Has("so voi", "so sanh", "tang ", "giam ", "hom qua", "tuan truoc", "thang truoc", "tuan nay", "thang nay", "hon kem")) Add("compare_periods");
+        if (Has("bao lau", "thoi gian xu ly", "nhanh", "cham", "trung binh", "xu ly")) Add("turnaround_stats");
+        if (Has("nhieu kien", "kien a", "kien b", "thieu kien", "tach kien", "nhom don")) Add("order_groups");
+        if (Has("hoan ve", "chang", "dang ve", "da dong y", "ve shop")) Add("return_watch");
+        if (Has("loi du lieu", "thieu", "sai ", "kiem tra du lieu", "chat luong")) Add("data_health");
+        if (Has("trung")) Add("duplicates");
+        if (Has("nhat ky", "hoat dong", "lich su", "da lam", "nap don", "bao nhieu lan")) Add("recent_activity", "activity_stats");
+        if (Has("ket noi", "sao luu", "backup", "thong bao", "dien thoai", "trang thai he thong")) Add("system_status", "notifications");
+        if (Has("lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung phan mem")) Add("app_guide");
+        if (want.Count == 3) Add("overview", "find_order");
+        var picked = new JsonArray();
+        foreach (var t in all)
+            if (want.Contains(t!["function"]!["name"]!.GetValue<string>())) picked.Add(t.DeepClone());
+        return picked.ToJsonString(Json);
+    }
+
+    private static string Fold(string? s)
+    {
+        var d = (s ?? "").Normalize(System.Text.NormalizationForm.FormD);
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in d)
+        {
+            if (System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) == System.Globalization.UnicodeCategory.NonSpacingMark) continue;
+            sb.Append(ch == 'đ' ? 'd' : ch == 'Đ' ? 'd' : char.ToLowerInvariant(ch));
+        }
+        return sb.ToString() + " ";
     }
 
     private static JsonObject Tool(string name, string description, JsonObject props, params string[] required)
@@ -128,17 +200,17 @@ public sealed partial class AiOrderTools
     private static string BuildDefinitions()
     {
         var listProps = FilterProps();
-        listProps["sort_by"] = Prop("string", "Sắp xếp theo: arrived (giờ hàng về), recv_date, return_date, value (giá trị). Mặc định: đơn đang chờ xếp cũ nhất trước, còn lại mới nhất trước.",
+        listProps["sort_by"] = Prop("string", "mặc định: đang chờ=cũ nhất trước, còn lại=mới nhất trước",
             "arrived", "recv_date", "return_date", "value");
-        listProps["descending"] = Prop("boolean", "true = giảm dần (mới nhất / lớn nhất trước), false = tăng dần.");
-        listProps["limit"] = Prop("integer", "Số dòng tối đa, mặc định 20, tối đa 50.");
+        listProps["descending"] = Prop("boolean", "true=giảm dần");
+        listProps["limit"] = Prop("integer", "mặc định 12, tối đa 30");
 
         var aggProps = FilterProps();
         aggProps["group_by"] = Prop("string", GroupByHelp,
             AggregateGroups);
-        aggProps["metric"] = Prop("string", "Sắp xếp các nhóm theo: count (số kiện), value (tổng giá trị đơn), quantity (tổng số lượng sản phẩm). Mặc định count. Nhóm theo ngày/tuần/tháng luôn xếp theo thời gian.",
+        aggProps["metric"] = Prop("string", "xếp nhóm theo: count (mặc định), value, quantity",
             "count", "value", "quantity");
-        aggProps["top"] = Prop("integer", "Số nhóm tối đa trả về, mặc định 20, tối đa 60.");
+        aggProps["top"] = Prop("integer", "mặc định 20, tối đa 60");
 
         var tools = new JsonArray
         {
@@ -178,6 +250,7 @@ public sealed partial class AiOrderTools
         };
         foreach (var t in ExtraTools()) tools.Add(t);
         foreach (var t in Extra2Tools()) tools.Add(t);
+        Compact(tools);
         return tools.ToJsonString(Json);
     }
 
@@ -516,7 +589,7 @@ public sealed partial class AiOrderTools
     {
         var f = ReadFilter(a);
         var rows = Select(f);
-        var limit = Math.Clamp(Int(a, "limit") ?? 20, 1, 50);
+        var limit = Math.Clamp(Int(a, "limit") ?? 12, 1, 30);
 
         var sortBy = Str(a, "sort_by")?.ToLowerInvariant();
         var desc = Bool(a, "descending");
@@ -547,8 +620,40 @@ public sealed partial class AiOrderTools
 
     private static bool Has(string? hay, string needle) => !string.IsNullOrEmpty(hay) && hay.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Dòng đơn GỌN cho danh sách: bỏ trường rỗng/false, tối đa 3 sản phẩm, ghi chú cắt 80 ký tự (tiết kiệm token).</summary>
+    private JsonObject RowJsonCompact(StoredOrder s)
+    {
+        var o = s.Order;
+        var lv = LevelOf(o);
+        var j = new JsonObject
+        {
+            ["id"] = o.Id, ["orderId"] = o.OrderId, ["track"] = o.Track, ["status"] = o.Status, ["value"] = (long)Math.Round(o.Price),
+        };
+        void Put(string k, string? v) { if (!string.IsNullOrWhiteSpace(v)) j[k] = v; }
+        Put("platform", o.Platform); Put("carrier", o.Carrier); Put("returnTrack", o.ReturnTrack); Put("orderType", o.OrderType);
+        Put("returnDate", o.ReturnDate); Put("arrivedAt", o.ReturnedAt); Put("recvDate", o.RecvDate);
+        if (lv != Level.Done) j["alert"] = LevelName(lv);
+        if (PhoneSnapshot.ArrivedAt(o) is { } ar && lv is Level.Safe or Level.Yellow or Level.Red) j["hoursWaiting"] = Math.Round((_clock() - ar).TotalHours, 1);
+        var note = MaskPhones(string.Join(" / ", new[] { o.Note, o.UserNote }.Where(x => !string.IsNullOrWhiteSpace(x))));
+        Put("note", note.Length > 80 ? note[..80] : note);
+        if (o.IsWatchlist) j["watching"] = true;
+        if (o.IsPartialReturn) j["partialReturn"] = true;
+        var items = new JsonArray();
+        foreach (var i in o.Items.Take(3))
+        {
+            var it = new JsonObject { ["product"] = MaskPhones(i.Product.Length > 50 ? i.Product[..50] : i.Product), ["qty"] = i.Qty };
+            if (!string.IsNullOrWhiteSpace(i.Color)) it["color"] = i.Color;
+            if (!string.IsNullOrWhiteSpace(i.Size)) it["size"] = i.Size;
+            items.Add(it);
+        }
+        j["items"] = items;
+        if (o.Items.Count > 3) j["moreItems"] = o.Items.Count - 3;
+        return j;
+    }
+
     private JsonObject RowJson(StoredOrder s, bool detailed)
     {
+        if (!detailed) return RowJsonCompact(s);
         var o = s.Order;
         var lv = LevelOf(o);
         var arrived = PhoneSnapshot.ArrivedAt(o);

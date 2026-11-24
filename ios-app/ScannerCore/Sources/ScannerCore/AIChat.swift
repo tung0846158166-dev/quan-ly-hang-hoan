@@ -60,7 +60,7 @@ public struct URLSessionAITransport: AIHTTPTransport {
     private let session: URLSession
     public init(session: URLSession = .shared) { self.session = session }
     public func post(url: URL, headers: [String: String], body: Data) async throws -> (Int, Data, TimeInterval?) {
-        var req = URLRequest(url: url, timeoutInterval: 60)
+        var req = URLRequest(url: url, timeoutInterval: 45)
         req.httpMethod = "POST"
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         req.httpBody = body
@@ -83,8 +83,11 @@ public final class AIChatService {
     private var history: [[String: Any]] = []
     private var restUntil: [String: Date] = [:]
     private static let maxRounds = 6
-    private static let maxToolChars = 14000
-    private static let maxHistory = 12
+    private static let maxToolChars = 6000
+    private static let maxHistory = 6
+    private static let maxHistoryChars = 500
+    /// Ngân sách ước lượng cho MỘT yêu cầu (token). Gói miễn phí Groq giới hạn 7.000-8.000 token mỗi yêu cầu/phút.
+    private static let tokenBudget = 4500
 
     public init(transport: AIHTTPTransport = URLSessionAITransport(), endpoints: [AIEndpoint], tools: AIOrderTools, now: @escaping () -> Date = { Date() }) {
         self.transport = transport
@@ -103,22 +106,17 @@ public final class AIChatService {
         let day = DateFormatter()
         day.dateFormat = "yyyy-MM-dd"
         return """
-        Bạn là trợ lý AI tích hợp trong phần mềm 'Quản lý hàng hoàn' của một shop bán hàng trên Shopee, TikTok Shop, Lazada. Khi được hỏi bạn là ai, hãy nói bạn là trợ lý AI của phần mềm này (đừng nhận là ChatGPT, Llama hay tên mô hình nào). Trả lời bằng tiếng Việt, ngắn gọn, rõ ràng.
+        Bạn là trợ lý AI của phần mềm 'Quản lý hàng hoàn' (Shopee, TikTok Shop, Lazada). Khi được hỏi bạn là ai: trợ lý AI của phần mềm này (đừng nhận là ChatGPT, Llama hay tên mô hình). Trả lời tiếng Việt, ngắn gọn.
         Bây giờ là \(f.string(from: n)), hôm nay là \(day.string(from: n)).
-        CÁCH LÀM VIỆC:
-        - Bạn có công cụ truy vấn dữ liệu của phần mềm: overview (tổng quan), count_orders (đếm + tổng tiền), aggregate (gom nhóm theo trạng thái/sàn/đơn vị vận chuyển/loại đơn/sản phẩm/ngày/tuần/tháng/mức cảnh báo, theo số kiện, tổng tiền hoặc số lượng), list_orders (danh sách), find_order (tìm theo mã), order_detail (chi tiết một đơn), product_stats (sản phẩm).
-        - Câu hỏi cần số liệu thì GỌI CÔNG CỤ NGAY, không hỏi lại 'bạn có muốn tôi làm không'. Câu hỏi nhiều phần (ví dụ 'giá trị chưa về và sản phẩm nào nhiều nhất') thì gọi nhiều công cụ liên tiếp rồi trả lời đủ mọi phần trong MỘT câu trả lời.
-        - Mọi con số và danh sách đơn PHẢI lấy từ công cụ. Tuyệt đối không bịa, không đoán, không tự tính nhẩm khi công cụ đã cho số.
-        - Từ ngữ: 'chưa về', 'chưa nhận', 'đang chờ' đều là đơn chưa nhận hàng về kho (status 'Đang chờ'). 'Đã về', 'đã nhận' là 'Đã nhận'. 'Giá trị', 'tiền' là giá trị đơn (đồng), trường 'value'/'totalValue'. 'Quá hạn' / 'báo đỏ' là chờ quá 24 giờ kể từ lúc hàng về, 'báo vàng' là quá 12 giờ.
-        - Tiền viết dạng 1.234.567 đ. Số kiện/số lượng viết rõ đơn vị.
-        - Một mã đơn có thể có nhiều kiện hoàn (A/B/C), mỗi kiện một dòng riêng. Đếm theo KIỆN (dòng), nói rõ 'kiện' hoặc 'dòng'.
-        - 'Hôm nay có bao nhiêu đơn về' nghĩa là status 'Đã nhận' với ngày nhận tại kho là hôm nay (date_field recv).
+        QUY TẮC:
+        - Số liệu và danh sách đơn PHẢI lấy từ công cụ, không bịa, không nhẩm. Cần số liệu thì gọi công cụ ngay, đừng hỏi lại; câu nhiều phần thì gọi nhiều công cụ rồi trả lời đủ trong MỘT lần.
+        - 'chưa về/chưa nhận/đang chờ' = status 'Đang chờ'; 'đã về/đã nhận' = 'Đã nhận'. 'tiền/giá trị' = value (đồng, viết 1.234.567 đ). 'quá hạn/báo đỏ' = chờ quá 24 giờ kể từ lúc hàng về, 'báo vàng' = quá 12 giờ.
+        - Đếm theo KIỆN (dòng); một mã đơn có thể có nhiều kiện A/B/C riêng. 'Về hôm nay' = Đã nhận có ngày nhận kho hôm nay (date_field recv).
         - Dữ liệu là bản điện thoại nhận từ máy tính ở lần đồng bộ gần nhất, có thể chưa mới nhất.
-        - Khi liệt kê đơn, ghi mã đơn và mã vận đơn; người dùng có thể chạm vào đơn bên dưới để xem chi tiết. Nếu kết quả bị cắt (truncated) hãy nói rõ.
-        - Câu hỏi mơ hồ: chọn cách hiểu hợp lý nhất và làm luôn, nói rõ bạn đã hiểu thế nào. Chỉ hỏi lại khi thật sự không thể đoán.
-        - Bạn chỉ ĐỌC dữ liệu. Không thể sửa, xóa, nhận hàng hay gửi gì ra ngoài.
-        - Dữ liệu không có tên, số điện thoại, địa chỉ người nhận (đã được ẩn). Nếu được hỏi, nói rằng thông tin đó đã bị ẩn.
-        - Nếu công cụ báo lỗi hoặc không có dữ liệu cho câu hỏi, nói thẳng điều đó và gợi ý cách hỏi khác dùng được.
+        - Liệt kê đơn: ghi mã đơn + mã vận đơn (người dùng chạm được bên dưới); kết quả bị cắt (truncated) thì nói rõ.
+        - Câu mơ hồ: chọn cách hiểu hợp lý, làm luôn, nói rõ đã hiểu thế nào.
+        - Hỏi cách dùng app: gọi app_guide, không bịa tính năng. Bạn chỉ ĐỌC dữ liệu, không sửa/xóa/nhận hàng.
+        - Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.
         """
     }
 
@@ -130,14 +128,15 @@ public final class AIChatService {
         var refs: [AIOrderRef] = []
         var trace: [String] = []
         var used: [String] = []
-        guard let toolsData = AIOrderTools.definitionsJSON.data(using: .utf8),
+        guard let toolsData = AIOrderTools.definitionsFor(question).data(using: .utf8),
               let toolsObj = try? JSONSerialization.jsonObject(with: toolsData) else {
             throw AIError("Không đọc được định nghĩa công cụ.")
         }
         defer { tools.releaseCache() }
 
         for _ in 0..<Self.maxRounds {
-            let body: [String: Any] = ["messages": msgs, "tools": toolsObj, "tool_choice": "auto", "temperature": 0.1]
+            var body: [String: Any] = ["messages": msgs, "tools": toolsObj, "tool_choice": "auto", "temperature": 0.1]
+            Self.shrinkToBudget(&body)
             let (message, ep) = try await postWithFallback(body)
             if !used.contains(ep.label) { used.append(ep.label) }
             let calls = message["tool_calls"] as? [[String: Any]] ?? []
@@ -170,20 +169,60 @@ public final class AIChatService {
     }
 
     private func remember(_ q: String, _ a: String) {
+        let shortAnswer = a.count > Self.maxHistoryChars ? String(a.prefix(Self.maxHistoryChars)) + "…" : a
         history.append(["role": "user", "content": q])
-        history.append(["role": "assistant", "content": a])
+        history.append(["role": "assistant", "content": shortAnswer])
         while history.count > Self.maxHistory { history.removeFirst() }
     }
 
-    /// Thử kết nối TỪNG mô hình bằng một yêu cầu rất nhỏ. Trả về (nhãn, lỗi hoặc nil nếu dùng được).
+    /// Thử kết nối TẤT CẢ mô hình CÙNG LÚC (một yêu cầu rất nhỏ cho mỗi mô hình), nên một mô hình treo không làm cả bước thử bị đứng.
+    /// Trả về theo thứ tự mô hình: (nhãn, lỗi hoặc nil nếu dùng được).
     public func testAll() async -> [(label: String, error: String?)] {
-        var res: [(label: String, error: String?)] = []
-        for ep in endpoints {
-            let body: [String: Any] = ["model": ep.model, "messages": [["role": "user", "content": "Trả lời đúng một từ: ok"]], "max_tokens": 16]
-            do { _ = try await post(ep, body); res.append((ep.label, nil)) }
-            catch { res.append((ep.label, (error as? AIError)?.message ?? error.localizedDescription)) }
+        let eps = endpoints
+        var results = [(label: String, error: String?)](repeating: ("", nil), count: eps.count)
+        await withTaskGroup(of: (Int, String, String?).self) { group in
+            for (i, ep) in eps.enumerated() {
+                group.addTask { [self] in
+                    let body: [String: Any] = ["model": ep.model, "messages": [["role": "user", "content": "Trả lời đúng một từ: ok"]], "max_tokens": 16]
+                    do { _ = try await self.post(ep, body); return (i, ep.label, nil) }
+                    catch {
+                        if (error as? URLError)?.code == .timedOut { return (i, ep.label, "không phản hồi (quá thời gian chờ).") }
+                        return (i, ep.label, (error as? AIError)?.message ?? error.localizedDescription)
+                    }
+                }
+            }
+            for await r in group { results[r.0] = (r.1, r.2) }
         }
-        return res
+        return results
+    }
+
+    // MARK: kích thước yêu cầu
+
+    static func estimateTokens(_ body: [String: Any]) -> Int {
+        guard JSONSerialization.isValidJSONObject(body), let d = try? JSONSerialization.data(withJSONObject: body) else { return 0 }
+        return Int(Double(d.count) / 2.8)
+    }
+
+    /// Chỉ giữ 3 công cụ cốt lõi. Trả true nếu đã bỏ bớt công cụ (đáng thử lại).
+    static func keepCoreToolsOnly(_ body: inout [String: Any]) -> Bool {
+        guard let tools = body["tools"] as? [[String: Any]] else { return false }
+        let core: Set<String> = ["count_orders", "aggregate", "list_orders"]
+        let kept = tools.filter { core.contains((($0["function"] as? [String: Any])?["name"] as? String) ?? "") }
+        if kept.count == tools.count { return false }
+        body["tools"] = kept
+        return true
+    }
+
+    /// Nếu yêu cầu quá lớn: bỏ bớt lịch sử cũ, rồi chỉ giữ 3 công cụ cốt lõi. Không bao giờ bỏ câu hỏi hiện tại.
+    static func shrinkToBudget(_ body: inout [String: Any]) {
+        if estimateTokens(body) <= tokenBudget { return }
+        if var msgs = body["messages"] as? [[String: Any]] {
+            while estimateTokens(body) > tokenBudget, msgs.count > 3, let role = msgs[1]["role"] as? String, role == "user" || role == "assistant" {
+                msgs.remove(at: 1)
+                body["messages"] = msgs
+            }
+        }
+        if estimateTokens(body) > tokenBudget { _ = keepCoreToolsOnly(&body) }
     }
 
     // MARK: chuyển dự phòng
@@ -194,21 +233,33 @@ public final class AIChatService {
             if let until = restUntil[ep.label], until > now() { continue }
             var attempt = body
             attempt["model"] = ep.model
-            do {
-                let msg = try await post(ep, attempt)
-                return (msg, ep)
-            } catch let e as AIError {
-                if e.statusCode != 0 {
-                    if Self.shouldFallback(e.statusCode) {
-                        restUntil[ep.label] = now().addingTimeInterval(Self.restTime(e))
-                        errors.append((ep, e))
-                    } else { throw e }
-                } else {
-                    errors.append((ep, e))   // lỗi mạng/định dạng: thử mô hình kế tiếp nhưng không bắt nghỉ
+            for pass in 0..<2 {
+                do {
+                    let msg = try await post(ep, attempt)
+                    return (msg, ep)
+                } catch let e as AIError {
+                    // 413: yêu cầu vượt giới hạn kích thước của mô hình này: thử lại NGAY với chỉ các công cụ cốt lõi trước khi bỏ sang mô hình khác.
+                    if e.statusCode == 413 && pass == 0 && Self.keepCoreToolsOnly(&attempt) { continue }
+                    if e.statusCode != 0 {
+                        if Self.shouldFallback(e.statusCode) {
+                            restUntil[ep.label] = now().addingTimeInterval(Self.restTime(e))
+                            errors.append((ep, e))
+                            break
+                        } else { throw e }
+                    } else {
+                        errors.append((ep, e))   // lỗi mạng/định dạng: thử mô hình kế tiếp nhưng không bắt nghỉ
+                        break
+                    }
+                } catch {
+                    if error is CancellationError { throw error }
+                    if (error as? URLError)?.code == .timedOut {
+                        restUntil[ep.label] = now().addingTimeInterval(120)   // treo/chậm: cho nghỉ để câu hỏi sau không chờ lại vô ích
+                        errors.append((ep, AIError("\(ep.label) không phản hồi (quá thời gian chờ).")))
+                    } else {
+                        errors.append((ep, AIError("Không kết nối được tới \(ep.provider) (kiểm tra mạng): \(error.localizedDescription)")))
+                    }
+                    break
                 }
-            } catch {
-                if error is CancellationError { throw error }
-                errors.append((ep, AIError("Không kết nối được tới \(ep.provider) (kiểm tra mạng): \(error.localizedDescription)")))
             }
         }
         if errors.isEmpty {

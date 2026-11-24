@@ -73,29 +73,99 @@ public final class AIOrderTools {
         return p
     }
 
+    /// Mô tả CỐ Ý ngắn: gói miễn phí của Groq giới hạn 7.000-8.000 token mỗi yêu cầu.
     private static func filterProps(withProduct: Bool = true) -> [String: Any] {
         var o: [String: Any] = [:]
-        o["status"] = prop("string",
-            "Trạng thái nhận hàng. 'Đang chờ' = chưa nhận hàng về kho (người dùng nói 'chưa về', 'chưa nhận', 'đang chờ' đều là đây). 'Đã nhận' = hàng đã về và đã nhận tại kho.",
-            ["Đang chờ", "Đã nhận"])
-        o["date_field"] = prop("string",
-            "Ngày dùng để lọc/gom theo ngày: recv = ngày nhận tại kho (mặc định), return = ngày khách hoàn/hủy, arrived = giờ hàng về shop.",
-            ["recv", "return", "arrived"])
-        o["from"] = prop("string", "Từ ngày (gồm), yyyy-MM-dd hoặc today/yesterday.")
-        o["to"] = prop("string", "Đến ngày (gồm), yyyy-MM-dd hoặc today/yesterday.")
-        o["platform"] = prop("string", "Sàn: Shopee, TikTok Shop, Lazada (khớp một phần).")
-        o["carrier"] = prop("string", "Đơn vị vận chuyển, ví dụ SPX Express, GHN (khớp một phần).")
-        o["order_type"] = prop("string", "Loại đơn, ví dụ 'Trả hàng/Hoàn tiền', 'Giao không thành công', 'Đơn hủy' (khớp một phần).")
-        o["platform_status"] = prop("string", "Trạng thái trên sàn (khớp một phần).")
-        o["alert"] = prop("string", "Mức cảnh báo cho đơn đang chờ: 'yellow' = quá 12 giờ kể từ lúc hàng về, 'red' = quá 24 giờ, 'warning' = vàng hoặc đỏ, 'safe' = chưa tới 12 giờ.",
-                          ["yellow", "red", "warning", "safe"])
-        o["watching"] = prop("boolean", "true = chỉ đơn đang theo dõi (có gắn sao).")
-        o["min_value"] = prop("number", "Giá trị đơn tối thiểu (đồng).")
-        o["max_value"] = prop("number", "Giá trị đơn tối đa (đồng).")
-        o["text"] = prop("string", "Tìm trong ghi chú (khớp một phần).")
-        o["scope"] = prop("string", "active = đang xử lý (mặc định), archived = kho lưu trữ, all = tất cả.", ["active", "archived", "all"])
-        if withProduct { o["product"] = prop("string", "Tên sản phẩm (khớp một phần).") }
+        o["status"] = prop("string", "Đang chờ=chưa nhận/chưa về; Đã nhận=đã về kho", ["Đang chờ", "Đã nhận"])
+        o["date_field"] = prop("string", "recv=ngày nhận (mặc định), return=ngày hoàn, arrived=giờ hàng về", ["recv", "return", "arrived"])
+        o["from"] = prop("string", "yyyy-MM-dd|today|yesterday")
+        o["to"] = prop("string", "yyyy-MM-dd|today|yesterday")
+        o["platform"] = prop("string", "Shopee|TikTok Shop|Lazada")
+        o["carrier"] = prop("string", "SPX, GHN...")
+        o["order_type"] = prop("string", "loại đơn")
+        o["platform_status"] = prop("string", "trạng thái trên sàn")
+        o["alert"] = prop("string", "đơn chờ: yellow>12h, red>24h, warning=vàng+đỏ, safe", ["yellow", "red", "warning", "safe"])
+        o["watching"] = prop("boolean", "chỉ đơn theo dõi")
+        o["min_value"] = prop("number", "đồng")
+        o["max_value"] = prop("number", "đồng")
+        o["text"] = prop("string", "trong ghi chú")
+        o["scope"] = prop("string", "mặc định active", ["active", "archived", "all"])
+        if withProduct { o["product"] = prop("string", "tên sản phẩm") }
         return o
+    }
+
+    private static let shortDescriptions: [String: String] = [
+        "overview": "Tổng quan: đơn đang chờ + tiền, cảnh báo vàng/đỏ, nhận hôm nay/hôm qua, đang theo dõi.",
+        "count_orders": "Đếm kiện + tổng tiền + số lượng theo bộ lọc. 'Đơn về hôm nay' = status Đã nhận, date_field recv, from=to=today.",
+        "aggregate": "Gom nhóm: số kiện/tiền/số lượng theo sàn, vận chuyển, sản phẩm, ngày, tuần, tháng, cảnh báo... Cho 'tổng tiền', 'nhiều nhất', 'theo ...'.",
+        "list_orders": "Liệt kê kiện (tối đa 30) kèm tiền, giờ hàng về, cảnh báo. Đơn chạm được.",
+        "find_order": "Tìm kiện theo mã đơn/mã vận đơn (khớp một phần).",
+        "order_detail": "Chi tiết đầy đủ MỘT đơn: sản phẩm, mã, mốc thời gian, ghi chú.",
+        "product_stats": "Sản phẩm: số lượng + số đơn, giảm dần.",
+        "compare_periods": "So sánh hai kỳ (hôm nay/hôm qua, tuần, tháng...) theo số kiện, tiền, % thay đổi.",
+        "order_groups": "Mã đơn có nhiều kiện A/B/C, liệt kê từng kiện.",
+        "return_watch": "Bảng Hàng hoàn về theo 4 chặng: số đơn + danh sách.",
+        "scan_history": "Lịch sử các lượt quét gần đây trên điện thoại này.",
+        "system_status": "Tình trạng: kết nối máy tính, lượt quét chờ gửi, lần cập nhật danh sách, số đơn.",
+        "app_guide": "Hướng dẫn dùng app theo chủ đề (không bịa tính năng).",
+        "search_orders": "Tìm tự do nhiều từ khóa (mã, sản phẩm, ghi chú...).",
+        "turnaround_stats": "Thời gian xử lý (giờ): TB, trung vị, p90, % trong 12h/24h, đơn chậm nhất; tách theo sàn/vận chuyển.",
+        "data_health": "Kiểm tra dữ liệu thiếu/sai (thiếu giá, ngày nhận, mã trùng...).",
+        "duplicates": "Mã vận đơn bị trùng giữa các dòng.",
+    ]
+
+    /// Rút gọn mô tả công cụ và thuộc tính để mỗi yêu cầu gửi AI nhỏ (token ít).
+    private static func compact(_ tools: [[String: Any]]) -> [[String: Any]] {
+        tools.map { tool in
+            var t = tool
+            guard var fn = t["function"] as? [String: Any], let name = fn["name"] as? String else { return t }
+            if let d = shortDescriptions[name] { fn["description"] = d }
+            if var params = fn["parameters"] as? [String: Any], var props = params["properties"] as? [String: Any] {
+                for (k, v) in props {
+                    if var p = v as? [String: Any], let d = p["description"] as? String, d.count > 80 {
+                        p["description"] = String(d.prefix(80))
+                        props[k] = p
+                    }
+                }
+                params["properties"] = props
+                fn["parameters"] = params
+            }
+            t["function"] = fn
+            return t
+        }
+    }
+
+    private static func fold(_ s: String) -> String {
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN"))
+            .replacingOccurrences(of: "đ", with: "d").lowercased() + " "
+    }
+
+    /// Chọn các công cụ liên quan tới câu hỏi (theo từ khóa, không phân biệt dấu) để mỗi yêu cầu chỉ gửi vài công cụ thay vì tất cả.
+    public static func definitionsFor(_ question: String) -> String {
+        guard let data = definitionsJSON.data(using: .utf8),
+              let all = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]] else { return "[]" }
+        let q = fold(question)
+        var want: Set<String> = ["count_orders", "aggregate", "list_orders"]
+        func has(_ keys: [String]) -> Bool { keys.contains { q.contains($0) } }
+        let codeLike = question.range(of: #"\b(?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9-]{6,}\b|\b\d{6,}\b"#, options: .regularExpression) != nil
+        if codeLike || has(["tim ", "chi tiet", "van don", "ma don", "ma van", "don nao", "tracking"]) { want.formUnion(["find_order", "order_detail", "search_orders"]) }
+        if has(["tinh hinh", "tong quan", "can xu ly", "co gi", "hom nay co"]) { want.insert("overview") }
+        if has(["san pham", "mau ", "size", "sku", "ao ", "quan "]) { want.insert("product_stats") }
+        if has(["so voi", "so sanh", "tang ", "giam ", "hom qua", "tuan truoc", "thang truoc", "tuan nay", "thang nay", "hon kem"]) { want.insert("compare_periods") }
+        if has(["bao lau", "thoi gian xu ly", "nhanh", "cham", "trung binh", "xu ly"]) { want.insert("turnaround_stats") }
+        if has(["nhieu kien", "kien a", "kien b", "thieu kien", "tach kien", "nhom don"]) { want.insert("order_groups") }
+        if has(["hoan ve", "chang", "dang ve", "da dong y", "ve shop"]) { want.insert("return_watch") }
+        if has(["loi du lieu", "thieu", "sai ", "kiem tra du lieu", "chat luong"]) { want.insert("data_health") }
+        if has(["trung"]) { want.insert("duplicates") }
+        if has(["lich su quet", "da quet", "luot quet", "quet nhieu", "lich su"]) { want.insert("scan_history") }
+        if has(["ket noi", "sao luu", "backup", "thong bao", "may tinh", "trang thai he thong"]) { want.insert("system_status") }
+        if has(["lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung app"]) { want.insert("app_guide") }
+        if want.count == 3 { want.formUnion(["overview", "find_order"]) }
+        let picked = all.filter { want.contains((($0["function"] as? [String: Any])?["name"] as? String) ?? "") }
+        guard JSONSerialization.isValidJSONObject(picked),
+              let out = try? JSONSerialization.data(withJSONObject: picked, options: [.withoutEscapingSlashes]),
+              let s = String(data: out, encoding: .utf8) else { return "[]" }
+        return s
     }
 
     private static func tool(_ name: String, _ desc: String, _ props: [String: Any], required: [String] = []) -> [String: Any] {
@@ -127,7 +197,7 @@ public final class AIOrderTools {
                  ["code": prop("string", "Mã đơn hoặc mã vận đơn (khớp một phần)."), "id": prop("string", "Mã nội bộ của đơn (từ list_orders/find_order).")]),
             tool("product_stats", "Thống kê sản phẩm: số lượng và số đơn theo từng sản phẩm, giảm dần (tối đa 20). Dùng cho 'sản phẩm nào ... nhiều nhất'.", filterProps(withProduct: false)),
         ]
-        let tools: [[String: Any]] = baseTools + extraTools() + extra2Tools()
+        let tools: [[String: Any]] = compact(baseTools + extraTools() + extra2Tools())
         guard JSONSerialization.isValidJSONObject(tools),
               let data = try? JSONSerialization.data(withJSONObject: tools, options: [.withoutEscapingSlashes]),
               let s = String(data: data, encoding: .utf8) else { return "[]" }
@@ -506,7 +576,7 @@ public final class AIOrderTools {
     private func list(_ a: [String: Any]) -> AIToolResult {
         let f = readFilter(a)
         var rows = select(f)
-        let limit = max(1, min(50, int(a, "limit") ?? 20))
+        let limit = max(1, min(30, int(a, "limit") ?? 12))
         let givenSort: String? = str(a, "sort_by")?.lowercased()
         let waitingOnly: Bool = (f.status == Self.waiting)
         let defaultSort: String = waitingOnly ? "arrived" : (f.dateField == "return" ? "return_date" : "recv_date")
@@ -548,7 +618,37 @@ public final class AIOrderTools {
         return rowsResult(found, limit: 3, detailed: true)
     }
 
+    /// Dòng đơn GỌN cho danh sách: bỏ trường rỗng/false, ghi chú cắt 80 ký tự (tiết kiệm token).
+    private func compactRowJSON(_ r: OrderRow) -> [String: Any] {
+        let lv = level(r)
+        var j: [String: Any] = [:]
+        j["id"] = r.id
+        j["orderCode"] = r.o
+        j["track"] = r.c
+        j["status"] = Self.statusText(r)
+        j["value"] = r.pr
+        func put(_ k: String, _ v: String) { if !v.trimmingCharacters(in: .whitespaces).isEmpty { j[k] = v } }
+        put("platform", r.p)
+        put("carrier", r.cr)
+        put("type", r.ty)
+        put("returnDate", r.rd)
+        put("recvDate", r.rcd)
+        put("product", String(Self.maskPhones(r.n).prefix(80)))
+        put("color", r.co)
+        put("size", r.sz)
+        if r.q != 1 { j["qty"] = r.q }
+        put("note", String(Self.maskPhones(r.nt).prefix(80)))
+        if r.wl { j["watching"] = true }
+        if lv != .done { j["alert"] = Self.levelName(lv) }
+        if let ms = arrivedMs(r), lv == .safe || lv == .yellow || lv == .red {
+            let nowMs = Int(now().timeIntervalSince1970 * 1000)
+            j["hoursWaiting"] = (Double(nowMs - ms) / 3_600_000 * 10).rounded() / 10
+        }
+        return j
+    }
+
     private func rowJSON(_ r: OrderRow, detailed: Bool) -> [String: Any] {
+        if !detailed { return compactRowJSON(r) }
         let lv = level(r)
         var j: [String: Any] = [:]
         j["id"] = r.id
@@ -630,7 +730,7 @@ public final class AIOrderTools {
         "weekday", "arrival_hour", "waiting_age", "watching", "watch_reason", "price_range", "return_stage",
     ]
 
-    static let groupByHelp = "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, day/week/month (theo date_field), alert (mức cảnh báo), weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), watching (có/không theo dõi), watch_reason (lý do theo dõi), price_range (khoảng giá trị), return_stage (chặng trong bảng Hàng hoàn về), none (chỉ tổng)."
+    static let groupByHelp = "platform=sàn, carrier=hãng vận chuyển, day/week/month theo date_field, alert=mức cảnh báo, waiting_age=đã chờ bao lâu, price_range=khoảng giá, return_stage=chặng hàng hoàn về, none=chỉ tổng"
 
     private static let weekdayNames = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"]
 
@@ -994,7 +1094,7 @@ public final class AIOrderTools {
     private func searchOrders(_ a: [String: Any]) -> AIToolResult {
         guard let q = str(a, "query"), q.count >= 2 else { return Self.error("Từ khóa quá ngắn (tối thiểu 2 ký tự).") }
         let tokens = q.lowercased().split(separator: " ").map(String.init)
-        let limit = max(1, min(50, int(a, "limit") ?? 20))
+        let limit = max(1, min(30, int(a, "limit") ?? 12))
         let rows = select(readFilter(a)).filter { r in
             let b = Self.blob(r)
             return tokens.allSatisfy { b.contains($0) }

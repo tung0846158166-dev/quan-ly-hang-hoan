@@ -16,12 +16,15 @@ public sealed partial class AiOrderTools
         "color", "size", "variant", "watch_reason",
     };
 
-    private const string GroupByHelp =
+    private const string GroupByHelpLong =
         "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, sku, " +
         "day/week/month (theo date_field), alert (mức cảnh báo), reason (lý do hoàn/ghi chú), forward_carrier (hãng giao đi), return_carrier (hãng trả về), " +
         "weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), " +
         "watching (có/không theo dõi), watch_reason (lý do theo dõi), partial (hoàn một phần hay toàn bộ), price_range (khoảng giá trị), " +
         "color (màu), size, variant (sản phẩm + màu + size), none (chỉ tổng).";
+
+    private const string GroupByHelp =
+        "platform=sàn, carrier=hãng vận chuyển, day/week/month theo date_field, alert=mức cảnh báo, waiting_age=đã chờ bao lâu, reason=lý do hoàn, variant=sản phẩm+màu+size, none=chỉ tổng";
 
     private static readonly HashSet<string> ExtraGroupKeys = new(StringComparer.Ordinal)
     {

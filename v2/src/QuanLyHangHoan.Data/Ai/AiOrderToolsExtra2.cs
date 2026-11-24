@@ -79,7 +79,7 @@ public sealed partial class AiOrderTools
         var q = Str(a, "query");
         if (q is null || q.Length < 2) return Error("Từ khóa quá ngắn (tối thiểu 2 ký tự).");
         var tokens = q.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var limit = Math.Clamp(Int(a, "limit") ?? 20, 1, 50);
+        var limit = Math.Clamp(Int(a, "limit") ?? 12, 1, 30);
         var rows = Select(ReadFilter(a)).Where(o => { var b = Blob(o); return tokens.All(b.Contains); }).ToList();
         return Rows(rows, limit);
     }

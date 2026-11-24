@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json.Nodes;
+using QuanLyHangHoan.Core.Models;
 using QuanLyHangHoan.Data;
 using QuanLyHangHoan.Data.Ai;
 
@@ -218,5 +219,101 @@ public sealed class AiFallbackTests
     private sealed class SyncProgress<T>(Action<T> onReport) : IProgress<T>
     {
         public void Report(T value) => onReport(value);
+    }
+
+    // ---------------- gói miễn phí giới hạn token: yêu cầu phải nhỏ ----------------
+
+    private static string[] ToolNames(string json) =>
+        JsonNode.Parse(json)!.AsArray().Select(t => t!["function"]!["name"]!.GetValue<string>()).ToArray();
+
+    [Fact]
+    public void Only_tools_relevant_to_the_question_are_sent_and_the_payload_stays_small()
+    {
+        var today = AiOrderTools.DefinitionsFor("hôm nay có bao nhiêu đơn về?");
+        Assert.Contains("count_orders", ToolNames(today));
+        Assert.Contains("overview", ToolNames(today));
+        Assert.True(today.Length < 7600, "định nghĩa gửi đi quá dài: " + today.Length);   // ~2.700 token
+        Assert.True(AiOrderTools.DefinitionsFor("giá trị chưa về và sản phẩm nào nhiều nhất").Length < 8200);
+
+        Assert.Contains("compare_periods", ToolNames(AiOrderTools.DefinitionsFor("so với hôm qua thì sao")));
+        Assert.Contains("app_guide", ToolNames(AiOrderTools.DefinitionsFor("làm sao để nạp đơn")));
+        Assert.Contains("turnaround_stats", ToolNames(AiOrderTools.DefinitionsFor("kho xử lý trung bình bao lâu")));
+        Assert.Contains("find_order", ToolNames(AiOrderTools.DefinitionsFor("tìm đơn 2611ABC123XYZ")));      // mã dạng chữ+số
+        Assert.Contains("duplicates", ToolNames(AiOrderTools.DefinitionsFor("có mã nào bị trùng không")));
+        Assert.DoesNotContain("app_guide", ToolNames(AiOrderTools.DefinitionsFor("bao nhiêu đơn shopee hôm nay")));
+        // luôn có 3 công cụ cốt lõi, kể cả câu hỏi lạ
+        var odd = ToolNames(AiOrderTools.DefinitionsFor("xyz"));
+        Assert.Contains("count_orders", odd);
+        Assert.Contains("aggregate", odd);
+        Assert.Contains("list_orders", odd);
+        // bản đầy đủ vẫn có đủ công cụ (để kiểm thử/điều chỉnh)
+        Assert.True(ToolNames(AiOrderTools.DefinitionsJson).Length >= 19);
+    }
+
+    private sealed class Recorder(Func<JsonObject, (HttpStatusCode, string)> reply) : HttpMessageHandler
+    {
+        public readonly List<JsonObject> Bodies = new();
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var body = (JsonObject)JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!;
+            Bodies.Add(body);
+            var (code, text) = reply(body);
+            return new HttpResponseMessage(code) { Content = new StringContent(text, Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
+    public async Task A_typical_request_is_well_under_the_free_tier_limit()
+    {
+        var r = new Recorder(_ => (HttpStatusCode.OK, Ok("xong")));
+        var svc = new AiChatService(new HttpClient(r), new List<AiEndpoint> { new("groq", AiChatService.GroqBaseUrl, "k", "m") },
+            new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now);
+        await svc.AskAsync("giá trị chưa về đang là bao nhiêu tiền và sản phẩm nào chưa về nhiều nhất");
+        var chars = r.Bodies[0].ToJsonString().Length;
+        Assert.True(chars / 2.8 < 4500, $"yêu cầu ước {chars / 2.8:0} token, vượt ngân sách 4500");
+    }
+
+    [Fact]
+    public async Task Long_history_is_trimmed_so_requests_do_not_grow_without_bound()
+    {
+        var longAnswer = new string('x', 3000);
+        var r = new Recorder(_ => (HttpStatusCode.OK, Ok(longAnswer)));
+        var svc = new AiChatService(new HttpClient(r), new List<AiEndpoint> { new("groq", AiChatService.GroqBaseUrl, "k", "m") },
+            new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now);
+        for (var i = 0; i < 10; i++) await svc.AskAsync("câu hỏi số " + i);
+        var last = r.Bodies[^1];
+        Assert.True(last["messages"]!.AsArray().Count <= 8);                       // system + tối đa 6 tin lịch sử + câu hỏi
+        Assert.True(last.ToJsonString().Length / 2.8 < 4500);
+    }
+
+    [Fact]
+    public async Task Http_413_retries_the_same_model_with_core_tools_only_before_giving_up()
+    {
+        var r = new Recorder(b => b["tools"]!.AsArray().Count > 3
+            ? ((HttpStatusCode)413, "{\"error\":{\"message\":\"Request too large for model\"}}")
+            : (HttpStatusCode.OK, Ok("trả lời gọn")));
+        var chain = new List<AiEndpoint> { new("groq", AiChatService.GroqBaseUrl, "k", "openai/gpt-oss-120b") };
+        var svc = new AiChatService(new HttpClient(r), chain, new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now);
+        var a = await svc.AskAsync("so với hôm qua tình hình hôm nay thế nào");      // chọn nhiều hơn 3 công cụ
+        Assert.Equal("trả lời gọn", a.Text);
+        Assert.Equal(2, r.Bodies.Count);
+        Assert.True(r.Bodies[0]["tools"]!.AsArray().Count > 3);
+        Assert.Equal(3, r.Bodies[1]["tools"]!.AsArray().Count);
+        Assert.Equal(r.Bodies[0]["model"]!.GetValue<string>(), r.Bodies[1]["model"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void List_results_are_compact_no_empty_fields_and_at_most_three_items()
+    {
+        var o = new Order { Id = "1", OrderId = "O1", Track = "T1", Status = "Chưa trả", Price = 1000, Platform = "Shopee", Note = "ghi chú 0987654321" };
+        o.Items = Enumerable.Range(1, 5).Select(i => new OrderItem { Product = "SP" + i, Qty = 1 }).ToList();
+        var t = new AiOrderTools(() => new[] { new StoredOrder(o, false, "", false, "", "") }, () => Now);
+        var json = t.Execute("list_orders", "{}").Json;
+        var row = JsonNode.Parse(json)!["orders"]![0]!.AsObject();
+        Assert.False(row.ContainsKey("carrier"));            // trường rỗng bị bỏ
+        Assert.False(row.ContainsKey("watching"));           // false bị bỏ
+        Assert.Equal(3, row["items"]!.AsArray().Count);
+        Assert.Equal(2, row["moreItems"]!.GetValue<int>());
+        Assert.DoesNotContain("0987654321", json);
     }
 }

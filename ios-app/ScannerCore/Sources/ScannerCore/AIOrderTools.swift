@@ -424,6 +424,7 @@ public final class AIOrderTools {
         guard let d = dateOf(r, field) else { return "(không có ngày)" }
         let f = DateFormatter()
         f.calendar = calendar
+        f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = format
         return f.string(from: d)
@@ -436,6 +437,7 @@ public final class AIOrderTools {
         let start = cal.dateInterval(of: .weekOfYear, for: d)?.start ?? d
         let f = DateFormatter()
         f.calendar = calendar
+        f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: start) + " (tuần)"
@@ -572,6 +574,7 @@ public final class AIOrderTools {
         if let ms = arrivedMs(r) {
             let f = DateFormatter()
             f.calendar = calendar
+            f.timeZone = calendar.timeZone
             f.locale = Locale(identifier: "vi_VN")
             f.dateFormat = "dd/MM/yyyy HH:mm"
             j["arrivedAt"] = f.string(from: Date(timeIntervalSince1970: Double(ms) / 1000))
@@ -710,6 +713,7 @@ public final class AIOrderTools {
     private func dayText(_ d: Date) -> String {
         let f = DateFormatter()
         f.calendar = calendar
+        f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
         return f.string(from: d)
@@ -846,6 +850,7 @@ public final class AIOrderTools {
         let limit = max(1, min(50, int(a, "limit") ?? 15))
         let f = DateFormatter()
         f.calendar = calendar
+        f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "vi_VN")
         f.dateFormat = "dd/MM/yyyy HH:mm"
         var arr: [[String: Any]] = []
@@ -888,6 +893,7 @@ public final class AIOrderTools {
         for it in items { byStatus[(it["status"] as? String) ?? "?", default: 0] += 1 }
         let f = DateFormatter()
         f.calendar = calendar
+        f.timeZone = calendar.timeZone
         f.locale = Locale(identifier: "vi_VN")
         f.dateFormat = "dd/MM/yyyy HH:mm:ss"
         var shown: [[String: Any]] = []

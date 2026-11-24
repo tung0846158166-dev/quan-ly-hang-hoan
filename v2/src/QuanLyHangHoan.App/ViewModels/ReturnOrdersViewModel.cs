@@ -518,6 +518,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         if (match is null) return false;
         SelectedRow = match;
         PendingReveal = match;
+        StatusBarText = $"📍 Đang chọn đơn {match.OrderId} • {match.DisplayTracking} — dòng này được tô nổi bật trong bảng";
         RevealRequested?.Invoke(match);
         return true;
     }

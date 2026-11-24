@@ -20,9 +20,18 @@ public sealed class WindowsSingleInstanceGuard : ISingleInstanceGuard
     private bool _ownsMutex;
     private bool _disposed;
 
+    internal static string DataDirSuffix()
+    {
+        var custom = Environment.GetEnvironmentVariable(AppPaths.DataDirEnvVar);
+        if (string.IsNullOrWhiteSpace(custom)) return "";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(System.IO.Path.GetFullPath(custom.Trim()).ToUpperInvariant()));
+        return "_" + Convert.ToHexString(hash, 0, 6);
+    }
+
     public bool TryAcquire(Action onSecondInstanceActivated)
     {
-        var userKey = BuildUserScopedSuffix();
+        // Chạy trên thư mục dữ liệu riêng (QLHH_DATA_DIR) thì khóa riêng, không tranh với app đang dùng dữ liệu mặc định.
+        var userKey = BuildUserScopedSuffix() + DataDirSuffix();
         var mutexName = $@"Local\QuanLyHangHoan_{userKey}";
         var eventName = $@"Local\QuanLyHangHoan_Activate_{userKey}";
 

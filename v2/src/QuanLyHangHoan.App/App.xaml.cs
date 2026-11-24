@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.App.ViewModels;
 using QuanLyHangHoan.Data.Sheet;
@@ -11,7 +12,37 @@ public partial class App : Application
     private ISingleInstanceGuard? _singleInstanceGuard;
     private ITrayService? _trayService;
 
+    /// <summary>Ghi lỗi khởi động/lỗi không bắt được vào thư mục dữ liệu để biết vì sao app không hiện (không có nhật ký thì chỉ thấy "mở lên rồi mất").</summary>
+
+    internal static void LogCrash(string where, Exception ex)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.BaseFolder);
+            File.AppendAllText(Path.Combine(AppPaths.BaseFolder, "startup-error.txt"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {where}{Environment.NewLine}{ex}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch (Exception) { /* không ghi được thì thôi */ }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
+    {
+        DispatcherUnhandledException += (_, args) => LogCrash("Lỗi không bắt được (giao diện)", args.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => { if (args.ExceptionObject is Exception ex) LogCrash("Lỗi không bắt được (nền)", ex); };
+        try
+        {
+            StartCore(e);
+        }
+        catch (Exception ex)
+        {
+            LogCrash("Lỗi khi khởi động", ex);
+            MessageBox.Show("App không khởi động được:\n" + ex.Message + "\n\nChi tiết đã ghi vào: " + Path.Combine(AppPaths.BaseFolder, "startup-error.txt"),
+                "Quản lý hàng hoàn", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+        }
+    }
+
+    private void StartCore(StartupEventArgs e)
     {
         base.OnStartup(e);
 

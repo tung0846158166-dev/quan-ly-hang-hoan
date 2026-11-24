@@ -34,7 +34,7 @@
                 </StackPanel>
                 <StackPanel VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="📊 Thống kê &amp; báo cáo" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        <TextBlock Text="📊 Thống kê đơn &amp; sản phẩm" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
                         <Border Background="{DynamicResource InfoBlueBadgeBgBrush}" BorderBrush="{DynamicResource InfoBlueCardBorderBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center"
                                 Visibility="{Binding IsDemoMode, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="TÍNH TỪ DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InfoBlueTextBrush}" />
@@ -207,7 +207,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="290" />
+                        <ColumnDefinition Width="260" />
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
@@ -231,7 +231,7 @@
                                   CellStyle="{StaticResource ModernDataGridCellStyle}">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="#" Binding="{Binding Rank}" Width="40" />
-                                <DataGridTextColumn Header="Sản phẩm" Binding="{Binding Name}" Width="*">
+                                <DataGridTextColumn Header="Sản phẩm" Binding="{Binding Name}" Width="*" MinWidth="230">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="FontWeight" Value="Bold" />
@@ -241,8 +241,8 @@
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <DataGridTextColumn Header="Số cái" Binding="{Binding Units, StringFormat='{}{0:N0}'}" Width="70" />
-                                <DataGridTemplateColumn Header="Tỷ trọng" Width="130" SortMemberPath="SharePercent">
+                                <DataGridTextColumn Header="Số cái" Binding="{Binding Units, StringFormat='{}{0:N0}'}" Width="64" />
+                                <DataGridTemplateColumn Header="Tỷ trọng" Width="118" SortMemberPath="SharePercent">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Grid VerticalAlignment="Center" Margin="4,0">
@@ -252,10 +252,10 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="Số đơn" Binding="{Binding Orders, StringFormat='{}{0:N0}'}" Width="70" />
-                                <DataGridTextColumn Header="Premium / Thường" Binding="{Binding PremiumText}" Width="150" />
-                                <DataGridTextColumn Header="Sàn" Binding="{Binding PlatformText}" Width="150" />
-                                <DataGridTextColumn Header="Lý do hay gặp" Binding="{Binding TopReason}" Width="170">
+                                <DataGridTextColumn Header="Số đơn" Binding="{Binding Orders, StringFormat='{}{0:N0}'}" Width="64" />
+                                <DataGridTextColumn Header="Premium / Thường" Binding="{Binding PremiumText}" Width="150" MinWidth="130" />
+                                <DataGridTextColumn Header="Sàn" Binding="{Binding PlatformText}" Width="105" />
+                                <DataGridTextColumn Header="Lý do hay gặp" Binding="{Binding TopReason}" Width="150">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="TextTrimming" Value="CharacterEllipsis" />

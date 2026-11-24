@@ -7,8 +7,19 @@ namespace QuanLyHangHoan.App.Services;
 /// </summary>
 public static class AppPaths
 {
-    public static string BaseFolder =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuanLyHangHoan", "v2");
+    /// <summary>Biến môi trường đặt thư mục dữ liệu khác (chạy thử trên bản sao, bản mang đi): không đặt thì dùng thư mục mặc định.</summary>
+    public const string DataDirEnvVar = "QLHH_DATA_DIR";
+
+    public static string BaseFolder
+    {
+        get
+        {
+            var custom = Environment.GetEnvironmentVariable(DataDirEnvVar);
+            return !string.IsNullOrWhiteSpace(custom)
+                ? Path.GetFullPath(custom.Trim())
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "QuanLyHangHoan", "v2");
+        }
+    }
 
     public static string DatabasePath => Path.Combine(BaseFolder, "data.db");
 

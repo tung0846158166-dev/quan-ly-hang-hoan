@@ -217,6 +217,40 @@ public sealed class PhoneListTests : IDisposable
         Assert.Equal(Of(inbox, "snapshot_chunk")[0].GetProperty("snapshotId").GetString(), doc.RootElement.GetProperty("base").GetString());
     }
 
+    [Fact]
+    public async Task Import_from_outside_pushes_a_delta_right_away_when_notified_even_with_polling_off()
+    {
+        var t = new InMemoryTransport();
+        var inbox = Listen(t);
+        using var svc = NewService(t);   // snapshotPoll = 0: không tự thăm dò
+        svc.Start();
+        await t.PublishAsync(Room, JsonSerializer.Serialize(new { type = "snapshot_request", room = Room, time = 1 }));
+        Assert.True(await WaitFor(() => Of(inbox, "snapshot_chunk").Count > 0));
+        await Task.Delay(100);
+
+        // Dữ liệu đổi từ bên ngoài (giống nạp Sheet): chưa báo thì chưa có gì gửi
+        ScanReceiver.Receive(Db, "SPXA1", Now);
+        await Task.Delay(700);
+        Assert.Empty(Of(inbox, "snapshot_delta"));
+
+        svc.NotifyDataChanged();
+        Assert.True(await WaitFor(() => Of(inbox, "snapshot_delta").Count > 0));
+    }
+
+    [Fact]
+    public async Task Notify_does_nothing_when_the_phone_never_asked_for_the_list()
+    {
+        var t = new InMemoryTransport();
+        var inbox = Listen(t);
+        using var svc = NewService(t);
+        svc.Start();
+        ScanReceiver.Receive(Db, "SPXA1", Now);
+        svc.NotifyDataChanged();
+        await Task.Delay(700);
+        Assert.Empty(Of(inbox, "snapshot_delta"));
+        Assert.Empty(Of(inbox, "snapshot_chunk"));
+    }
+
     // ---------------- thao tác từ iPhone ----------------
     private PhoneActionResult Act(object msg) => PhoneActions.Handle(Db, Room, JsonSerializer.Serialize(msg), Now)!;
     private static string Outcome(PhoneActionResult r) => r.Outcome;

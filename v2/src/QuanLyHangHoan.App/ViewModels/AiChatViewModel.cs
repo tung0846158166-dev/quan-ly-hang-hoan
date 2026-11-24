@@ -41,6 +41,7 @@ public sealed partial class AiChatViewModel : ObservableObject
     private readonly Action<Order> _openOrder;
     private readonly Func<IReadOnlyList<AiEndpoint>, IAiChat>? _chatFactory;
     private readonly Action? _openSettings;
+    private readonly Func<int, string, string, IReadOnlyList<AuditEntry>>? _activityLoader;
     private IAiChat? _chat;
     private CancellationTokenSource? _cts;
 
@@ -50,7 +51,8 @@ public sealed partial class AiChatViewModel : ObservableObject
         Func<DateTime> clock,
         Action<Order> openOrder,
         Func<IReadOnlyList<AiEndpoint>, IAiChat>? chatFactory = null,
-        Action? openSettings = null)
+        Action? openSettings = null,
+        Func<int, string, string, IReadOnlyList<AuditEntry>>? activityLoader = null)
     {
         _store = store;
         _loader = loader;
@@ -58,6 +60,7 @@ public sealed partial class AiChatViewModel : ObservableObject
         _openOrder = openOrder;
         _chatFactory = chatFactory;
         _openSettings = openSettings;
+        _activityLoader = activityLoader;
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         GroqModels = store?.LoadModel(AiSettingsStore.Groq) ?? AiChatService.DefaultGroqModels;
         GeminiModels = store?.LoadModel(AiSettingsStore.Gemini) ?? AiChatService.DefaultGeminiModels;
@@ -106,7 +109,7 @@ public sealed partial class AiChatViewModel : ObservableObject
         if (endpoints is null || endpoints.Count == 0) return null;
         _chat = _chatFactory is not null
             ? _chatFactory(endpoints)
-            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock), _clock);
+            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock, _activityLoader), _clock);
         return _chat;
     }
 

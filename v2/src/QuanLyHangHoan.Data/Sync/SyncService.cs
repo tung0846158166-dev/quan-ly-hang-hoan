@@ -143,7 +143,7 @@ public sealed class SyncService : IDisposable
         // Chỉ gửi danh sách khi một app điện thoại ĐÃ xin (phone_connected / snapshot_request): trang quét cũ không cần và không nhận.
         if (sameRoom && (type == "phone_connected" || type == "snapshot_request")) _phoneWantsList = true;
         if (sameRoom && _phoneWantsList && type.Length > 0 && !type.StartsWith("pc_", StringComparison.Ordinal) && type != "latency_pong"
-            && !type.StartsWith("snapshot_", StringComparison.Ordinal) && type != "watch_sync" && type != "manifest_sync")
+            && (type == "snapshot_request" || !type.StartsWith("snapshot_", StringComparison.Ordinal)) && type != "watch_sync" && type != "manifest_sync")
             _lastActivityUtc = DateTime.UtcNow; // điện thoại đang dùng: bật gửi phần thay đổi định kỳ
 
         if (type == "phone_connected" && sameRoom)
@@ -210,6 +210,10 @@ public sealed class SyncService : IDisposable
     private volatile bool _phoneWantsList;
 
     /// <summary>Hẹn gửi phần thay đổi sau ~0,3 giây (gộp nhiều thay đổi liên tiếp).</summary>
+    /// <summary>Báo dữ liệu vừa đổi từ bên ngoài (nạp Sheet/Excel/thư mục/Salework): gửi phần thay đổi cho điện thoại ngay (~0,3 giây) thay vì đợi lần thăm dò kế tiếp.
+    /// Vẫn chỉ gửi khi điện thoại đang hoạt động (đã xin danh sách gần đây).</summary>
+    public void NotifyDataChanged() => ScheduleDelta();
+
     private void ScheduleDelta()
     {
         if (!_phoneWantsList || DateTime.UtcNow - _lastActivityUtc > PhoneActiveWindow) return;

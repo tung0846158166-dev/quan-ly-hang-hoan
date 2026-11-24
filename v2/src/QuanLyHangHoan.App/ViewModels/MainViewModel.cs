@@ -135,7 +135,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         INewOrderCreator? newOrderCreator = null,
         INewOrderDialogService? newOrderDialogService = null,
         QuanLyHangHoan.Data.Ai.AiSettingsStore? aiSettingsStore = null,
-        Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null)
+        Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null,
+        Func<int, string, string, IReadOnlyList<QuanLyHangHoan.Data.AuditEntry>>? aiActivityLoader = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -228,7 +229,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IsDemoMode = isDemoMode
         };
         AiChatVm = new AiChatViewModel(aiSettingsStore, aiOrderLoader, returnOrderProvider.GetCurrentTime, OpenOrderDetail,
-            openSettings: () => { SettingsVm.SelectTab(SettingsViewModel.GeneralTabKey); NavigateByKey("settings"); });
+            openSettings: () => { SettingsVm.SelectTab(SettingsViewModel.GeneralTabKey); NavigateByKey("settings"); },
+            activityLoader: aiActivityLoader);
         SettingsVm.AiChat = AiChatVm;
         HelpVm = new HelpViewModel(
             diagnosticsProvider ?? new FakeDiagnosticsProvider(),
@@ -1235,6 +1237,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task ReloadAllDataAsync()
     {
+        _syncController.NotifyDataChanged();   // nạp Sheet/Excel/thư mục xong: điện thoại nhận phần thay đổi ngay
         if (ReferenceEquals(CurrentPage, ActivityLogVm)) _ = ActivityLogVm.RefreshQuietlyAsync();   // có hoạt động mới: làm mới nhẹ nếu đang xem nhật ký
         var now = _returnOrderProvider.GetCurrentTime();
         var returnOrdersTask = _returnOrderProvider.GetReturnOrdersAsync();

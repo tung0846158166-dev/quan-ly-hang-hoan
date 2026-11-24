@@ -37,7 +37,7 @@
                             <TextBlock Text="GIẢ LẬP (--demo)" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource DemoBadgeFgBrush}" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="Tự động tải đơn Shopee từ Google Sheet qua Apps Script (mỗi 10 phút)."
+                    <TextBlock Text="Tự động tải đơn Shopee từ Google Sheet qua Apps Script (mỗi 3 phút)."
                                FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,3,0,0" />
                 </StackPanel>
             </DockPanel>
@@ -225,7 +225,7 @@
                             <TextBlock Text="CẤU HÌNH ĐỒNG BỘ" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,10" />
 
                             <CheckBox IsChecked="{Binding IsEnabled}"
-                                      Content="Tự cập nhật mỗi 10 phút"
+                                      Content="Tự cập nhật mỗi 3 phút"
                                       FontSize="13"
                                       FontWeight="SemiBold"
                                       Foreground="{DynamicResource InkPrimaryBrush}"

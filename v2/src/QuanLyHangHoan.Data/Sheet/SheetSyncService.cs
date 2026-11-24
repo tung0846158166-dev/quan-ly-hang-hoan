@@ -258,11 +258,14 @@ public sealed class SheetSyncService : IDisposable
     }
 
     // ------------------------------------------------------------ định kỳ
+    /// <summary>Chu kỳ lấy Sheet. Nội dung không đổi thì bỏ qua (so mã băm), nên chu kỳ ngắn rất nhẹ.</summary>
+    public static readonly TimeSpan DefaultInterval = TimeSpan.FromMinutes(3);
+
     public void Start(TimeSpan? firstDelay = null, TimeSpan? interval = null)
     {
         Stop();
         _cts = new CancellationTokenSource();
-        _timer = new PeriodicTimer(interval ?? TimeSpan.FromMinutes(10));
+        _timer = new PeriodicTimer(interval ?? DefaultInterval);
         var ct = _cts.Token; var timer = _timer;
         _ = Task.Run(async () =>
         {

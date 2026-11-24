@@ -39,6 +39,9 @@ public interface ISyncController : IDisposable
 
     /// <summary>Địa chỉ broker riêng (wss://tên:mật-khẩu@máy-chủ/mqtt); rỗng = dùng 3 broker công cộng.</summary>
     string PrivateBroker { get; }
+
+    /// <summary>Dữ liệu vừa đổi từ bên ngoài (nạp Sheet/Excel...): đẩy phần thay đổi sang điện thoại ngay. Mặc định không làm gì.</summary>
+    void NotifyDataChanged() { }
     void SetPrivateBroker(string url);
 }
 
@@ -210,6 +213,13 @@ public sealed class RealSyncController : ISyncController
             }
         }
         StatusChanged?.Invoke();
+    }
+
+    public void NotifyDataChanged()
+    {
+        QuanLyHangHoan.Data.Sync.SyncService? svc;
+        lock (_gate) svc = _disposed ? null : _service;
+        svc?.NotifyDataChanged();
     }
 
     public string PrivateBroker

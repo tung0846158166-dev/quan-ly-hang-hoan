@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             xmlns:ctl="clr-namespace:QuanLyHangHoan.App.Controls"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:DeletedOrdersViewModel}"
              UseLayoutRounding="True"
@@ -321,7 +322,8 @@
 
         <!-- Footer -->
         <Border Grid.Row="3" Background="#0F172A" Padding="18,8">
-            <TextBlock Text="{Binding StatusBarText}" Foreground="#E2E8F0" FontSize="12" FontWeight="SemiBold" />
+            <DockPanel><ctl:PagerBar DockPanel.Dock="Right" DataContext="{Binding Pager}" Margin="18,0,0,0" />
+            <TextBlock Text="{Binding StatusBarText}" Foreground="#E2E8F0" FontSize="12" FontWeight="SemiBold" /></DockPanel>
         </Border>
     </Grid>
 </UserControl>

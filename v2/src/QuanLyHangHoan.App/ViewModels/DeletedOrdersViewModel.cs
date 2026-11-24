@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -77,6 +77,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
             new SortOptionItem("source_asc", "Nguồn xóa (A → Z)")
         ];
         _selectedSortOption = SortOptions[0];
+        Pager = new Pager<DeletedOrderRowViewModel>(p => VisibleOrders = p);
         Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
         LoadOrders(_provider.GetDeletedOrders());
@@ -85,6 +86,9 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
     public TableFilterState Filters { get; } = new("Ngày xóa");
 
     public IReadOnlyList<SortOptionItem> SortOptions { get; }
+
+    /// <summary>Chia trang 100 đơn/trang.</summary>
+    public Pager<DeletedOrderRowViewModel> Pager { get; private set; } = null!;
 
     [ObservableProperty]
     private bool _isDemoMode;
@@ -190,7 +194,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         ShopeeCount = shopeeCount;
         TikTokCount = tikTokCount;
 
-        ApplyFiltersAndSort(previousId);
+        ApplyFiltersAndSort(previousId, resetPage: false);
     }
 
     [RelayCommand]
@@ -231,7 +235,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         ApplyFiltersAndSort();
     }
 
-    public void ApplyFiltersAndSort(string? preserveOrderId = null)
+    public void ApplyFiltersAndSort(string? preserveOrderId = null, bool resetPage = true)
     {
         var sw = Stopwatch.StartNew();
         var kw = AlertThresholds.NormalizeForSearch(SearchText).Trim();
@@ -275,7 +279,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         }
 
         sw.Stop();
-        VisibleOrders = filtered;
+        Pager.SetItems(filtered, resetPage);
         VisibleCount = filtered.Count;
         IsEmpty = filtered.Count == 0;
         var targetId = preserveOrderId ?? SelectedRow?.Source.Id;
@@ -288,20 +292,21 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
             SelectedRow = null;
         }
 
-        StatusBarText = $"Đang hiển thị {filtered.Count:N0} / {_allRows.Count:N0} đơn đã xóa (chặn nạp lại)  •  Lọc: {sw.ElapsedMilliseconds} ms";
+        StatusBarText = $"Đang hiển thị {Pager.RangeText} đơn đã xóa (chặn nạp lại)  •  Lọc: {sw.ElapsedMilliseconds} ms";
     }
 
     public bool SelectOrder(string orderId, string track)
     {
         ResetAllFilters();
 
-        var match = VisibleOrders.FirstOrDefault(r =>
+        var match = Pager.All.FirstOrDefault(r =>
             r.OrderId.Equals(orderId, StringComparison.OrdinalIgnoreCase)
             && (string.IsNullOrWhiteSpace(track)
                 || r.Source.Track.Equals(track, StringComparison.OrdinalIgnoreCase)
                 || r.Source.ReturnTrack.Equals(track, StringComparison.OrdinalIgnoreCase)));
 
         if (match is null) return false;
+        Pager.GoToItem(match);   // nhảy tới đúng trang chứa đơn
         SelectedRow = match;
         PendingReveal = match;
         StatusBarText = $"📍 Đang chọn đơn {match.OrderId} • {match.DisplayTracking} — dòng này được tô nổi bật trong bảng";

@@ -193,4 +193,35 @@ public class T037TableFiltersTests
         Assert.True(vm.VisibleCount <= 100);
         Assert.False(vm.ShowPager);
     }
+
+    [Fact]
+    public void ArchivedAndDeleted_PageBy100_WithQuickJumpAndRevealOnRightPage()
+    {
+        var provider = new FakeDataService(() => Now);
+        var arc = new ArchivedOrdersViewModel(provider);
+        arc.LoadOrders(Enumerable.Range(1, 230).Select(i => new Order { OrderId = "A" + i, Track = "TA" + i, Platform = "Shopee", RecvDate = "20/11/2026 10:00" }).ToList());
+        Assert.Equal(3, arc.Pager.TotalPages);
+        Assert.Equal(100, arc.VisibleOrders.Count);
+        Assert.Equal(230, arc.VisibleCount);
+        arc.Pager.NextPageCommand.Execute(null);
+        Assert.Equal("A101", arc.VisibleOrders[0].OrderId);
+        arc.Pager.PageInput = "3"; arc.Pager.GoToPageInputCommand.Execute(null);
+        Assert.Equal(30, arc.VisibleOrders.Count);
+        Assert.Equal(230, arc.Pager.All.Count);
+        Assert.True(arc.SelectOrder("A150", "TA150"));
+        Assert.Equal(2, arc.Pager.CurrentPage);
+        Assert.Contains(arc.SelectedRow, arc.VisibleOrders);
+        arc.SearchText = "A7";
+        Assert.Equal(1, arc.Pager.CurrentPage);
+
+        var del = new DeletedOrdersViewModel(provider);
+        del.LoadOrders(Enumerable.Range(1, 120).Select(i => new DeletedOrderRecord { OrderId = "D" + i, Track = "TD" + i, Platform = "Shopee", DeletedFrom = "Bảng chính", DeletedAt = "20/11/2026 09:00" }).ToList());
+        Assert.Equal(2, del.Pager.TotalPages);
+        Assert.Equal(100, del.VisibleOrders.Count);
+        Assert.True(del.SelectOrder("D110", "TD110"));
+        Assert.Equal(2, del.Pager.CurrentPage);
+        Assert.Equal("D110", del.SelectedRow!.OrderId);
+        del.Pager.LastPageCommand.Execute(null);
+        Assert.Equal(20, del.VisibleOrders.Count);
+    }
 }

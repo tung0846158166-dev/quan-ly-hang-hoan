@@ -230,6 +230,8 @@ public sealed class T041AiChatUiTests
                     Assert.True(vm.AiChatVm.IsPanelOpen);
 
                     vm.AiChatVm.ClosePanelCommand.Execute(null);
+                    WpfTestHost.PumpDispatcher();
+                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "07-table-pager-and-ai-button.png"));
                     vm.NavigateByKey("settings");
                     WpfTestHost.PumpDispatcher();
                     WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "06-settings-with-ai-card.png"));

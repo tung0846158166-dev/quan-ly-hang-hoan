@@ -68,6 +68,9 @@
         <DataTemplate DataType="{x:Type vm:ActivityLogViewModel}">
             <views:ActivityLogView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AiChatViewModel}">
+            <views:AiChatView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:HelpViewModel}">
             <views:HelpView />
         </DataTemplate>

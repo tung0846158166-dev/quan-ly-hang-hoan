@@ -198,6 +198,8 @@ public partial class App : Application
                 notificationService: notificationService,
                 alertNotifyStateStore: alertStateStore,
                 backupController: new SqliteBackupController(AppPaths.DatabasePath),
+                aiSettingsStore: new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder),
+                aiOrderLoader: () => QuanLyHangHoan.Data.OrderRepository.Load(AppPaths.DatabasePath),
                 activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
                 orderExportService: new OrderExportService(fileSaveService),
                 notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),

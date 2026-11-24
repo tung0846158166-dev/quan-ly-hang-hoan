@@ -133,7 +133,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IDiagnosticsProvider? diagnosticsProvider = null,
         NotificationCenter? notificationCenter = null,
         INewOrderCreator? newOrderCreator = null,
-        INewOrderDialogService? newOrderDialogService = null)
+        INewOrderDialogService? newOrderDialogService = null,
+        QuanLyHangHoan.Data.Ai.AiSettingsStore? aiSettingsStore = null,
+        Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -225,6 +227,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             IsDemoMode = isDemoMode
         };
+        AiChatVm = new AiChatViewModel(aiSettingsStore, aiOrderLoader, returnOrderProvider.GetCurrentTime, OpenOrderDetail);
         HelpVm = new HelpViewModel(
             diagnosticsProvider ?? new FakeDiagnosticsProvider(),
             _backupController,
@@ -392,6 +395,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["settings"] = SettingsVm;
         SettingsVm.AttachImportPages(k => k switch { "file_import" => FileImportVm, "folder_watch" => FolderWatchVm, "google_sheet" => GoogleSheetVm, "salework" => SaleworkVm, _ => null });
         _pageCache["help"] = HelpVm;
+        _pageCache["ai_chat"] = AiChatVm;
         _pageCache["activity"] = ActivityLogVm;
 
         _homeNavItem = new NavigationItem(
@@ -442,6 +446,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
             new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
             new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm),
+            new NavigationItem("ai_chat", "🤖", "Hỏi AI", "CHUNG", () => AiChatVm),
             new NavigationItem("help", "❓", "Trợ giúp", "CHUNG", () => HelpVm)
         ];
 
@@ -507,6 +512,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public SettingsViewModel SettingsVm { get; }
     public ActivityLogViewModel ActivityLogVm { get; }
     public HelpViewModel HelpVm { get; }
+    public AiChatViewModel AiChatVm { get; }
     public ReturnOrdersViewModel NewCreatedVm { get; }
     public NotificationCenterViewModel NotificationsVm { get; }
 

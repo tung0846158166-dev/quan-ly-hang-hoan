@@ -199,6 +199,36 @@ public sealed class T035NewOrdersTableUiTests
     }
 
     [Fact]
+    public void RenderScreenshots_UrgentClickReveal_ToReportsFolder()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !(Directory.Exists(Path.Combine(dir.FullName, "tasks")) && Directory.Exists(Path.Combine(dir.FullName, "v2")))) dir = dir.Parent;
+        var outDir = Path.Combine(dir!.FullName, "tasks", "reports", "T035-screens");
+        Directory.CreateDirectory(outDir);
+        WpfTestHost.Run(() =>
+        {
+            var r = NewRig();
+            var window = new MainWindow
+            {
+                DataContext = r.Vm, Width = 1360, Height = 820, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false,
+            };
+            try
+            {
+                window.Show();
+                WpfTestHost.PumpDispatcher();
+                r.Vm.SetTheme(ThemeService.LightTheme);
+                var item = r.Vm.HomeVm.UrgentItems.First(u => u.AlertLevel == QuanLyHangHoan.Core.Alerts.AlertLevel.Red);
+                r.Vm.HomeVm.OpenUrgentOrderCommand.Execute(item);
+                WpfTestHost.PumpDispatcher();
+                WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "06-urgent-click-reveal.png"));
+            }
+            finally { window.Close(); WpfTestHost.PumpDispatcher(); }
+        });
+        Assert.True(File.Exists(Path.Combine(outDir, "06-urgent-click-reveal.png")));
+    }
+
+    [Fact]
     public void RenderScreenshots_NewOrdersTable_ToReportsFolder()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

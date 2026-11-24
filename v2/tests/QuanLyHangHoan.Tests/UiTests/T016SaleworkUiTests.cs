@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -271,13 +271,14 @@ public sealed class T016SaleworkUiTests
             Assert.False(controller.WebViewCreated);
             Assert.True(mainVm.SaleworkVm.IsDemoMode);
 
-            var navs = mainVm.NavigationItems.ToList();
-            var sheetIdx = navs.FindIndex(n => n.Key == "google_sheet");
-            var swIdx = navs.FindIndex(n => n.Key == "salework");
-            Assert.True(sheetIdx >= 0);
-            Assert.Equal(sheetIdx + 1, swIdx);
-            Assert.Equal("Salework", navs[swIdx].Title);
-            Assert.Equal("NẠP ĐƠN TỰ ĐỘNG", navs[swIdx].Section);
+            // Salework nay là một thẻ trong Cài đặt (không còn mục riêng ở thanh bên)
+            Assert.DoesNotContain(mainVm.NavigationItems, n => n.Key == "salework");
+            var tabs = mainVm.SettingsVm.Tabs.Select(t => t.Key).ToList();
+            Assert.Equal(tabs.IndexOf("google_sheet") + 1, tabs.IndexOf("salework"));
+            Assert.Equal("Salework", mainVm.SettingsVm.Tabs.Single(t => t.Key == "salework").Title);
+            mainVm.NavigateByKey("salework");
+            Assert.Same(mainVm.SettingsVm, mainVm.CurrentPage);
+            Assert.Same(mainVm.SaleworkVm, mainVm.SettingsVm.ImportPage);
         });
     }
 

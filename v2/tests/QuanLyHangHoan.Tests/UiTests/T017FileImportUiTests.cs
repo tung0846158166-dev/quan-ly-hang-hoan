@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -246,18 +246,11 @@ public sealed class T017FileImportUiTests : IDisposable
             dispatchToUi: a => a(),
             uiSettingsStore: new UiSettingsStore(null, isDemoMode: true));
 
-        var autoGroup = mainVm.NavigationItems
-            .Where(i => i.Section == "NẠP ĐƠN TỰ ĐỘNG")
-            .ToList();
-
-        Assert.Equal(4, autoGroup.Count);
-        Assert.Equal("file_import", autoGroup[0].Key);
-        Assert.Equal("Nạp file Excel", autoGroup[0].Title);
-        Assert.True(autoGroup[0].ShowSectionHeader);
-        Assert.Equal("folder_watch", autoGroup[1].Key);
-        Assert.False(autoGroup[1].ShowSectionHeader);
-        Assert.Equal("google_sheet", autoGroup[2].Key);
-        Assert.Equal("salework", autoGroup[3].Key);
+        // Nạp đơn nay nằm trong Cài đặt: thanh bên không còn nhóm "NẠP ĐƠN TỰ ĐỘNG"
+        Assert.DoesNotContain(mainVm.NavigationItems, i => i.Section == "NẠP ĐƠN TỰ ĐỘNG");
+        var tabs = mainVm.SettingsVm.Tabs;
+        Assert.Equal(new[] { "general", "file_import", "folder_watch", "google_sheet", "salework" }, tabs.Select(t => t.Key).ToArray());
+        Assert.Contains("TikTok", tabs.Single(t => t.Key == "file_import").Title);   // Nạp file Excel chỉ dành cho TikTok
     }
 
     [Fact]

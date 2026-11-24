@@ -15,7 +15,9 @@ public enum ReturnTableScope
     All,
     ShopeeReturn,
     ShopeeCancelled,
-    TikTokReturn
+    TikTokReturn,
+    /// <summary>Bảng đơn mới: các đơn tạo tay / quét tạo từ điện thoại (đánh dấu NewOrderMarker), nằm sẵn ở bảng chính.</summary>
+    NewCreated
 }
 
 public sealed partial class OrderTypeChipItem : ObservableObject
@@ -55,6 +57,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
     private readonly Services.IOrderExportService? _exportService;
+    private readonly Services.INewOrderCreator? _newOrderCreator;
+    private readonly Services.INewOrderDialogService? _newOrderDialog;
     private List<ReturnOrderRowViewModel> _allRows = [];
     private IReadOnlyList<ReturnOrderRowViewModel> _selectedRows = Array.Empty<ReturnOrderRowViewModel>();
     private long _lastLoadMs;
@@ -71,9 +75,13 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         Action<IReadOnlyList<(string OrderId, string Tracking)>>? onOrdersDeleted = null,
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
-        Services.IOrderExportService? exportService = null)
+        Services.IOrderExportService? exportService = null,
+        Services.INewOrderCreator? newOrderCreator = null,
+        Services.INewOrderDialogService? newOrderDialog = null)
     {
         _provider = provider;
+        _newOrderCreator = newOrderCreator;
+        _newOrderDialog = newOrderDialog;
         _exportService = exportService;
         Scope = scope;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
@@ -109,7 +117,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     [ObservableProperty]
     private bool _isDemoMode;
 
-    public bool ShowPlatformFilter => Scope == ReturnTableScope.All;
+    public bool ShowPlatformFilter => Scope is ReturnTableScope.All or ReturnTableScope.NewCreated;
+    public bool ShowCreateButton => Scope == ReturnTableScope.NewCreated;
     public bool ShowOrderTypeFilter => Scope is ReturnTableScope.TikTokReturn or ReturnTableScope.ShopeeReturn;
 
     public string ScreenTitle => Scope switch
@@ -117,6 +126,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         ReturnTableScope.ShopeeReturn => "🟠 Shopee — Hoàn hàng",
         ReturnTableScope.ShopeeCancelled => "🚫 Shopee — Đơn hủy",
         ReturnTableScope.TikTokReturn => "⚫ TikTok — Hoàn hàng",
+        ReturnTableScope.NewCreated => "📥 Bảng đơn mới",
         _ => "🚚 Bảng Hàng Hoàn Về"
     };
 
@@ -128,6 +138,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             $"Bộ lọc đơn Shopee có loại \"{OrderTypeNames.Cancelled}\" trên bảng đơn chung • {AlertRuleDescription}",
         ReturnTableScope.TikTokReturn =>
             $"Hiển thị tất cả loại đơn TikTok (THẤT THOÁT, Trả hàng/Hoàn tiền, Giao không thành công, Chỉ hoàn tiền) • {AlertRuleDescription}",
+        ReturnTableScope.NewCreated =>
+            $"Đơn tạo tay hoặc quét tạo từ điện thoại, nằm sẵn ở bảng chính. Bấm \"➕ Tạo đơn mới\" để thêm • {AlertRuleDescription}",
         _ => AlertRuleDescription
     };
 
@@ -182,8 +194,29 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         ReturnTableScope.ShopeeReturn => "Shopee - Hoàn hàng",
         ReturnTableScope.ShopeeCancelled => "Shopee - Đơn hủy",
         ReturnTableScope.TikTokReturn => "TikTok - Hoàn hàng",
+        ReturnTableScope.NewCreated => "Bảng đơn mới",
         _ => "Bảng chính"
     };
+
+    /// <summary>"➕ Tạo đơn mới": hỏi thông tin, tạo thẳng vào bảng chính, tải lại và chọn đúng đơn vừa tạo.</summary>
+    [RelayCommand]
+    public async Task CreateNewOrderAsync()
+    {
+        if (_newOrderCreator is null || _newOrderDialog is null) { _onNotify?.Invoke("Chưa sẵn sàng tạo đơn.", true); return; }
+        var input = _newOrderDialog.Ask();
+        if (input is null) return;                                   // hủy: không làm gì
+        Data.NewOrderResult result;
+        try { result = await _newOrderCreator.CreateAsync(input); }
+        catch (Exception ex) { _onNotify?.Invoke("Không tạo được đơn: " + ex.Message, true); return; }
+        if (!result.Ok)
+        {
+            _onNotify?.Invoke(result.Outcome == "duplicate" ? "⚠️ " + result.Message : "Không tạo được đơn: " + result.Message, true);
+            return;
+        }
+        if (_onDataChangedAsync is not null) await _onDataChangedAsync();
+        SelectOrder(result.OrderId, result.Code);
+        _onNotify?.Invoke($"✅ Đã tạo đơn {result.Code} ({result.Platform}) ở Bảng đơn mới", false);
+    }
 
     /// <summary>Giao diện nghe sự kiện này để bỏ chọn mọi dòng trên lưới (nút "Bỏ chọn", phím Esc).</summary>
     public event Action? ClearSelectionRequested;
@@ -282,6 +315,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
                 && OrderTypeNames.IsCancelled(order.OrderType),
             ReturnTableScope.TikTokReturn =>
                 order.Platform.Equals(PlatformNames.TikTok, StringComparison.OrdinalIgnoreCase),
+            ReturnTableScope.NewCreated => NewOrderMarker.IsNewlyCreated(order),
             _ => true
         };
     }

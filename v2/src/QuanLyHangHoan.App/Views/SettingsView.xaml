@@ -47,11 +47,48 @@
                         <TextBlock Text="DỮ LIỆU GIẢ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource AlertYellowTextBrush}" />
                     </Border>
                 </StackPanel>
-                <TextBlock Text="Chạy nền, thông báo, đồng bộ điện thoại và sao lưu. Mọi thay đổi được lưu ngay." Style="{StaticResource SettingsHintStyle}" Margin="0,4,0,0" />
+                <TextBlock Text="Chạy nền, thông báo, đồng bộ điện thoại, sao lưu và các đường nạp đơn. Mọi thay đổi được lưu ngay." Style="{StaticResource SettingsHintStyle}" Margin="0,4,0,0" />
+
+                <!-- Thẻ: Chung + 4 đường nạp đơn (Excel TikTok, theo dõi thư mục, Google Sheet, Salework) -->
+                <ItemsControl ItemsSource="{Binding Tabs}" Margin="0,12,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.SelectTabCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding Key}"
+                                    Margin="0,0,8,6"
+                                    AutomationProperties.Name="{Binding Title}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock>
+                                    <Run Text="{Binding Icon, Mode=OneWay}" /><Run Text=" " /><Run Text="{Binding Title, Mode=OneWay}" />
+                                </TextBlock>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16">
+        <!-- Nội dung của thẻ nạp đơn: đúng các màn Nạp file / Theo dõi thư mục / Google Sheet / Salework -->
+        <ContentControl Grid.Row="1" Content="{Binding ImportPage}"
+                        Visibility="{Binding IsImportTab, Converter={StaticResource BoolToVis}}" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16"
+                      Visibility="{Binding IsGeneralTab, Converter={StaticResource BoolToVis}}">
             <StackPanel MaxWidth="900" HorizontalAlignment="Left">
 
                 <!-- Chạy nền và thông báo -->

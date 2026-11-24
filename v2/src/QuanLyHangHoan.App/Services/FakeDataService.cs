@@ -1,4 +1,4 @@
-using QuanLyHangHoan.Core.Models;
+﻿using QuanLyHangHoan.Core.Models;
 
 namespace QuanLyHangHoan.App.Services;
 
@@ -96,8 +96,44 @@ public sealed class FakeDataService :
             });
         }
 
+        // Demo: 3 đơn cuối của bảng chính được đánh dấu "mới tạo" để Bảng đơn mới có dữ liệu mẫu (số đơn không đổi).
+        var mainOnly = list.Where(e => !e.IsArchived && !e.IsDeleted && !OrderTypeNames.IsCancelled(e.Order.OrderType)).ToList();
+        foreach (var e in mainOnly.TakeLast(3)) e.Order.ImportWeek = NewOrderMarker.Week;
+
         _demoStore = list;
         return _demoStore;
+    }
+
+    /// <summary>Demo: thêm một đơn mới vào kho demo (cùng quy tắc trùng mã như bản thật).</summary>
+    internal QuanLyHangHoan.Data.NewOrderResult AddDemoNewOrder(QuanLyHangHoan.Data.NewOrderInput input)
+    {
+        var code = QuanLyHangHoan.Core.Tracking.TrackingResolver.Normalize(input.Track ?? "");
+        if (code.Length == 0) return new QuanLyHangHoan.Data.NewOrderResult(false, "invalid", "Mã vận đơn trống", "", "", "");
+        lock (_storeLock)
+        {
+            var store = EnsureDemoStore();
+            var dup = store.FirstOrDefault(e => string.Equals(QuanLyHangHoan.Core.Tracking.TrackingResolver.Normalize(e.Order.Track), code, StringComparison.OrdinalIgnoreCase)
+                                                || string.Equals(QuanLyHangHoan.Core.Tracking.TrackingResolver.Normalize(e.Order.ReturnTrack), code, StringComparison.OrdinalIgnoreCase));
+            if (dup is not null)
+            {
+                var where = dup.IsDeleted ? "mục Đã xóa" : dup.IsArchived ? "Kho lưu trữ" : "Bảng chính";
+                return new QuanLyHangHoan.Data.NewOrderResult(false, "duplicate", $"ĐƠN ĐÃ CÓ Ở {where.ToUpperInvariant()}, KHÔNG TẠO LẠI", code, "", dup.Order.OrderId);
+            }
+            var platformIn = (input.Platform ?? "").Trim();
+            var platform = platformIn.Length > 0 ? platformIn : QuanLyHangHoan.Data.Sync.PhoneActions.DetectPlatform(code);
+            var stamp = _clock().ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+            var o = new Order
+            {
+                OrderId = string.IsNullOrWhiteSpace(input.OrderId) ? code : input.OrderId.Trim(), Track = code, Platform = platform,
+                Carrier = string.IsNullOrWhiteSpace(input.Carrier) ? "J&T Express" : input.Carrier.Trim(),
+                OrderType = "Trả hàng/Hoàn tiền", PlatformStatus = "Đang chuyển hoàn", PreOrder = "Đơn thường",
+                Status = ReceiveStatus.NotReturned, ShipDate = stamp, ReturnDate = stamp, ImportedAt = stamp, ImportWeek = NewOrderMarker.Week,
+                Note = string.IsNullOrWhiteSpace(input.Note) ? "Đơn tạo tay trên máy tính" : input.Note.Trim(),
+                Items = { new OrderItem { Product = string.IsNullOrWhiteSpace(input.Product) ? "Sản phẩm mới (nhập tay)" : input.Product.Trim(), Color = input.Color ?? "", Size = input.Size ?? "", Qty = input.Qty > 0 ? input.Qty : 1 } },
+            };
+            store.Add(new DemoOrderEntry { Order = o });
+            return new QuanLyHangHoan.Data.NewOrderResult(true, "success", $"ĐÃ TẠO ĐƠN MỚI Ở BẢNG CHÍNH ({platform})", code, platform, o.OrderId);
+        }
     }
 
     public IReadOnlyList<Order> GetReturnOrders(int count = 40)
@@ -862,6 +898,9 @@ public sealed class FakeDataService :
         IsWatchlist = o.IsWatchlist,
         WatchlistReason = o.WatchlistReason,
         IsPartialReturn = o.IsPartialReturn,
+        ImportWeek = o.ImportWeek,
+        PreOrder = o.PreOrder,
+        ImportedAt = o.ImportedAt,
         Items = o.Items.ToList()
     };
 }

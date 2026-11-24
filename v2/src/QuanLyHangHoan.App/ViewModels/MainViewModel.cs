@@ -131,7 +131,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IActivityLogProvider? activityLogProvider = null,
         IOrderExportService? orderExportService = null,
         IDiagnosticsProvider? diagnosticsProvider = null,
-        NotificationCenter? notificationCenter = null)
+        NotificationCenter? notificationCenter = null,
+        INewOrderCreator? newOrderCreator = null,
+        INewOrderDialogService? newOrderDialogService = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -268,7 +270,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService) { IsDemoMode = isDemoMode };
 
-        NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+        NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };   // bảng cũ (không còn trên thanh bên)
+        // "Bảng đơn mới" thật: cửa sổ lọc các đơn tạo tay/quét tạo từ điện thoại, có đủ thao tác của các bảng khác + nút "Tạo đơn mới".
+        var resolvedCreator = newOrderCreator ?? (returnOrderProvider is FakeDataService fakeForCreate ? new FakeNewOrderCreator(fakeForCreate) : null);
+        NewCreatedVm = new ReturnOrdersViewModel(
+            returnOrderProvider,
+            ReturnTableScope.NewCreated,
+            onOpenPhoto: OpenOrderPhoto,
+            editService: _orderEditService,
+            dialogService: dialogSvc,
+            onDataChangedAsync: ReloadAllDataAsync,
+            onOrdersDeleted: ShowDeletedUndoToast,
+            onNotify: ShowToast,
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService,
+            newOrderCreator: resolvedCreator,
+            newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService()) { IsDemoMode = isDemoMode };
         Func<string, string, bool> returnWatchConfirm = confirmationService is not null
             ? confirmationService.Confirm
             : (title, message) =>
@@ -360,13 +377,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["google_sheet"] = GoogleSheetVm;
         _pageCache["salework"] = SaleworkVm;
         _pageCache["return_watch"] = ReturnWatchVm;
-        _pageCache["new_orders"] = NewOrdersVm;
+        _pageCache["new_orders"] = NewCreatedVm;
         _pageCache["watchlist"] = WatchlistVm;
         _pageCache["archive"] = ArchivedOrdersVm;
         _pageCache["deleted"] = DeletedOrdersVm;
         _pageCache["stats"] = StatisticsVm;
         _pageCache["legacy_import"] = LegacyImportVm;
         _pageCache["settings"] = SettingsVm;
+        SettingsVm.AttachImportPages(k => k switch { "file_import" => FileImportVm, "folder_watch" => FolderWatchVm, "google_sheet" => GoogleSheetVm, "salework" => SaleworkVm, _ => null });
         _pageCache["help"] = HelpVm;
         _pageCache["activity"] = ActivityLogVm;
 
@@ -385,7 +403,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _returnWatchNavItem = new NavigationItem(
             "return_watch", "🚚", "Hàng hoàn về", "CHUNG", () => ReturnWatchVm, ReturnWatchVm.TrackingCount.ToString("N0"));
         _newOrdersNavItem = new NavigationItem(
-            "new_orders", "📥", "Bảng đơn mới", "CHUNG", () => NewOrdersVm, NewOrdersVm.TotalCount.ToString("N0"));
+            "new_orders", "📥", "Bảng đơn mới", "CHUNG", () => NewCreatedVm, NewCreatedVm.TotalCount.ToString("N0"));
         _watchlistNavItem = new NavigationItem(
             "watchlist", "⭐", "Đang theo dõi", "CHUNG", () => WatchlistVm, WatchlistVm.ActiveWatchlistCount.ToString("N0"));
         _archiveNavItem = new NavigationItem(
@@ -407,10 +425,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _shopeeReturnNavItem,
             _shopeeCancelledNavItem,
             _tiktokReturnNavItem,
-            _fileImportNavItem,
-            _folderWatchNavItem,
-            _googleSheetNavItem,
-            _saleworkNavItem,
             _scanReceiveNavItem,
             _phoneSyncNavItem,
             _returnWatchNavItem,
@@ -418,7 +432,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _watchlistNavItem,
             _archiveNavItem,
             _deletedNavItem,
-            new NavigationItem("stats", "📊", "Thống kê & báo cáo", "CHUNG", () => StatisticsVm),
+            new NavigationItem("stats", "📊", "Thống kê đơn & sản phẩm", "CHUNG", () => StatisticsVm),
             new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
             new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
             new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm),
@@ -487,6 +501,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public SettingsViewModel SettingsVm { get; }
     public ActivityLogViewModel ActivityLogVm { get; }
     public HelpViewModel HelpVm { get; }
+    public ReturnOrdersViewModel NewCreatedVm { get; }
     public NotificationCenterViewModel NotificationsVm { get; }
 
     /// <summary>Thanh bên mặc định thu gọn (chỉ biểu tượng); rê chuột vào thì mở rộng đè lên nội dung.</summary>
@@ -849,6 +864,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void NavigateByKey(string key)
     {
+        // Các đường nạp đơn nay nằm trong Cài đặt (thẻ riêng): khóa cũ mở Cài đặt đúng thẻ đó.
+        var importKey = SettingsViewModel.ImportTabKeys.FirstOrDefault(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (importKey is not null) { SettingsVm.SelectTab(importKey); key = "settings"; }
         var item = NavigationItems.FirstOrDefault(n => n.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
         if (item is not null) SelectNavigation(item);
     }
@@ -1240,6 +1258,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ArchivedOrdersVm.LoadOrders(archivedOrders);
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);
+        NewCreatedVm.LoadOrders(returnOrders, now);
         StatisticsVm.LoadData(returnOrders, archivedOrders, now);
         StatisticsVm.MissingPhotoCount = missingCount;
         SyncSidebarKpis();
@@ -1454,7 +1473,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _shopeeCancelledNavItem.Badge = ShopeeCancelledVm.TotalCount.ToString("N0");
         _tiktokReturnNavItem.Badge = TikTokReturnVm.TotalCount.ToString("N0");
         _returnWatchNavItem.Badge = ReturnWatchVm.TrackingCount.ToString("N0");
-        _newOrdersNavItem.Badge = NewOrdersVm.TotalCount.ToString("N0");
+        _newOrdersNavItem.Badge = NewCreatedVm.TotalCount.ToString("N0");
         _watchlistNavItem.Badge = WatchlistVm.ActiveWatchlistCount.ToString("N0");
         _archiveNavItem.Badge = ArchivedOrdersVm.TotalCount.ToString("N0");
         _deletedNavItem.Badge = DeletedOrdersVm.TotalCount.ToString("N0");
@@ -1477,7 +1496,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var tiktokAlerts = TikTokReturnVm.RedAlertCount + TikTokReturnVm.YellowAlertCount;
         var tiktokTotal = TikTokReturnVm.TotalCount;
 
-        var chungTotal = ReturnWatchVm.TrackingCount + NewOrdersVm.TotalCount + WatchlistVm.ActiveWatchlistCount + ArchivedOrdersVm.TotalCount + DeletedOrdersVm.TotalCount;
+        var chungTotal = ReturnWatchVm.TrackingCount + NewCreatedVm.TotalCount + WatchlistVm.ActiveWatchlistCount + ArchivedOrdersVm.TotalCount + DeletedOrdersVm.TotalCount;
 
         foreach (var item in NavigationItems)
         {

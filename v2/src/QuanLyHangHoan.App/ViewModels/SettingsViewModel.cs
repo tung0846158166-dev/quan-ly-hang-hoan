@@ -8,6 +8,15 @@ namespace QuanLyHangHoan.App.ViewModels;
 
 public sealed record BackupRow(string Name, string TimeText, string SizeText);
 
+public sealed partial class SettingsTabItem : ObservableObject
+{
+    public SettingsTabItem(string key, string icon, string title) { Key = key; Icon = icon; Title = title; }
+    public string Key { get; }
+    public string Icon { get; }
+    public string Title { get; }
+    [ObservableProperty] private bool _isSelected;
+}
+
 /// <summary>
 /// Màn "Cài đặt": gom các công tắc chạy nền/thông báo (trước đây nằm ở Trang chủ), mã phòng đồng bộ và SAO LƯU.
 /// Bốn công tắc chạy nền được MainViewModel lưu và áp dụng (khay, registry, âm thanh): màn này chỉ phản chiếu và báo ngược qua callback.
@@ -49,6 +58,53 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     public bool IsDemoMode { get; set; }
+
+    // ---------------- các thẻ (tab): Chung + 4 đường nạp đơn (trước đây nằm ở thanh bên) ----------------
+    public const string GeneralTabKey = "general";
+    public static readonly string[] ImportTabKeys = { "file_import", "folder_watch", "google_sheet", "salework" };
+
+    private Func<string, object?>? _importPageResolver;
+
+    public IReadOnlyList<SettingsTabItem> Tabs { get; } = new[]
+    {
+        new SettingsTabItem(GeneralTabKey, "⚙️", "Chung") { IsSelected = true },
+        new SettingsTabItem("file_import", "📄", "Nạp file Excel (TikTok)"),
+        new SettingsTabItem("folder_watch", "📁", "Theo dõi thư mục"),
+        new SettingsTabItem("google_sheet", "📊", "Google Sheet"),
+        new SettingsTabItem("salework", "🛒", "Salework"),
+    };
+
+    [ObservableProperty] private string _selectedTabKey = GeneralTabKey;
+    [ObservableProperty] private object? _importPage;
+
+    public bool IsGeneralTab => SelectedTabKey == GeneralTabKey;
+    public bool IsImportTab => !IsGeneralTab;
+
+    /// <summary>MainViewModel cấp các màn nạp đơn có sẵn để hiện bên trong Cài đặt.</summary>
+    public void AttachImportPages(Func<string, object?> resolver)
+    {
+        _importPageResolver = resolver;
+        UpdateTabContent();
+    }
+
+    [RelayCommand]
+    public void SelectTab(string? key)
+    {
+        var k = string.IsNullOrWhiteSpace(key) ? GeneralTabKey : key;
+        if (!Tabs.Any(t => t.Key == k)) k = GeneralTabKey;
+        SelectedTabKey = k;
+    }
+
+    partial void OnSelectedTabKeyChanged(string value)
+    {
+        foreach (var t in Tabs) t.IsSelected = t.Key == value;
+        OnPropertyChanged(nameof(IsGeneralTab));
+        OnPropertyChanged(nameof(IsImportTab));
+        UpdateTabContent();
+    }
+
+    private void UpdateTabContent() =>
+        ImportPage = IsGeneralTab ? null : _importPageResolver?.Invoke(SelectedTabKey);
 
     // ---------------- chạy nền và thông báo ----------------
     [ObservableProperty] private bool _autoStart;

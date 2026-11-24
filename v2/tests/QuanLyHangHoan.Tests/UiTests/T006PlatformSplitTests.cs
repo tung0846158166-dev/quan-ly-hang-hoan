@@ -1,4 +1,4 @@
-using QuanLyHangHoan.App.Services;
+﻿using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.App.ViewModels;
 using QuanLyHangHoan.Core.Alerts;
 using QuanLyHangHoan.Core.Models;
@@ -97,10 +97,6 @@ public class T006PlatformSplitTests
             "shopee_return",
             "shopee_cancelled",
             "tiktok_return",
-            "file_import",
-            "folder_watch",
-            "google_sheet",
-            "salework",
             "scan_receive",
             "phone_sync",
             "return_watch",

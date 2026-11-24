@@ -170,6 +170,8 @@ public partial class App : Application
                 activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
                 orderExportService: new OrderExportService(fileSaveService),
                 notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),
+                newOrderCreator: isDemoMode ? null : new SqliteNewOrderCreator(AppPaths.DatabasePath),
+                newOrderDialogService: new WindowsNewOrderDialogService(),
                 diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)));
         }
 

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using System.Windows;
 using QuanLyHangHoan.App;
@@ -262,7 +262,7 @@ public sealed class T014FolderWatchUiTests : IDisposable
     }
 
     [Fact]
-    public void SidebarGroup_NapDonTuDong_CollapsesExpandsAndPersists()
+    public void SidebarGroup_Shopee_CollapsesExpandsAndPersists()
     {
         var settingsPath = Path.Combine(_tempRoot, "ui-settings.json");
         var fakeData = new FakeDataService(() => FixedNow);
@@ -278,13 +278,13 @@ public sealed class T014FolderWatchUiTests : IDisposable
             folderWatchController: new FakeFolderWatchController()))
         {
             vm1.NavigateByKey("home");
-            var fwNav = vm1.NavigationItems.Single(n => n.Key == "folder_watch");
-            Assert.Equal("NẠP ĐƠN TỰ ĐỘNG", fwNav.Section);
-            Assert.True(fwNav.IsVisible);
+            var swNav = vm1.NavigationItems.Single(n => n.Key == "shopee_cancelled");
+            Assert.Equal("SHOPEE", swNav.Section);
+            Assert.True(swNav.IsVisible);
 
-            vm1.ToggleNavGroupCommand.Execute("NẠP ĐƠN TỰ ĐỘNG");
-            Assert.True(vm1.IsGroupCollapsed("NẠP ĐƠN TỰ ĐỘNG"));
-            Assert.False(fwNav.IsVisible);
+            vm1.ToggleNavGroupCommand.Execute("SHOPEE");
+            Assert.True(vm1.IsGroupCollapsed("SHOPEE"));
+            Assert.False(swNav.IsVisible);
         }
 
         using var vm2 = new MainViewModel(
@@ -297,12 +297,12 @@ public sealed class T014FolderWatchUiTests : IDisposable
             uiSettingsStore: new UiSettingsStore(settingsPath, isDemoMode: false),
             folderWatchController: new FakeFolderWatchController());
 
-        Assert.True(vm2.IsGroupCollapsed("NẠP ĐƠN TỰ ĐỘNG"));
-        Assert.False(vm2.NavigationItems.Single(n => n.Key == "folder_watch").IsVisible);
+        Assert.True(vm2.IsGroupCollapsed("SHOPEE"));
+        Assert.False(vm2.NavigationItems.Single(n => n.Key == "shopee_cancelled").IsVisible);
 
-        vm2.ToggleNavGroupCommand.Execute("NẠP ĐƠN TỰ ĐỘNG");
-        Assert.False(vm2.IsGroupCollapsed("NẠP ĐƠN TỰ ĐỘNG"));
-        Assert.True(vm2.NavigationItems.Single(n => n.Key == "folder_watch").IsVisible);
+        vm2.ToggleNavGroupCommand.Execute("SHOPEE");
+        Assert.False(vm2.IsGroupCollapsed("SHOPEE"));
+        Assert.True(vm2.NavigationItems.Single(n => n.Key == "shopee_cancelled").IsVisible);
     }
 
     [Fact]

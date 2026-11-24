@@ -1,4 +1,4 @@
-using QuanLyHangHoan.App.Services;
+﻿using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.App.ViewModels;
 using QuanLyHangHoan.Core.Alerts;
 using QuanLyHangHoan.Core.Models;
@@ -188,23 +188,25 @@ public class ReturnOrdersViewModelTests
     {
         var mainVm = new MainViewModel(new FakeDataService(() => FixedNow));
 
-        Assert.Equal(20, mainVm.NavigationItems.Count);   // + "Nhật ký hoạt động" + "Cài đặt" + "Trợ giúp"
+        Assert.Equal(16, mainVm.NavigationItems.Count);   // 4 đường nạp đơn đã chuyển vào Cài đặt
         Assert.IsType<HomeViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("return_watch");
         Assert.IsType<ReturnWatchViewModel>(mainVm.CurrentPage);
 
+        // Bốn đường nạp đơn mở trong Cài đặt, mỗi đường một thẻ
         mainVm.NavigateByKey("file_import");
-        Assert.IsType<FileImportViewModel>(mainVm.CurrentPage);
+        Assert.IsType<SettingsViewModel>(mainVm.CurrentPage);
+        Assert.IsType<FileImportViewModel>(mainVm.SettingsVm.ImportPage);
 
         mainVm.NavigateByKey("folder_watch");
-        Assert.IsType<FolderWatchViewModel>(mainVm.CurrentPage);
+        Assert.IsType<FolderWatchViewModel>(mainVm.SettingsVm.ImportPage);
 
         mainVm.NavigateByKey("google_sheet");
-        Assert.IsType<GoogleSheetViewModel>(mainVm.CurrentPage);
+        Assert.IsType<GoogleSheetViewModel>(mainVm.SettingsVm.ImportPage);
 
         mainVm.NavigateByKey("salework");
-        Assert.IsType<SaleworkViewModel>(mainVm.CurrentPage);
+        Assert.IsType<SaleworkViewModel>(mainVm.SettingsVm.ImportPage);
 
         mainVm.NavigateByKey("scan_receive");
         Assert.IsType<ScanReceiveViewModel>(mainVm.CurrentPage);
@@ -225,7 +227,7 @@ public class ReturnOrdersViewModelTests
         Assert.IsType<ArchivedOrdersViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("new_orders");
-        Assert.IsType<NewOrdersViewModel>(mainVm.CurrentPage);
+        Assert.Same(mainVm.NewCreatedVm, mainVm.CurrentPage);   // Bảng đơn mới thật = bảng lọc đơn mới tạo (đủ thao tác như các bảng khác)
 
         mainVm.NavigateByKey("stats");
         Assert.IsType<StatisticsViewModel>(mainVm.CurrentPage);

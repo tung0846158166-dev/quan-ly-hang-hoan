@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -276,7 +276,8 @@ public sealed class T027NotificationCenterUiTests : IDisposable
         rig.Vm.NotificationsVm.OpenItemCommand.Execute(excel);
         Assert.False(rig.Vm.NotificationsVm.IsOpen);
         Assert.Equal(1, rig.Vm.NotificationsVm.UnreadCount);
-        Assert.IsType<FileImportViewModel>(rig.Vm.CurrentPage);
+        Assert.Same(rig.Vm.SettingsVm, rig.Vm.CurrentPage);                  // nạp đơn nằm trong Cài đặt, đúng thẻ
+        Assert.Same(rig.Vm.FileImportVm, rig.Vm.SettingsVm.ImportPage);
         rig.Vm.NotificationsVm.ToggleCommand.Execute(null);
         var order = rig.Vm.NotificationsVm.Items.Single(i => i.Target == "search:SPXTHU");
         rig.Vm.NotificationsVm.OpenItemCommand.Execute(order);

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -69,10 +69,12 @@ public sealed class T025HelpAndDiagnosticsUiTests : IDisposable
         vm.SettingsVm.BackupEnabled = false;
         await vm.HelpVm.RefreshAsync();
         Assert.False(vm.HelpVm.Steps.Single(x => x.Number == 5).Done);
-        vm.HelpVm.GoToStepCommand.Execute("folder_watch");
-        Assert.IsType<FolderWatchViewModel>(vm.CurrentPage);
+        vm.HelpVm.GoToStepCommand.Execute("folder_watch");             // nạp đơn nay nằm trong Cài đặt, đúng thẻ "Theo dõi thư mục"
+        Assert.IsType<SettingsViewModel>(vm.CurrentPage);
+        Assert.Equal("folder_watch", vm.SettingsVm.SelectedTabKey);
         vm.HelpVm.GoToStepCommand.Execute(null);                       // khóa rỗng: không làm gì, không sập
-        Assert.IsType<FolderWatchViewModel>(vm.CurrentPage);
+        Assert.IsType<SettingsViewModel>(vm.CurrentPage);
+        Assert.Equal("folder_watch", vm.SettingsVm.SelectedTabKey);
     }
 
     // ---------------- chẩn đoán ----------------

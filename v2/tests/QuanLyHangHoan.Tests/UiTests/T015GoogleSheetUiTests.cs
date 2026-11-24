@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -282,16 +282,13 @@ public sealed class T015GoogleSheetUiTests : IDisposable
             isDemoMode: true,
             sheetSyncController: fakeSheet);
 
-        var autoItems = mainVm.NavigationItems.Where(i => i.Section == "NẠP ĐƠN TỰ ĐỘNG").ToList();
-        Assert.Equal(4, autoItems.Count);
-        Assert.Equal("file_import", autoItems[0].Key);
-        Assert.Equal("folder_watch", autoItems[1].Key);
-        Assert.Equal("google_sheet", autoItems[2].Key);
-        Assert.Equal("Google Sheet", autoItems[2].Title);
-        Assert.Equal("salework", autoItems[3].Key);
+        // Google Sheet nay là một thẻ trong Cài đặt
+        Assert.DoesNotContain(mainVm.NavigationItems, i => i.Section == "NẠP ĐƠN TỰ ĐỘNG");
+        Assert.Equal("Google Sheet", mainVm.SettingsVm.Tabs.Single(t => t.Key == "google_sheet").Title);
 
         mainVm.NavigateByKey("google_sheet");
-        Assert.IsType<GoogleSheetViewModel>(mainVm.CurrentPage);
+        Assert.Same(mainVm.SettingsVm, mainVm.CurrentPage);
+        Assert.IsType<GoogleSheetViewModel>(mainVm.SettingsVm.ImportPage);
     }
 
     [Fact]

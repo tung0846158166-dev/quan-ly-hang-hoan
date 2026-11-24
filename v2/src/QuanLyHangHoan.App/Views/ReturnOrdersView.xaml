@@ -38,6 +38,17 @@
                             ToolTip="Kiểm tra hiệu năng virtualization của DataGrid với 50.000 dòng dữ liệu giả" />
                 </StackPanel>
 
+                <!-- Chỉ ở Bảng đơn mới: tạo một đơn mới thẳng vào bảng chính -->
+                <Button DockPanel.Dock="Right" Content="➕ Tạo đơn mới"
+                        Command="{Binding CreateNewOrderCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#16A34A"
+                        VerticalAlignment="Center"
+                        Margin="12,0,0,0"
+                        ToolTip="Nhập mã vận đơn và thông tin để tạo đơn mới"
+                        AutomationProperties.Name="Tạo đơn mới"
+                        Visibility="{Binding ShowCreateButton, Converter={StaticResource BoolToVis}}" />
+
                 <StackPanel VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{Binding ScreenTitle}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />

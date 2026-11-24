@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -95,10 +95,10 @@ public sealed class T034ProductStatsUiTests
                 vm.NavigateByKey("stats");
                 WpfTestHost.PumpDispatcher();
                 var sv = FindScrollViewer(window);
-                sv?.ScrollToBottom();
+                sv?.ScrollToVerticalOffset(0);
                 vm.StatisticsVm.SelectedProduct = vm.StatisticsVm.ProductRows.FirstOrDefault();
                 WpfTestHost.PumpDispatcher();
-                sv?.ScrollToBottom();
+                sv?.ScrollToVerticalOffset(0);
                 WpfTestHost.PumpDispatcher();
                 WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "01-product-stats-light.png"));
                 vm.SetTheme(ThemeService.DarkTheme);

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using QuanLyHangHoan.Core.Models;
@@ -201,45 +201,11 @@ public static class PhoneActions
     private static PhoneActionResult NewOrder(string db, string room, JsonElement r, string requestId, DateTime now)
     {
         var raw = Str(r, "code"); if (raw.Length == 0) raw = Str(r, "track");
-        var code = TrackingResolver.Normalize(raw);
         var cap = Str(r, "captureId");
-        if (code.Length == 0) return Make(room, requestId, raw, "invalid", "Mã vận đơn trống", "scan", false, cap);
-
-        var orderId = Str(r, "orderId").Trim();
-        var oidNorm = TrackingResolver.Normalize(orderId);
-        // Đã có ở đâu đó (kể cả kho lưu trữ / đã xóa): không tạo lại, không "hồi sinh" đơn đã xóa.
-        var hit = OrderRepository.Load(db).FirstOrDefault(s =>
-            OwnCodes(s.Order).Contains(code) || (oidNorm.Length > 0 && TrackingResolver.Normalize(s.Order.OrderId) == oidNorm && s.Order.Track.Length == 0));
-        if (hit is not null)
-        {
-            var where = hit.IsDeleted ? "mục Đã xóa" : hit.IsArchived ? "Kho lưu trữ" : "Bảng chính";
-            return Make(room, requestId, code, "duplicate", $"ĐƠN ĐÃ CÓ Ở {where.ToUpperInvariant()}, KHÔNG TẠO LẠI", "scan", false, cap);
-        }
-
-        var platformIn = Str(r, "platform");
-        var platform = platformIn.Length > 0 && platformIn != "auto" ? (platformIn.StartsWith("TikTok") ? "TikTok" : platformIn) : DetectPlatform(code);
-        var carrierIn = Str(r, "carrier");
-        var carrier = carrierIn.Length > 0 ? carrierIn : (Core.Import.LegacyText.DetectCarrierByTrackingCode(code) ?? (platform == "Shopee" ? "SPX Express" : "J&T Express"));
-        var stamp = now.ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-        var note = Str(r, "note").Trim();
-        var o = new Order
-        {
-            OrderId = orderId.Length > 0 ? orderId : code, Track = code, Platform = platform, Carrier = carrier,
-            OrderType = "Trả hàng/Hoàn tiền", PlatformStatus = "Đang chuyển hoàn", PreOrder = "Đơn thường",
-            Status = ReceiveStatus.NotReturned, ShipDate = stamp, ReturnDate = stamp, ImportedAt = stamp,
-            Note = note.Length > 0 ? Clip(note, 300) : "Đơn mới tạo từ máy quét điện thoại",
-            Items = { new OrderItem { Product = "Sản phẩm mới (Quét điện thoại)", Qty = 1 } },
-        };
-
-        using (var conn = new SqliteConnection($"Data Source={db};Pooling=False"))
-        {
-            conn.Open();
-            using var tx = conn.BeginTransaction();
-            OrderStore.Insert(conn, tx, o, "phone|" + o.Id);
-            OrderStore.AppendAudit(conn, tx, "phone_new_order", now, $"Điện thoại quét tạo đơn mới (MVĐ: {code}, sàn: {platform}) vào bảng chính");
-            tx.Commit();
-        }
-        return Make(room, requestId, code, "success", $"ĐÃ TẠO ĐƠN MỚI Ở BẢNG CHÍNH ({platform})", "scan", true, cap) with { Kind = "new_order" };
+        var res = NewOrderService.Create(db, new NewOrderInput(
+            raw, Str(r, "orderId"), Str(r, "platform"), Str(r, "carrier"), Note: Str(r, "note"), Origin: "phone"), now);
+        if (!res.Ok) return Make(room, requestId, res.Code.Length > 0 ? res.Code : raw, res.Outcome, res.Message, "scan", false, cap);
+        return Make(room, requestId, res.Code, "success", res.Message, "scan", true, cap) with { Kind = "new_order" };
     }
 
     // ---------------- chưa hỗ trợ ----------------

@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -788,7 +788,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             SelectedRow = null;
         }
         StatusBarText =
-            $"Đang hiển thị {filtered.Count:N0} / {_allRows.Count:N0} đơn  •  Nạp: {_lastLoadMs} ms  •  Lọc/Sắp xếp: {sw.ElapsedMilliseconds} ms  •  Virtualization: BẬT (Recycling)";
+            $"Đang hiển thị {filtered.Count:N0} / {_allRows.Count:N0} đơn  •  Nạp: {_lastLoadMs} ms  •  Lọc/Sắp xếp: {sw.ElapsedMilliseconds} ms  •  Virtualization: BẬT";
     }
 
     // ---------------- Thao tác thủ công trên đơn (T013) ----------------

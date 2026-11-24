@@ -211,6 +211,52 @@ public sealed class T035NewOrdersTableUiTests
     }
 
     [Fact]
+    public void Selected_rows_survive_scrolling_a_big_table()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var r = NewRig();
+            var window = new MainWindow
+            {
+                DataContext = r.Vm, Width = 1360, Height = 820, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false,
+            };
+            try
+            {
+                window.Show();
+                WpfTestHost.PumpDispatcher();
+                r.Vm.NavigateByKey("shopee_cancelled");
+                var many = Enumerable.Range(1, 3_000).Select(i => new Order
+                {
+                    OrderId = "SEL" + i, Track = "TRK" + i, Platform = "Shopee", OrderType = "Đơn hủy", Status = ReceiveStatus.NotReturned,
+                    ReturnedAt = Now.AddHours(-(i % 40)).ToString("dd/MM/yyyy HH:mm"),
+                }).ToList();
+                r.Vm.ShopeeCancelledVm.LoadOrders(many, Now);
+                WpfTestHost.PumpDispatcher();
+                var grid = FindGrid(window);
+                Assert.True(grid.Items.Count > 1000);
+                var picked = new[] { grid.Items[1], grid.Items[2] };
+                foreach (var p in picked) grid.SelectedItems.Add(p);
+                WpfTestHost.PumpDispatcher();
+                Assert.Equal(2, grid.SelectedItems.Count);
+                Assert.Equal(2, r.Vm.ShopeeCancelledVm.SelectedCount);
+                // Cuộn xuống rồi cuộn lên nhiều lần như người dùng kéo thanh cuộn.
+                foreach (var idx in new[] { 400, 900, 1500, 60, 2500, 5, 2900, 0, grid.Items.Count - 1, 10, 200 })
+                {
+                    grid.ScrollIntoView(grid.Items[idx]);
+                    grid.UpdateLayout();
+                    WpfTestHost.PumpDispatcher();
+                    Assert.Equal(2, grid.SelectedItems.Count);
+                    Assert.Contains(picked[0], grid.SelectedItems.Cast<object>());
+                    Assert.Contains(picked[1], grid.SelectedItems.Cast<object>());
+                    Assert.Equal(2, r.Vm.ShopeeCancelledVm.SelectedCount);
+                }
+            }
+            finally { window.Close(); WpfTestHost.PumpDispatcher(); }
+        });
+    }
+
+    [Fact]
     public void RenderScreenshots_UrgentClickReveal_ToReportsFolder()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

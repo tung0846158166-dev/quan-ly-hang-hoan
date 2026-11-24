@@ -24,6 +24,12 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
     public var detail: String = "Đang chờ máy tính xác nhận"
     /// Ghi chú gắn lúc quét đơn mới (lưu bền cùng lượt quét để gửi lại đúng ghi chú khi mất mạng).
     public var note: String = ""
+    /// T039/T040: Mã dòng kiện (`OrderRow.id`) đã gắn ảnh cục bộ (nil nếu chưa gắn hoặc không có ảnh).
+    public var attachedOrderId: String? = nil
+    /// T039/T040: ID bản ghi ảnh trong `OrderPhotoDiskStore` sau khi chuyển vào `Documents/order-photos/`.
+    public var attachedPhotoId: String? = nil
+    /// Giữ trường cũ từ T039 để giải mã tương thích ngược với `scan_items.json` đã lưu; không còn dùng ở T040.
+    public var photoAttachDismissed: Bool = false
 
     public init(requestId: String, code: String, kind: ScanKind, time: Int, photoFile: String?, note: String = "") {
         self.requestId = requestId
@@ -40,9 +46,10 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         case scanConfirmed, photoConfirmed, reviewRequired
         case photoFile, photoSentAt, photoAttempts, lastSendAt, attempts
         case orderNum, detail, note
+        case attachedOrderId, attachedPhotoId, photoAttachDismissed
     }
 
-    /// Giải mã tương thích ngược với tệp `scan_items.json` cũ (chưa có trường `note`, hoặc từng có trường phụ).
+    /// Giải mã tương thích ngược với tệp `scan_items.json` cũ (giữ các trường ảnh cũ để đọc không lỗi, thêm trường mới tùy chọn).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let rid = try c.decode(String.self, forKey: .requestId)
@@ -63,12 +70,23 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         self.orderNum = try? c.decodeIfPresent(String.self, forKey: .orderNum)
         self.detail = (try? c.decodeIfPresent(String.self, forKey: .detail)) ?? "Đang chờ máy tính xác nhận"
         self.note = (try? c.decodeIfPresent(String.self, forKey: .note)) ?? ""
+        self.attachedOrderId = try? c.decodeIfPresent(String.self, forKey: .attachedOrderId)
+        self.attachedPhotoId = try? c.decodeIfPresent(String.self, forKey: .attachedPhotoId)
+        self.photoAttachDismissed = (try? c.decodeIfPresent(Bool.self, forKey: .photoAttachDismissed)) ?? false
     }
 
-    /// Đã xong hẳn: PC xác nhận quét và (nếu có ảnh) đã xác nhận lưu ảnh, hoặc cần kiểm tra thủ công.
-    /// Quy tắc 6: ảnh chưa ACK không bao giờ coi là đã lưu.
+    /// T040: Lượt quét đang giữ ảnh tạm trong hàng đợi (chờ PC xác nhận hoặc chờ gắn vào kho đơn).
+    public var hasTemporaryPhoto: Bool {
+        if let f = photoFile, !f.isEmpty, attachedPhotoId == nil {
+            return true
+        }
+        return false
+    }
+
+    /// T039: Lượt quét chỉ cần PC xác nhận lệnh quét (`scanConfirmed`) là xong; không còn chờ ACK ảnh từ PC.
+    /// Quy tắc 6 vẫn giữ chặt cho lệnh quét: chỉ coi đã quét khi PC đã lưu bền và trả ACK.
     public var isSettled: Bool {
-        scanConfirmed && (photoFile == nil || photoConfirmed || reviewRequired || status == .error)
+        scanConfirmed
     }
 
     /// Cập nhật theo phản hồi của PC. Trả về true nếu có thay đổi.
@@ -76,12 +94,12 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
     public mutating func apply(_ ack: PcAck) -> Bool {
         guard ack.requestId == requestId, ack.code == code else { return false }
         guard ["success", "duplicate", "not_found", "ambiguous", "error", "invalid", "locked"].contains(ack.outcome) else { return false }
-        let isPhoto = ack.ackStage == "photo"
-        if (isPhoto || ack.captureId != nil) && ack.captureId != captureId { return false }
+        // T039: Bỏ luồng gửi ảnh sang PC -> bỏ qua mọi ACK giai đoạn ảnh (nếu có gói cũ còn sót).
+        if ack.ackStage == "photo" { return false }
+        if ack.captureId != nil && ack.captureId != captureId { return false }
         if reviewRequired { return false }
         // v2: PC TỪ CHỐI dứt khoát (yêu cầu không hợp lệ / đơn đang khóa): thôi gửi lại, báo lý do, người dùng kiểm tra thủ công.
         if ack.outcome == "invalid" || ack.outcome == "locked" {
-            if isPhoto { return false }
             scanConfirmed = true
             reviewRequired = true
             status = .error
@@ -92,35 +110,23 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
 
         if ack.outcome == "error" {
             if !scanConfirmed { status = .error }
-            detail = isPhoto
-                ? "PC chưa lưu ảnh thành công; app giữ ảnh và sẽ thử gửi lại."
-                : "PC chưa lưu thành công; app giữ lại và sẽ thử lại."
+            detail = "PC chưa lưu thành công; app giữ lại và sẽ thử lại."
             return true
         }
-        if isPhoto {
-            // Tương thích cả PC cũ (gửi photoSaved: true/false) và PC v2 (SyncProtocol.BuildPhotoAck: ackStage="photo", outcome="success", không gửi photoSaved).
-            // Quy tắc 6: photoSaved == false hoặc outcome khác success/duplicate tuyệt đối KHÔNG coi ảnh đã lưu.
-            if ack.photoSaved == true {
-                photoConfirmed = true
-            } else if ack.photoSaved == nil && (ack.outcome == "success" || ack.outcome == "duplicate") {
-                photoConfirmed = true
-            } else if !unmatched {
-                return false
-            }
-        } else {
-            scanConfirmed = true
-            status = ScanStatus(rawValue: ack.outcome) ?? .success
-            orderNum = ack.orderNum
-            if ack.photoSaved == true && ack.captureId == captureId { photoConfirmed = true }
-        }
+
+        scanConfirmed = true
+        status = ScanStatus(rawValue: ack.outcome) ?? .success
+        orderNum = ack.orderNum
+
         if unmatched {
             reviewRequired = true
             scanConfirmed = true
             status = ScanStatus(rawValue: ack.outcome) ?? .notFound
         }
         if let extra = ack.extra, !extra.isEmpty { detail = extra }
-        else if reviewRequired { detail = "Cần kiểm tra: ảnh vẫn giữ trên điện thoại, chưa gắn vào đơn." }
-        else if photoFile != nil && !photoConfirmed { detail = "Đã xác nhận quét. Ảnh đang gửi ngầm." }
+        else if status == .ambiguous { detail = "Trùng nhiều kiện, cần kiểm tra trên máy tính." }
+        else if status == .notFound { detail = "Không tìm thấy mã trên hệ thống." }
+        else if reviewRequired { detail = "Cần kiểm tra lại trên máy tính." }
         else if status == .duplicate { detail = "Mã này đã quét trước đó." }
         else { detail = "PC đã xác nhận." }
         return true
@@ -133,7 +139,8 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         return lastSendAt + Self.retrySchedule[idx]
     }
 
-    /// Giới hạn lịch sử: giữ tối đa `limit` mục đã hoàn tất mới nhất; TUYỆT ĐỐI không bỏ lượt chưa hoàn tất (`!isSettled`).
+    /// Giới hạn lịch sử: giữ tối đa `limit` mục đã hoàn tất mới nhất;
+    /// TUYỆT ĐỐI không bỏ lượt chưa xác nhận (`!isSettled`) hoặc lượt còn giữ ảnh tạm chờ gắn vào đơn (Quy tắc 6 & 8).
     public static func trimHistory(_ items: [ScanItem], limit: Int = 800) -> (kept: [ScanItem], dropped: [ScanItem]) {
         let safeLimit = max(0, limit)
         guard items.count > safeLimit else { return (items, []) }
@@ -141,7 +148,7 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         var kept: [ScanItem] = Array(items.prefix(tailStart))
         var dropped: [ScanItem] = []
         for it in items.suffix(from: tailStart) {
-            if it.isSettled {
+            if it.isSettled && !it.hasTemporaryPhoto {
                 dropped.append(it)
             } else {
                 kept.append(it)

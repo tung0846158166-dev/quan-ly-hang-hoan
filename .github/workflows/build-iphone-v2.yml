@@ -33,8 +33,17 @@ jobs:
       - name: Kiểm thử lõi (ScannerCore)
         working-directory: ios-app/ScannerCore
         run: |
-          set -o pipefail
-          swift test 2>&1 | tail -80
+          set +e
+          swift test > core-test.log 2>&1
+          status=$?
+          tail -80 core-test.log
+          if [ $status -ne 0 ]; then
+            # Mỗi lỗi biên dịch hoặc test lỗi thành một chú thích (annotation) đọc được công khai ở trang chạy, không cần đăng nhập để xem log.
+            grep -E "error:|: error|failed \(" core-test.log | sort -u | head -40 | while IFS= read -r line; do
+              echo "::error::$(echo "$line" | sed 's#.*/ios-app/##' | cut -c1-400)"
+            done
+          fi
+          exit $status
 
       - name: Cài XcodeGen
         run: brew install xcodegen

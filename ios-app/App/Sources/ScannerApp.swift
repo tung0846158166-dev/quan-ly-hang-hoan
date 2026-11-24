@@ -30,6 +30,8 @@ struct ContentView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
     @EnvironmentObject var router: NotificationRouter
+    @StateObject private var aiVM = AIChatViewModel()
+    @State private var showAI = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,14 +54,30 @@ struct ContentView: View {
                     .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                     .badge(engine.pendingCount)
                     .tag(NotificationRouter.historyTab)
-                AIChatView()
-                    .tabItem { Label("Hỏi AI", systemImage: "sparkles") }
-                    .tag(99)
                 SettingsView()
                     .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
                     .tag(NotificationRouter.settingsTab)
             }
             .tint(Theme.accent)
+            .overlay(alignment: .bottomTrailing) {
+                // Nút ✨ hỏi AI: có ở mọi tab, nằm trên thanh tab.
+                AIFloatingButton { Haptics.tap(); showAI = true }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 62)
+            }
+        }
+        .environmentObject(aiVM)
+        .onAppear { aiVM.bind(store) }
+        .sheet(isPresented: $showAI) {
+            // Cửa sổ chat dạng popup: kéo xuống để đóng; cuộc trò chuyện giữ nguyên khi đổi tab.
+            AIChatView()
+                .environmentObject(aiVM)
+                .environmentObject(engine)
+                .environmentObject(store)
+                .environmentObject(engine.photoManager)
+                .environmentObject(router)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

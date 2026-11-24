@@ -27,25 +27,8 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(n["note"] as? String, "Khách gửi hoàn")
     }
 
-    func testPhotoChunksRoundTripAndSafeChunkSize() {
-        let data = "data:image/jpeg;base64," + String(repeating: "AbC1", count: 1500)
-        let chunks = SyncProtocol.photoChunks(dataURL: data, code: "C", kind: .returnScan, requestId: "r", captureId: "r",
-                                              captureTime: 1, room: "ROOM-TEST-2026", now: 100, photoId: "ph_1")
-        XCTAssertEqual(chunks.count, 3)
-        XCTAssertEqual(chunks.compactMap { $0["total"] as? Int }, [3, 3, 3])
-        let joined = chunks.compactMap { $0["chunk"] as? String }.joined()
-        XCTAssertEqual(joined, data)
-        XCTAssertLessThan(SyncProtocol.json(chunks[0]).utf8.count, 4000)
-
-        // chunkSize <= 0 không chia cho 0
-        let safeChunks = SyncProtocol.photoChunks(dataURL: "abc", code: "C", kind: .returnScan, requestId: "r", captureId: "r",
-                                                  captureTime: 1, room: "ROOM-TEST-2026", now: 100, photoId: "ph_2", chunkSize: 0)
-        XCTAssertEqual(safeChunks.count, 3)
-        XCTAssertEqual(safeChunks.compactMap { $0["chunk"] as? String }.joined(), "abc")
-    }
-
     func testParseAckAndRejectEmptyRoom() {
-        let inner = "{\"type\":\"pc_ack\",\"room\":\"ROOM-TEST-2026\",\"requestId\":\"s-1\",\"code\":\"spxvn067887279218\",\"outcome\":\"success\",\"orderNum\":12,\"captureId\":\"s-1\",\"photoSaved\":true,\"ackStage\":\"photo\"}"
+        let inner = "{\"type\":\"pc_ack\",\"room\":\"ROOM-TEST-2026\",\"requestId\":\"s-1\",\"code\":\"spxvn067887279218\",\"outcome\":\"success\",\"orderNum\":12,\"captureId\":\"s-1\",\"photoSaved\":true,\"ackStage\":\"scan\"}"
         let outer = SyncProtocol.json(["event": "message", "message": inner])
         guard case .ack(let a)? = SyncProtocol.parseIncoming(sseData: outer, room: "ROOM-TEST-2026") else { return XCTFail("không đọc được ack") }
         XCTAssertEqual(a.code, "SPXVN067887279218")
@@ -61,18 +44,16 @@ final class ProtocolTests: XCTestCase {
     func testItemStateMachine() {
         var item = ScanItem(requestId: "s-1", code: "SPXVN067887279218", kind: .returnScan, time: 1, photoFile: "s-1.jpg")
         XCTAssertFalse(item.isSettled)
+        // ack sai request bị bỏ qua
+        XCTAssertFalse(item.apply(PcAck(requestId: "x", code: "SPXVN067887279218", outcome: "success", ackStage: nil, photoSaved: nil, captureId: nil, orderNum: nil, extra: nil)))
+        // ack giai đoạn ảnh bị bỏ qua (T039 không gửi ảnh sang PC)
+        XCTAssertFalse(item.apply(PcAck(requestId: "s-1", code: "SPXVN067887279218", outcome: "success", ackStage: "photo", photoSaved: true, captureId: "s-1", orderNum: nil, extra: nil)))
+        XCTAssertFalse(item.isSettled)
+        // PC xác nhận lệnh quét -> hoàn tất ngay (không còn chờ ảnh)
         let scanAck = PcAck(requestId: "s-1", code: "SPXVN067887279218", outcome: "success", ackStage: nil, photoSaved: nil, captureId: nil, orderNum: "7", extra: nil)
         XCTAssertTrue(item.apply(scanAck))
         XCTAssertTrue(item.scanConfirmed)
         XCTAssertEqual(item.status, .success)
-        XCTAssertFalse(item.isSettled, "còn chờ ảnh")
-        // ack sai request / sai captureId bị bỏ qua
-        XCTAssertFalse(item.apply(PcAck(requestId: "x", code: "SPXVN067887279218", outcome: "success", ackStage: nil, photoSaved: nil, captureId: nil, orderNum: nil, extra: nil)))
-        XCTAssertFalse(item.apply(PcAck(requestId: "s-1", code: "SPXVN067887279218", outcome: "success", ackStage: "photo", photoSaved: true, captureId: "khac", orderNum: nil, extra: nil)))
-        // photoSaved == false tuyệt đối KHÔNG coi ảnh đã lưu (Quy tắc 6)
-        XCTAssertFalse(item.apply(PcAck(requestId: "s-1", code: "SPXVN067887279218", outcome: "success", ackStage: "photo", photoSaved: false, captureId: "s-1", orderNum: nil, extra: nil)))
-        XCTAssertFalse(item.photoConfirmed)
-        XCTAssertTrue(item.apply(PcAck(requestId: "s-1", code: "SPXVN067887279218", outcome: "success", ackStage: "photo", photoSaved: true, captureId: "s-1", orderNum: nil, extra: nil)))
         XCTAssertTrue(item.isSettled)
     }
 

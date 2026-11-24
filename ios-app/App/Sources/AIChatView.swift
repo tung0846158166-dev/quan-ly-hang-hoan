@@ -63,7 +63,7 @@ final class AIChatViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var status = ""
     @Published var hasKey = false
-    @Published var showSettings = false
+
     @Published var groqModels: String
     @Published var geminiModels: String
 
@@ -159,7 +159,7 @@ final class AIChatViewModel: ObservableObject {
             let ok = results.filter { $0.error == nil }.count
             let lines = results.map { ($0.error == nil ? "✓ " : "✗ ") + $0.label + ($0.error.map { ": " + $0 } ?? "") }
             status = (ok > 0 ? "Dùng được \(ok)/\(results.count) mô hình." : "Không mô hình nào dùng được.") + "\n" + lines.joined(separator: "\n")
-            if ok > 0 { showSettings = false }
+
             isBusy = false
         }
     }
@@ -173,9 +173,12 @@ final class AIChatViewModel: ObservableObject {
     }
 }
 
+/// Cửa sổ chat dạng popup (bảng trượt) mở từ nút ✨ nổi. Dùng chung một AIChatViewModel của cả app, nên cuộc trò chuyện còn nguyên khi đổi tab.
 struct AIChatView: View {
     @EnvironmentObject var store: SnapshotStore
-    @StateObject private var vm = AIChatViewModel()
+    @EnvironmentObject var vm: AIChatViewModel
+    @EnvironmentObject var router: NotificationRouter
+    @Environment(.dismiss) private var dismiss
     @State private var openRow: OrderRow?
     @FocusState private var focused: Bool
 
@@ -192,6 +195,21 @@ struct AIChatView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 10) {
+                            if !vm.hasKey {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Chưa có khóa API. Hãy nhập khóa Groq và/hoặc Google trong Cài đặt.")
+                                        .font(.subheadline)
+                                    Button("Mở Cài đặt trợ lý AI") {
+                                        dismiss()
+                                        router.tab = NotificationRouter.settingsTab
+                                    }
+                                    .font(.subheadline.bold())
+                                }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.yellow.opacity(0.22))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
                             if vm.messages.isEmpty {
                                 Text("AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài. Dữ liệu là bản đã đồng bộ gần nhất từ máy tính.")
                                     .font(.footnote)
@@ -242,10 +260,9 @@ struct AIChatView: View {
                     Button("Mới") { vm.newChat() }.disabled(vm.messages.isEmpty)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { vm.showSettings = true } label: { Image(systemName: "gearshape") }
+                    Button("Đóng") { dismiss() }
                 }
             }
-            .sheet(isPresented: $vm.showSettings) { AIKeySettingsView(vm: vm) }
             .sheet(item: $openRow) { DetailView(row: $0) }
             .onAppear { vm.bind(store) }
         }
@@ -286,47 +303,66 @@ struct AIChatView: View {
     }
 }
 
+/// Cấu hình trợ lý AI nằm trong Cài đặt: khóa API (Keychain) và danh sách mô hình theo thứ tự ưu tiên.
 struct AIKeySettingsView: View {
-    @ObservedObject var vm: AIChatViewModel
+    @EnvironmentObject var vm: AIChatViewModel
     @State private var groqKey = ""
     @State private var geminiKey = ""
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section(header: Text("Groq (console.groq.com)")) {
-                    SecureField("Khóa API Groq (để trống = giữ khóa đã lưu)", text: $groqKey)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    TextField("Mô hình theo thứ tự ưu tiên", text: $vm.groqModels, axis: .vertical)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                        .font(.system(.footnote, design: .monospaced))
+        Form {
+            Section(header: Text("Groq (console.groq.com)")) {
+                SecureField("Khóa API Groq (để trống = giữ khóa đã lưu)", text: $groqKey)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.groqModels, axis: .vertical)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                    .font(.system(.footnote, design: .monospaced))
+            }
+            Section(header: Text("Google Gemini (aistudio.google.com)"),
+                    footer: Text("Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau, rồi sang Google. Khóa lưu trong Keychain của điện thoại và không hiện lại. Dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận.")) {
+                SecureField("Khóa API Google (để trống = giữ khóa đã lưu)", text: $geminiKey)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                    .font(.system(.footnote, design: .monospaced))
+            }
+            Section {
+                Button("Lưu và thử kết nối") {
+                    vm.saveSettings(groqKey: groqKey, geminiKey: geminiKey)
+                    groqKey = ""; geminiKey = ""
                 }
-                Section(header: Text("Google Gemini (aistudio.google.com)"),
-                        footer: Text("Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau, rồi sang Google. Khóa lưu trong Keychain của điện thoại và không hiện lại.")) {
-                    SecureField("Khóa API Google (để trống = giữ khóa đã lưu)", text: $geminiKey)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                        .font(.system(.footnote, design: .monospaced))
-                }
-                Section {
-                    Button("Lưu và thử kết nối") {
-                        vm.saveSettings(groqKey: groqKey, geminiKey: geminiKey)
-                        groqKey = ""; geminiKey = ""
-                    }
-                    .disabled(vm.isBusy)
-                    Button("Xóa các khóa khỏi điện thoại", role: .destructive) { vm.forgetKeys() }
-                }
-                if !vm.status.isEmpty {
-                    Section(header: Text("Trạng thái")) {
-                        Text(vm.status).font(.footnote)
-                    }
+                .disabled(vm.isBusy)
+                Button("Xóa các khóa khỏi điện thoại", role: .destructive) { vm.forgetKeys() }
+            }
+            if !vm.status.isEmpty {
+                Section(header: Text("Trạng thái")) {
+                    Text(vm.status).font(.footnote)
                 }
             }
-            .navigationTitle("Khóa API")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Xong") { dismiss() } } }
         }
+        .navigationTitle("Trợ lý AI")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// Nút ✨ nổi ở góc phải dưới, có ở mọi tab. Chạm để mở cửa sổ chat.
+struct AIFloatingButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 56, height: 56)
+                .background(
+                    Circle().fill(LinearGradient(colors: [Color(red: 0.39, green: 0.40, blue: 0.95),
+                                                          Color(red: 0.55, green: 0.36, blue: 0.96),
+                                                          Color(red: 0.93, green: 0.28, blue: 0.60)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+                )
+                .shadow(color: Color.black.opacity(0.28), radius: 8, x: 0, y: 4)
+        }
+        .accessibilityLabel("Hỏi AI về đơn hàng")
     }
 }

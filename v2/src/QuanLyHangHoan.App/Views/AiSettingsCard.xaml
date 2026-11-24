@@ -1,0 +1,34 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.AiSettingsCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:AiChatViewModel}"
+             UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
+    <StackPanel>
+        <TextBlock Text="Nút ✨ ở góc phải dưới của mọi màn hình mở cửa sổ hỏi đáp về đơn hàng. Nhập khóa của nhà cung cấp nào bạn có (một hoặc cả hai). Khóa lưu mã hóa trên máy này, không hiện lại sau khi lưu. Để trống ô khóa = giữ khóa đã lưu."
+                   TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,10" />
+
+        <TextBlock Text="Khóa Groq (console.groq.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
+        <PasswordBox x:Name="KeyBox" Padding="6,5" FontFamily="Consolas" />
+        <TextBlock Text="Mô hình Groq theo thứ tự ưu tiên (cách nhau dấu phẩy). Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau:"
+                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
+        <TextBox Text="{Binding GroqModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
+
+        <TextBlock Text="Khóa Google Gemini (aistudio.google.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
+        <PasswordBox x:Name="GeminiKeyBox" Padding="6,5" FontFamily="Consolas" />
+        <TextBlock Text="Mô hình Google theo thứ tự ưu tiên (dùng sau khi các mô hình Groq hết hạn mức):"
+                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
+        <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="Lưu và thử kết nối" Click="Save_Click" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" />
+            <Button Content="Xóa các khóa khỏi máy" Click="Forget_Click" Padding="12,6" Cursor="Hand" />
+        </StackPanel>
+        <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" />
+        <TextBlock Style="{x:Null}" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Text="Dữ liệu gửi cho nhà cung cấp AI không có tên, số điện thoại, địa chỉ người nhận. Câu hỏi và kết quả truy vấn vẫn đi qua internet tới Groq/Google." />
+    </StackPanel>
+</UserControl>

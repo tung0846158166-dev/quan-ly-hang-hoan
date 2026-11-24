@@ -227,7 +227,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             IsDemoMode = isDemoMode
         };
-        AiChatVm = new AiChatViewModel(aiSettingsStore, aiOrderLoader, returnOrderProvider.GetCurrentTime, OpenOrderDetail);
+        AiChatVm = new AiChatViewModel(aiSettingsStore, aiOrderLoader, returnOrderProvider.GetCurrentTime, OpenOrderDetail,
+            openSettings: () => { SettingsVm.SelectTab(SettingsViewModel.GeneralTabKey); NavigateByKey("settings"); });
+        SettingsVm.AiChat = AiChatVm;
         HelpVm = new HelpViewModel(
             diagnosticsProvider ?? new FakeDiagnosticsProvider(),
             _backupController,
@@ -395,7 +397,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["settings"] = SettingsVm;
         SettingsVm.AttachImportPages(k => k switch { "file_import" => FileImportVm, "folder_watch" => FolderWatchVm, "google_sheet" => GoogleSheetVm, "salework" => SaleworkVm, _ => null });
         _pageCache["help"] = HelpVm;
-        _pageCache["ai_chat"] = AiChatVm;
         _pageCache["activity"] = ActivityLogVm;
 
         _homeNavItem = new NavigationItem(
@@ -446,7 +447,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
             new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
             new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm),
-            new NavigationItem("ai_chat", "🤖", "Hỏi AI", "CHUNG", () => AiChatVm),
             new NavigationItem("help", "❓", "Trợ giúp", "CHUNG", () => HelpVm)
         ];
 

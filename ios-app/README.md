@@ -6,6 +6,7 @@ Dùng với **app Windows v2** qua **mã phòng**. Bản này được tách t�
 - Không còn mã phòng mặc định `SHP-2026`: phải dán mã phòng của app PC v2 (màn "Đồng bộ điện thoại"), tối thiểu 12 ký tự.
 - Bỏ **tạo đơn hủy** từ điện thoại và bỏ **Hộp Đơn Mới** (PC v2 không có). Đơn thường quét từ điện thoại vào thẳng Bảng chính của PC.
 - Đổi trạng thái chỉ gồm: Chưa nhận, Hàng đã trả, Không cần nhận, Bị mất.
+- Ảnh chụp lúc quét chỉ được lưu cục bộ vào Chi tiết đơn (`Documents/order-photos/`, tối đa 5 ảnh/kiện) khi PC xác nhận khớp đúng 1 kiện; lượt quét không tìm thấy, mơ hồ, lỗi, bị từ chối hoặc trùng sẽ tự xóa ảnh tạm ngay; KHÔNG gửi ảnh sang máy tính.
 - Cài song song được với bản cũ (khác tên và mã định danh `com.quanlyhanghoan.scannerv2`).
 
 ## Build (không có máy Mac)

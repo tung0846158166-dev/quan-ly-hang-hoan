@@ -54,6 +54,7 @@ final class SyncEngine: ObservableObject {
 
     var snapshotProvider: (() -> Data?)?
     let snapshot = SnapshotStore()
+    let photoManager = OrderPhotoManager()
 
     private let client = NtfyClient()
     private var mqttClients: [MQTTClient] = []
@@ -80,16 +81,21 @@ final class SyncEngine: ObservableObject {
     private var pendingCommands: [String: PendingCommand] = [:]
     private static let maxPendingCommands = 200
     private static let maxActionFeedbackEntries = 200
-    private static let maxConfirmedPhotoFiles = 200
-    private static let maxConfirmedPhotoBytes: Int64 = 30 * 1024 * 1024
+    /// `true` chỉ khi tệp `scan_items.json` được nạp sạch (hoặc lần chạy đầu chưa có tệp); khóa dọn ảnh tạm mồ côi nếu đọc lỗi.
+    private var scanItemsLoadedCleanly = true
 
     var pendingNoteCount: Int { pendingCommands.count }
 
     init() {
         room = SyncProtocol.normalizeRoom(UserDefaults.standard.string(forKey: "room") ?? "")   // v2: không có mã phòng mặc định
         try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
-        if let data = try? Data(contentsOf: storeURL), let list = try? JSONDecoder().decode([ScanItem].self, from: data) {
-            items = list
+        if FileManager.default.fileExists(atPath: storeURL.path) {
+            if let data = try? Data(contentsOf: storeURL), let list = try? JSONDecoder().decode([ScanItem].self, from: data) {
+                items = list
+                scanItemsLoadedCleanly = true
+            } else {
+                scanItemsLoadedCleanly = false
+            }
         }
         if let data = try? Data(contentsOf: pendingCmdsURL),
            let list = try? JSONDecoder().decode([PendingCommand].self, from: data) {
@@ -136,19 +142,17 @@ final class SyncEngine: ObservableObject {
         return nil
     }
 
-    /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
+    /// Gửi lại một lượt quét chưa được PC xác nhận (T039: không gửi ảnh sang PC).
     func resend(_ requestId: String) {
         guard !isDemoMode, !room.isEmpty else { return }
         guard let i = items.firstIndex(where: { $0.requestId == requestId }) else { return }
         let it = items[i]
-        if it.photoFile != nil && !it.photoConfirmed { items[i].photoAttempts = 0 }   // cho phép tự thử gửi ảnh lại
         if !it.scanConfirmed { transmit(requestId) }
-        if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired { transmitPhoto(requestId) }
         banner = Banner(code: it.code, text: "Đã gửi lại, đang chờ PC xác nhận", color: Theme.warning)
     }
 
-    /// Đưa tất cả lượt quét chưa được máy tính xác nhận (và ảnh chưa gửi xong) vào hàng gửi lại ngay.
-    /// Mỗi nhịp app gửi tối đa 6 lượt quét + 1 ảnh nên không dồn cục; 100 đơn mất khoảng nửa phút.
+    /// Đưa tất cả lượt quét chưa được máy tính xác nhận vào hàng gửi lại ngay.
+    /// Mỗi nhịp app gửi tối đa 6 lượt quét nên không dồn cục; 100 đơn mất khoảng nửa phút.
     @discardableResult
     func resendAllPending(kind: ScanKind? = nil) -> Int {
         guard !isDemoMode else { return 0 }
@@ -156,9 +160,6 @@ final class SyncEngine: ObservableObject {
         for i in items.indices where !items[i].isSettled && (kind == nil || items[i].kind == kind) {
             n += 1
             if !items[i].scanConfirmed { items[i].lastSendAt = 0; items[i].attempts = 0 }
-            if items[i].photoFile != nil && !items[i].photoConfirmed && !items[i].reviewRequired {
-                items[i].photoAttempts = 0; items[i].photoSentAt = 0
-            }
         }
         if n > 0 { persist() }
         return n
@@ -192,11 +193,79 @@ final class SyncEngine: ObservableObject {
         pcLastSeen = now
     }
 
+    /// Đường dẫn ảnh tạm của lượt quét (chưa gắn vào kiện).
     func photoURL(_ item: ScanItem) -> URL? { item.photoFile.map { photosDir.appendingPathComponent($0) } }
+
+    /// Đường dẫn ảnh hiển thị cho một lượt quét (ưu tiên ảnh đã chuyển vào kho `order-photos/`, sau đó tới ảnh đang giữ ở lượt quét).
+    func scanDisplayPhotoURL(_ item: ScanItem) -> URL? {
+        if let pid = item.attachedPhotoId, let u = photoManager.photoURL(forPhotoId: pid) {
+            return u
+        }
+        if let u = photoURL(item), FileManager.default.fileExists(atPath: u.path) {
+            return u
+        }
+        return nil
+    }
+
+    /// Thống kê các ảnh tạm đang chờ PC xác nhận trong `Documents/photos/`.
+    var tempPhotoSummary: PhotoStorageSummary {
+        guard !isDemoMode else { return PhotoStorageSummary() }
+        return ScanPhotoLifecycle.tempPhotoSummary(for: items, tempPhotosDir: photosDir)
+    }
+
+    /// Các lượt quét treo quá 7 ngày chưa có kết quả vẫn còn ảnh tạm (T040 mục 3: chỉ cảnh báo để người dùng quyết định).
+    func stalePendingTempPhotoItems(nowMs: Int? = nil) -> [ScanItem] {
+        guard !isDemoMode else { return [] }
+        return ScanPhotoLifecycle.stalePendingTempPhotoItems(
+            in: items,
+            tempPhotosDir: photosDir,
+            nowMs: nowMs ?? self.nowMs()
+        )
+    }
+
+    func isStalePendingTempPhoto(_ item: ScanItem, nowMs: Int? = nil) -> Bool {
+        guard !isDemoMode, item.hasTemporaryPhoto else { return false }
+        let stale = stalePendingTempPhotoItems(nowMs: nowMs)
+        return stale.contains { $0.requestId == item.requestId }
+    }
+
+    var stalePendingTempPhotoSummary: PhotoStorageSummary {
+        guard !isDemoMode else { return PhotoStorageSummary() }
+        let stale = stalePendingTempPhotoItems()
+        return ScanPhotoLifecycle.tempPhotoSummary(for: stale, tempPhotosDir: photosDir)
+    }
+
+    /// Người dùng chọn bỏ ẢNH TẠM của một lượt quét treo quá 7 ngày (KHÔNG xóa lượt quét, Quy tắc 8).
+    @discardableResult
+    func discardTempPhoto(requestId: String) -> PhotoCleanupResult {
+        guard !isDemoMode else { return PhotoCleanupResult(deletedCount: 0, freedBytes: 0) }
+        let res = ScanPhotoLifecycle.discardTempPhotos(
+            requestIds: [requestId],
+            items: &items,
+            tempPhotosDir: photosDir
+        )
+        if res.deletedCount > 0 { persist() }
+        return res
+    }
+
+    /// Người dùng chọn bỏ toàn bộ ẢNH TẠM của các lượt quét treo quá 7 ngày (KHÔNG xóa lượt quét, Quy tắc 8).
+    @discardableResult
+    func discardStalePendingTempPhotos() -> PhotoCleanupResult {
+        guard !isDemoMode else { return PhotoCleanupResult(deletedCount: 0, freedBytes: 0) }
+        let ids = Set(stalePendingTempPhotoItems().map { $0.requestId })
+        let res = ScanPhotoLifecycle.discardTempPhotos(
+            requestIds: ids,
+            items: &items,
+            tempPhotosDir: photosDir
+        )
+        if res.deletedCount > 0 { persist() }
+        return res
+    }
 
     // MARK: vòng đời
     func start() {
         snapshot.onNeedFull = { [weak self] in self?.requestFullIfNeeded() }
+        snapshot.onRowsUpdated = { [weak self] in self?.reconcileScanPhotos() }
         snapshot.unconfirmedReturnCodes = { [weak self] in
             Set((self?.items ?? []).filter { $0.kind == .returnScan && !$0.scanConfirmed }.map { $0.code.uppercased() })
         }
@@ -217,7 +286,15 @@ final class SyncEngine: ObservableObject {
         }
         guard !started else { return }
         started = true
-        cleanupPhotos()
+        // T040: Đối soát ảnh tạm còn tồn từ phiên trước (đúng -> gắn vào kho, không đúng -> xóa ngay, đang chờ -> giữ tạm).
+        reconcileScanPhotos()
+        // Dọn tệp JPEG mồ côi trong `Documents/order-photos/` và `Documents/photos/` chỉ khi chắc chắn và ghi nhật ký.
+        photoManager.runSafeOrphanCleanup()
+        photoManager.runSafeTempOrphanCleanup(
+            tempPhotosDir: photosDir,
+            items: items,
+            scanItemsLoadedCleanly: scanItemsLoadedCleanly
+        )
         startSSE()
         startMQTT()
         tickTask = Task { [weak self] in
@@ -342,7 +419,7 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    /// Kênh vừa nối: báo cho PC biết, mở khóa lại hàng đợi (gồm cả ảnh từng chạm 6 lần thử khi mất mạng), xin danh sách đơn nếu cũ.
+    /// Kênh vừa nối: báo cho PC biết, mở khóa lại hàng đợi lệnh quét/sửa, xin danh sách đơn nếu cũ.
     private func channelOpened() {
         guard !room.isEmpty else { return }
         let hello = SyncProtocol.json(["type": "phone_connected", "room": room, "time": nowMs()])
@@ -439,12 +516,12 @@ final class SyncEngine: ObservableObject {
             let extra = ack.extra ?? ""
             if isDuplicate("a|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(stage)|\(cap)|\(saved)|\(extra)") { return }
             guard let i = items.firstIndex(where: { $0.requestId == ack.requestId }) else { return }
-            let wasPhotoConfirmed = items[i].photoConfirmed
             if items[i].apply(ack) {
+                // T040: Áp dụng quy tắc giữ/xóa ảnh ngay khi có kết quả từ PC.
+                reconcileScanPhotos()
                 persist()
-                showResult(items[i])
-                if !wasPhotoConfirmed && items[i].photoConfirmed {
-                    cleanupPhotos()
+                if let updated = items.first(where: { $0.requestId == ack.requestId }) {
+                    showResult(updated)
                 }
             }
         default:
@@ -618,8 +695,8 @@ final class SyncEngine: ObservableObject {
             banner = Banner(code: code, text: "Chưa có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)
         }
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        // T040: Chỉ gửi LỆNH QUÉT sang PC; giữ ảnh TẠM trong hàng đợi cho tới khi PC trả ACK (đúng -> gắn vào đơn, sai -> xóa ngay).
         transmit(rid)
-        if savedFile != nil { transmitPhoto(rid) }
         return true
     }
 
@@ -844,7 +921,7 @@ final class SyncEngine: ObservableObject {
         return out
     }
 
-    // MARK: gửi
+    // MARK: gửi lệnh quét (T039: KHÔNG còn gửi ảnh sang PC; ảnh lưu cục bộ trên điện thoại)
     private func transmit(_ id: String) {
         guard !isDemoMode, !room.isEmpty else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }) else { return }
@@ -858,61 +935,9 @@ final class SyncEngine: ObservableObject {
         broadcast(body, title: "Shopee Scan", room: r)
     }
 
-    private func transmitPhoto(_ id: String) {
-        guard !isDemoMode, !room.isEmpty else { return }
-        guard let i = items.firstIndex(where: { $0.requestId == id }), let file = items[i].photoFile else { return }
-        let url = photosDir.appendingPathComponent(file)
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            items[i].detail = "Không tìm thấy tệp ảnh trên máy; không thể gửi ảnh."
-            items[i].photoAttempts = 6
-            persist()
-            return
-        }
-        items[i].photoSentAt = nowMs()
-        items[i].photoAttempts += 1
-        let it = items[i]
-        let r = room
-        persist()
-        let stamp = nowMs()
-        // Ảnh chỉ đi qua MỘT broker MQTT (không nhân ba); ntfy chỉ dùng khi nó đang nối hoặc MQTT chưa nối được.
-        let mq = mqttClients.last(where: { $0.isConnected })
-        let useNtfy = sseConnected || mq == nil
-        let mqTopic = SyncProtocol.mqttTopic(room: r)
-        let ntfyTopic = SyncProtocol.topic(room: r)
-        let client = self.client
-        // Đọc file, mã hóa base64 và cắt mảnh ở luồng nền.
-        Task.detached(priority: .utility) { [weak self] in
-            guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
-            let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
-            let chunks = SyncProtocol.photoChunks(dataURL: dataURL, code: it.code, kind: it.kind, requestId: it.requestId,
-                captureId: it.captureId, captureTime: it.time, room: r, now: stamp, photoId: "ph_\(stamp)_\(it.photoAttempts)")
-            for c in chunks {
-                if Task.isCancelled { return }
-                let shouldContinue: Bool = await MainActor.run { [weak self] in
-                    guard let self = self, !self.isDemoMode, self.room == r else { return false }
-                    guard let cur = self.items.first(where: { $0.requestId == it.requestId }) else { return false }
-                    return !cur.photoConfirmed && !cur.reviewRequired
-                }
-                if !shouldContinue { return }
-                let body = SyncProtocol.json(c)
-                mq?.publish(topic: mqTopic, body: body)
-                if useNtfy {
-                    try? await client.post(topic: ntfyTopic, title: "Shopee Photo Chunk", body: body)
-                    try? await Task.sleep(nanoseconds: 45_000_000)
-                } else {
-                    try? await Task.sleep(nanoseconds: 15_000_000)
-                }
-            }
-        }
-    }
-
     private func resetPendingForReconnect() {
         for i in items.indices where !items[i].isSettled {
             items[i].lastSendAt = 0
-            if items[i].photoFile != nil && !items[i].photoConfirmed && !items[i].reviewRequired {
-                items[i].photoSentAt = 0
-                if items[i].photoAttempts >= 6 { items[i].photoAttempts = 0 }
-            }
         }
     }
 
@@ -935,25 +960,11 @@ final class SyncEngine: ObservableObject {
 
         let n = nowMs()
         var needPoll = false
-        var scanBudget = 6, photoBudget = 1
-        let backlog = items.reduce(0) { $0 + (($1.isSettled || $1.scanConfirmed) ? 0 : 1) }
+        var scanBudget = 6
         for it in items.reversed() where !it.isSettled {
             if !it.scanConfirmed {
                 needPoll = true
                 if scanBudget > 0 && n >= it.nextRetryDue() { scanBudget -= 1; transmit(it.requestId) }
-            }
-            if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired {
-                if it.photoAttempts < 6 {
-                    if n - it.photoSentAt > 30_000 && n - it.time > 8_000 {
-                        needPoll = true
-                        if photoBudget > 0 && backlog <= 10 { photoBudget -= 1; transmitPhoto(it.requestId) }
-                    }
-                } else if it.scanConfirmed,
-                          let idx = items.firstIndex(where: { $0.requestId == it.requestId }),
-                          !items[idx].detail.contains("thử lại") && !items[idx].detail.contains("Không tìm thấy tệp ảnh") {
-                    items[idx].detail = "Ảnh chưa được PC xác nhận sau 6 lần thử; bấm \"Gửi lại\" khi mạng ổn định."
-                    persist()
-                }
             }
         }
         // Hỏi lại ntfy để bắt phản hồi bị lỡ khi mất kết nối.
@@ -965,78 +976,53 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    // MARK: lịch sử & dọn ảnh
+    // MARK: vòng đời ảnh tạm -> kho đơn (`Documents/order-photos/`) theo T040
+
+    /// Đối soát toàn bộ ảnh tạm trong hàng đợi theo kết quả PC ACK (T040):
+    /// - PC ACK thành công + khớp đúng 1 kiện -> gắn vào kho `Documents/order-photos/`, xóa tệp tạm.
+    /// - Không tìm thấy / mơ hồ / lỗi / bị từ chối / quét trùng -> xóa tệp tạm và mọi tham chiếu ngay.
+    /// - Chưa có kết quả -> giữ ảnh tạm trong hàng đợi, không xóa.
+    func reconcileScanPhotos() {
+        guard !isDemoMode else { return }
+        let report = photoManager.reconcileScanPhotos(
+            items: &items,
+            tempPhotosDir: photosDir,
+            snapshot: snapshot
+        )
+        if report.changed {
+            persist()
+        }
+        if report.waitingForFreshSnapshot && channelUp {
+            requestFullIfNeeded()
+        }
+    }
+
+    // MARK: lịch sử (T040: xóa lượt quét -> xóa luôn ảnh tạm; KHÔNG đụng ảnh đã gắn vào đơn trong `Documents/order-photos/`)
     func delete(_ item: ScanItem) {
-        if !isDemoMode { removePhoto(item) }
-        items.removeAll { $0.requestId == item.requestId }
-        persist()
+        if isDemoMode {
+            items.removeAll { $0.requestId == item.requestId }
+            return
+        }
+        if ScanPhotoLifecycle.deleteScanItem(requestId: item.requestId, items: &items, tempPhotosDir: photosDir) {
+            persist()
+        }
     }
 
     func clear(kind: ScanKind) {
-        if !isDemoMode { items.filter { $0.kind == kind }.forEach(removePhoto) }
-        items.removeAll { $0.kind == kind }
-        persist()
-    }
-
-    private func removePhoto(_ it: ScanItem) {
-        if let u = photoURL(it) { try? FileManager.default.removeItem(at: u) }
+        if isDemoMode {
+            items.removeAll { $0.kind == kind }
+            return
+        }
+        if ScanPhotoLifecycle.clearScanItems(kind: kind, items: &items, tempPhotosDir: photosDir) > 0 {
+            persist()
+        }
     }
 
     private func trimHistory() {
         let res = ScanItem.trimHistory(items, limit: 800)
         guard !res.dropped.isEmpty else { return }
-        res.dropped.forEach(removePhoto)
+        // `ScanItem.trimHistory` đã giữ lại mọi mục chưa xác nhận hoặc còn ảnh tạm; ảnh đã gắn nằm an toàn ở `Documents/order-photos/`.
         items = res.kept
-        cleanupPhotos()
-    }
-
-    /// Dọn tệp ảnh mồ côi và giới hạn dung lượng ảnh ĐÃ ĐƯỢC PC XÁC NHẬN (<= 30 MB / 200 tệp).
-    /// Quy tắc 6: TUYỆT ĐỐI không xóa tệp ảnh nào chưa `photoConfirmed`.
-    private func cleanupPhotos() {
-        guard !isDemoMode else { return }
-        let dir = photosDir
-        let snapshotItems = items
-        let maxFiles = Self.maxConfirmedPhotoFiles
-        let maxBytes = Self.maxConfirmedPhotoBytes
-        persistQueue.async { [weak self] in
-            let fm = FileManager.default
-            guard let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]) else { return }
-            let referenced = Set(snapshotItems.compactMap { $0.photoFile })
-            // 1. Xóa tệp mồ côi không có lượt quét nào tham chiếu.
-            for u in files where !referenced.contains(u.lastPathComponent) {
-                try? fm.removeItem(at: u)
-            }
-            // 2. Giới hạn dung lượng ảnh ĐÃ xác nhận lưu trên PC (giữ ảnh mới nhất, xóa ảnh cũ nhất vượt hạn mức).
-            let confirmed = snapshotItems
-                .filter { $0.photoConfirmed && $0.photoFile != nil }
-                .sorted { $0.time > $1.time }
-            var keptCount = 0
-            var keptBytes: Int64 = 0
-            var prunedIds: [String] = []
-            for it in confirmed {
-                guard let fname = it.photoFile else { continue }
-                let u = dir.appendingPathComponent(fname)
-                let size = Int64((try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
-                if keptCount < maxFiles && (keptBytes + size) <= maxBytes {
-                    keptCount += 1
-                    keptBytes += size
-                } else {
-                    try? fm.removeItem(at: u)
-                    prunedIds.append(it.requestId)
-                }
-            }
-            guard !prunedIds.isEmpty else { return }
-            let idSet = Set(prunedIds)
-            Task { @MainActor [weak self] in
-                guard let self = self, !self.isDemoMode else { return }
-                var changed = false
-                for i in self.items.indices where idSet.contains(self.items[i].requestId) && self.items[i].photoConfirmed {
-                    self.items[i].photoFile = nil
-                    changed = true
-                }
-                if changed { self.persist() }
-            }
-        }
     }
 
     /// Ghi danh sách quét xuống máy: gom nhiều lần gọi liên tiếp thành một, mã hóa + ghi ở luồng nền.

@@ -29,6 +29,7 @@ public sealed partial class AiChatViewModel : ObservableObject
     private readonly Func<DateTime> _clock;
     private readonly Action<Order> _openOrder;
     private readonly Func<IReadOnlyList<AiEndpoint>, IAiChat>? _chatFactory;
+    private readonly Action? _openSettings;
     private IAiChat? _chat;
     private CancellationTokenSource? _cts;
 
@@ -37,13 +38,15 @@ public sealed partial class AiChatViewModel : ObservableObject
         Func<IReadOnlyList<StoredOrder>>? loader,
         Func<DateTime> clock,
         Action<Order> openOrder,
-        Func<IReadOnlyList<AiEndpoint>, IAiChat>? chatFactory = null)
+        Func<IReadOnlyList<AiEndpoint>, IAiChat>? chatFactory = null,
+        Action? openSettings = null)
     {
         _store = store;
         _loader = loader;
         _clock = clock;
         _openOrder = openOrder;
         _chatFactory = chatFactory;
+        _openSettings = openSettings;
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         GroqModels = store?.LoadModel(AiSettingsStore.Groq) ?? AiChatService.DefaultGroqModels;
         GeminiModels = store?.LoadModel(AiSettingsStore.Gemini) ?? AiChatService.DefaultGeminiModels;
@@ -74,11 +77,14 @@ public sealed partial class AiChatViewModel : ObservableObject
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _hasKey;
-    [ObservableProperty] private bool _showSettings;
+    [ObservableProperty] private bool _isPanelOpen;
 
     partial void OnIsBusyChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
     partial void OnInputChanged(string value) => SendCommand.NotifyCanExecuteChanged();
-    partial void OnHasKeyChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
+    partial void OnHasKeyChanged(bool value) { SendCommand.NotifyCanExecuteChanged(); OnPropertyChanged(nameof(NeedsKey)); }
+
+    /// <summary>Có thể dùng AI nhưng chưa nhập khóa: hiện lời nhắc kèm nút mở Cài đặt.</summary>
+    public bool NeedsKey => Available && !HasKey;
 
     public bool CanSend => Available && HasKey && !IsBusy && !string.IsNullOrWhiteSpace(Input);
 
@@ -144,7 +150,18 @@ public sealed partial class AiChatViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ToggleSettings() => ShowSettings = !ShowSettings;
+    private void TogglePanel() => IsPanelOpen = !IsPanelOpen;
+
+    [RelayCommand]
+    private void ClosePanel() => IsPanelOpen = false;
+
+    /// <summary>Đóng cửa sổ chat và mở Cài đặt (nơi nhập khóa API).</summary>
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        IsPanelOpen = false;
+        _openSettings?.Invoke();
+    }
 
     [RelayCommand]
     private void OpenRef(AiOrderRef? r)
@@ -177,7 +194,7 @@ public sealed partial class AiChatViewModel : ObservableObject
             var ok = results.Count(r => r.Error is null);
             var lines = results.Select(r => (r.Error is null ? "✓ " : "✗ ") + r.Label + (r.Error is null ? "" : ": " + r.Error));
             StatusText = (ok > 0 ? $"Dùng được {ok}/{results.Count} mô hình. " : "Không mô hình nào dùng được. ") + "\n" + string.Join("\n", lines);
-            if (ok > 0) ShowSettings = false;
+
         }
         catch (Exception ex) { StatusText = "Không dùng được: " + ex.Message; }
         finally { IsBusy = false; }

@@ -59,6 +59,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public bool IsDemoMode { get; set; }
 
+    /// <summary>Trợ lý AI: Cài đặt hiện khối nhập khóa API và danh sách mô hình (MainViewModel gán sau khi tạo).</summary>
+    public AiChatViewModel? AiChat { get; set; }
+
     // ---------------- các thẻ (tab): Chung + 4 đường nạp đơn (trước đây nằm ở thanh bên) ----------------
     public const string GeneralTabKey = "general";
     public static readonly string[] ImportTabKeys = { "file_import", "folder_watch", "google_sheet", "salework" };

@@ -386,6 +386,50 @@
 
             <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
 
+            <!-- Trợ lý AI: cửa sổ chat dạng popup (mở bằng nút ✨ nổi ở góc phải dưới, có ở mọi màn hình) -->
+            <Border x:Name="AiChatPanel" Grid.Row="1" Panel.ZIndex="115" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,20,88" Width="440" Height="560"
+                    Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushStrong}" BorderThickness="1.2" CornerRadius="12"
+                    Visibility="{Binding AiChatVm.IsPanelOpen, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="5" Opacity="0.30" Color="#000000" />
+                </Border.Effect>
+                <Border CornerRadius="11" ClipToBounds="True">
+                    <views:AiChatView DataContext="{Binding AiChatVm}" />
+                </Border>
+            </Border>
+            <Button x:Name="AiFloatingButton" Grid.Row="1" Panel.ZIndex="120" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,20,20" Width="56" Height="56" Cursor="Hand" ToolTip="Hỏi AI về đơn hàng"
+                    Command="{Binding AiChatVm.TogglePanelCommand}" AutomationProperties.Name="Hỏi AI">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Disc" Width="56" Height="56">
+                                <Ellipse.Fill>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                        <GradientStop Color="#6366F1" Offset="0" />
+                                        <GradientStop Color="#8B5CF6" Offset="0.55" />
+                                        <GradientStop Color="#EC4899" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Ellipse.Fill>
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.40" Color="#4C1D95" />
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <TextBlock Text="✨" FontSize="26" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Disc" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Disc" Property="Opacity" Value="0.75" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
             <!-- Chuông thông báo: khung thả xuống (T027) -->
             <Border x:Name="NotificationDropdown" Grid.Row="1" Panel.ZIndex="110" HorizontalAlignment="Right" VerticalAlignment="Top"
                     Margin="0,4,16,0" Width="430" MaxHeight="520"

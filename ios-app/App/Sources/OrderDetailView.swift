@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 import ScannerCore
 
 /// Màn Chi tiết đơn hàng thiết kế lại (T033):
@@ -11,6 +12,7 @@ struct DetailView: View {
     @Environment(\.colorScheme) private var scheme
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
+    @EnvironmentObject var photoManager: OrderPhotoManager
 
     @State private var copiedCode: String?
     @State private var showNoteSheet = false
@@ -19,6 +21,12 @@ struct DetailView: View {
     @State private var watchDraft = false
     @State private var askDelete = false
     @State private var confirmDelete = false
+    @State private var viewerSession: PhotoViewerSession?
+    @State private var showCameraPicker = false
+    @State private var selectedPickerItem: PhotosPickerItem?
+    @State private var photoPendingDelete: OrderPhotoRecord?
+    @State private var photoAlertMessage: String?
+    @State private var isSavingPhoto = false
 
     private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất"]
 
@@ -94,6 +102,7 @@ struct DetailView: View {
                     heroCard
                     quickActionsBar
                     productsCard
+                    photosCard
 
                     if live.inReturnWatch {
                         returnJourneyCard
@@ -124,6 +133,51 @@ struct DetailView: View {
             }
             .sheet(isPresented: $showStatusSheet) {
                 statusPickerSheet
+            }
+            .sheet(isPresented: $showCameraPicker) {
+                CameraPhotoPicker { img in
+                    Task {
+                        await handleAddedCameraImage(img)
+                    }
+                }
+            }
+            .fullScreenCover(item: $viewerSession) { session in
+                ZoomablePhotoViewer(
+                    items: session.items,
+                    initialIndex: session.initialIndex
+                ) { deletedId in
+                    _ = photoManager.deletePhoto(id: deletedId)
+                }
+            }
+            .onChange(of: selectedPickerItem) { newItem in
+                guard let pickerItem = newItem else { return }
+                selectedPickerItem = nil
+                Task {
+                    await handleSelectedLibraryItem(pickerItem)
+                }
+            }
+            .alert("Xóa ảnh này?", isPresented: Binding(
+                get: { photoPendingDelete != nil },
+                set: { if !$0 { photoPendingDelete = nil } }
+            )) {
+                Button("Hủy", role: .cancel) { photoPendingDelete = nil }
+                Button("Xóa ảnh", role: .destructive) {
+                    if let target = photoPendingDelete {
+                        Haptics.medium()
+                        _ = photoManager.deletePhoto(id: target.id)
+                    }
+                    photoPendingDelete = nil
+                }
+            } message: {
+                Text("Ảnh sẽ bị xóa khỏi điện thoại và không thể khôi phục.")
+            }
+            .alert("Thông báo ảnh", isPresented: Binding(
+                get: { photoAlertMessage != nil },
+                set: { if !$0 { photoAlertMessage = nil } }
+            )) {
+                Button("Đã hiểu", role: .cancel) { photoAlertMessage = nil }
+            } message: {
+                Text(photoAlertMessage ?? "")
             }
             .confirmationDialog("Xóa đơn này?", isPresented: $askDelete, titleVisibility: .visible) {
                 Button("Tiếp tục xóa", role: .destructive) { confirmDelete = true }
@@ -580,6 +634,198 @@ struct DetailView: View {
             .background(color.opacity(0.14))
             .foregroundColor(color)
             .clipShape(Capsule())
+    }
+
+    // MARK: - 3b. Thẻ "Ảnh" cục bộ trên iPhone (T039: tối đa 5 ảnh/kiện, zoom 2 ngón/chạm đúp, thêm/xóa có xác nhận)
+    private var photosCard: some View {
+        let _ = photoManager.revision
+        let parcelPhotos = photoManager.photos(for: live, snapshot: store)
+        let maxCount = OrderPhotoDiskStore.maxPhotosPerParcel
+        let isFull = parcelPhotos.count >= maxCount
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                SectionTitleRow(
+                    title: "Ảnh",
+                    icon: "photo.on.rectangle.angled",
+                    iconColor: Theme.teal
+                )
+                StatusPill(
+                    text: "\(parcelPhotos.count)/\(maxCount)",
+                    color: isFull ? Theme.warning : Theme.teal
+                )
+                if isSavingPhoto {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                }
+            }
+
+            if store.isDemoMode {
+                Text("Chế độ dữ liệu mẫu: ảnh thật được lưu riêng trên máy khi tắt chế độ mẫu.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                if parcelPhotos.isEmpty {
+                    Text("Chưa có ảnh cho kiện này. Ảnh chụp lúc quét (khi PC xác nhận khớp đúng kiện) hoặc thêm thủ công sẽ lưu trực tiếp trên iPhone.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(Array(parcelPhotos.enumerated()), id: \.element.id) { idx, rec in
+                                ZStack(alignment: .topTrailing) {
+                                    Button {
+                                        Haptics.tap()
+                                        openPhotoViewer(records: parcelPhotos, initialIndex: idx)
+                                    } label: {
+                                        Group {
+                                            if let img = photoManager.thumbnail(for: rec) {
+                                                Image(uiImage: img)
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            } else {
+                                                ZStack {
+                                                    Theme.subtleFill
+                                                    Image(systemName: "photo")
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                        }
+                                        .frame(width: 90, height: 90)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .stroke(Color.primary.opacity(0.10), lineWidth: 0.8)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Xem ảnh \(idx + 1) của kiện")
+
+                                    Button {
+                                        Haptics.medium()
+                                        photoPendingDelete = rec
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 20))
+                                            .symbolRenderingMode(.palette)
+                                            .foregroundStyle(.white, Color.black.opacity(0.65))
+                                            .padding(4)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Xóa ảnh \(idx + 1)")
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                if isFull {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(Theme.warning)
+                        Text("Đã đủ tối đa \(maxCount) ảnh cho kiện này. Xóa bớt ảnh cũ nếu muốn thêm mới.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Theme.warning.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        Haptics.tap()
+                        if isFull {
+                            photoAlertMessage = "Kiện này đã đủ tối đa \(maxCount) ảnh. Hãy xóa bớt ảnh cũ trước khi chụp thêm (app không tự xóa ảnh cũ)."
+                        } else if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            showCameraPicker = true
+                        } else {
+                            photoAlertMessage = "Thiết bị này không có camera khả dụng."
+                        }
+                    } label: {
+                        Label("Chụp ảnh", systemImage: "camera.fill")
+                            .font(Theme.Typography.captionBold)
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(isFull ? .secondary : Theme.teal)
+                    .disabled(isSavingPhoto)
+
+                    if isFull {
+                        Button {
+                            Haptics.tap()
+                            photoAlertMessage = "Kiện này đã đủ tối đa \(maxCount) ảnh. Hãy xóa bớt ảnh cũ trước khi chọn thêm (app không tự xóa ảnh cũ)."
+                        } label: {
+                            Label("Chọn ảnh", systemImage: "photo.on.rectangle")
+                                .font(Theme.Typography.captionBold)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.secondary)
+                    } else {
+                        PhotosPicker(selection: $selectedPickerItem, matching: .images) {
+                            Label("Chọn ảnh", systemImage: "photo.on.rectangle")
+                                .font(Theme.Typography.captionBold)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.accent)
+                        .disabled(isSavingPhoto)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+    }
+
+    private func openPhotoViewer(records: [OrderPhotoRecord], initialIndex: Int) {
+        let items = records.map { rec in
+            PhotoViewerItem(
+                id: rec.id,
+                url: photoManager.photoURL(for: rec),
+                createdAtMs: rec.createdAtMs,
+                byteSize: rec.byteSize,
+                canDelete: true
+            )
+        }
+        viewerSession = PhotoViewerSession(items: items, initialIndex: initialIndex)
+    }
+
+    private func handleAddedCameraImage(_ image: UIImage) async {
+        isSavingPhoto = true
+        let res = await photoManager.addManualPhoto(image: image, for: live, source: .manualCamera, snapshot: store)
+        isSavingPhoto = false
+        handlePhotoSaveResult(res)
+    }
+
+    private func handleSelectedLibraryItem(_ pickerItem: PhotosPickerItem) async {
+        isSavingPhoto = true
+        defer { isSavingPhoto = false }
+        guard let data = try? await pickerItem.loadTransferable(type: Data.self), !data.isEmpty else {
+            photoAlertMessage = "Không đọc được ảnh từ thư viện."
+            return
+        }
+        let res = await photoManager.addManualPhotoData(data, for: live, source: .manualLibrary, snapshot: store)
+        handlePhotoSaveResult(res)
+    }
+
+    private func handlePhotoSaveResult(_ res: Result<OrderPhotoRecord, OrderPhotoError>) {
+        switch res {
+        case .success:
+            Haptics.medium()
+        case .failure(.limitReached(let maxCount)):
+            photoAlertMessage = "Kiện này đã đủ tối đa \(maxCount) ảnh. Hãy xóa bớt ảnh cũ nếu muốn thêm mới."
+        case .failure(.emptyData):
+            photoAlertMessage = "Dữ liệu ảnh trống, không thể lưu."
+        case .failure(.ioFailure(let msg)):
+            photoAlertMessage = msg
+        }
     }
 
     // MARK: - 4. Thẻ "Hành trình hàng hoàn" (4 chặng)

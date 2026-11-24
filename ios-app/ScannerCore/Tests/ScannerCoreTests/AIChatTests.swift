@@ -10,7 +10,7 @@ final class AIChatTests: XCTestCase {
     }
     private var now: Date { cal.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 14))! }
 
-    private func row(_ k: String = "m", _ c: String, _ o: String, n: String = "Áo thun", q: Int = 1, rv: Bool, rcd: String = "", nt: String = "") -> OrderRow {
+    private func row(_ k: String = "m", c: String, o: String, n: String = "Áo thun", q: Int = 1, rv: Bool, rcd: String = "", nt: String = "") -> OrderRow {
         var r = OrderRow(k: k, c: c, o: o, p: "Shopee", n: n, co: "", sz: "", q: q, rd: "20/11/2026", due: 0, st: rv ? "Hàng đã trả" : "Chưa trả")
         r.rv = rv
         r.pd = !rv
@@ -25,7 +25,7 @@ final class AIChatTests: XCTestCase {
             row(c: "VN002", o: "SHP2", n: "Quần jean", rv: true, rcd: "25/11/2026 11:30"),
             row(c: "VN003", o: "SHP3", n: "Áo thun", rv: true, rcd: "24/11/2026 10:00:00"),
             row(c: "VN004", o: "SHP4", rv: false),
-            row("a", "VN005", "SHP5", rv: true, rcd: "25/11/2026 08:00:00"),
+            row("a", c: "VN005", o: "SHP5", rv: true, rcd: "25/11/2026 08:00:00"),
         ]
     }
 

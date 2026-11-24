@@ -1,5 +1,4 @@
 using System.Collections.Specialized;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using QuanLyHangHoan.App.ViewModels;
@@ -13,14 +12,28 @@ public partial class AiChatView : UserControl
         InitializeComponent();
         DataContextChanged += (_, e) =>
         {
-            if (e.OldValue is AiChatViewModel old) old.Messages.CollectionChanged -= OnMessages;
-            if (e.NewValue is AiChatViewModel vm) vm.Messages.CollectionChanged += OnMessages;
+            if (e.OldValue is AiChatViewModel old)
+            {
+                old.Messages.CollectionChanged -= OnMessages;
+                old.PropertyChanged -= OnVmChanged;
+            }
+            if (e.NewValue is AiChatViewModel vm)
+            {
+                vm.Messages.CollectionChanged += OnMessages;
+                vm.PropertyChanged += OnVmChanged;
+            }
         };
-        Loaded += (_, _) => InputBox.Focus();
     }
 
     private void OnMessages(object? s, NotifyCollectionChangedEventArgs e) =>
         Dispatcher.BeginInvoke(new Action(() => Scroller.ScrollToEnd()), System.Windows.Threading.DispatcherPriority.Background);
+
+    // Mở cửa sổ chat thì đưa con trỏ vào ô nhập để gõ ngay.
+    private void OnVmChanged(object? s, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiChatViewModel.IsPanelOpen) && s is AiChatViewModel { IsPanelOpen: true })
+            Dispatcher.BeginInvoke(new Action(() => InputBox.Focus()), System.Windows.Threading.DispatcherPriority.Background);
+    }
 
     private void InputBox_KeyDown(object sender, KeyEventArgs e)
     {
@@ -29,20 +42,5 @@ public partial class AiChatView : UserControl
             vm.SendCommand.Execute(null);
             e.Handled = true;
         }
-    }
-
-    private async void SaveSettings_Click(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not AiChatViewModel vm) return;
-        var key = KeyBox.Password;
-        var gKey = GeminiKeyBox.Password;
-        GeminiKeyBox.Clear();
-        KeyBox.Clear();
-        await vm.SaveSettingsAsync(key, gKey);
-    }
-
-    private void ForgetKey_Click(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is AiChatViewModel vm) vm.ForgetKeys();
     }
 }

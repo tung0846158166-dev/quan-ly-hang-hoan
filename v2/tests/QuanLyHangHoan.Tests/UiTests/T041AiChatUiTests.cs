@@ -166,14 +166,91 @@ public sealed class T041AiChatUiTests
                     WpfTestHost.RunTask(() => WaitIdle(r.Vm));
                     WpfTestHost.PumpDispatcher();
                     WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "02-answer-with-orders.png"));
-                    r.Vm.ShowSettings = true;
+                    var card = new AiSettingsCard { DataContext = r.Vm, Width = 700, Margin = new Thickness(20) };
+                    window.Content = card;
                     WpfTestHost.PumpDispatcher();
-                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "03-settings.png"));
+                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "03-settings-card.png"));
                 }
                 finally { window.Close(); WpfTestHost.PumpDispatcher(); }
             });
             Assert.True(File.Exists(Path.Combine(outDir, "02-answer-with-orders.png")));
         }
         finally { try { Directory.Delete(r.Dir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Floating_button_toggles_the_popup_and_settings_card_is_in_settings_page()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !(Directory.Exists(Path.Combine(dir.FullName, "tasks")) && Directory.Exists(Path.Combine(dir.FullName, "v2")))) dir = dir.Parent;
+        var outDir = dir is null ? Path.Combine(Path.GetTempPath(), "T041-screens") : Path.Combine(dir.FullName, "tasks", "reports", "T041-screens");
+        Directory.CreateDirectory(outDir);
+        var aiDir = TempDir();
+        new AiSettingsStore(aiDir).SaveKey("gsk_ui_test_key");
+        try
+        {
+            WpfTestHost.Run(() =>
+            {
+                var d = new QuanLyHangHoan.App.Services.FakeDataService(clock: () => new DateTime(2026, 11, 25, 14, 0, 0), enableMutableDemoStore: true);
+                var vm = new MainViewModel(d, d, d, d, new QuanLyHangHoan.App.Services.FakeLegacyImporter(d.GetCurrentTime), isDemoMode: true,
+                    uiSettingsStore: new QuanLyHangHoan.App.Services.UiSettingsStore(null, true), dispatchToUi: a => a(), deferInitialLoad: false,
+                    aiSettingsStore: new AiSettingsStore(aiDir), aiOrderLoader: () => Array.Empty<StoredOrder>());
+                var window = new QuanLyHangHoan.App.MainWindow
+                {
+                    DataContext = vm, Width = 1360, Height = 820, WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false,
+                };
+                try
+                {
+                    window.Show();
+                    WpfTestHost.PumpDispatcher();
+                    Assert.False(vm.AiChatVm.IsPanelOpen);
+                    Assert.Same(vm.AiChatVm, vm.SettingsVm.AiChat);
+                    Assert.DoesNotContain(vm.NavigationItems, n => n.Key == "ai_chat");
+                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "04-main-floating-button.png"));
+
+                    vm.AiChatVm.TogglePanelCommand.Execute(null);
+                    vm.AiChatVm.Messages.Add(new AiChatMessage(true, "hôm nay có bao nhiêu đơn về?", Array.Empty<AiOrderRef>(), ""));
+                    vm.AiChatVm.Messages.Add(new AiChatMessage(false, "Hôm nay có 2 kiện về.",
+                        new[] { new AiOrderRef("a1", "SHP-A1", "VN001", ReceiveStatus.Received), new AiOrderRef("a2", "SHP-A2", "VN002", ReceiveStatus.Received) }, "• Mô hình: groq/openai/gpt-oss-120b"));
+                    WpfTestHost.PumpDispatcher();
+                    Assert.True(vm.AiChatVm.IsPanelOpen);
+                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "05-main-ai-popup.png"));
+
+                    // Chuyển trang: nút và cửa sổ vẫn còn
+                    vm.NavigateByKey("shopee_return");
+                    WpfTestHost.PumpDispatcher();
+                    Assert.True(vm.AiChatVm.IsPanelOpen);
+
+                    vm.AiChatVm.ClosePanelCommand.Execute(null);
+                    vm.NavigateByKey("settings");
+                    WpfTestHost.PumpDispatcher();
+                    WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "06-settings-with-ai-card.png"));
+                }
+                finally { window.Close(); WpfTestHost.PumpDispatcher(); }
+            });
+        }
+        finally { try { Directory.Delete(aiDir, true); } catch { } }
+    }
+
+    [Fact]
+    public void Missing_key_popup_offers_to_open_settings()
+    {
+        var opened = 0;
+        var dir = TempDir();
+        try
+        {
+            WpfTestHost.Run(() =>
+            {
+                var vm = new AiChatViewModel(new AiSettingsStore(dir), () => Array.Empty<StoredOrder>(), () => DateTime.Now, _ => { }, openSettings: () => opened++);
+                Assert.True(vm.NeedsKey);
+                vm.TogglePanelCommand.Execute(null);
+                Assert.True(vm.IsPanelOpen);
+                vm.OpenSettingsCommand.Execute(null);
+                Assert.False(vm.IsPanelOpen);
+                Assert.Equal(1, opened);
+            });
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
     }
 }

@@ -34,6 +34,8 @@ final class SnapshotStore: ObservableObject {
     private var lastDeltaSeq = 0
     /// Gói thay đổi không khớp bản gốc trên điện thoại: xin PC gửi lại danh sách đầy đủ.
     var onNeedFull: () -> Void = {}
+    /// Gọi mỗi khi danh sách đơn thật (`!isDemoMode`) vừa được nạp từ đĩa hoặc cập nhật từ PC (dùng để gắn ảnh quét chờ khớp).
+    var onRowsUpdated: (() -> Void)?
     /// Giải mã, dựng chỉ mục và ghi file chạy ở luồng nền để không làm đứng giao diện khi đang đồng bộ 5.000+ đơn.
     private let work = DispatchQueue(label: "snapshot.work", qos: .userInitiated)
     private var progressReceived = 0
@@ -234,6 +236,7 @@ final class SnapshotStore: ObservableObject {
         recount()
         revision += 1
         scheduleNotifications()
+        onRowsUpdated?()
     }
 
     /// Tính lại số quá hạn / sắp đến hạn / thông báo; gọi khi danh sách, danh sách ẩn đổi hoặc theo thời gian (mỗi phút).
@@ -260,6 +263,14 @@ final class SnapshotStore: ObservableObject {
 
     /// Kiểm tra mã có khớp từ 2 kiện đang chờ trở lên hay không (Quy tắc 2 & 3: tránh tự nhận nhầm kiện A/B).
     func isAmbiguousPending(_ code: String) -> Bool { index.isAmbiguousPending(code) }
+
+    /// Chỉ mục hiện tại (chỉ đọc) phục vụ tra cứu/gắn ảnh cục bộ.
+    var snapshotIndex: SnapshotIndex { index }
+
+    /// Khớp mã quét vào kiện trong snapshot (duy nhất 1 kiện / mơ hồ nhiều ứng viên / không tìm thấy).
+    func matchParcel(for rawCode: String) -> ParcelMatchResult {
+        index.matchParcel(for: rawCode, in: rows)
+    }
 
     /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi thao tác cục bộ.
     private func commit(rebuildIndex: Bool = false) {

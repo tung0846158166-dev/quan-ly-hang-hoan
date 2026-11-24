@@ -4,6 +4,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             xmlns:views="clr-namespace:QuanLyHangHoan.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}"
              UseLayoutRounding="True"
@@ -101,6 +102,14 @@
                         <CheckBox Content="Âm thanh khi điện thoại tạo/quét đơn hoặc báo lỗi" IsChecked="{Binding Sounds}" Style="{StaticResource SettingsCheckStyle}" Margin="0" />
                         <TextBlock Style="{StaticResource SettingsHintStyle}" Margin="0,10,0,0"
                                    Text="Muốn thoát hẳn app: chuột phải biểu tượng ở khay hệ thống và chọn &quot;Thoát hẳn&quot; (bấm X chỉ thu nhỏ khi bật tùy chọn thứ hai)." />
+                    </StackPanel>
+                </Border>
+
+                <!-- Trợ lý AI -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="✨ Trợ lý AI (hỏi đáp về đơn hàng)" Style="{StaticResource SettingsTitleStyle}" />
+                        <views:AiSettingsCard DataContext="{Binding AiChat}" />
                     </StackPanel>
                 </Border>
 

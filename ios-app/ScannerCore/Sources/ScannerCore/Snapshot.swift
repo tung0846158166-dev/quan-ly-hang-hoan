@@ -283,18 +283,30 @@ public struct SnapshotChunk: Equatable {
 
 public enum SnapshotError: Error { case badBase64, badCompression, badJSON }
 
+/// Kết quả so khớp một mã quét vào danh sách kiện trong snapshot (Quy tắc 1, 2, 3).
+public enum ParcelMatchResult: Equatable {
+    case unique(OrderRow)
+    case ambiguous([OrderRow])
+    case notFound
+}
+
 /// Chỉ mục nhẹ (lưu chỉ số `Int` thay vì nhân bản struct `OrderRow`) để tra cứu O(1) theo mã vận đơn và `row.id`
-/// trên 5.000+ đơn mà vẫn tiết kiệm RAM, đồng thời phát hiện mã trùng nhiều kiện đang chờ (Quy tắc 2 & 3).
+/// trên 5.000+ đơn mà vẫn tiết kiệm RAM, đồng thời phát hiện mã trùng nhiều kiện (Quy tắc 2 & 3).
 public struct SnapshotIndex: Equatable {
     public private(set) var codeToIndex: [String: Int] = [:]
+    public private(set) var codeToIndices: [String: [Int]] = [:]
     public private(set) var idToIndex: [String: Int] = [:]
     public private(set) var ambiguousPendingCodes: Set<String> = []
+    /// Đếm số dòng kiện mang cùng mã vận đơn chính chuẩn hóa `TrackingCode.clean(r.c)` (dùng để kiểm tra dự phòng an toàn khi gắn/đọc ảnh).
+    public private(set) var trackingCodeCounts: [String: Int] = [:]
 
     public init() {}
 
     public init(rows: [OrderRow]) {
         codeToIndex.reserveCapacity(rows.count * 2)
+        codeToIndices.reserveCapacity(rows.count * 2)
         idToIndex.reserveCapacity(rows.count)
+        trackingCodeCounts.reserveCapacity(rows.count)
         var pendingHits: [String: Int] = [:]
         pendingHits.reserveCapacity(rows.count)
 
@@ -302,6 +314,22 @@ public struct SnapshotIndex: Equatable {
             if idToIndex[r.id] == nil { idToIndex[r.id] = i }
             let kc = r.c.uppercased()
             if !kc.isEmpty && codeToIndex[kc] == nil { codeToIndex[kc] = i }
+            let cleanTrack = TrackingCode.clean(r.c).uppercased()
+            if !cleanTrack.isEmpty {
+                trackingCodeCounts[cleanTrack, default: 0] += 1
+            }
+
+            var seenAllInRow = Set<String>()
+            for code in r.lookupCodes {
+                if seenAllInRow.insert(code).inserted {
+                    codeToIndices[code, default: []].append(i)
+                }
+                let cleaned = TrackingCode.clean(code).uppercased()
+                if !cleaned.isEmpty && seenAllInRow.insert(cleaned).inserted {
+                    codeToIndices[cleaned, default: []].append(i)
+                }
+            }
+
             if r.pd {
                 var seenInRow = Set<String>()
                 for code in r.lookupCodes where seenInRow.insert(code).inserted {
@@ -330,6 +358,39 @@ public struct SnapshotIndex: Equatable {
 
     public func isAmbiguousPending(_ code: String) -> Bool {
         ambiguousPendingCodes.contains(code.uppercased())
+    }
+
+    /// Trả về mọi kiện ứng viên khớp với mã (dùng cho cả tự gắn ảnh và màn chọn tay khi mơ hồ).
+    public func candidateRows(for rawCode: String, in rows: [OrderRow]) -> [OrderRow] {
+        let upper = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let cleaned = TrackingCode.clean(rawCode).uppercased()
+        var indices: [Int] = []
+        if !cleaned.isEmpty, let list = codeToIndices[cleaned] {
+            indices = list
+        } else if !upper.isEmpty, let list = codeToIndices[upper] {
+            indices = list
+        }
+        var seenRowIds = Set<String>()
+        var result: [OrderRow] = []
+        result.reserveCapacity(indices.count)
+        for i in indices where i >= 0 && i < rows.count {
+            let r = rows[i]
+            if seenRowIds.insert(r.id).inserted {
+                result.append(r)
+            }
+        }
+        return result
+    }
+
+    /// Khớp mã quét vào kiện trong snapshot:
+    /// - 0 ứng viên -> `.notFound`
+    /// - Đúng 1 ứng viên -> `.unique(row)`
+    /// - >= 2 ứng viên -> `.ambiguous(candidates)` (Quy tắc 2 & 3: tuyệt đối không đoán).
+    public func matchParcel(for rawCode: String, in rows: [OrderRow]) -> ParcelMatchResult {
+        let candidates = candidateRows(for: rawCode, in: rows)
+        if candidates.isEmpty { return .notFound }
+        if candidates.count == 1 { return .unique(candidates[0]) }
+        return .ambiguous(candidates)
     }
 }
 

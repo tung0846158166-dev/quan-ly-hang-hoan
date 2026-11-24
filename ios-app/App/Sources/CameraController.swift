@@ -1,6 +1,7 @@
 import AVFoundation
 import UIKit
 import SwiftUI
+import ScannerCore
 
 /// Camera + bộ quét mã gốc của iPhone (AVCaptureMetadataOutput).
 /// Mọi thao tác cấu hình phần cứng camera (`device.lockForConfiguration`, `session`, `metaOutput`) đều chạy tuần tự trên `queue`.
@@ -350,24 +351,15 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         frameLock.unlock()
     }
 
-    /// Ảnh khung hình hiện tại, thu nhỏ để gửi nhanh qua 4G.
-    func snapshotJPEG(maxDim: CGFloat = 560, quality: CGFloat = 0.55) -> Data? {
+    /// Chụp khung hình hiện tại và nén theo cấu hình LƯU TRỮ cục bộ trên iPhone (T039: cạnh dài ~1280 px, mục tiêu ~60-120 KB, không dưới 960 px).
+    func snapshotJPEG(config: PhotoCompressionConfig = .storageDefault) -> Data? {
         frameLock.lock()
         let px = latestBuffer
         frameLock.unlock()
         guard let px = px else { return nil }
         let ci = CIImage(cvPixelBuffer: px)
         guard let cg = ciContext.createCGImage(ci, from: ci.extent) else { return nil }
-        let w = CGFloat(cg.width), h = CGFloat(cg.height)
-        guard w > 0, h > 0 else { return nil }
-        let scale = min(1, maxDim / max(w, h))
-        let size = CGSize(width: max(1, (w * scale).rounded()), height: max(1, (h * scale).rounded()))
-        let fmt = UIGraphicsImageRendererFormat.default()
-        fmt.scale = 1
-        let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
-            UIImage(cgImage: cg).draw(in: CGRect(origin: .zero, size: size))
-        }
-        return img.jpegData(compressionQuality: quality)
+        return PhotoCompressor.compressCGImage(cg, config: config)
     }
 }
 

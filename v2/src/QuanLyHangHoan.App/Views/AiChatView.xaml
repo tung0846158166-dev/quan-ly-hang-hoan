@@ -8,7 +8,7 @@
              d:DataContext="{d:DesignInstance Type=vm:AiChatViewModel}"
              UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
 
-    <Grid Background="{DynamicResource AppBgBrush}">
+    <Grid Background="{DynamicResource CardBgBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -17,43 +17,32 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Tiêu đề -->
-        <Grid Grid.Row="0" Margin="24,16,24,8">
-            <StackPanel>
-                <TextBlock Text="🤖 Hỏi AI về đơn hàng" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
-                <TextBlock Text="AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài."
-                           FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,2,0,0" TextWrapping="Wrap" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <Button Content="Cuộc trò chuyện mới" Command="{Binding NewChatCommand}" Padding="10,4" Margin="0,0,8,0" />
-                <Button Content="⚙ Khóa API" Command="{Binding ToggleSettingsCommand}" Padding="10,4" />
-            </StackPanel>
-        </Grid>
-
-        <!-- Cài đặt khóa API -->
-        <Border Grid.Row="1" Margin="24,0,24,8" Padding="14" CornerRadius="8"
-                Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1"
-                Visibility="{Binding ShowSettings, Converter={StaticResource BoolToVis}}">
-            <StackPanel>
-                <TextBlock Text="Nhập khóa của nhà cung cấp nào bạn có (một hoặc cả hai). Khóa lưu mã hóa trên máy này, không hiện lại sau khi lưu. Để trống ô khóa = giữ khóa đã lưu."
-                           TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,8" />
-                <TextBlock Text="Khóa Groq (console.groq.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
-                <PasswordBox x:Name="KeyBox" Padding="6,5" FontFamily="Consolas" />
-                <TextBlock Text="Mô hình Groq, theo thứ tự ưu tiên (cách nhau dấu phẩy). Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau:" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
-                <TextBox Text="{Binding GroqModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
-                <TextBlock Text="Khóa Google Gemini (aistudio.google.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
-                <PasswordBox x:Name="GeminiKeyBox" Padding="6,5" FontFamily="Consolas" />
-                <TextBlock Text="Mô hình Google, theo thứ tự ưu tiên (dùng sau khi các mô hình Groq hết hạn mức):" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
-                <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
-                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                    <Button Content="Lưu và thử kết nối" Click="SaveSettings_Click" Padding="12,5" Margin="0,0,8,0" />
-                    <Button Content="Xóa các khóa khỏi máy" Click="ForgetKey_Click" Padding="12,5" />
+        <!-- Tiêu đề cửa sổ chat -->
+        <Border Grid.Row="0" Padding="14,10" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="✕" Command="{Binding ClosePanelCommand}" Width="28" Height="28" Padding="0"
+                        ToolTip="Đóng" Cursor="Hand" />
+                <Button DockPanel.Dock="Right" Content="Mới" Command="{Binding NewChatCommand}" Padding="10,3" Margin="0,0,8,0"
+                        ToolTip="Bắt đầu cuộc trò chuyện mới" Cursor="Hand" />
+                <StackPanel>
+                    <TextBlock Text="✨ Hỏi AI về đơn hàng" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                    <TextBlock Text="Chỉ ĐỌC dữ liệu. Tên, SĐT, địa chỉ người nhận được ẩn."
+                               FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" />
                 </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Chưa có khóa API: nhắc và mở Cài đặt -->
+        <Border Grid.Row="1" Margin="12,10,12,0" Padding="12,10" CornerRadius="8" Background="#FEF3C7" BorderBrush="#FCD34D" BorderThickness="1"
+                Visibility="{Binding NeedsKey, Converter={StaticResource BoolToVis}}">
+            <StackPanel>
+                <TextBlock Text="Chưa có khóa API. Hãy nhập khóa Groq và/hoặc Google trong Cài đặt." TextWrapping="Wrap" FontSize="12.5" Foreground="#78350F" />
+                <Button Content="Mở Cài đặt trợ lý AI" Command="{Binding OpenSettingsCommand}" HorizontalAlignment="Left" Padding="12,5" Margin="0,8,0,0" Cursor="Hand" />
             </StackPanel>
         </Border>
 
         <!-- Hội thoại -->
-        <ScrollViewer Grid.Row="2" x:Name="Scroller" VerticalScrollBarVisibility="Auto" Margin="24,0,24,0">
+        <ScrollViewer Grid.Row="2" x:Name="Scroller" VerticalScrollBarVisibility="Auto" Margin="12,0,12,0">
             <StackPanel>
                 <StackPanel Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}" Margin="0,12,0,0">
                     <TextBlock Text="Gợi ý câu hỏi:" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,6" />
@@ -69,11 +58,11 @@
                 <ItemsControl ItemsSource="{Binding Messages}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,6" Padding="12,9" CornerRadius="10" MaxWidth="820">
+                            <Border Margin="0,6" Padding="12,9" CornerRadius="10" MaxWidth="400">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="HorizontalAlignment" Value="Left" />
-                                        <Setter Property="Background" Value="{DynamicResource CardBgBrush}" />
+                                        <Setter Property="Background" Value="{DynamicResource SurfaceMutedBgBrush}" />
                                         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
                                         <Setter Property="BorderThickness" Value="1" />
                                         <Style.Triggers>
@@ -87,18 +76,18 @@
                                 </Border.Style>
                                 <StackPanel>
                                     <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent"
-                                             TextWrapping="Wrap" FontSize="13.5" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                             TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource InkPrimaryBrush}" />
                                     <TextBlock Text="{Binding RefsHeader}" FontSize="11.5" FontWeight="SemiBold" Margin="0,8,0,4"
                                                Foreground="{DynamicResource InkSecondaryBrush}"
                                                Visibility="{Binding HasRefs, Converter={StaticResource BoolToVis}}" />
-                                    <ItemsControl ItemsSource="{Binding Refs}" MaxHeight="220"
+                                    <ItemsControl ItemsSource="{Binding Refs}" MaxHeight="200"
                                                   Visibility="{Binding HasRefs, Converter={StaticResource BoolToVis}}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Command="{Binding DataContext.OpenRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}" HorizontalContentAlignment="Left" Padding="8,3" Margin="0,0,0,3" Cursor="Hand">
-                                                    <TextBlock FontFamily="Consolas" FontSize="12">
-                                                        <Run Text="{Binding OrderId, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding Track, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding Status, Mode=OneWay}" />
+                                                    <TextBlock FontFamily="Consolas" FontSize="11.5">
+                                                        <Run Text="{Binding OrderId, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Track, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Status, Mode=OneWay}" />
                                                     </TextBlock>
                                                 </Button>
                                             </DataTemplate>
@@ -106,7 +95,7 @@
                                     </ItemsControl>
                                     <Expander Header="Xem cách tính" FontSize="11.5" Margin="0,6,0,0"
                                               Visibility="{Binding HasTrace, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding Trace}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"
+                                        <TextBlock Text="{Binding Trace}" FontFamily="Consolas" FontSize="10.5" TextWrapping="Wrap"
                                                    Foreground="{DynamicResource InkMutedBrush}" />
                                     </Expander>
                                 </StackPanel>
@@ -118,17 +107,17 @@
         </ScrollViewer>
 
         <!-- Trạng thái -->
-        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Margin="24,6,24,4" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Margin="14,6,14,4" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" MaxHeight="90" />
 
         <!-- Ô nhập -->
-        <Grid Grid.Row="4" Margin="24,0,24,16">
+        <Grid Grid.Row="4" Margin="12,0,12,12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" Padding="10,8" FontSize="14"
+            <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" Padding="10,8" FontSize="13.5"
                      AcceptsReturn="False" VerticalContentAlignment="Center" IsEnabled="{Binding Available}" KeyDown="InputBox_KeyDown" />
-            <Button Grid.Column="1" Content="Gửi" Command="{Binding SendCommand}" Padding="22,8" Margin="8,0,0,0" FontWeight="SemiBold" />
+            <Button Grid.Column="1" Content="Gửi" Command="{Binding SendCommand}" Padding="18,8" Margin="8,0,0,0" FontWeight="SemiBold" />
         </Grid>
     </Grid>
 </UserControl>

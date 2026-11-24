@@ -71,7 +71,7 @@ public enum SyncProtocol {
         return s
     }
 
-    /// Bản tin quét (không kèm ảnh; ảnh đi riêng bằng photo_chunk).
+    /// Bản tin quét (không kèm ảnh; ảnh lưu cục bộ trong chi tiết đơn trên iPhone, không gửi sang PC).
     public static func scanPayload(kind: ScanKind, code: String, requestId: String, captureId: String,
                                    captureTime: Int, time: Int, room: String, note: String = "") -> [String: Any] {
         var p: [String: Any] = [
@@ -91,28 +91,6 @@ public enum SyncProtocol {
             p["note"] = note.isEmpty ? "Đơn mới tạo từ máy quét điện thoại" : note
         }
         return p
-    }
-
-    public static func photoChunks(dataURL: String, code: String, kind: ScanKind, requestId: String, captureId: String,
-                                   captureTime: Int, room: String, now: Int, photoId: String,
-                                   chunkSize: Int = 2400) -> [[String: Any]] {
-        let safeChunkSize = max(1, chunkSize)
-        let chars = Array(dataURL)
-        let total = max(1, Int((Double(chars.count) / Double(safeChunkSize)).rounded(.up)))
-        var out: [[String: Any]] = []
-        out.reserveCapacity(total)
-        for i in 0..<total {
-            let start = i * safeChunkSize
-            let end = min(chars.count, start + safeChunkSize)
-            let slice = start < end ? String(chars[start..<end]) : ""
-            out.append([
-                "type": "photo_chunk", "captureId": captureId, "captureTime": captureTime,
-                "requestId": requestId, "kind": kind == .returnScan ? "barcode" : "new_order_scan",
-                "photoOnly": false, "bypassScan": false, "photoId": photoId, "code": code,
-                "idx": i, "total": total, "chunk": slice, "room": room, "time": now + i
-            ])
-        }
-        return out
     }
 
     public static func snapshotRequest(room: String, now: Int) -> String {

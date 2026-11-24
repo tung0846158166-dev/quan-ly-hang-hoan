@@ -58,12 +58,15 @@ private struct HistoryCSVFile: Transferable {
 
 struct HistoryView: View {
     @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var photoManager: OrderPhotoManager
     @State private var kind: ScanKind = .returnScan
     @State private var filter: HistoryFilter = .all
     @State private var confirmClear = false
     @State private var query = ""
     @State private var detail: ScanItem?
     @State private var resentNote = ""
+    @State private var confirmDiscardStale = false
+    @State private var discardStaleNotice: String?
 
     private struct ComputedHistory {
         var counts: [HistoryFilter: Int]
@@ -109,6 +112,9 @@ struct HistoryView: View {
     var body: some View {
         let state = computeHistory()
         let waiting = state.counts[.pending] ?? 0
+        let staleItems = engine.stalePendingTempPhotoItems()
+        let staleIds = Set(staleItems.map { $0.requestId })
+        let staleSummary = engine.stalePendingTempPhotoSummary
         return NavigationStack {
             VStack(spacing: 6) {
                 Picker("Loại", selection: $kind) {
@@ -136,11 +142,48 @@ struct HistoryView: View {
                     .padding(.horizontal, Theme.screenPadding)
                 }
 
+                if !engine.isDemoMode && !staleItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.subheadline)
+                                .foregroundColor(Theme.warning)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(staleItems.count) lượt quét treo quá 7 ngày còn ảnh tạm (\(staleSummary.formattedMB))")
+                                    .font(Theme.Typography.captionBold)
+                                    .foregroundColor(.primary)
+                                Text("Lượt quét vẫn được giữ nguyên. Bạn có thể bỏ ảnh tạm để giải phóng dung lượng.")
+                                    .font(Theme.Typography.micro)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 4)
+                        }
+                        Button(role: .destructive) {
+                            Haptics.medium()
+                            confirmDiscardStale = true
+                        } label: {
+                            Label("Bỏ \(staleItems.count) ảnh tạm quá 7 ngày", systemImage: "trash")
+                                .font(Theme.Typography.captionBold)
+                                .frame(maxWidth: .infinity, minHeight: 34)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.danger)
+                    }
+                    .padding(10)
+                    .background(Theme.warning.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                            .stroke(Theme.warning.opacity(0.35), lineWidth: 0.8)
+                    )
+                    .padding(.horizontal, Theme.screenPadding)
+                }
+
                 if waiting > 0 && !engine.isDemoMode {
                     VStack(spacing: 4) {
                         Button {
                             let n = engine.resendAllPending(kind: kind)
-                            resentNote = "Đã đưa \(n) đơn vào hàng gửi lại, app gửi dần vài đơn mỗi nhịp."
+                            resentNote = "Đã đưa \(n) lượt quét vào hàng gửi lại, app gửi dần vài lượt mỗi nhịp."
                             Haptics.medium()
                         } label: {
                             Label("Gửi lại tất cả lên máy tính (\(waiting))", systemImage: "arrow.clockwise")
@@ -162,7 +205,7 @@ struct HistoryView: View {
                     ForEach(state.grouped) { group in
                         Section {
                             ForEach(group.items) { it in
-                                row(it)
+                                row(it, isStaleTemp: staleIds.contains(it.requestId))
                                     .card(padding: 10, radius: Theme.cardRadius)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
@@ -221,6 +264,28 @@ struct HistoryView: View {
             }
             .confirmationDialog("Xóa toàn bộ lịch sử mục này?", isPresented: $confirmClear) {
                 Button("Xóa", role: .destructive) { engine.clear(kind: kind) }
+            } message: {
+                Text("Ảnh tạm của các lượt chưa xác nhận cũng bị xóa. Ảnh đã gắn vào Chi tiết đơn được giữ nguyên.")
+            }
+            .alert(
+                "Bỏ \(staleSummary.photoCount) ảnh tạm treo quá 7 ngày (\(staleSummary.formattedMB))?",
+                isPresented: $confirmDiscardStale
+            ) {
+                Button("Hủy", role: .cancel) {}
+                Button("Bỏ ảnh tạm", role: .destructive) {
+                    let res = engine.discardStalePendingTempPhotos()
+                    discardStaleNotice = "Đã bỏ \(res.deletedCount) ảnh tạm (\(PhotoStorageSummary.formatMB(res.freedBytes))). Toàn bộ lượt quét vẫn được giữ nguyên."
+                }
+            } message: {
+                Text("Chỉ xóa tệp ảnh tạm của các lượt quét chưa có kết quả quá 7 ngày. KHÔNG xóa lượt quét khỏi lịch sử và KHÔNG xóa ảnh đã gắn vào đơn.")
+            }
+            .alert("Ảnh tạm", isPresented: Binding(
+                get: { discardStaleNotice != nil },
+                set: { if !$0 { discardStaleNotice = nil } }
+            )) {
+                Button("Đã hiểu", role: .cancel) { discardStaleNotice = nil }
+            } message: {
+                Text(discardStaleNotice ?? "")
             }
             .onChange(of: kind) { _ in filter = .all; resentNote = "" }
             .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
@@ -238,10 +303,11 @@ struct HistoryView: View {
         }
     }
 
-    private func row(_ it: ScanItem) -> some View {
+    private func row(_ it: ScanItem, isStaleTemp: Bool) -> some View {
+        let _ = photoManager.revision
         let color = scanColor(it)
         return HStack(spacing: 10) {
-            if let u = engine.photoURL(it), let img = ScanThumbCache.image(at: u) {
+            if let u = engine.scanDisplayPhotoURL(it), let img = ScanThumbCache.image(at: u) {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFill()
@@ -268,15 +334,32 @@ struct HistoryView: View {
                     Text(scanLabel(it))
                         .font(Theme.Typography.microBold)
                         .foregroundColor(color)
-                    if it.scanConfirmed && it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired {
-                        Text("· Ảnh gửi ngầm (\(it.photoAttempts))")
-                            .font(Theme.Typography.microBold)
-                            .foregroundColor(Theme.warning)
+                    if !it.scanConfirmed {
+                        if isStaleTemp {
+                            Text("· Treo > 7 ngày (còn ảnh tạm)")
+                                .font(Theme.Typography.microBold)
+                                .foregroundColor(Theme.danger)
+                                .lineLimit(1)
+                        } else if it.hasTemporaryPhoto {
+                            Text("· Chưa xác nhận · có ảnh tạm")
+                                .font(Theme.Typography.microBold)
+                                .foregroundColor(Theme.warning)
+                                .lineLimit(1)
+                        } else {
+                            Text("· Chưa xác nhận (\(it.attempts) lần)")
+                                .font(Theme.Typography.microBold)
+                                .foregroundColor(Theme.warning)
+                                .lineLimit(1)
+                        }
+                    } else if it.attachedPhotoId != nil {
+                        Text("· Đã lưu ảnh vào đơn")
+                            .font(Theme.Typography.micro)
+                            .foregroundColor(Theme.teal)
                             .lineLimit(1)
-                    } else if !it.scanConfirmed {
-                        Text("· Chưa xác nhận (\(it.attempts) lần)")
+                    } else if it.hasTemporaryPhoto {
+                        Text("· Ảnh tạm chờ đồng bộ đơn")
                             .font(Theme.Typography.microBold)
-                            .foregroundColor(Theme.warning)
+                            .foregroundColor(Theme.info)
                             .lineLimit(1)
                     } else if !it.detail.isEmpty {
                         Text("· \(it.detail)")

@@ -82,7 +82,7 @@ struct DetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(spacing: Theme.sectionSpacing) {
                     if store.isDemoMode {
                         demoNoticeBar
                     }
@@ -103,9 +103,9 @@ struct DetailView: View {
                     timelineCard
                     notesCard
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 28)
+                .padding(.horizontal, Theme.screenPadding)
+                .padding(.top, 8)
+                .padding(.bottom, 20)
             }
             .background(Theme.pageBackground.ignoresSafeArea())
             .navigationTitle(navTitle)
@@ -288,16 +288,16 @@ struct DetailView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(18)
+        .padding(Theme.cardPadding)
         .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .fill(Theme.cardBackground)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    heroTint.opacity(scheme == .dark ? 0.24 : 0.14),
+                                    heroTint.opacity(scheme == .dark ? 0.22 : 0.13),
                                     heroTint.opacity(scheme == .dark ? 0.04 : 0.02)
                                 ],
                                 startPoint: .topLeading,
@@ -306,10 +306,10 @@ struct DetailView: View {
                         )
                 )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(heroTint.opacity(scheme == .dark ? 0.34 : 0.22), lineWidth: 0.9)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(heroTint.opacity(scheme == .dark ? 0.32 : 0.20), lineWidth: 0.8)
         )
     }
 
@@ -419,7 +419,7 @@ struct DetailView: View {
                 }
             }
         }
-        .card(padding: 12, radius: 18)
+        .card(padding: 10, radius: Theme.cardRadius)
     }
 
     private func quickActionButton(
@@ -508,7 +508,7 @@ struct DetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 16, radius: 18)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     private func productLineRow(_ line: OrderProductLine, showSingleQty: Int?) -> some View {
@@ -658,7 +658,7 @@ struct DetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 16, radius: 18)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     // MARK: - 5. Thẻ "Mã vận đơn & liên quan"
@@ -727,7 +727,7 @@ struct DetailView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .card(padding: 16, radius: 18)
+                .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
             }
         }
     }
@@ -870,7 +870,7 @@ struct DetailView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .card(padding: 16, radius: 18)
+                .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
             }
         }
     }
@@ -955,7 +955,7 @@ struct DetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 16, radius: 18)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     // MARK: - Sheet sửa Ghi chú & Theo dõi
@@ -975,7 +975,7 @@ struct DetailView: View {
                     }
                 }
                 .tint(Theme.accent)
-                .card(padding: 14, radius: 16)
+                .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Ghi chú / lý do theo dõi")
@@ -987,7 +987,7 @@ struct DetailView: View {
                         .background(Theme.subtleFill)
                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .card(padding: 14, radius: 16)
+                .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
 
                 Button {
                     Haptics.medium()

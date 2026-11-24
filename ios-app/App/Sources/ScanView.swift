@@ -12,7 +12,7 @@ struct ScanView: View {
 
     private var connectionStatus: (text: String, color: Color) {
         if engine.isDemoMode {
-            return ("Chế độ dữ liệu mẫu", Theme.accent)
+            return ("Dữ liệu mẫu", Theme.accent)
         }
         if engine.pcOnline {
             return ("Đã nối PC", Theme.success)
@@ -28,22 +28,42 @@ struct ScanView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let camHeight = max(230, min(420, geo.size.height * 0.54))
-            ScrollView {
-                VStack(spacing: 12) {
-                    topHeader
-                    cameraSection(height: camHeight)
-                    controlsRow
-                    manualInputCard
-                    recentSection
+        NavigationStack {
+            GeometryReader { geo in
+                let camHeight = max(180, min(280, geo.size.height * 0.36))
+                ScrollView {
+                    VStack(spacing: Theme.cardSpacing) {
+                        topHeader
+                        cameraSection(height: camHeight)
+                        controlsRow
+                        manualInputCard
+                        recentSection
+                    }
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.top, 6)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
-                .padding(.bottom, 18)
+                .scrollDismissesKeyboard(.interactively)
+                .background(Theme.pageBackground.ignoresSafeArea())
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Theme.pageBackground.ignoresSafeArea())
+            .navigationTitle("Quét")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(connectionStatus.color)
+                            .frame(width: 7, height: 7)
+                        Text(connectionStatus.text)
+                            .font(Theme.Typography.microBold)
+                            .foregroundColor(connectionStatus.color)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(connectionStatus.color.opacity(0.14))
+                    .clipShape(Capsule())
+                }
+            }
         }
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
@@ -64,7 +84,7 @@ struct ScanView: View {
             if reduceMotion {
                 showBannerCard = true
             } else {
-                withAnimation(.spring(response: 0.32, dampingFraction: 0.84)) {
+                withAnimation(.spring(response: 0.30, dampingFraction: 0.85)) {
                     showBannerCard = true
                 }
             }
@@ -73,138 +93,124 @@ struct ScanView: View {
             if reduceMotion {
                 showBannerCard = false
             } else {
-                withAnimation(.easeOut(duration: 0.25)) {
+                withAnimation(.easeOut(duration: 0.22)) {
                     showBannerCard = false
                 }
             }
         }
     }
 
-    // MARK: - Thanh trên: chế độ quét + 1 chấm trạng thái + số đã quét hôm nay
+    // MARK: - Thanh chế độ quét + số đã quét hôm nay
     private var topHeader: some View {
-        let st = connectionStatus
-        return VStack(spacing: 10) {
+        VStack(spacing: 6) {
             ModePicker(mode: $engine.mode)
 
-            HStack(spacing: 10) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(st.color)
-                        .frame(width: 9, height: 9)
-                    Text(st.text)
-                        .font(.footnote.bold())
-                        .foregroundColor(.primary)
-                }
-                .accessibilityElement(children: .combine)
-
+            HStack(spacing: 8) {
                 if engine.pendingCount > 0 && !engine.isDemoMode {
                     StatusPill(text: "Chờ gửi \(engine.pendingCount)", color: Theme.warning)
                 }
-
                 Spacer(minLength: 4)
-
-                Text("Đã quét hôm nay: \(todayScannedCount)")
-                    .font(.caption.bold())
+                Text("Hôm nay: \(todayScannedCount) lượt")
+                    .font(Theme.Typography.captionBold)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
         }
     }
 
-    // MARK: - Khung camera (~55% màn) + thẻ kết quả trượt từ dưới lên
+    // MARK: - Khung camera gọn (~36% màn để thấy Quét gần đây) + thẻ kết quả trượt từ dưới lên
     private func cameraSection(height: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             ZStack {
                 CameraPreview(controller: camera)
 
                 if camera.denied {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         Image(systemName: "camera.fill")
-                            .font(.title)
+                            .font(.title2)
                             .foregroundColor(Theme.accent)
                         Text("Chưa cho phép camera")
-                            .font(.headline)
+                            .font(Theme.Typography.sectionTitle)
                         Text("Vào Cài đặt iPhone > Quét Hàng Hoàn > bật Camera.")
-                            .font(.footnote)
+                            .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
                     }
-                    .padding(18)
+                    .padding(14)
                     .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .padding(16)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                    .padding(12)
                 } else if let why = camera.restReason, !camera.running {
                     Button {
                         Haptics.tap()
                         camera.start()
                     } label: {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 6) {
                             Image(systemName: "pause.circle.fill")
-                                .font(.system(size: 44))
+                                .font(.system(size: 36))
                             Text(why)
-                                .font(.footnote.bold())
+                                .font(Theme.Typography.captionBold)
                                 .multilineTextAlignment(.center)
                             Text("Chạm để quét tiếp")
-                                .font(.caption.bold())
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 6)
+                                .font(Theme.Typography.microBold)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
                                 .background(Color.white.opacity(0.22), in: Capsule())
                         }
                         .foregroundColor(.white)
-                        .padding(20)
+                        .padding(16)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(Color.black.opacity(0.75))
                     }
                     .buttonStyle(.plain)
                 } else {
                     ScanGuide()
-                        .stroke(Theme.modeColor(engine.mode).opacity(0.95), style: StrokeStyle(lineWidth: 3.2, lineCap: .round))
-                        .padding(22)
+                        .stroke(Theme.modeColor(engine.mode).opacity(0.95), style: StrokeStyle(lineWidth: 2.8, lineCap: .round))
+                        .padding(18)
                 }
             }
             .frame(height: height)
             .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Theme.modeColor(engine.mode).opacity(0.65), lineWidth: 2)
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .stroke(Theme.modeColor(engine.mode).opacity(0.65), lineWidth: 1.8)
             )
 
-            // Thẻ kết quả trượt từ dưới lên
             if showBannerCard, let b = engine.banner {
                 resultBottomCard(b)
-                    .padding(10)
+                    .padding(8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
 
     private func resultBottomCard(_ b: Banner) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: bannerIcon(for: b.color))
-                .font(.system(size: 30, weight: .semibold))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(b.color)
-                .frame(width: 42, height: 42)
+                .frame(width: 34, height: 34)
                 .background(b.color.opacity(0.16))
                 .clipShape(Circle())
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 if !b.code.isEmpty {
                     Text(b.code)
-                        .font(.system(.headline, design: .monospaced).bold())
+                        .font(Theme.Typography.code)
                         .foregroundColor(.primary)
                         .lineLimit(1)
                 }
                 Text(b.text)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.Typography.secondaryBold)
                     .foregroundColor(b.color)
                     .lineLimit(2)
                 if !b.sub.isEmpty {
                     Text(b.sub)
-                        .font(.caption)
+                        .font(Theme.Typography.micro)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                 }
             }
 
@@ -214,21 +220,21 @@ struct ScanView: View {
                 showBannerCard = false
             } label: {
                 Image(systemName: "xmark")
-                    .font(.caption.bold())
+                    .font(.caption2.bold())
                     .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 26, height: 26)
                     .background(Color.primary.opacity(0.08))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Đóng thông báo kết quả")
         }
-        .padding(14)
+        .padding(10)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(b.color.opacity(0.45), lineWidth: 1.2)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(b.color.opacity(0.45), lineWidth: 1.0)
         )
     }
 
@@ -242,10 +248,10 @@ struct ScanView: View {
         return "clock.badge.exclamationmark.fill"
     }
 
-    // MARK: - Hàng nút tròn có nhãn nhỏ (Đèn, Zoom, Dừng, Dán)
+    // MARK: - Hàng nút điều khiển gọn (Đèn, Zoom, Tạm dừng, Dán mã)
     private var controlsRow: some View {
-        HStack(spacing: 0) {
-            roundControl(
+        HStack(spacing: 6) {
+            compactControl(
                 title: "Đèn",
                 icon: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill",
                 active: camera.torchOn
@@ -254,8 +260,8 @@ struct ScanView: View {
                 camera.setTorch(!camera.torchOn)
             }
 
-            roundControl(
-                title: zoom >= 2 ? "Zoom 2x" : "Zoom 1x",
+            compactControl(
+                title: zoom >= 2 ? "2x" : "1x",
                 icon: "plus.magnifyingglass",
                 active: zoom >= 2
             ) {
@@ -264,8 +270,8 @@ struct ScanView: View {
                 camera.setZoom(zoom)
             }
 
-            roundControl(
-                title: camera.running ? "Tạm dừng" : "Bật quét",
+            compactControl(
+                title: camera.running ? "Dừng" : "Quét",
                 icon: camera.running ? "pause.fill" : "play.fill",
                 active: !camera.running
             ) {
@@ -273,7 +279,7 @@ struct ScanView: View {
                 camera.running ? camera.stop() : camera.start()
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 PasteButton(payloadType: String.self) { texts in
                     let codes = PasteCodes.split(texts.joined(separator: "\n"))
                     DispatchQueue.main.async {
@@ -285,61 +291,62 @@ struct ScanView: View {
                     }
                 }
                 .labelStyle(.iconOnly)
-                .buttonBorderShape(.capsule)   // .circle chỉ có từ iOS 17; khung 48x48 + capsule vẫn ra hình tròn
+                .buttonBorderShape(.capsule)
                 .tint(Theme.accent)
-                .frame(width: 48, height: 48)
+                .frame(height: 36)
 
                 Text("Dán mã")
-                    .font(.caption2.weight(.medium))
+                    .font(Theme.Typography.micro)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
         }
-        .padding(.vertical, 4)
     }
 
-    private func roundControl(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func compactControl(title: String, icon: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(active ? .white : .primary)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 38, height: 36)
                     .background(active ? Theme.accent : Theme.cardBackground)
-                    .clipShape(Circle())
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
                     .overlay(
-                        Circle()
-                            .stroke(active ? Color.clear : Color.primary.opacity(0.10), lineWidth: 0.8)
+                        RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
+                            .stroke(active ? Color.clear : Color.primary.opacity(0.08), lineWidth: 0.7)
                     )
                 Text(title)
-                    .font(.caption2.weight(.medium))
+                    .font(Theme.Typography.micro)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Nhập mã tay
+    // MARK: - Ô nhập tay một dòng gọn
     private var manualInputCard: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
                 TextField("Nhập mã vận đơn thủ công...", text: $manual)
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
-                    .font(.system(.subheadline, design: .monospaced))
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 44)
+                    .font(.system(.footnote, design: .monospaced))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 38)
                     .background(Theme.subtleFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
                     .submitLabel(.send)
                     .onSubmit(sendManual)
 
                 Button(action: sendManual) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
+                        .font(.system(size: 28))
                         .foregroundColor(manual.trimmingCharacters(in: .whitespaces).isEmpty ? .secondary : Theme.accent)
-                        .frame(width: 44, height: 44)
+                        .frame(width: Theme.minTapTarget, height: Theme.minTapTarget)
                 }
                 .buttonStyle(.plain)
                 .disabled(manual.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -348,53 +355,55 @@ struct ScanView: View {
 
             if engine.mode != .returnScan {
                 TextField("Ghi chú đơn mới (không bắt buộc)", text: $engine.note)
-                    .font(.footnote)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 38)
+                    .font(Theme.Typography.caption)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 34)
                     .background(Theme.subtleFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
             }
         }
-        .card(padding: 12, radius: 18)
+        .card(padding: 8, radius: Theme.cardRadius)
     }
 
-    // MARK: - Gần đây
+    // MARK: - Quét gần đây (gọn, không bị che)
     private var recentSection: some View {
         let list = Array(engine.items.filter { $0.kind == engine.mode }.prefix(5))
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 6) {
             if !list.isEmpty {
                 Text("Quét gần đây")
-                    .font(.caption.bold())
+                    .font(Theme.Typography.captionBold)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
 
                 ForEach(list) { it in
                     Button {
                         Haptics.tap()
                         detail = it
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             Circle()
                                 .fill(scanColor(it))
-                                .frame(width: 9, height: 9)
-                            VStack(alignment: .leading, spacing: 2) {
+                                .frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 1) {
                                 Text(it.code)
-                                    .font(.system(.subheadline, design: .monospaced).bold())
+                                    .font(Theme.Typography.code)
                                     .foregroundColor(.primary)
+                                    .lineLimit(1)
                                 Text(scanLabel(it))
-                                    .font(.caption2.bold())
+                                    .font(Theme.Typography.microBold)
                                     .foregroundColor(scanColor(it))
                             }
                             Spacer()
                             Text(Date(timeIntervalSince1970: Double(it.time) / 1000).formatted(date: .omitted, time: .shortened))
-                                .font(.caption2)
+                                .font(Theme.Typography.micro)
+                                .monospacedDigit()
                                 .foregroundStyle(.secondary)
                             Image(systemName: "chevron.right")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }
-                        .frame(minHeight: 44)
-                        .card(padding: 10, radius: 14)
+                        .frame(minHeight: Theme.minTapTarget)
+                        .card(padding: 8, radius: Theme.cardRadius)
                     }
                     .buttonStyle(.plain)
                 }
@@ -415,7 +424,7 @@ struct ScanView: View {
 struct ScanGuide: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
-        let l: CGFloat = 28
+        let l: CGFloat = 24
         let corners: [(CGPoint, CGFloat, CGFloat)] = [
             (CGPoint(x: r.minX, y: r.minY), 1, 1),
             (CGPoint(x: r.maxX, y: r.minY), -1, 1),

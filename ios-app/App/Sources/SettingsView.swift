@@ -34,9 +34,10 @@ struct SettingsView: View {
             List {
                 // MARK: - Dữ liệu mẫu
                 Section {
-                    HStack(spacing: 12) {
-                        IconTile(systemName: "sparkles", color: Theme.accent, size: 32, cornerRadius: 8)
+                    HStack(spacing: 10) {
+                        IconTile(systemName: "sparkles", color: Theme.accent, size: 28, cornerRadius: 7)
                         Toggle("Xem thử với dữ liệu mẫu", isOn: demoBinding)
+                            .font(Theme.Typography.primary)
                             .tint(Theme.accent)
                     }
                 } header: {
@@ -47,17 +48,17 @@ struct SettingsView: View {
 
                 // MARK: - Mã phòng (thẻ riêng có Dán / Sao chép)
                 Section {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: Theme.cardSpacing) {
                         TextField("Dán mã phòng từ app PC v2", text: $roomText)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
-                            .font(.system(.body, design: .monospaced))
-                            .padding(12)
+                            .font(.system(.subheadline, design: .monospaced))
+                            .padding(10)
                             .background(Theme.subtleFill)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
                             .onSubmit { saveRoom() }
 
-                        HStack(spacing: 10) {
+                        HStack(spacing: Theme.cardSpacing) {
                             Button {
                                 Haptics.tap()
                                 if let pasted = UIPasteboard.general.string {
@@ -65,8 +66,8 @@ struct SettingsView: View {
                                 }
                             } label: {
                                 Label("Dán", systemImage: "doc.on.clipboard")
-                                    .font(.footnote.bold())
-                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .font(Theme.Typography.secondaryBold)
+                                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
                             }
                             .buttonStyle(.bordered)
 
@@ -76,8 +77,8 @@ struct SettingsView: View {
                                 savedToast = "Đã sao chép mã phòng"
                             } label: {
                                 Label("Sao chép", systemImage: "doc.on.doc")
-                                    .font(.footnote.bold())
-                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .font(Theme.Typography.secondaryBold)
+                                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
                             }
                             .buttonStyle(.bordered)
                             .disabled(engine.room.isEmpty && roomText.isEmpty)
@@ -85,8 +86,8 @@ struct SettingsView: View {
 
                         Button { saveRoom() } label: {
                             Text("Lưu mã phòng")
-                                .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .font(Theme.Typography.secondaryBold)
+                                .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(Theme.accent)
@@ -94,15 +95,15 @@ struct SettingsView: View {
 
                         if !roomText.isEmpty && !SyncProtocol.isValidRoom(roomText) {
                             Text("Mã phòng cần ít nhất 12 ký tự (lấy ở mục Đồng bộ điện thoại trên app PC v2).")
-                                .font(.caption)
+                                .font(Theme.Typography.caption)
                                 .foregroundColor(Theme.danger)
                         } else if !savedToast.isEmpty {
                             Text(savedToast)
-                                .font(.caption.bold())
+                                .font(Theme.Typography.captionBold)
                                 .foregroundColor(Theme.success)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
                 } header: {
                     Text("Mã phòng đồng bộ")
                 }
@@ -150,13 +151,14 @@ struct SettingsView: View {
                     NavigationLink {
                         ReconcileDetailView()
                     } label: {
-                        HStack(spacing: 12) {
-                            IconTile(systemName: "checkmark.shield.fill", color: Theme.success, size: 32, cornerRadius: 8)
+                        HStack(spacing: 10) {
+                            IconTile(systemName: "checkmark.shield.fill", color: Theme.success, size: 28, cornerRadius: 7)
                             Text("Đối chiếu số đơn với PC")
+                                .font(Theme.Typography.primary)
                             Spacer()
                             if !store.stats.isEmpty {
                                 Text("\(store.rows.count)")
-                                    .font(.caption.bold())
+                                    .font(Theme.Typography.captionBold)
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -166,9 +168,10 @@ struct SettingsView: View {
                         Haptics.tap()
                         engine.requestSnapshot()
                     } label: {
-                        HStack(spacing: 12) {
-                            IconTile(systemName: "arrow.clockwise", color: Theme.info, size: 32, cornerRadius: 8)
+                        HStack(spacing: 10) {
+                            IconTile(systemName: "arrow.clockwise", color: Theme.info, size: 28, cornerRadius: 7)
                             Text("Cập nhật danh sách từ PC")
+                                .font(Theme.Typography.primary)
                                 .foregroundColor(engine.isDemoMode ? .secondary : Theme.accent)
                         }
                     }
@@ -179,7 +182,7 @@ struct SettingsView: View {
                 Section("Thông báo") {
                     settingsRow(icon: "bell.badge.fill", color: Theme.danger, title: "Nhắc đơn sắp đến hạn") {
                         Text(store.notificationsAllowed ? "Đã bật" : "Chưa bật")
-                            .font(.subheadline.bold())
+                            .font(Theme.Typography.secondaryBold)
                             .foregroundColor(store.notificationsAllowed ? Theme.success : Theme.warning)
                     }
 
@@ -188,9 +191,10 @@ struct SettingsView: View {
                             Haptics.medium()
                             store.requestNotificationPermission()
                         } label: {
-                            HStack(spacing: 12) {
-                                IconTile(systemName: "bell.fill", color: Theme.accent, size: 32, cornerRadius: 8)
+                            HStack(spacing: 10) {
+                                IconTile(systemName: "bell.fill", color: Theme.accent, size: 28, cornerRadius: 7)
                                 Text("Bật quyền thông báo")
+                                    .font(Theme.Typography.primary)
                                     .foregroundColor(Theme.accent)
                             }
                         }
@@ -199,41 +203,44 @@ struct SettingsView: View {
 
                 // MARK: - Quét
                 Section("Quét") {
-                    HStack(spacing: 12) {
-                        IconTile(systemName: "speaker.wave.2.fill", color: Theme.info, size: 32, cornerRadius: 8)
+                    HStack(spacing: 10) {
+                        IconTile(systemName: "speaker.wave.2.fill", color: Theme.info, size: 28, cornerRadius: 7)
                         Toggle("Âm thanh khi quét", isOn: $soundOn)
+                            .font(Theme.Typography.primary)
                             .tint(Theme.accent)
                     }
-                    HStack(spacing: 12) {
-                        IconTile(systemName: "iphone.radiowaves.left.and.right", color: Theme.purple, size: 32, cornerRadius: 8)
+                    HStack(spacing: 10) {
+                        IconTile(systemName: "iphone.radiowaves.left.and.right", color: Theme.purple, size: 28, cornerRadius: 7)
                         Toggle("Rung phản hồi", isOn: $hapticOn)
+                            .font(Theme.Typography.primary)
                             .tint(Theme.accent)
                     }
-                    HStack(spacing: 12) {
-                        IconTile(systemName: "camera.fill", color: Theme.teal, size: 32, cornerRadius: 8)
+                    HStack(spacing: 10) {
+                        IconTile(systemName: "camera.fill", color: Theme.teal, size: 28, cornerRadius: 7)
                         Toggle("Gửi ảnh khi quét hoàn kho", isOn: $sendPhoto)
+                            .font(Theme.Typography.primary)
                             .tint(Theme.accent)
                     }
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 12) {
-                            IconTile(systemName: "viewfinder", color: Theme.accent, size: 32, cornerRadius: 8)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 10) {
+                            IconTile(systemName: "viewfinder", color: Theme.accent, size: 28, cornerRadius: 7)
                             Text(minCodeSize <= 0 ? "Khoảng cách quét: không giới hạn" : "Khoảng cách quét (\(String(format: "%.2f", minCodeSize)))")
-                                .font(.subheadline)
+                                .font(Theme.Typography.primary)
                         }
                         Slider(value: $minCodeSize, in: 0...0.3, step: 0.01)
                             .tint(Theme.accent)
                         Text("Kéo sang phải để chỉ nhận mã ở gần hơn. Mặc định 0,12 (~30 cm).")
-                            .font(.caption)
+                            .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
                 }
 
                 // MARK: - Giới thiệu
                 Section("Giới thiệu") {
                     settingsRow(icon: "info.circle.fill", color: .secondary, title: "Phiên bản") {
                         Text((Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0.0") + " (SwiftUI v2)")
-                            .font(.subheadline)
+                            .font(Theme.Typography.secondary)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -242,7 +249,7 @@ struct SettingsView: View {
             .scrollContentBackground(.hidden)
             .background(Theme.pageBackground.ignoresSafeArea())
             .navigationTitle("Cài đặt")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear { roomText = engine.room }
         }
     }
@@ -253,15 +260,15 @@ struct SettingsView: View {
         title: String,
         @ViewBuilder trailing: () -> Trailing
     ) -> some View {
-        HStack(spacing: 12) {
-            IconTile(systemName: icon, color: color, size: 32, cornerRadius: 8)
+        HStack(spacing: 10) {
+            IconTile(systemName: icon, color: color, size: 28, cornerRadius: 7)
             Text(title)
-                .font(.subheadline)
+                .font(Theme.Typography.primary)
                 .foregroundColor(.primary)
             Spacer(minLength: 8)
             trailing()
         }
-        .frame(minHeight: 36)
+        .frame(minHeight: 32)
     }
 
     private func saveRoom() {

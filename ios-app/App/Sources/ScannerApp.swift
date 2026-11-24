@@ -25,30 +25,31 @@ struct ContentView: View {
     @EnvironmentObject var router: NotificationRouter
 
     var body: some View {
-        TabView(selection: $router.tab) {
-            HomeView()
-                .tabItem { Label("Tổng quan", systemImage: "house.fill") }
-                .badge(store.alertCount)
-                .tag(NotificationRouter.homeTab)
-            ScanView()
-                .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
-                .tag(NotificationRouter.scanTab)
-            OrdersView()
-                .tabItem { Label("Đơn", systemImage: "shippingbox.fill") }
-                .tag(NotificationRouter.ordersTab)
-            HistoryView()
-                .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
-                .badge(engine.pendingCount)
-                .tag(NotificationRouter.historyTab)
-            SettingsView()
-                .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
-                .tag(NotificationRouter.settingsTab)
-        }
-        .tint(Theme.accent)
-        .safeAreaInset(edge: .top, spacing: 0) {
+        VStack(spacing: 0) {
             if store.isDemoMode {
                 DemoModeBanner { engine.setDemoMode(false) }
             }
+
+            TabView(selection: $router.tab) {
+                HomeView()
+                    .tabItem { Label("Tổng quan", systemImage: "house.fill") }
+                    .tag(NotificationRouter.homeTab)
+                ScanView()
+                    .tabItem { Label("Quét", systemImage: "barcode.viewfinder") }
+                    .tag(NotificationRouter.scanTab)
+                OrdersView()
+                    .tabItem { Label("Đơn", systemImage: "shippingbox.fill") }
+                    .badge(store.overdueCount)
+                    .tag(NotificationRouter.ordersTab)
+                HistoryView()
+                    .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
+                    .badge(engine.pendingCount)
+                    .tag(NotificationRouter.historyTab)
+                SettingsView()
+                    .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
+                    .tag(NotificationRouter.settingsTab)
+            }
+            .tint(Theme.accent)
         }
     }
 }

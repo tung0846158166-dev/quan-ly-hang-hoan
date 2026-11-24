@@ -15,8 +15,31 @@ enum Theme {
     static let teal = Color(red: 0.10, green: 0.68, blue: 0.63)
     static let purple = Color(red: 0.64, green: 0.40, blue: 0.96)
 
-    static let cardRadius: CGFloat = 20
-    static let smallRadius: CGFloat = 14
+    static let cardRadius: CGFloat = 14
+    static let smallRadius: CGFloat = 10
+    static let cardPadding: CGFloat = 12
+    static let cardSpacing: CGFloat = 8
+    static let sectionSpacing: CGFloat = 10
+    static let screenPadding: CGFloat = 14
+    static let minTapTarget: CGFloat = 44
+    static let demoBannerHeight: CGFloat = 24
+
+    /// Thang cỡ chữ chuẩn toàn app (tự co giãn theo Dynamic Type, mặc định 17 / 15 / 13 / 12 / 11pt).
+    enum Typography {
+        static let navTitle: Font = .headline.bold()              // ~17pt bold
+        static let sectionTitle: Font = .subheadline.bold()       // ~15pt bold
+        static let primary: Font = .subheadline                   // ~15pt
+        static let primaryBold: Font = .subheadline.weight(.semibold)
+        static let code: Font = .system(.subheadline, design: .monospaced).bold() // ~15pt mono bold
+        static let secondary: Font = .footnote                    // ~13pt
+        static let secondaryBold: Font = .footnote.weight(.semibold)
+        static let caption: Font = .caption                       // ~12pt
+        static let captionBold: Font = .caption.bold()
+        static let micro: Font = .caption2                        // ~11pt
+        static let microBold: Font = .caption2.bold()
+        static let heroNumber: Font = .system(size: 26, weight: .bold, design: .rounded)
+        static let metricNumber: Font = .system(size: 18, weight: .bold, design: .rounded)
+    }
 
     /// Nền trang: tối thật sâu ở Dark Mode, sáng gọn ở Light Mode.
     static let pageBackground = Color(UIColor { traits in
@@ -76,7 +99,7 @@ enum Haptics {
 
 /// Thẻ mờ tinh tế (Material nhẹ + nền thẻ + đường viền mảnh).
 struct CardModifier: ViewModifier {
-    var padding: CGFloat = 16
+    var padding: CGFloat = Theme.cardPadding
     var radius: CGFloat = Theme.cardRadius
     @Environment(\.colorScheme) private var scheme
 
@@ -88,7 +111,7 @@ struct CardModifier: ViewModifier {
                     .fill(Theme.cardBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .fill(.ultraThinMaterial.opacity(scheme == .dark ? 0.35 : 0.18))
+                            .fill(.ultraThinMaterial.opacity(scheme == .dark ? 0.30 : 0.14))
                     )
             }
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
@@ -96,12 +119,12 @@ struct CardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(Color.primary.opacity(scheme == .dark ? 0.11 : 0.06), lineWidth: 0.7)
             )
-            .shadow(color: Color.black.opacity(scheme == .dark ? 0.28 : 0.04), radius: 12, x: 0, y: 4)
+            .shadow(color: Color.black.opacity(scheme == .dark ? 0.22 : 0.03), radius: 6, x: 0, y: 2)
     }
 }
 
 extension View {
-    func card(padding: CGFloat = 16, radius: CGFloat = Theme.cardRadius) -> some View {
+    func card(padding: CGFloat = Theme.cardPadding, radius: CGFloat = Theme.cardRadius) -> some View {
         modifier(CardModifier(padding: padding, radius: radius))
     }
 
@@ -125,17 +148,17 @@ extension View {
     }
 }
 
-/// Dải báo chế độ Dữ liệu mẫu cố định trên đầu mọi màn hình.
+/// Dải báo chế độ Dữ liệu mẫu mảnh (tối đa 24pt, chữ 11pt) đặt TRÊN thanh điều hướng, không đè nội dung.
 struct DemoModeBanner: View {
     let onExit: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "sparkles")
-                .font(.caption.bold())
+                .font(.system(size: 10, weight: .bold))
                 .foregroundColor(Theme.accent)
-            Text("DỮ LIỆU MẪU, không gửi gì cho máy tính")
-                .font(.caption.bold())
+            Text("DỮ LIỆU MẪU · không gửi lên máy tính")
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -145,9 +168,9 @@ struct DemoModeBanner: View {
                 onExit()
             } label: {
                 Text("Tắt")
-                    .font(.caption2.bold())
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
                     .background(Theme.accent.opacity(0.18))
                     .foregroundColor(Theme.accent)
                     .clipShape(Capsule())
@@ -155,13 +178,13 @@ struct DemoModeBanner: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Tắt chế độ dữ liệu mẫu")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, Theme.screenPadding)
+        .frame(height: Theme.demoBannerHeight)
+        .background(.ultraThinMaterial, ignoresSafeAreaEdges: .top)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Theme.accent.opacity(0.35))
-                .frame(height: 0.8)
+                .fill(Theme.accent.opacity(0.30))
+                .frame(height: 0.6)
         }
     }
 }
@@ -214,7 +237,7 @@ struct AnimatedCounter: View {
     }
 }
 
-/// Huy hiệu sàn (Shopee / TikTok / Lazada) đồng nhất toàn app.
+/// Huy hiệu sàn (Shopee / TikTok / Lazada) nhỏ gọn đồng nhất toàn app.
 struct PlatformBadge: View {
     let platform: String
 
@@ -222,9 +245,9 @@ struct PlatformBadge: View {
         let name = DashboardMetrics.normalizedPlatform(platform)
         let tint = Theme.platformColor(platform)
         Text(name)
-            .font(.caption2.bold())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .font(Theme.Typography.microBold)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
             .background(tint.opacity(0.14))
             .foregroundColor(tint)
             .clipShape(Capsule())
@@ -238,9 +261,9 @@ struct StatusPill: View {
 
     var body: some View {
         Text(text)
-            .font(.caption2.bold())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
+            .font(Theme.Typography.microBold)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
             .background(color.opacity(0.15))
             .foregroundColor(color)
             .clipShape(Capsule())
@@ -255,17 +278,18 @@ struct SectionTitleRow: View {
     var subtitle: String? = nil
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if let icon = icon {
-                IconTile(systemName: icon, color: iconColor, size: 28, cornerRadius: 8)
+                IconTile(systemName: icon, color: iconColor, size: 24, cornerRadius: 7)
             }
             Text(title)
-                .font(.headline.bold())
+                .font(Theme.Typography.sectionTitle)
                 .foregroundColor(.primary)
+                .lineLimit(1)
             Spacer(minLength: 4)
             if let subtitle = subtitle, !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.caption.bold())
+                    .font(Theme.Typography.captionBold)
                     .foregroundStyle(.secondary)
             }
         }
@@ -326,27 +350,28 @@ struct FilterTile: View {
                 withAnimation(.easeInOut(duration: 0.16)) { action() }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Text(title)
-                    .font(.footnote.weight(selected ? .bold : .semibold))
+                    .font(selected ? Theme.Typography.captionBold : Theme.Typography.caption.weight(.semibold))
                 Text("\(count)")
-                    .font(.system(.caption, design: .rounded).bold())
+                    .font(.system(.caption2, design: .rounded).bold())
                     .monospacedDigit()
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(selected ? Color.white.opacity(0.22) : Color.primary.opacity(0.08))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1.5)
+                    .background(selected ? Color.white.opacity(0.24) : Color.primary.opacity(0.08))
                     .clipShape(Capsule())
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 40)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(selected ? accent : Theme.cardBackground)
             .foregroundColor(selected ? .white : .primary)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous)
                     .stroke(selected ? Color.clear : Color.primary.opacity(0.08), lineWidth: 0.7)
             )
+            .frame(minHeight: Theme.minTapTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

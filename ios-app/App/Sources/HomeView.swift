@@ -1,9 +1,9 @@
 import SwiftUI
 import ScannerCore
 
-/// Màn hình mở đầu "Tổng quan" (Pass 2):
-/// Hero tiến độ hôm nay, dải thẻ cuộn ngang (Hàng hoàn về / Theo sàn / Hoàn một phần),
-/// Cần xử lý ngay (có vuốt Ghi chú / Theo dõi), biểu đồ 7 ngày có đường trung bình.
+/// Màn hình mở đầu "Tổng quan" (T036 - gọn & hiện đại):
+/// Thanh trên inline với 1 dòng chào + ngày và nút Quét gọn; Hero vòng 84pt + dải 4 số liệu ngang;
+/// Các thẻ xếp dọc gọn (Sản phẩm hoàn nhiều nhất, Hàng hoàn về, Cần xử lý ngay, Theo sàn, 7 ngày).
 struct HomeView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
@@ -19,13 +19,13 @@ struct HomeView: View {
     @State private var showSelectedProductStat = false
 
     private func recompute() {
-        let next = DashboardMetrics.compute(rows: store.rows, stats: store.stats, now: Date())
+        let next = DashboardMetrics.compute(rows: store.rows, stats: store.stats, now: Date(), urgentLimit: 3)
         let nextProducts = ProductMetrics.compute(rows: store.rows)
         if reduceMotion {
             summary = next
             productStats = nextProducts
         } else {
-            withAnimation(.easeOut(duration: 0.22)) {
+            withAnimation(.easeOut(duration: 0.20)) {
                 summary = next
                 productStats = nextProducts
             }
@@ -34,10 +34,10 @@ struct HomeView: View {
 
     private var connectionStatus: (text: String, color: Color) {
         if store.isDemoMode {
-            return ("Dữ liệu mẫu", Theme.accent)
+            return ("Mẫu", Theme.accent)
         }
         if engine.room.isEmpty || !engine.channelUp {
-            return ("Chưa kết nối", .secondary)
+            return ("Chưa nối", .secondary)
         }
         if engine.pcOnline {
             return ("PC online", Theme.success)
@@ -48,9 +48,13 @@ struct HomeView: View {
     private var formattedToday: String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "vi_VN")
-        f.dateFormat = "EEEE, dd/MM"
+        f.dateFormat = "EEE, dd/MM"
         let s = f.string(from: Date())
         return s.prefix(1).uppercased() + s.dropFirst()
+    }
+
+    private var greetingLine: String {
+        "\(DashboardMetrics.greeting(for: Date())) · \(formattedToday)"
     }
 
     var body: some View {
@@ -58,51 +62,56 @@ struct HomeView: View {
             List {
                 if !store.hasData {
                     emptyStateSection
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 8, leading: Theme.screenPadding, bottom: 6, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
                     topProductsCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 16, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 16, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 } else {
                     heroCard
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 6, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+
+                    metricsStrip
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
                     if summary.discrepancyCount > 0 {
                         discrepancyCard
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
 
                     topProductsCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
-                    horizontalDeck
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 10, trailing: 0))
+                    returnWatchCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
                     urgentHeader
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 6, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 6, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
                     if summary.urgentOrders.isEmpty {
                         urgentEmptyCard
-                            .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 10, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 2, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     } else {
                         ForEach(summary.urgentOrders) { item in
                             urgentRow(item)
-                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowInsets(EdgeInsets(top: 3, leading: Theme.screenPadding, bottom: 3, trailing: Theme.screenPadding))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -126,15 +135,20 @@ struct HomeView: View {
                         }
                     }
 
+                    platformsCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+
                     if summary.has7DayData {
                         last7DaysCard
-                            .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 10, trailing: 16))
+                            .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
 
                     statsShortcutCard
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 20, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 16, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -148,20 +162,43 @@ struct HomeView: View {
                 engine.requestSnapshot()
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
             }
-            .safeAreaInset(edge: .bottom) {
-                scanNowBar
-            }
-            .navigationTitle("Tổng quan")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text(greetingLine)
+                        .font(Theme.Typography.secondaryBold)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        Haptics.medium()
+                        router.tab = NotificationRouter.scanTab
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "barcode.viewfinder")
+                                .font(.system(size: 13, weight: .bold))
+                            Text("Quét")
+                                .font(Theme.Typography.captionBold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Theme.accent)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Quét mã vận đơn")
+
                     if !store.isDemoMode {
                         Button {
                             Haptics.tap()
                             engine.requestSnapshot()
                         } label: {
                             Image(systemName: "arrow.clockwise")
-                                .font(.body.weight(.semibold))
+                                .font(.subheadline.weight(.semibold))
                         }
                         .accessibilityLabel("Cập nhật dữ liệu từ máy tính")
                     }
@@ -171,7 +208,7 @@ struct HomeView: View {
                         router.showNotifications = true
                     } label: {
                         Image(systemName: store.alertCount > 0 ? "bell.badge.fill" : "bell")
-                            .font(.body.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                             .foregroundColor(store.alertCount > 0 ? Theme.accent : .primary)
                     }
                     .accessibilityLabel("Thông báo (\(store.alertCount))")
@@ -198,123 +235,94 @@ struct HomeView: View {
         .sheet(item: $router.openRow) { DetailView(row: $0) }
     }
 
-    // MARK: - Khối Hero trên cùng
+    // MARK: - 1. Khối Hero gọn (vòng 84pt + quá hạn / sắp hạn bên phải)
     private var heroCard: some View {
         let st = connectionStatus
-        let ringSize: CGFloat = 112
-        return VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Hôm nay")
-                        .font(.title2.bold())
-                        .foregroundColor(.primary)
-                    Text(formattedToday)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(.secondary)
+        let ringSize: CGFloat = 84
+        return HStack(spacing: 14) {
+            Button {
+                Haptics.tap()
+                router.openOrders(filter: .received)
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(Theme.accent.opacity(scheme == .dark ? 0.22 : 0.16), lineWidth: 8)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(max(summary.todayProgress, summary.receivedTodayCount > 0 ? 0.05 : 0)))
+                        .stroke(
+                            LinearGradient(
+                                colors: [Theme.accent, Theme.warning],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+
+                    VStack(spacing: 0) {
+                        AnimatedCounter(
+                            value: summary.receivedTodayCount,
+                            font: Theme.Typography.heroNumber,
+                            color: .primary
+                        )
+                        Text("/ \(summary.todayTargetCount)")
+                            .font(.system(.caption2, design: .rounded).bold())
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Spacer(minLength: 8)
+                .frame(width: ringSize, height: ringSize)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Đã nhận \(summary.receivedTodayCount) trên \(summary.todayTargetCount) đơn hôm nay")
+
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Circle().fill(st.color).frame(width: 8, height: 8)
-                    Text(st.text)
-                        .font(.caption.bold())
-                        .foregroundColor(st.color)
+                    Text("Tiến độ hôm nay")
+                        .font(Theme.Typography.sectionTitle)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    HStack(spacing: 4) {
+                        Circle().fill(st.color).frame(width: 6, height: 6)
+                        Text(st.text)
+                            .font(Theme.Typography.microBold)
+                            .foregroundColor(st.color)
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
+                    .background(st.color.opacity(0.14))
+                    .clipShape(Capsule())
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(st.color.opacity(0.14))
-                .clipShape(Capsule())
+
+                heroSubMetric(
+                    title: "Quá hạn",
+                    value: summary.overdueCount,
+                    color: Theme.danger
+                ) {
+                    router.openOrders(filter: .overdue)
+                }
+
+                heroSubMetric(
+                    title: "Sắp đến hạn",
+                    value: summary.soonCount,
+                    color: Theme.warning
+                ) {
+                    router.openOrders(filter: .soon)
+                }
             }
-
-            HStack(spacing: 18) {
-                // Vòng tiến độ hôm nay
-                Button {
-                    Haptics.tap()
-                    router.openOrders(filter: .received)
-                } label: {
-                    ZStack {
-                        Circle()
-                            .stroke(Theme.accent.opacity(scheme == .dark ? 0.22 : 0.16), lineWidth: 11)
-                        Circle()
-                            .trim(from: 0, to: CGFloat(max(summary.todayProgress, summary.receivedTodayCount > 0 ? 0.05 : 0)))
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Theme.accent, Theme.warning],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                style: StrokeStyle(lineWidth: 11, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-
-                        VStack(spacing: 1) {
-                            AnimatedCounter(
-                                value: summary.receivedTodayCount,
-                                font: .system(size: 30, weight: .bold, design: .rounded),
-                                color: .primary
-                            )
-                            Text("/ \(summary.todayTargetCount)")
-                                .font(.system(.caption, design: .rounded).bold())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(width: ringSize, height: ringSize)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Đã nhận \(summary.receivedTodayCount) trên \(summary.todayTargetCount) đơn hôm nay")
-
-                // 2 con số phụ bên phải (quá hạn, sắp hạn) + còn chờ
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Đã nhận \(summary.receivedTodayCount) / Cần nhận \(summary.todayTargetCount)")
-                        .font(.caption.bold())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-
-                    heroSubMetric(
-                        title: "Quá hạn",
-                        value: summary.overdueCount,
-                        color: Theme.danger
-                    ) {
-                        router.openOrders(filter: .overdue)
-                    }
-
-                    heroSubMetric(
-                        title: "Sắp đến hạn",
-                        value: summary.soonCount,
-                        color: Theme.warning
-                    ) {
-                        router.openOrders(filter: .soon)
-                    }
-
-                    Button {
-                        Haptics.tap()
-                        router.openOrders(filter: .pending)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Circle().fill(Theme.accent).frame(width: 7, height: 7)
-                            Text("Còn chờ \(summary.pendingCount) đơn")
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .font(.caption2.bold())
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(18)
+        .padding(Theme.cardPadding)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .fill(Theme.cardBackground)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Theme.accent.opacity(scheme == .dark ? 0.22 : 0.14),
-                                    Theme.accent.opacity(scheme == .dark ? 0.04 : 0.02)
+                                    Theme.accent.opacity(scheme == .dark ? 0.20 : 0.12),
+                                    Theme.accent.opacity(scheme == .dark ? 0.03 : 0.01)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -322,10 +330,10 @@ struct HomeView: View {
                         )
                 )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Theme.accent.opacity(scheme == .dark ? 0.30 : 0.20), lineWidth: 0.9)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(Theme.accent.opacity(scheme == .dark ? 0.28 : 0.18), lineWidth: 0.8)
         )
     }
 
@@ -334,71 +342,205 @@ struct HomeView: View {
             Haptics.tap()
             action()
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(color)
-                    .frame(width: 9, height: 9)
+                    .frame(width: 7, height: 7)
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(Theme.Typography.secondary)
                     .foregroundColor(.primary)
                 Spacer(minLength: 4)
                 AnimatedCounter(
                     value: value,
-                    font: .system(size: 20, weight: .bold, design: .rounded),
+                    font: Theme.Typography.metricNumber,
                     color: value > 0 ? color : .secondary
                 )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .frame(minHeight: 40)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .frame(minHeight: 32)
             .background(Theme.subtleFill)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Dải thẻ cuộn ngang (Hàng hoàn về / Theo sàn / Hoàn một phần)
-    private var horizontalDeck: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 14) {
-                returnWatchDeckCard
-                    .frame(width: 300)
-                platformsDeckCard
-                    .frame(width: 300)
-                partialReturnDeckCard
-                    .frame(width: 224)
+    // MARK: - 2. Dải 4 số liệu ngang gọn (Chờ về / Nhận hôm nay / Quá hạn / Sắp hạn)
+    private var metricsStrip: some View {
+        HStack(spacing: 0) {
+            stripMetricCell("Chờ về", summary.pendingCount, Theme.accent) {
+                router.openOrders(filter: .pending)
             }
-            .snapTargetLayoutIfAvailable()
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
+            Divider().frame(height: 28)
+            stripMetricCell("Nhận hôm nay", summary.receivedTodayCount, Theme.success) {
+                router.openOrders(filter: .received)
+            }
+            Divider().frame(height: 28)
+            stripMetricCell("Quá hạn", summary.overdueCount, Theme.danger) {
+                router.openOrders(filter: .overdue)
+            }
+            Divider().frame(height: 28)
+            stripMetricCell("Sắp hạn", summary.soonCount, Theme.warning) {
+                router.openOrders(filter: .soon)
+            }
         }
-        .snapPagingIfAvailable()
+        .card(padding: 8, radius: Theme.cardRadius)
     }
 
-    private var returnWatchDeckCard: some View {
+    private func stripMetricCell(_ title: String, _ value: Int, _ color: Color, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
+            VStack(spacing: 2) {
+                AnimatedCounter(
+                    value: value,
+                    font: Theme.Typography.metricNumber,
+                    color: value > 0 ? color : .secondary
+                )
+                Text(title)
+                    .font(Theme.Typography.micro)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 3. Sản phẩm hoàn nhiều nhất (xếp dọc gọn, luôn hiển thị, không ẩn khi trống)
+    private var topProductsCard: some View {
+        let top3 = Array(productStats.products.prefix(3))
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                SectionTitleRow(
+                    title: "Sản phẩm hoàn nhiều nhất",
+                    icon: "tshirt.fill",
+                    iconColor: Theme.accent
+                )
+                Button {
+                    Haptics.tap()
+                    showAllProductStats = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Text("Xem tất cả")
+                            .font(Theme.Typography.microBold)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(Theme.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.accent.opacity(0.14))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            if top3.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Chưa có dữ liệu sản phẩm. Kết nối máy tính hoặc bật dữ liệu mẫu để xem")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if !store.isDemoMode {
+                        Button {
+                            Haptics.medium()
+                            engine.setDemoMode(true)
+                        } label: {
+                            Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
+                                .font(Theme.Typography.secondaryBold)
+                                .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
+                    }
+                }
+            } else {
+                Text(productStats.summaryLine)
+                    .font(Theme.Typography.micro)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                VStack(spacing: 6) {
+                    ForEach(Array(top3.enumerated()), id: \.element.id) { idx, item in
+                        let rank = idx + 1
+                        let barColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : Theme.teal)
+                        let pct = Int((item.share * 100).rounded())
+
+                        Button {
+                            Haptics.tap()
+                            selectedProductStat = item
+                            showSelectedProductStat = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("\(rank)")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .frame(width: 18, height: 18)
+                                    .background(barColor)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.name)
+                                        .font(Theme.Typography.secondaryBold)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                    if item.premiumUnits > 0 {
+                                        Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
+                                            .font(Theme.Typography.micro)
+                                            .foregroundColor(Theme.warning)
+                                            .monospacedDigit()
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer(minLength: 4)
+
+                                Text("\(item.units) cái")
+                                    .font(.system(.caption, design: .rounded).bold())
+                                    .foregroundColor(.primary)
+                                    .monospacedDigit()
+                                Text("(\(pct)%)")
+                                    .font(Theme.Typography.micro)
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                            .frame(minHeight: 28)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+    }
+
+    // MARK: - 4. Hàng hoàn về (thẻ dọc gọn <= 120pt)
+    private var returnWatchCard: some View {
         let rw = summary.returnWatch
         let total = max(1, rw.total)
         return NavigationLink {
             ReturnWatchView()
         } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    IconTile(systemName: "arrow.uturn.backward", color: Theme.teal, size: 30, cornerRadius: 8)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Hàng hoàn về")
-                            .font(.subheadline.bold())
-                            .foregroundColor(.primary)
-                        Text("\(rw.active) đang về kho")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    SectionTitleRow(
+                        title: "Hàng hoàn về",
+                        icon: "arrow.uturn.backward",
+                        iconColor: Theme.teal,
+                        subtitle: "\(rw.active) đang về"
+                    )
                     Image(systemName: "chevron.right")
-                        .font(.caption.bold())
+                        .font(.caption2.bold())
                         .foregroundStyle(.tertiary)
                 }
 
-                // Thanh liền 4 chặng
                 GeometryReader { geo in
                     let w = geo.size.width
                     HStack(spacing: 2) {
@@ -406,22 +548,22 @@ struct HomeView: View {
                             Capsule().fill(Color.gray.opacity(0.2))
                         } else {
                             if rw.stage1 > 0 {
-                                Rectangle().fill(Theme.info).frame(width: max(8, w * CGFloat(rw.stage1) / CGFloat(total)))
+                                Rectangle().fill(Theme.info).frame(width: max(6, w * CGFloat(rw.stage1) / CGFloat(total)))
                             }
                             if rw.stage2 > 0 {
-                                Rectangle().fill(Theme.teal).frame(width: max(8, w * CGFloat(rw.stage2) / CGFloat(total)))
+                                Rectangle().fill(Theme.teal).frame(width: max(6, w * CGFloat(rw.stage2) / CGFloat(total)))
                             }
                             if rw.stage3 > 0 {
-                                Rectangle().fill(Theme.warning).frame(width: max(8, w * CGFloat(rw.stage3) / CGFloat(total)))
+                                Rectangle().fill(Theme.warning).frame(width: max(6, w * CGFloat(rw.stage3) / CGFloat(total)))
                             }
                             if rw.stage4 > 0 {
-                                Rectangle().fill(Theme.success).frame(width: max(8, w * CGFloat(rw.stage4) / CGFloat(total)))
+                                Rectangle().fill(Theme.success).frame(width: max(6, w * CGFloat(rw.stage4) / CGFloat(total)))
                             }
                         }
                     }
                     .clipShape(Capsule())
                 }
-                .frame(height: 10)
+                .frame(height: 7)
 
                 HStack(spacing: 6) {
                     stageMini("Đồng ý", rw.stage1, Theme.info)
@@ -430,117 +572,27 @@ struct HomeView: View {
                     stageMini("Nhận kho", rw.stage4, Theme.success)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 138, alignment: .leading)
-            .card(padding: 16)
+            .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
         }
         .buttonStyle(.plain)
     }
 
     private func stageMini(_ title: String, _ count: Int, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 4) {
             Text("\(count)")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(count > 0 ? color : .secondary)
                 .monospacedDigit()
             Text(title)
-                .font(.caption2)
+                .font(Theme.Typography.micro)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var platformsDeckCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                IconTile(systemName: "storefront.fill", color: Theme.accent, size: 30, cornerRadius: 8)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Theo sàn")
-                        .font(.subheadline.bold())
-                        .foregroundColor(.primary)
-                    Text("Chạm sàn để lọc đơn")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                ForEach(summary.platforms.prefix(3)) { plat in
-                    let tint = Theme.platformColor(plat.name)
-                    Button {
-                        Haptics.tap()
-                        router.openOrders(filter: .pending, platform: plat.name)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 4) {
-                                Circle().fill(tint).frame(width: 7, height: 7)
-                                Text(plat.name)
-                                    .font(.caption2.bold())
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
-                            }
-                            Text("\(plat.pending)")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundColor(.primary)
-                                .monospacedDigit()
-                            Text(plat.overdue > 0 ? "\(plat.overdue) quá hạn" : "Ổn định")
-                                .font(.caption2.bold())
-                                .foregroundColor(plat.overdue > 0 ? Theme.danger : .secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Theme.subtleFill)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .leading)
-        .card(padding: 16)
-    }
-
-    private var partialReturnDeckCard: some View {
-        Button {
-            Haptics.tap()
-            router.openOrders(filter: .partialReturn)
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    IconTile(systemName: "square.split.2x1.fill", color: Theme.purple, size: 30, cornerRadius: 8)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
-                }
-
-                AnimatedCounter(
-                    value: summary.partialReturnCount,
-                    font: .system(size: 34, weight: .bold, design: .rounded),
-                    color: summary.partialReturnCount > 0 ? Theme.accent : .secondary
-                )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Hoàn một phần")
-                        .font(.subheadline.bold())
-                        .foregroundColor(.primary)
-                    Text("Giữ đủ SP, tô màu món hoàn")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 138, alignment: .leading)
-            .card(padding: 16)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Cần xử lý ngay
+    // MARK: - 5. Cần xử lý ngay (tối đa 3 đơn gọn, giữ vuốt Ghi chú / Theo dõi)
     private var urgentHeader: some View {
         HStack {
             SectionTitleRow(
@@ -553,7 +605,7 @@ struct HomeView: View {
                     Haptics.tap()
                     router.openOrders(filter: summary.overdueCount > 0 ? .overdue : .soon)
                 }
-                .font(.caption.bold())
+                .font(Theme.Typography.captionBold)
                 .foregroundColor(Theme.accent)
                 .buttonStyle(.plain)
             }
@@ -561,18 +613,14 @@ struct HomeView: View {
     }
 
     private var urgentEmptyCard: some View {
-        HStack(spacing: 12) {
-            IconTile(systemName: "checkmark", color: Theme.success, size: 32, cornerRadius: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Mọi thứ đang ổn")
-                    .font(.subheadline.bold())
-                Text("Không có đơn quá hạn hay sắp đến hạn.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+        HStack(spacing: 10) {
+            IconTile(systemName: "checkmark", color: Theme.success, size: 26, cornerRadius: 8)
+            Text("Không có đơn quá hạn hay sắp đến hạn")
+                .font(Theme.Typography.secondary)
+                .foregroundStyle(.secondary)
             Spacer()
         }
-        .card(padding: 14)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     private func urgentRow(_ item: UrgentOrder) -> some View {
@@ -582,51 +630,108 @@ struct HomeView: View {
             Haptics.tap()
             selectedRow = r
         } label: {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 3, style: .continuous)
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(tint)
-                    .frame(width: 4)
+                    .frame(width: 3.5)
                     .padding(.vertical, 2)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
                         PlatformBadge(platform: r.p)
                         Text(r.c)
-                            .font(.system(.subheadline, design: .monospaced).bold())
+                            .font(Theme.Typography.code)
                             .foregroundColor(.primary)
                             .lineLimit(1)
                         if r.wl {
                             Image(systemName: "star.fill")
-                                .font(.caption2)
+                                .font(.system(size: 10))
                                 .foregroundColor(Theme.warning)
                         }
                     }
                     if !r.n.isEmpty {
                         Text(r.n)
-                            .font(.caption)
+                            .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
 
                 Text(item.deadlineText)
-                    .font(.caption.bold())
+                    .font(Theme.Typography.microBold)
                     .foregroundColor(tint)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
             }
-            .frame(minHeight: 54)
-            .card(padding: 12, radius: 16)
+            .frame(minHeight: Theme.minTapTarget)
+            .card(padding: 10, radius: Theme.cardRadius)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - 7 ngày gần nhất (cột + đường trung bình)
+    // MARK: - 6. Theo sàn (thẻ dọc gọn <= 120pt + lối tắt Hoàn một phần)
+    private var platformsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                SectionTitleRow(
+                    title: "Theo sàn",
+                    icon: "storefront.fill",
+                    iconColor: Theme.accent
+                )
+                if summary.partialReturnCount > 0 {
+                    Button {
+                        Haptics.tap()
+                        router.openOrders(filter: .partialReturn)
+                    } label: {
+                        StatusPill(text: "Hoàn 1 phần: \(summary.partialReturnCount)", color: Theme.purple)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 8) {
+                ForEach(summary.platforms.prefix(3)) { plat in
+                    let tint = Theme.platformColor(plat.name)
+                    Button {
+                        Haptics.tap()
+                        router.openOrders(filter: .pending, platform: plat.name)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                Circle().fill(tint).frame(width: 6, height: 6)
+                                Text(plat.name)
+                                    .font(Theme.Typography.microBold)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                            }
+                            Text("\(plat.pending)")
+                                .font(Theme.Typography.metricNumber)
+                                .foregroundColor(.primary)
+                                .monospacedDigit()
+                            Text(plat.overdue > 0 ? "\(plat.overdue) quá hạn" : "Ổn định")
+                                .font(Theme.Typography.micro)
+                                .foregroundColor(plat.overdue > 0 ? Theme.danger : .secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(Theme.subtleFill)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+    }
+
+    // MARK: - 7. 7 ngày gần nhất (gọn)
     private var last7DaysCard: some View {
         let avgRatio = summary.average7DaysRatio
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 SectionTitleRow(
                     title: "7 ngày gần nhất",
@@ -637,29 +742,28 @@ struct HomeView: View {
             }
 
             GeometryReader { geo in
-                let barAreaHeight: CGFloat = 88
+                let barAreaHeight: CGFloat = 56
                 let avgY = barAreaHeight * (1 - CGFloat(avgRatio))
 
                 ZStack(alignment: .top) {
-                    // Đường trung bình nét đứt
                     if summary.average7Days > 0 {
                         Path { path in
-                            path.move(to: CGPoint(x: 0, y: avgY + 18))
-                            path.addLine(to: CGPoint(x: geo.size.width, y: avgY + 18))
+                            path.move(to: CGPoint(x: 0, y: avgY + 14))
+                            path.addLine(to: CGPoint(x: geo.size.width, y: avgY + 14))
                         }
-                        .stroke(Theme.accent.opacity(0.55), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+                        .stroke(Theme.accent.opacity(0.55), style: StrokeStyle(lineWidth: 1.0, dash: [4, 3]))
                     }
 
-                    HStack(alignment: .bottom, spacing: 8) {
+                    HStack(alignment: .bottom, spacing: 6) {
                         ForEach(summary.last7Days) { day in
                             let ratio = summary.dailyRatio(for: day)
-                            let barH = day.count > 0 ? max(10, CGFloat(ratio) * barAreaHeight) : 4
-                            VStack(spacing: 5) {
+                            let barH = day.count > 0 ? max(8, CGFloat(ratio) * barAreaHeight) : 3
+                            VStack(spacing: 3) {
                                 Text(day.count > 0 ? "\(day.count)" : "")
-                                    .font(.system(.caption2, design: .rounded).bold())
+                                    .font(.system(size: 10, weight: .bold, design: .rounded))
                                     .foregroundColor(day.isToday ? Theme.accent : .secondary)
                                     .monospacedDigit()
-                                    .frame(height: 14)
+                                    .frame(height: 12)
 
                                 Capsule()
                                     .fill(
@@ -671,39 +775,39 @@ struct HomeView: View {
                                                 endPoint: .bottom
                                             )
                                     )
-                                    .frame(maxWidth: 24, minHeight: barH, maxHeight: barH)
+                                    .frame(maxWidth: 20, minHeight: barH, maxHeight: barH)
 
                                 Text(day.label)
-                                    .font(.caption2.bold())
+                                    .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(day.isToday ? Theme.accent : .secondary)
                             }
                             .frame(maxWidth: .infinity)
                         }
                     }
-                    .frame(height: barAreaHeight + 38, alignment: .bottom)
+                    .frame(height: barAreaHeight + 30, alignment: .bottom)
                 }
             }
-            .frame(height: 128)
+            .frame(height: 88)
         }
-        .card(padding: 16)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     // MARK: - Cảnh báo lệch số đơn
     private var discrepancyCard: some View {
         HStack(alignment: .top, spacing: 10) {
-            IconTile(systemName: "exclamationmark.triangle.fill", color: Theme.warning, size: 30, cornerRadius: 8)
-            VStack(alignment: .leading, spacing: 4) {
+            IconTile(systemName: "exclamationmark.triangle.fill", color: Theme.warning, size: 26, cornerRadius: 7)
+            VStack(alignment: .leading, spacing: 3) {
                 Text("Lệch \(summary.discrepancyCount) đơn so với máy tính")
-                    .font(.subheadline.bold())
+                    .font(Theme.Typography.secondaryBold)
                 Text(discrepancyDetail)
-                    .font(.caption)
+                    .font(Theme.Typography.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Button("Tải lại") {
                         Haptics.tap()
                         engine.requestSnapshot()
                     }
-                    .font(.caption.bold())
+                    .font(Theme.Typography.captionBold)
                     .foregroundColor(Theme.accent)
                     .buttonStyle(.plain)
 
@@ -711,20 +815,19 @@ struct HomeView: View {
                         Haptics.tap()
                         router.tab = NotificationRouter.settingsTab
                     }
-                    .font(.caption.bold())
+                    .font(Theme.Typography.captionBold)
                     .foregroundStyle(.secondary)
                     .buttonStyle(.plain)
                 }
-                .padding(.top, 2)
             }
             Spacer(minLength: 0)
         }
-        .padding(14)
+        .padding(Theme.cardPadding)
         .background(Theme.warning.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Theme.warning.opacity(0.32), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(Theme.warning.opacity(0.30), lineWidth: 0.8)
         )
     }
 
@@ -737,16 +840,16 @@ struct HomeView: View {
 
     // MARK: - Trạng thái rỗng kèm nút Xem thử dữ liệu mẫu
     private var emptyStateSection: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 14) {
-                IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 48, cornerRadius: 14)
-                VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 40, cornerRadius: 11)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(engine.room.isEmpty ? "Chưa nối với máy tính" : "Đang chờ dữ liệu đơn")
-                        .font(.title3.bold())
+                        .font(Theme.Typography.navTitle)
                     Text(engine.room.isEmpty
                          ? "Nhập mã phòng từ PC v2 hoặc xem thử ngay với dữ liệu mẫu."
                          : (store.assembleInfo.isEmpty ? "Mở app PC v2 để gửi danh sách đơn sang iPhone." : store.assembleInfo))
-                        .font(.footnote)
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -756,39 +859,38 @@ struct HomeView: View {
                 engine.setDemoMode(true)
             } label: {
                 Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(.subheadline.bold())
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .font(Theme.Typography.secondaryBold)
+                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
 
             if engine.room.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
                     stepRow("1", "Mở app Quản lý hàng hoàn v2 trên máy tính → Đồng bộ điện thoại → sao chép mã phòng.")
                     stepRow("2", "Vào Cài đặt trên iPhone, dán mã phòng và bấm Lưu.")
                 }
-                .padding(.top, 2)
 
                 Button {
                     Haptics.tap()
                     router.tab = NotificationRouter.settingsTab
                 } label: {
                     Label("Đi tới Cài đặt", systemImage: "gearshape.fill")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .font(Theme.Typography.secondaryBold)
+                        .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
                 }
                 .buttonStyle(.bordered)
                 .tint(Theme.accent)
             } else {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     Button {
                         Haptics.tap()
                         engine.requestSnapshot()
                     } label: {
                         Label("Xin lại danh sách", systemImage: "arrow.clockwise")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .font(Theme.Typography.secondaryBold)
+                            .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
                     }
                     .buttonStyle(.bordered)
                     .tint(Theme.accent)
@@ -798,154 +900,30 @@ struct HomeView: View {
                         router.tab = NotificationRouter.settingsTab
                     } label: {
                         Text("Cài đặt")
-                            .font(.subheadline.bold())
-                            .frame(minHeight: 44)
+                            .font(Theme.Typography.secondaryBold)
+                            .frame(minHeight: Theme.minTapTarget)
                             .padding(.horizontal, 12)
                     }
                     .buttonStyle(.bordered)
                 }
             }
         }
-        .card(padding: 20, radius: 22)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     private func stepRow(_ number: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 8) {
             Text(number)
-                .font(.caption.bold())
+                .font(Theme.Typography.microBold)
                 .foregroundColor(.white)
-                .frame(width: 22, height: 22)
+                .frame(width: 18, height: 18)
                 .background(Theme.accent)
                 .clipShape(Circle())
             Text(text)
-                .font(.footnote)
+                .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-    }
-
-    // MARK: - Top 5 Sản phẩm hoàn nhiều nhất (luôn hiển thị, không ẩn khi trống)
-    private var topProductsCard: some View {
-        let top5 = Array(productStats.products.prefix(5))
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                SectionTitleRow(
-                    title: "Sản phẩm hoàn nhiều nhất",
-                    icon: "tshirt.fill",
-                    iconColor: Theme.accent
-                )
-                Button {
-                    Haptics.tap()
-                    showAllProductStats = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Xem tất cả")
-                            .font(.caption.bold())
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.bold())
-                    }
-                    .foregroundColor(Theme.accent)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Theme.accent.opacity(0.14))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-
-            if top5.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Chưa có dữ liệu sản phẩm. Kết nối máy tính hoặc bật dữ liệu mẫu để xem")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if !store.isDemoMode {
-                        Button {
-                            Haptics.medium()
-                            engine.setDemoMode(true)
-                        } label: {
-                            Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                                .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity, minHeight: 44)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    }
-                }
-            } else {
-                Text(productStats.summaryLine)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                VStack(spacing: 10) {
-                    ForEach(Array(top5.enumerated()), id: \.element.id) { idx, item in
-                        let rank = idx + 1
-                        let barColor: Color = rank == 1 ? Theme.accent : (rank == 2 ? Theme.warning : (rank == 3 ? Theme.teal : Theme.info))
-                        let pct = Int((item.share * 100).rounded())
-
-                        Button {
-                            Haptics.tap()
-                            selectedProductStat = item
-                            showSelectedProductStat = true
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text("\(rank)")
-                                        .font(.system(.caption2, design: .rounded).bold())
-                                        .foregroundColor(rank <= 3 ? .white : .secondary)
-                                        .frame(width: 20, height: 20)
-                                        .background(rank <= 3 ? barColor : Theme.subtleFill)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.name)
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundColor(.primary)
-                                            .lineLimit(1)
-
-                                        if item.premiumUnits > 0 {
-                                            Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
-                                                .font(.caption2.weight(.semibold))
-                                                .foregroundColor(Theme.warning)
-                                                .monospacedDigit()
-                                                .lineLimit(1)
-                                        }
-                                    }
-
-                                    Spacer(minLength: 4)
-
-                                    Text("\(item.units) cái")
-                                        .font(.system(.caption, design: .rounded).bold())
-                                        .foregroundColor(.primary)
-                                        .monospacedDigit()
-
-                                    Text("(\(pct)%)")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .monospacedDigit()
-                                }
-
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        Capsule().fill(Theme.subtleFill)
-                                        Capsule()
-                                            .fill(barColor.opacity(0.85))
-                                            .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
-                                    }
-                                }
-                                .frame(height: 6)
-                            }
-                            .frame(minHeight: 44)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .card(padding: 16)
     }
 
     // MARK: - Lối tắt thống kê
@@ -953,14 +931,14 @@ struct HomeView: View {
         NavigationLink {
             StatsView()
         } label: {
-            HStack(spacing: 12) {
-                IconTile(systemName: "chart.bar.xaxis", color: Theme.info, size: 36, cornerRadius: 10)
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                IconTile(systemName: "chart.bar.xaxis", color: Theme.info, size: 30, cornerRadius: 8)
+                VStack(alignment: .leading, spacing: 1) {
                     Text("Thống kê chi tiết")
-                        .font(.subheadline.bold())
+                        .font(Theme.Typography.sectionTitle)
                         .foregroundColor(.primary)
-                    Text("Xem theo ngày, tuần, tháng và so sánh các sàn")
-                        .font(.caption)
+                    Text("Theo ngày, tuần, tháng và so sánh các sàn")
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -968,39 +946,9 @@ struct HomeView: View {
                     .font(.caption.bold())
                     .foregroundStyle(.tertiary)
             }
-            .frame(minHeight: 48)
-            .card(padding: 14, radius: 18)
+            .frame(minHeight: Theme.minTapTarget)
+            .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Nút "Quét ngay" cạnh dưới
-    private var scanNowBar: some View {
-        Button {
-            Haptics.medium()
-            router.tab = NotificationRouter.scanTab
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "barcode.viewfinder")
-                    .font(.title3.bold())
-                Text("Quét ngay")
-                    .font(.headline.bold())
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .background(
-                LinearGradient(
-                    colors: [Theme.accent, Theme.accent.opacity(0.86)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .shadow(color: Theme.accent.opacity(0.30), radius: 10, x: 0, y: 4)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
     }
 }

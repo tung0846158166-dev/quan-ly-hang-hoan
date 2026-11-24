@@ -110,7 +110,7 @@ struct OrdersView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
+            VStack(spacing: 4) {
                 shortcutRow
                 if store.hasData {
                     filterBar
@@ -129,7 +129,7 @@ struct OrdersView: View {
                     .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -143,12 +143,12 @@ struct OrdersView: View {
                     if !store.hasData {
                         emptyOrdersView
                     } else if shown.isEmpty {
-                        VStack(spacing: 8) {
+                        VStack(spacing: 6) {
                             Image(systemName: "magnifyingglass")
-                                .font(.title2)
+                                .font(.title3)
                                 .foregroundStyle(.secondary)
                             Text("Không có đơn phù hợp")
-                                .font(.subheadline.weight(.medium))
+                                .font(Theme.Typography.secondary)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -157,7 +157,7 @@ struct OrdersView: View {
             .background(Theme.pageBackground.ignoresSafeArea())
             .searchable(text: $query, prompt: "Tìm mã vận đơn, mã đơn, sản phẩm...")
             .navigationTitle("Đơn hàng")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 applyPendingNavigation()
                 refresh()
@@ -214,60 +214,69 @@ struct OrdersView: View {
         }
     }
 
-    // MARK: - Lối tắt bảng phụ & Thống kê sản phẩm (biểu tượng + số, gọn)
+    // MARK: - Hàng chip lối tắt nhỏ gọn (Hoàn về / Sản phẩm / Đơn hủy / Sau CB)
     private var shortcutRow: some View {
         let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
         let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
         let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
 
         return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 NavigationLink { ReturnWatchView() } label: {
-                    shortcutPill(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
+                    shortcutChip(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
                 }
                 .buttonStyle(.plain)
 
                 NavigationLink { ProductStatsView() } label: {
-                    shortcutPill(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent, alwaysTint: true)
+                    shortcutChip(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent, alwaysTint: true)
                 }
                 .buttonStyle(.plain)
 
                 NavigationLink { CancelledTableView() } label: {
-                    shortcutPill(icon: "xmark", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
+                    shortcutChip(icon: "xmark", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
                 }
                 .buttonStyle(.plain)
 
                 NavigationLink { CancelAfterPrepView() } label: {
-                    shortcutPill(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
+                    shortcutChip(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.screenPadding)
         }
     }
 
-    private func shortcutPill(icon: String, title: String, count: Int, color: Color, alwaysTint: Bool = false) -> some View {
-        HStack(spacing: 8) {
-            IconTile(systemName: icon, color: (count > 0 || alwaysTint) ? color : .secondary, size: 28, cornerRadius: 8)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(count)")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundColor((count > 0 || alwaysTint) ? .primary : .secondary)
-                    .monospacedDigit()
-                Text(title)
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+    private func shortcutChip(icon: String, title: String, count: Int, color: Color, alwaysTint: Bool = false) -> some View {
+        let active = count > 0 || alwaysTint
+        return HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(active ? color : .secondary)
+            Text(title)
+                .font(Theme.Typography.captionBold)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+            Text("\(count)")
+                .font(.system(.caption2, design: .rounded).bold())
+                .monospacedDigit()
+                .foregroundColor(active ? color : .secondary)
         }
-        .frame(minWidth: 102, minHeight: 46, alignment: .leading)
-        .card(padding: 8, radius: 14)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(active ? color.opacity(0.11) : Theme.cardBackground)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(active ? color.opacity(0.26) : Color.primary.opacity(0.08), lineWidth: 0.7)
+        )
+        .frame(minHeight: Theme.minTapTarget)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Hàng ô lọc cuộn ngang có số đếm
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(OrderFilter.allCases, id: \.self) { f in
                     FilterTile(
                         title: f.rawValue,
@@ -279,14 +288,14 @@ struct OrdersView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.screenPadding)
         }
     }
 
     private var activePlatformStrip: some View {
         HStack(spacing: 8) {
             Text("Đang lọc sàn:")
-                .font(.caption)
+                .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
             PlatformBadge(platform: platform)
             Spacer()
@@ -294,123 +303,150 @@ struct OrdersView: View {
                 Haptics.tap()
                 platform = ""
             }
-            .font(.caption.bold())
+            .font(Theme.Typography.captionBold)
             .foregroundColor(Theme.accent)
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, Theme.screenPadding)
     }
 
-    // MARK: - Thẻ đơn hàng rộng rãi
+    // MARK: - Hàng đơn gọn 3 dòng
     private func orderCard(_ r: OrderRow) -> some View {
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let level = r.pd ? r.alertLevel(now: now) : .unknown
-        let hasBoth = !r.o.isEmpty && r.o.uppercased() != r.c.uppercased()
         let isPartial = DashboardMetrics.isPartialReturn(r)
+        let variantText = [r.co, r.sz].filter { !$0.isEmpty }.joined(separator: " · ")
 
-        return VStack(alignment: .leading, spacing: 10) {
-            // Dòng trên: huy hiệu sàn + hạn tô màu
-            HStack(spacing: 8) {
+        return VStack(alignment: .leading, spacing: 5) {
+            // Dòng 1: huy hiệu sàn nhỏ + mã vận đơn đậm + hạn màu bên phải
+            HStack(spacing: 6) {
                 if !r.p.isEmpty { PlatformBadge(platform: r.p) }
+                Text(r.c.isEmpty ? r.o : r.c)
+                    .font(Theme.Typography.code)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
                 if r.wl {
                     Image(systemName: "star.fill")
-                        .font(.caption)
+                        .font(.system(size: 10))
                         .foregroundColor(Theme.warning)
                 }
                 Spacer(minLength: 4)
                 if r.pd && r.due > 0 {
                     Text(Deadline.text(due: r.due, now: now))
-                        .font(.caption.bold())
+                        .font(Theme.Typography.microBold)
                         .foregroundColor(deadlineColor(level))
+                        .lineLimit(1)
                 } else if r.rv {
                     Text("Đã nhận")
-                        .font(.caption.bold())
+                        .font(Theme.Typography.microBold)
                         .foregroundColor(Theme.success)
                 }
             }
 
-            // Mã vận đơn đậm
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.c.isEmpty ? r.o : r.c)
-                    .font(.system(.headline, design: .monospaced).bold())
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                if hasBoth {
-                    Text("Mã đơn: \(r.o)")
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            // Sản phẩm (hoàn một phần giữ tô màu + nhãn)
+            // Dòng 2: sản phẩm 1 dòng (hoàn một phần chỉ hiện chip "Hoàn K/N" + tên món đã hoàn tô màu)
             if !r.n.isEmpty {
                 if isPartial {
-                    ProductLines(n: r.n, rn: r.rn)
-                } else {
-                    Text(r.n)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-            }
-
-            if r.wl && !r.wr.isEmpty {
-                HStack(spacing: 5) {
-                    Image(systemName: "pin.fill").font(.caption2)
-                    Text(r.wr).font(.caption).lineLimit(1)
-                }
-                .foregroundColor(Theme.warning)
-            }
-
-            // Chân thẻ: chặng hàng hoàn về hoặc trạng thái
-            HStack(spacing: 8) {
-                if r.inReturnWatch {
-                    let st = r.returnWatchStage
-                    HStack(spacing: 4) {
-                        ForEach(1...4, id: \.self) { k in
-                            Circle()
-                                .fill(k <= st ? stageColor(st) : Color.gray.opacity(0.25))
-                                .frame(width: 6, height: 6)
-                        }
-                        Text(OrderRow.returnWatchStageNames[st])
-                            .font(.caption2.bold())
-                            .foregroundColor(stageColor(st))
+                    let lines = ProductMetrics.productLines(for: r)
+                    let returnedNames = lines.filter { $0.isReturned }.map { $0.name }
+                    let returnedText = returnedNames.isEmpty ? r.rn : returnedNames.joined(separator: ", ")
+                    HStack(spacing: 6) {
+                        StatusPill(
+                            text: "Hoàn \(max(1, returnedNames.count))/\(max(1, lines.count))",
+                            color: Theme.accent
+                        )
+                        Text(returnedText)
+                            .font(Theme.Typography.secondaryBold)
+                            .foregroundColor(Theme.accent)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                } else if scanned.contains(r.c.uppercased()) {
-                    StatusPill(text: "Đã quét", color: Theme.success)
-                } else if r.rv {
-                    StatusPill(text: "Đã nhận kho", color: Theme.success)
-                } else if r.isCancelled {
-                    StatusPill(text: "Đơn hủy", color: Theme.danger)
-                } else if !r.st.isEmpty {
-                    StatusPill(text: r.st, color: r.pd ? Theme.info : .secondary)
+                } else {
+                    HStack(spacing: 6) {
+                        Text(r.n)
+                            .font(Theme.Typography.secondary)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if !variantText.isEmpty {
+                            Text("· \(variantText)")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                        }
+                    }
                 }
+            }
 
-                if isPartial {
-                    StatusPill(text: "Hoàn 1 phần", color: Theme.purple)
+            // Dòng 3: chấm tiến trình / trạng thái + ghi chú rút gọn 1 dòng có biểu tượng ghim
+            HStack(spacing: 8) {
+                statusProgressIndicator(r)
+
+                if !r.wr.isEmpty {
+                    HStack(spacing: 3) {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 9))
+                        Text(r.wr)
+                            .font(Theme.Typography.micro)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .foregroundColor(Theme.warning)
                 }
 
                 Spacer(minLength: 0)
-
-                if !r.co.isEmpty || !r.sz.isEmpty {
-                    Text([r.co, r.sz].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(padding: 15, radius: 18)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+    }
+
+    @ViewBuilder
+    private func statusProgressIndicator(_ r: OrderRow) -> some View {
+        if r.inReturnWatch {
+            let st = r.returnWatchStage
+            let color = stageColor(st)
+            HStack(spacing: 3) {
+                ForEach(1...4, id: \.self) { k in
+                    Circle()
+                        .fill(k <= st ? color : Color.gray.opacity(0.25))
+                        .frame(width: 5, height: 5)
+                }
+                Text(OrderRow.returnWatchStageNames[st])
+                    .font(Theme.Typography.microBold)
+                    .foregroundColor(color)
+                    .lineLimit(1)
+            }
+        } else if scanned.contains(r.c.uppercased()) {
+            dotStatus("Đã quét", Theme.success)
+        } else if r.rv {
+            dotStatus("Đã nhận kho", Theme.success)
+        } else if r.isCancelled {
+            dotStatus("Đơn hủy", Theme.danger)
+        } else if !r.st.isEmpty {
+            dotStatus(r.st, r.pd ? Theme.info : .secondary)
+        } else {
+            dotStatus(r.pd ? "Chưa nhận" : "Đã xử lý", r.pd ? Theme.info : .secondary)
+        }
+    }
+
+    private func dotStatus(_ text: String, _ color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(text)
+                .font(Theme.Typography.microBold)
+                .foregroundColor(color)
+                .lineLimit(1)
+        }
     }
 
     private var emptyOrdersView: some View {
-        VStack(spacing: 14) {
-            IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 52, cornerRadius: 15)
+        VStack(spacing: 12) {
+            IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 46, cornerRadius: 13)
             Text("Chưa có dữ liệu đơn")
-                .font(.headline.bold())
+                .font(Theme.Typography.navTitle)
             Text("Kết nối máy tính ở Cài đặt hoặc bật chế độ xem thử để khám phá giao diện.")
-                .font(.footnote)
+                .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
@@ -419,14 +455,14 @@ struct OrdersView: View {
                 engine.setDemoMode(true)
             } label: {
                 Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(.subheadline.bold())
-                    .padding(.horizontal, 18)
-                    .frame(minHeight: 44)
+                    .font(Theme.Typography.secondaryBold)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: Theme.minTapTarget)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
         }
-        .padding(24)
+        .padding(20)
     }
 
     private func deadlineColor(_ l: DeadlineLevel) -> Color {
@@ -459,27 +495,28 @@ struct ScanSearchSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
+            VStack(spacing: 10) {
                 ZStack {
                     CameraPreview(controller: camera)
                     ScanGuide().stroke(Color.green.opacity(0.9), style: StrokeStyle(lineWidth: 3, lineCap: .round)).padding(14)
                 }
-                .frame(height: 345).background(Color.black)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Theme.accent, lineWidth: 2.5))
-                Text(hint).font(.footnote).foregroundStyle(.secondary)
+                .frame(height: 300).background(Color.black)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).stroke(Theme.accent, lineWidth: 2))
+                Text(hint).font(Theme.Typography.caption).foregroundStyle(.secondary)
                 Button { camera.setTorch(!camera.torchOn) } label: {
                     Label("Đèn", systemImage: camera.torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
-                        .frame(minHeight: 44)
+                        .frame(minHeight: Theme.minTapTarget)
                         .padding(.horizontal, 14)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
-                if camera.denied { Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.").font(.footnote).foregroundColor(Theme.danger) }
+                if camera.denied { Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.").font(Theme.Typography.caption).foregroundColor(Theme.danger) }
                 Spacer()
             }
-            .padding()
+            .padding(Theme.screenPadding)
             .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
             .onAppear {
                 camera.onCode = { raw in

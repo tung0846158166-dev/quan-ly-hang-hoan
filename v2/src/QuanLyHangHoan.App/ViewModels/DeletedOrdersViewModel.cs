@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -61,7 +61,8 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         IOrderActionDialogService? dialogService = null,
         Func<Task>? onDataChangedAsync = null,
         Action<string, bool>? onNotify = null,
-        Action<Order>? onOpenDetail = null)
+        Action<Order>? onOpenDetail = null,
+        bool loadInitialData = true)
     {
         _provider = provider;
         _editService = editService;
@@ -80,7 +81,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         Pager = new Pager<DeletedOrderRowViewModel>(p => VisibleOrders = p);
         Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
-        LoadOrders(_provider.GetDeletedOrders());
+        if (loadInitialData) LoadOrders(_provider.GetDeletedOrders());
     }
 
     public TableFilterState Filters { get; } = new("Ngày xóa");

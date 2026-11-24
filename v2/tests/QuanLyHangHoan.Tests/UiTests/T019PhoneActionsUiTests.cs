@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -263,36 +263,42 @@ public sealed class T019PhoneActionsUiTests : IDisposable
         await vm.ReloadAllDataAsync();
         var loads = countingProvider.AsyncLoadCount;
 
+        // Chờ theo điều kiện (tối đa 5 giây) thay vì ngủ cố định 100 ms: máy bận thì tải lại chậm hơn nhưng vẫn đúng.
+        static async Task WaitFor(Func<bool> cond)
+        {
+            for (var i = 0; i < 100 && !cond(); i++) await Task.Delay(50);
+        }
+
         // 1. note
         sync.Emit(new SyncHandled("req-note", "SPX-T019-001", "success", "Đã lưu ghi chú", FixedNow, "note"));
-        await Task.Delay(100);
-        Assert.Equal(++loads, countingProvider.AsyncLoadCount);
+        loads++; await WaitFor(() => countingProvider.AsyncLoadCount >= loads && vm.PhoneSyncVm.Logs.Count > 0 && vm.ToastMessage.Contains("ghi chú"));
+        Assert.Equal(loads, countingProvider.AsyncLoadCount);
         Assert.Equal("📝 Điện thoại cập nhật ghi chú đơn SPX-T019-001", vm.ToastMessage);
         Assert.Equal("Ghi chú", vm.PhoneSyncVm.Logs[0].StageLabel);
 
         // 2. edit
         sync.Emit(new SyncHandled("req-edit", "SPX-T019-001", "success", "Đã cập nhật trạng thái", FixedNow, "edit"));
-        await Task.Delay(100);
-        Assert.Equal(++loads, countingProvider.AsyncLoadCount);
+        loads++; await WaitFor(() => countingProvider.AsyncLoadCount >= loads && vm.ToastMessage.Contains("trạng thái"));
+        Assert.Equal(loads, countingProvider.AsyncLoadCount);
         Assert.Equal("📝 Điện thoại cập nhật trạng thái đơn SPX-T019-001", vm.ToastMessage);
         Assert.Equal("Sửa trạng thái", vm.PhoneSyncVm.Logs[0].StageLabel);
 
         // 3. delete
         sync.Emit(new SyncHandled("req-del", "SPX-T019-001", "success", "Đã xóa đơn", FixedNow, "delete"));
-        await Task.Delay(100);
-        Assert.Equal(++loads, countingProvider.AsyncLoadCount);
+        loads++; await WaitFor(() => countingProvider.AsyncLoadCount >= loads && vm.ToastMessage.Contains("xóa đơn"));
+        Assert.Equal(loads, countingProvider.AsyncLoadCount);
         Assert.Equal("🗑 Điện thoại xóa đơn SPX-T019-001 (khôi phục được ở Đã xóa)", vm.ToastMessage);
         Assert.Equal("Xóa", vm.PhoneSyncVm.Logs[0].StageLabel);
 
         // 4. photo -> không tải lại, không toast mới
         vm.DismissToast();
         sync.Emit(new SyncHandled("req-photo", "SPX-T019-001", "success", "Đã lưu ảnh", FixedNow, "photo"));
-        await Task.Delay(100);
+        await WaitFor(() => vm.PhoneSyncVm.Logs[0].StageLabel == "Ảnh");   // log ghi nhận trước; sau đó đợi thêm một nhịp để chắc chắn không có tải lại
+        await Task.Delay(300);
         Assert.Equal(loads, countingProvider.AsyncLoadCount);
         Assert.False(vm.IsToastVisible);
         Assert.Equal("Ảnh", vm.PhoneSyncVm.Logs[0].StageLabel);
     }
-
     [Fact]
     public async Task BurstEvents_CoalesceIntoSingleReload()
     {

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -41,7 +41,7 @@ public sealed partial class NewOrdersViewModel : ObservableObject
     private List<NewOrderRowViewModel> _allRows = [];
     private bool _suppressRefresh;
 
-    public NewOrdersViewModel(INewOrderProvider provider, Action<Order>? onOpenDetail = null)
+    public NewOrdersViewModel(INewOrderProvider provider, Action<Order>? onOpenDetail = null, bool loadInitialData = true)
     {
         _provider = provider;
         _onOpenDetail = onOpenDetail;
@@ -54,7 +54,7 @@ public sealed partial class NewOrdersViewModel : ObservableObject
         ];
         _selectedSortOption = SortOptions[0];
 
-        LoadOrders(_provider.GetNewOrders());
+        if (loadInitialData) LoadOrders(_provider.GetNewOrders());
     }
 
     public IReadOnlyList<SortOptionItem> SortOptions { get; }

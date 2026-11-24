@@ -1,4 +1,4 @@
-<UserControl x:Class="QuanLyHangHoan.App.Views.ReturnOrdersView"
+﻿<UserControl x:Class="QuanLyHangHoan.App.Views.ReturnOrdersView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -417,7 +417,6 @@
                           BorderThickness="0"
                           Background="{DynamicResource CardBgBrush}"
                           MinRowHeight="36"
-                          FrozenColumnCount="2"
                           EnableRowVirtualization="True"
                           Sorting="OrdersGrid_Sorting"
                           VirtualizingPanel.IsVirtualizing="True"

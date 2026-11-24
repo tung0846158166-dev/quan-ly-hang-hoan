@@ -54,7 +54,8 @@ public sealed partial class StatisticsViewModel : ObservableObject
         IReturnOrderProvider returnProvider,
         IArchivedOrderProvider archivedProvider,
         IFileSaveService? fileSaveService = null,
-        AlertPolicy? mainPolicy = null)
+        AlertPolicy? mainPolicy = null,
+        bool loadInitialData = true)
     {
         _returnProvider = returnProvider;
         _archivedProvider = archivedProvider;
@@ -72,7 +73,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
         ];
         _selectedOrderType = OrderTypeOptions[0];
 
-        Refresh();
+        if (loadInitialData) Refresh();
     }
 
     public IReadOnlyList<string> OrderTypeOptions { get; }

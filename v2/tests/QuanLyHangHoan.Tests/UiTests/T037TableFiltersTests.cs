@@ -1,4 +1,4 @@
-using QuanLyHangHoan.App.Services;
+﻿using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.App.ViewModels;
 using QuanLyHangHoan.Core.Models;
 
@@ -239,5 +239,29 @@ public class T037TableFiltersTests
         vm.SearchText = "W13";
         Assert.Equal(1, vm.Pager.CurrentPage);
         Assert.False(vm.Pager.ShowPager);
+    }
+
+    [Fact]
+    public async Task FileImport_BacksUpTheDatabaseBeforeImporting()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "QLHH_T038_" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var db = System.IO.Path.Combine(dir, "data.db");
+            QuanLyHangHoan.Data.AppDatabase.Initialize(db);
+            var csv = System.IO.Path.Combine(dir, "khong-phai-file-don.csv");
+            System.IO.File.WriteAllText(csv, "a,b\n1,2\n");
+            var ctl = new QuanLyHangHoan.App.Services.RealFileImportController(db, () => new DateTime(2026, 11, 24, 12, 0, 0));
+            await ctl.ImportAsync([csv], new QuanLyHangHoan.Core.Import.TikTokMapOptions(), QuanLyHangHoan.Core.Import.ImportProductMode.Supplement);
+            var backups = System.IO.Directory.GetFiles(System.IO.Path.Combine(dir, "backups"), "data-*.db");
+            Assert.Single(backups);                                   // đã có bản sao lưu ngay trước khi nạp
+            Assert.True(new System.IO.FileInfo(backups[0]).Length > 0);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { System.IO.Directory.Delete(dir, true); } catch { }
+        }
     }
 }

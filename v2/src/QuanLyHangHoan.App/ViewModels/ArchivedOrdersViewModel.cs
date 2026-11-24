@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -114,7 +114,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         Action<IReadOnlyList<(string OrderId, string Tracking)>>? onOrdersDeleted = null,
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
-        Services.IOrderExportService? exportService = null)
+        Services.IOrderExportService? exportService = null,
+        bool loadInitialData = true)
     {
         _provider = provider;
         _exportService = exportService;
@@ -136,7 +137,7 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         Pager = new Pager<ArchivedOrderRowViewModel>(p => VisibleOrders = p);
         Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
-        LoadOrders(_provider.GetArchivedOrders());
+        if (loadInitialData) LoadOrders(_provider.GetArchivedOrders());
     }
 
     public TableFilterState Filters { get; } = new("Ngày về kho");

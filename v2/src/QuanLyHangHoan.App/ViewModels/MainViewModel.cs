@@ -246,7 +246,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            exportService: _orderExportService) { IsDemoMode = isDemoMode };
+            exportService: _orderExportService,
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
         ShopeeCancelledVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.ShopeeCancelled,
@@ -257,7 +258,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            exportService: _orderExportService) { IsDemoMode = isDemoMode };
+            exportService: _orderExportService,
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
         TikTokReturnVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.TikTokReturn,
@@ -268,9 +270,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            exportService: _orderExportService) { IsDemoMode = isDemoMode };
+            exportService: _orderExportService,
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
 
-        NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };   // bảng cũ (không còn trên thanh bên)
+        NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail, loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };   // bảng cũ (không còn trên thanh bên)
         // "Bảng đơn mới" thật: cửa sổ lọc các đơn tạo tay/quét tạo từ điện thoại, có đủ thao tác của các bảng khác + nút "Tạo đơn mới".
         var resolvedCreator = newOrderCreator ?? (returnOrderProvider is FakeDataService fakeForCreate ? new FakeNewOrderCreator(fakeForCreate) : null);
         NewCreatedVm = new ReturnOrdersViewModel(
@@ -285,7 +288,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService,
             newOrderCreator: resolvedCreator,
-            newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService()) { IsDemoMode = isDemoMode };
+            newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService(),
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
         Func<string, string, bool> returnWatchConfirm = confirmationService is not null
             ? confirmationService.Confirm
             : (title, message) =>
@@ -322,15 +326,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOrdersDeleted: ShowDeletedUndoToast,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            exportService: _orderExportService) { IsDemoMode = isDemoMode };
+            exportService: _orderExportService,
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
         DeletedOrdersVm = new DeletedOrdersViewModel(
             deletedOrderProvider,
             editService: _orderEditService,
             dialogService: dialogSvc,
             onDataChangedAsync: ReloadAllDataAsync,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
-        StatisticsVm = new StatisticsViewModel(returnOrderProvider, archivedOrderProvider, fileSaveService) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+        StatisticsVm = new StatisticsViewModel(returnOrderProvider, archivedOrderProvider, fileSaveService, loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
         LegacyImportVm = new LegacyImportViewModel(legacyImporter, folderPickerService, isDemoMode);
         LegacyImportVm.ImportSucceeded += OnLegacyImportSucceededAsync;
         ScanReceiveVm = new ScanReceiveViewModel(

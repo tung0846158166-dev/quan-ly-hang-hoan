@@ -207,6 +207,7 @@ public partial class MainWindow : Window
             e.Cancel = true;
             IsHiddenToTray = true;
             Hide();
+            TrimMemoryLater();   // ẩn xuống khay: trả lại RAM cho hệ thống
             if (!_hasShownTrayMinimizeHint)
             {
                 _hasShownTrayMinimizeHint = true;
@@ -216,6 +217,28 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    /// <summary>Khi app ẩn xuống khay: sau vài giây dọn rác bộ nhớ và trả bộ nhớ chưa dùng về cho Windows (app chạy cả ngày nên nên giữ nhẹ).</summary>
+    private void TrimMemoryLater()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (!IsHiddenToTray) return;
+            try
+            {
+                GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+                GC.WaitForPendingFinalizers();
+                SetProcessWorkingSetSize(System.Diagnostics.Process.GetCurrentProcess().Handle, (IntPtr)(-1), (IntPtr)(-1));
+            }
+            catch { /* không quan trọng */ }
+        };
+        timer.Start();
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr minimumWorkingSetSize, IntPtr maximumWorkingSetSize);
 
     private void PersistPlacement()
     {

@@ -1,4 +1,4 @@
-using QuanLyHangHoan.Core.Models;
+﻿using QuanLyHangHoan.Core.Models;
 using QuanLyHangHoan.Data;
 
 namespace QuanLyHangHoan.App.Services;
@@ -31,16 +31,48 @@ public sealed class SqliteOrderProvider :
         => Task.Run(() => GetReturnOrders(count), cancellationToken);
 
     public IReadOnlyList<Order> GetArchivedOrders()
-        => OrderRepository.Load(_dbPath)
+        => LoadAllShortLived()
             .Where(s => s.IsArchived && !s.IsDeleted)
             .Select(s => s.Order)
             .ToList();
 
     public IReadOnlyList<DeletedOrderRecord> GetDeletedOrders()
-        => OrderRepository.Load(_dbPath)
+        => LoadAllShortLived()
             .Where(s => s.IsDeleted)
             .Select(MapDeletedOrder)
             .ToList();
+
+    // Nạp lại dữ liệu gọi Kho lưu trữ và Đã xóa gần như cùng lúc: dùng chung MỘT lần đọc cả CSDL (thay vì hai lần, mỗi lần hàng chục MB).
+    // Bộ nhớ đệm chỉ sống vài giây và chỉ dùng khi tệp CSDL (và -wal) chưa đổi, nên không bao giờ trả dữ liệu cũ sau khi có ghi.
+    private readonly object _cacheLock = new();
+    private string? _cacheSignature;
+    private IReadOnlyList<StoredOrder>? _cacheData;
+    private System.Threading.Timer? _cacheExpiry;
+
+    private IReadOnlyList<StoredOrder> LoadAllShortLived()
+    {
+        lock (_cacheLock)
+        {
+            var sig = FileSignature();
+            if (_cacheData is not null && _cacheSignature == sig) return _cacheData;
+            var data = OrderRepository.Load(_dbPath);
+            _cacheData = data;
+            _cacheSignature = sig;
+            _cacheExpiry?.Dispose();
+            _cacheExpiry = new System.Threading.Timer(_ => { lock (_cacheLock) { _cacheData = null; _cacheSignature = null; } }, null, 4000, System.Threading.Timeout.Infinite);
+            return data;
+        }
+    }
+
+    private string FileSignature()
+    {
+        string F(string path)
+        {
+            try { var i = new System.IO.FileInfo(path); return i.Exists ? $"{i.LastWriteTimeUtc.Ticks}:{i.Length}" : "-"; }
+            catch { return "?"; }
+        }
+        return F(_dbPath) + "|" + F(_dbPath + "-wal");
+    }
 
     public IReadOnlyList<NewOrderRecord> GetNewOrders()
         => Array.Empty<NewOrderRecord>();

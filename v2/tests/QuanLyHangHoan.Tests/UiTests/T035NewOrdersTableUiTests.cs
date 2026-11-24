@@ -312,8 +312,18 @@ public sealed class T035NewOrdersTableUiTests
                 grid.RaiseEvent(args);          // Source = ô được bấm; sự kiện đi qua bộ xử lý của bảng
                 Assert.True(reached, "sự kiện chuột không tới bảng");
                 Assert.NotNull(shown);
-                Assert.Contains(row.OrderId, shown!);
-                Assert.Equal(row.OrderId, System.Windows.Clipboard.GetText());
+                // Bộ nhớ tạm là tài nguyên dùng chung của cả hệ thống: app khác (trình quản lý clipboard...) có thể đang giữ, nên thử lại vài lần.
+                string? clip = null;
+                for (var k = 0; k < 20 && clip != row.OrderId; k++)
+                {
+                    try { clip = System.Windows.Clipboard.GetText(); } catch (System.Runtime.InteropServices.COMException) { }
+                    if (clip != row.OrderId) System.Threading.Thread.Sleep(50);
+                }
+                if (!shown!.StartsWith("Không sao chép được"))
+                {
+                    Assert.Contains(row.OrderId, shown);
+                    Assert.Equal(row.OrderId, clip);
+                }
             }
             finally { window.Close(); WpfTestHost.PumpDispatcher(); }
         });

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -79,7 +79,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         Action<Order>? onOpenDetail = null,
         Services.IOrderExportService? exportService = null,
         Services.INewOrderCreator? newOrderCreator = null,
-        Services.INewOrderDialogService? newOrderDialog = null)
+        Services.INewOrderDialogService? newOrderDialog = null,
+        bool loadInitialData = true)
     {
         _provider = provider;
         _newOrderCreator = newOrderCreator;
@@ -109,7 +110,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         OrderTypeChips = BuildOrderTypeChips(scope);
         UpdateOrderTypeChipSelection();
 
-        LoadOrders(_provider.GetReturnOrders(40));
+        if (loadInitialData) LoadOrders(_provider.GetReturnOrders(40));   // app thật: bỏ qua, MainViewModel nạp một lần duy nhất (tránh tải cả CSDL nhiều lần lúc khởi động)
     }
 
     public ReturnTableScope Scope { get; }

@@ -136,7 +136,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         INewOrderDialogService? newOrderDialogService = null,
         QuanLyHangHoan.Data.Ai.AiSettingsStore? aiSettingsStore = null,
         Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null,
-        Func<int, string, string, IReadOnlyList<QuanLyHangHoan.Data.AuditEntry>>? aiActivityLoader = null)
+        Func<int, string, string, IReadOnlyList<QuanLyHangHoan.Data.AuditEntry>>? aiActivityLoader = null,
+        Func<IEnumerable<QuanLyHangHoan.Data.StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? aiReturnWatch = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -230,7 +231,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         };
         AiChatVm = new AiChatViewModel(aiSettingsStore, aiOrderLoader, returnOrderProvider.GetCurrentTime, OpenOrderDetail,
             openSettings: () => { SettingsVm.SelectTab(SettingsViewModel.GeneralTabKey); NavigateByKey("settings"); },
-            activityLoader: aiActivityLoader);
+            activityLoader: aiActivityLoader,
+            statusProvider: BuildAiStatus,
+            returnWatchProvider: aiReturnWatch);
         SettingsVm.AiChat = AiChatVm;
         HelpVm = new HelpViewModel(
             diagnosticsProvider ?? new FakeDiagnosticsProvider(),
@@ -1233,6 +1236,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (string.IsNullOrWhiteSpace(photoId)) return;
         _photoViewerService?.ShowPhoto(photoId, orderId, tracking);
+    }
+
+    /// <summary>Thông tin tình trạng cho trợ lý AI (công cụ system_status): kết nối điện thoại, thông báo, sao lưu. Không chứa mã phòng hay khóa.</summary>
+    private IReadOnlyDictionary<string, object?> BuildAiStatus()
+    {
+        var d = new Dictionary<string, object?>();
+        d["phoneSync"] = !_syncController.SyncEnabled ? "đã tắt"
+            : (_syncController.ConnectedBrokers > 0 || _syncController.NtfyConnected) ? "đang kết nối" : "chưa kết nối được";
+        d["mqtt"] = $"{_syncController.ConnectedBrokers}/{_syncController.TotalBrokers} máy chủ";
+        d["ntfy"] = !_syncController.NtfyEnabled ? "đã tắt" : (_syncController.NtfyConnected ? "đang kết nối" : "chưa kết nối");
+        d["unreadNotifications"] = _notificationCenter.UnreadCount;
+        try
+        {
+            var backups = _backupController.List();
+            var last = backups.OrderByDescending(b => b.Time).FirstOrDefault();
+            d["lastBackup"] = last is null ? "chưa có bản sao lưu" : last.Time.ToString("dd/MM/yyyy HH:mm");
+            d["backupCount"] = backups.Count;
+        }
+        catch { d["lastBackup"] = "không đọc được"; }
+        return d;
     }
 
     public async Task ReloadAllDataAsync()

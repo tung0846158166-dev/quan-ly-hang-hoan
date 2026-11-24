@@ -201,6 +201,7 @@ public partial class App : Application
                 aiSettingsStore: new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder),
                 aiOrderLoader: () => QuanLyHangHoan.Data.OrderRepository.Load(AppPaths.DatabasePath),
                 aiActivityLoader: (limit, type, text) => QuanLyHangHoan.Data.AuditLogReader.Read(AppPaths.DatabasePath, limit, 0, type, text),
+                aiReturnWatch: all => QuanLyHangHoan.Data.ReturnWatchService.ActiveMarks(AppPaths.DatabasePath, all),
                 activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
                 orderExportService: new OrderExportService(fileSaveService),
                 notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),

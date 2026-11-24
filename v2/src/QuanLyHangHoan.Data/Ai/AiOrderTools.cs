@@ -18,22 +18,28 @@ public sealed record AiToolResult(string Json, IReadOnlyList<AiOrderRef> Refs);
 /// Quyền riêng tư: chỉ trả về các trường trong danh sách trắng bên dưới. KHÔNG bao giờ trả tên/số điện thoại/địa chỉ người nhận
 /// (không có trong mô hình đơn; nằm trong RawDetails/ExtraJson/BuyerNote nên cố ý không lấy), và ghi chú còn bị che mọi dãy giống số điện thoại.
 /// </summary>
-public sealed class AiOrderTools
+public sealed partial class AiOrderTools
 {
     internal static readonly JsonSerializerOptions Json = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly Func<IReadOnlyList<StoredOrder>> _loader;
     private readonly Func<DateTime> _clock;
     private readonly Func<int, string, string, IReadOnlyList<AuditEntry>>? _activity;
+    private readonly Func<IReadOnlyDictionary<string, object?>>? _status;
+    private readonly Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? _returnWatch;
     private readonly Dictionary<string, Order> _seen = new(StringComparer.Ordinal);
 
     /// <param name="activity">Đọc nhật ký hoạt động (giới hạn, loại, chữ lọc). null = công cụ nhật ký báo chưa có.</param>
     public AiOrderTools(Func<IReadOnlyList<StoredOrder>> loader, Func<DateTime>? clock = null,
-        Func<int, string, string, IReadOnlyList<AuditEntry>>? activity = null)
+        Func<int, string, string, IReadOnlyList<AuditEntry>>? activity = null,
+        Func<IReadOnlyDictionary<string, object?>>? status = null,
+        Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? returnWatch = null)
     {
         _loader = loader;
         _clock = clock ?? (() => DateTime.Now);
         _activity = activity;
+        _status = status;
+        _returnWatch = returnWatch;
     }
 
     private IReadOnlyList<StoredOrder>? _cache;
@@ -125,8 +131,8 @@ public sealed class AiOrderTools
         listProps["limit"] = Prop("integer", "Số dòng tối đa, mặc định 20, tối đa 50.");
 
         var aggProps = FilterProps();
-        aggProps["group_by"] = Prop("string", "Gom nhóm theo: status, platform, carrier, order_type, platform_status, product, day, week, month (ngày/tuần/tháng tính theo date_field), alert (mức cảnh báo), none (không gom, chỉ tổng).",
-            "none", "status", "platform", "carrier", "order_type", "platform_status", "product", "day", "week", "month", "alert");
+        aggProps["group_by"] = Prop("string", GroupByHelp,
+            AggregateGroups);
         aggProps["metric"] = Prop("string", "Sắp xếp các nhóm theo: count (số kiện), value (tổng giá trị đơn), quantity (tổng số lượng sản phẩm). Mặc định count. Nhóm theo ngày/tuần/tháng luôn xếp theo thời gian.",
             "count", "value", "quantity");
         aggProps["top"] = Prop("integer", "Số nhóm tối đa trả về, mặc định 20, tối đa 60.");
@@ -167,6 +173,7 @@ public sealed class AiOrderTools
                     ["text"] = Prop("string", "Lọc theo chữ trong chi tiết (ví dụ mã đơn)."),
                 }),
         };
+        foreach (var t in ExtraTools()) tools.Add(t);
         return tools.ToJsonString(Json);
     }
 
@@ -183,6 +190,11 @@ public sealed class AiOrderTools
             return name switch
             {
                 "overview" => Overview(),
+                "compare_periods" => ComparePeriods(args),
+                "order_groups" => OrderGroups(args),
+                "return_watch" => ReturnWatch(args),
+                "system_status" => SystemStatus(),
+                "app_guide" => AppGuide(args),
                 "count_orders" => Count(args),
                 "aggregate" => Aggregate(args),
                 "list_orders" => List(args),
@@ -436,6 +448,7 @@ public sealed class AiOrderTools
             "order_type" => rows.GroupBy(o => Label(o.OrderType)),
             "platform_status" => rows.GroupBy(o => Label(o.PlatformStatus)),
             "alert" => rows.GroupBy(o => LevelName(LevelOf(o))),
+            var g when ExtraGroupKeys.Contains(g) => rows.GroupBy(o => ExtraGroupKey(g, o)),
             "product" => rows.SelectMany(o => (o.Items.Count == 0 ? new List<OrderItem> { new() { Product = "(không có sản phẩm)", Qty = 1 } } : o.Items)
                               .Select(i => (Key: Label(i.Product.Trim()), Order: o))).GroupBy(x => x.Key, x => x.Order),
             "day" => rows.GroupBy(o => DayKey(o, f.DateField, "yyyy-MM-dd")),

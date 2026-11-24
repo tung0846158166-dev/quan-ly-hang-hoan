@@ -42,6 +42,8 @@ public sealed partial class AiChatViewModel : ObservableObject
     private readonly Func<IReadOnlyList<AiEndpoint>, IAiChat>? _chatFactory;
     private readonly Action? _openSettings;
     private readonly Func<int, string, string, IReadOnlyList<AuditEntry>>? _activityLoader;
+    private readonly Func<IReadOnlyDictionary<string, object?>>? _statusProvider;
+    private readonly Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? _returnWatchProvider;
     private IAiChat? _chat;
     private CancellationTokenSource? _cts;
 
@@ -52,7 +54,9 @@ public sealed partial class AiChatViewModel : ObservableObject
         Action<Order> openOrder,
         Func<IReadOnlyList<AiEndpoint>, IAiChat>? chatFactory = null,
         Action? openSettings = null,
-        Func<int, string, string, IReadOnlyList<AuditEntry>>? activityLoader = null)
+        Func<int, string, string, IReadOnlyList<AuditEntry>>? activityLoader = null,
+        Func<IReadOnlyDictionary<string, object?>>? statusProvider = null,
+        Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? returnWatchProvider = null)
     {
         _store = store;
         _loader = loader;
@@ -61,6 +65,8 @@ public sealed partial class AiChatViewModel : ObservableObject
         _chatFactory = chatFactory;
         _openSettings = openSettings;
         _activityLoader = activityLoader;
+        _statusProvider = statusProvider;
+        _returnWatchProvider = returnWatchProvider;
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         GroqModels = store?.LoadModel(AiSettingsStore.Groq) ?? AiChatService.DefaultGroqModels;
         GeminiModels = store?.LoadModel(AiSettingsStore.Gemini) ?? AiChatService.DefaultGeminiModels;
@@ -109,7 +115,7 @@ public sealed partial class AiChatViewModel : ObservableObject
         if (endpoints is null || endpoints.Count == 0) return null;
         _chat = _chatFactory is not null
             ? _chatFactory(endpoints)
-            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock, _activityLoader), _clock);
+            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock, _activityLoader, _statusProvider, _returnWatchProvider), _clock);
         return _chat;
     }
 

@@ -163,7 +163,8 @@ public sealed class AiToolsExtendedTests
     {
         var arr = JsonNode.Parse(AiOrderTools.DefinitionsJson)!.AsArray();
         var names = arr.Select(t => t!["function"]!["name"]!.GetValue<string>()).ToArray();
-        Assert.Equal(new[] { "overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats", "recent_activity" }, names);
+        Assert.Equal(new[] { "overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats", "recent_activity",
+            "compare_periods", "order_groups", "return_watch", "system_status", "app_guide" }, names);
         foreach (var t in arr)
         {
             Assert.False(string.IsNullOrWhiteSpace(t!["function"]!["description"]!.GetValue<string>()));
@@ -182,5 +183,116 @@ public sealed class AiToolsExtendedTests
         var free = QuanLyHangHoan.Data.Sync.PhoneSnapshot.BuildRow(S(O("10", "VN010", "Chưa trả", 0, carrier: "")), Now);
         Assert.False(free.ContainsKey("pr"));
         Assert.False(free.ContainsKey("cr"));
+    }
+
+    // ---------------- công cụ chạy ngầm bổ sung ----------------
+
+    [Fact]
+    public void Compare_today_vs_yesterday_gives_counts_value_and_percent()
+    {
+        var j = J(Tools().Execute("compare_periods", """{"preset":"today_vs_yesterday","status":"Đã nhận"}"""));
+        Assert.Equal(1, j["periodA"]!["count"]!.GetValue<long>());          // VN005 nhận hôm nay
+        Assert.Equal(70_000, j["periodA"]!["value"]!.GetValue<long>());
+        Assert.Equal(1, j["periodB"]!["count"]!.GetValue<long>());          // VN006 nhận hôm qua
+        Assert.Equal(30_000, j["periodB"]!["value"]!.GetValue<long>());
+        Assert.Equal(40_000, j["change"]!["value"]!["diff"]!.GetValue<long>());
+        Assert.Equal(133.3, j["change"]!["value"]!["percent"]!.GetValue<double>());
+        Assert.False(j["change"]!["count"]!.AsObject().ContainsKey("percent") && j["change"]!["count"]!["percent"]!.GetValue<double>() != 0);
+    }
+
+    [Fact]
+    public void Compare_custom_ranges_default_previous_period_is_equal_length_right_before()
+    {
+        var j = J(Tools().Execute("compare_periods", """{"a_from":"2026-11-24","a_to":"2026-11-25","status":"Đã nhận"}"""));
+        Assert.Equal(2, j["periodA"]!["count"]!.GetValue<long>());
+        Assert.Equal("2026-11-22", j["periodB"]!["from"]!.GetValue<string>());
+        Assert.Equal("2026-11-23", j["periodB"]!["to"]!.GetValue<string>());
+        Assert.Equal(0, j["periodB"]!["count"]!.GetValue<long>());
+        Assert.Contains("error", Tools().Execute("compare_periods", "{}").Json);
+    }
+
+    [Fact]
+    public void Order_groups_lists_multi_parcel_orders_with_each_parcel()
+    {
+        var rows = new[]
+        {
+            S(O("21", "A1", "Hàng đã trả", 10_000, recv: "25/11/2026 09:00:00")),
+            S(O("22", "A2", "Chưa trả", 20_000)),
+            S(O("23", "B1", "Chưa trả", 5_000)),
+        };
+        rows[0].Order.OrderId = "SAME"; rows[1].Order.OrderId = "SAME";
+        var tools = new AiOrderTools(() => rows, () => Now);
+        var r = tools.Execute("order_groups", "{}");
+        var g = J(r)["groups"]![0]!;
+        Assert.Equal("SAME", g["orderId"]!.GetValue<string>());
+        Assert.Equal(2, g["parcels"]!.GetValue<int>());
+        Assert.Equal(1, g["received"]!.GetValue<int>());
+        Assert.Equal(1, g["waiting"]!.GetValue<int>());
+        Assert.Equal(30_000, g["value"]!.GetValue<long>());
+        Assert.Equal(2, r.Refs.Count);
+        Assert.Equal(1, J(r)["groupsTotal"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void Return_watch_counts_by_stage_and_reports_when_unavailable()
+    {
+        IReadOnlyDictionary<string, (long Since, int Stage)> Marks(IEnumerable<StoredOrder> all) => new Dictionary<string, (long, int)>
+        {
+            ["1"] = (new DateTimeOffset(2026, 11, 24, 8, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), 2),
+            ["2"] = (new DateTimeOffset(2026, 11, 25, 8, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), 3),
+            ["3"] = (new DateTimeOffset(2026, 11, 25, 9, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds(), 3),
+        };
+        var t = new AiOrderTools(() => Data, () => Now, null, null, Marks);
+        var j = J(t.Execute("return_watch", "{}"));
+        Assert.Equal(3, j["total"]!.GetValue<int>());
+        Assert.Equal(1, j["byStage"]!["Đang về"]!["count"]!.GetValue<int>());
+        Assert.Equal(2, j["byStage"]!["Đã về shop"]!["count"]!.GetValue<int>());
+        Assert.Equal(2, J(t.Execute("return_watch", """{"stage":"3"}"""))["orders"]!.AsArray().Count);
+        Assert.Contains("error", Tools().Execute("return_watch", "{}").Json);
+    }
+
+    [Fact]
+    public void System_status_merges_counts_with_provider_facts()
+    {
+        var t = new AiOrderTools(() => Data, () => Now, null, () => new Dictionary<string, object?> { ["phoneSync"] = "đang kết nối", ["unreadNotifications"] = 3, ["lastBackup"] = null });
+        var j = J(t.Execute("system_status", "{}"));
+        Assert.Equal(7, j["orders"]!["active"]!.GetValue<int>());
+        Assert.Equal(1, j["orders"]!["archived"]!.GetValue<int>());
+        Assert.Equal("đang kết nối", j["phoneSync"]!.GetValue<string>());
+        Assert.Equal(3, j["unreadNotifications"]!.GetValue<int>());
+        Assert.NotNull(J(Tools().Execute("system_status", "{}"))["orders"]);
+    }
+
+    [Fact]
+    public void App_guide_lists_topics_finds_by_keyword_and_never_invents()
+    {
+        var idx = J(Tools().Execute("app_guide", "{}"))["topics"]!.AsArray();
+        Assert.True(idx.Count >= 10);
+        Assert.Contains("nap_don", idx.Select(x => x!["topic"]!.GetValue<string>()));
+        Assert.Contains("Google Sheet", Tools().Execute("app_guide", """{"topic":"nap_don"}""").Json);
+        Assert.Contains("sao lưu", Tools().Execute("app_guide", """{"topic":"sao lưu"}""").Json);
+        Assert.Contains("MQTT", Tools().Execute("app_guide", """{"topic":"điện thoại"}""").Json);
+        Assert.Contains("error", Tools().Execute("app_guide", """{"topic":"zzzzqqqq"}""").Json);
+    }
+
+    [Fact]
+    public void Extra_group_by_options_work()
+    {
+        string First(string groupBy, string extra = "") =>
+            J(Tools().Execute("aggregate", $$"""{"status":"Đang chờ","group_by":"{{groupBy}}"{{extra}}}"""))["groups"]![0]!["group"]!.GetValue<string>();
+        Assert.Equal("12-24h", First("waiting_age"));                    // 4 nhóm đều 1 đơn: hòa điểm thì xếp theo tên
+        var ages = J(Tools().Execute("aggregate", """{"status":"Đang chờ","group_by":"waiting_age"}"""))["groups"]!.AsArray().Select(x => x!["group"]!.GetValue<string>()).ToArray();
+        Assert.Contains("24-48h", ages);   // VN001: 28 giờ
+        Assert.Contains("12-24h", ages);   // VN002: 14 giờ
+        Assert.Contains("<12h", ages);     // VN003: 4 giờ
+        Assert.Equal("100k-300k", First("price_range"));                  // 100k và 250k cùng khoảng: 2 đơn
+        Assert.Equal("hoàn toàn bộ", First("partial"));
+        var watching = J(Tools().Execute("aggregate", """{"status":"Đang chờ","group_by":"watching"}"""))["groups"]!.AsArray();
+        Assert.Equal(2, watching.Count);
+        var hours = J(Tools().Execute("aggregate", """{"status":"Đang chờ","group_by":"arrival_hour"}"""))["groups"]!.AsArray();
+        Assert.True(hours.Count >= 2);
+        var reason = J(Tools().Execute("aggregate", """{"group_by":"reason"}"""))["groups"]![0]!["group"]!.GetValue<string>();
+        Assert.Equal("(không ghi lý do)", reason);
+        Assert.NotEmpty(J(Tools().Execute("aggregate", """{"group_by":"weekday"}"""))["groups"]!.AsArray());
     }
 }

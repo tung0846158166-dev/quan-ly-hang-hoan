@@ -97,6 +97,17 @@ public partial class ReturnOrdersView : UserControl
         }
     }
 
+    /// <summary>Tự sắp xếp trong ViewModel (so sánh trực tiếp) thay vì để WPF sắp 50.000 dòng bằng reflection.</summary>
+    private void OrdersGrid_Sorting(object sender, DataGridSortingEventArgs e)
+    {
+        e.Handled = true;
+        if (DataContext is not ReturnOrdersViewModel vm) return;
+        var member = string.IsNullOrWhiteSpace(e.Column.SortMemberPath) ? null : e.Column.SortMemberPath;
+        if (!vm.SortByColumn(member, out var dir)) return;
+        foreach (var c in OrdersGrid.Columns) c.SortDirection = null;
+        e.Column.SortDirection = dir;
+    }
+
     private async void OrdersGrid_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (DataContext is not ReturnOrdersViewModel vm) return;

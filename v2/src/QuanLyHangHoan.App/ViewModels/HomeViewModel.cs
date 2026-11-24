@@ -18,6 +18,8 @@ public sealed record PlatformKpiSummary(
     decimal PendingTotalValue,
     string PendingTotalValueFormatted);
 
+public sealed record HomeProductItem(int Rank, string Name, int Units, int Orders, string ShareText, double BarWidth, string PremiumText);
+
 public sealed record DailyTrendPoint(
     DateTime Date,
     string DateLabel,
@@ -119,6 +121,28 @@ public sealed partial class HomeViewModel : ObservableObject
 
     [ObservableProperty]
     private IReadOnlyList<UrgentOrderItem> _urgentItems = Array.Empty<UrgentOrderItem>();
+
+    [ObservableProperty]
+    private IReadOnlyList<HomeProductItem> _topProducts = Array.Empty<HomeProductItem>();
+
+    [ObservableProperty]
+    private string _productSummaryText = "Chưa có sản phẩm hoàn nào.";
+
+    public bool HasTopProducts => TopProducts.Count > 0;
+    partial void OnTopProductsChanged(IReadOnlyList<HomeProductItem> value) => OnPropertyChanged(nameof(HasTopProducts));
+
+    private void BuildTopProducts(IReadOnlyList<Order> orders)
+    {
+        var r = QuanLyHangHoan.Core.Stats.ProductStatistics.Compute(orders);
+        if (r.Products.Count == 0) { TopProducts = Array.Empty<HomeProductItem>(); ProductSummaryText = "Chưa có sản phẩm hoàn nào."; return; }
+        var top = r.Products.Take(6).ToList();
+        var max = Math.Max(1, top[0].Units);
+        TopProducts = top.Select((p, i) => new HomeProductItem(
+            i + 1, p.Name, p.Units, p.Orders, p.Share.ToString("P1", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")),
+            Math.Max(8, p.Units * 150.0 / max),
+            p.PremiumUnits > 0 ? $"Premium {p.PremiumUnits:N0} • Thường {p.StandardUnits:N0}" : "")).ToList();
+        ProductSummaryText = $"{r.Products.Count:N0} sản phẩm • {r.TotalUnits:N0} cái bị hoàn trong {r.OrdersWithItems:N0} đơn";
+    }
 
     [ObservableProperty]
     private DateTime? _reportFromDate;
@@ -246,6 +270,7 @@ public sealed partial class HomeViewModel : ObservableObject
             OrderTypeBars = Array.Empty<OrderTypeBarItem>();
             TopReasons = Array.Empty<ReasonBarItem>();
             UrgentItems = Array.Empty<UrgentOrderItem>();
+            BuildTopProducts(orders);
             return;
         }
 
@@ -257,6 +282,7 @@ public sealed partial class HomeViewModel : ObservableObject
         OrderTypeBars = BuildOrderTypeBars(orders);
         TopReasons = BuildTopReasons(orders, topN: 5);
         UrgentItems = BuildUrgentItems(orders, now);
+        BuildTopProducts(orders);
     }
 
     public string BuildCsvSummary()

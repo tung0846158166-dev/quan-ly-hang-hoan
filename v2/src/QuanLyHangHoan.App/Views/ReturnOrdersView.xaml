@@ -156,6 +156,13 @@
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
+                    <Button DockPanel.Dock="Right"
+                            Content="{Binding AdvancedFilterButtonText}"
+                            Command="{Binding ToggleAdvancedFiltersCommand}"
+                            Style="{StaticResource FilterPillButtonStyle}"
+                            VerticalAlignment="Top"
+                            Margin="0,0,8,0"
+                            ToolTip="Lọc theo sản phẩm, ĐVVC, ảnh, khoảng ngày" />
                     <!-- Sắp xếp: gom lên hàng bộ lọc (không còn hàng riêng) -->
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="0,-3,12,0">
                     <TextBlock Text="Sắp xếp:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
@@ -320,6 +327,20 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
+
+                <!-- Bộ lọc nâng cao theo cột -->
+                <WrapPanel Margin="0,8,0,0"
+                           Visibility="{Binding ShowAdvancedFilters, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="Sản phẩm:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <TextBox Text="{Binding ProductFilter, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="190" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" ToolTip="Gõ một phần tên sản phẩm (không cần dấu)" />
+                    <TextBlock Text="ĐVVC:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding CarrierOptions}" SelectedItem="{Binding CarrierFilter}" Width="150" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
+                    <ComboBox ItemsSource="{Binding PhotoOptions}" SelectedItem="{Binding PhotoOption}" Width="130" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
+                    <TextBlock Text="Ngày hoàn từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding DateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" />
+                    <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding DateTo}" Width="120" Height="30" FontSize="12" />
+                </WrapPanel>
             </StackPanel>
         </Border>
 
@@ -383,7 +404,7 @@
                           MinRowHeight="36"
                           FrozenColumnCount="2"
                           EnableRowVirtualization="True"
-                          EnableColumnVirtualization="True"
+                          Sorting="OrdersGrid_Sorting"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Recycling"
                           VirtualizingPanel.CacheLengthUnit="Page"

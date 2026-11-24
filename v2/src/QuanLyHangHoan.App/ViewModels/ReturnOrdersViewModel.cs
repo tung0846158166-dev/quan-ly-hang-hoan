@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using QuanLyHangHoan.App.Services;
@@ -247,6 +249,120 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     [ObservableProperty]
     private string _searchText = string.Empty;
 
+    // ---- Bộ lọc nâng cao (theo cột) ----
+    [ObservableProperty] private bool _showAdvancedFilters;
+    [ObservableProperty] private string _productFilter = string.Empty;
+    [ObservableProperty] private string _carrierFilter = AllCarriers;
+    [ObservableProperty] private string _photoFilter = "all"; // all | with | without
+    [ObservableProperty] private DateTime? _dateFrom;
+    [ObservableProperty] private DateTime? _dateTo;
+    [ObservableProperty] private ObservableCollection<string> _carrierOptions = [AllCarriers];
+
+    public const string AllCarriers = "Tất cả ĐVVC";
+    public IReadOnlyList<string> PhotoOptions { get; } = ["Ảnh: tất cả", "Có ảnh", "Chưa có ảnh"];
+
+    [ObservableProperty] private string _photoOption = "Ảnh: tất cả";
+
+    /// <summary>Số bộ lọc nâng cao đang bật (hiện trên nút Bộ lọc).</summary>
+    public int AdvancedFilterCount =>
+        (ProductFilter.Trim().Length > 0 ? 1 : 0)
+        + (CarrierFilter != AllCarriers ? 1 : 0)
+        + (PhotoFilter != "all" ? 1 : 0)
+        + (DateFrom.HasValue || DateTo.HasValue ? 1 : 0);
+
+    public string AdvancedFilterButtonText => AdvancedFilterCount == 0 ? "🔎 Bộ lọc" : $"🔎 Bộ lọc ({AdvancedFilterCount})";
+
+    private void AdvancedFilterChanged()
+    {
+        OnPropertyChanged(nameof(AdvancedFilterCount));
+        OnPropertyChanged(nameof(AdvancedFilterButtonText));
+        if (!_suppressFilterRefresh) ApplyFiltersAndSort();
+    }
+
+    partial void OnProductFilterChanged(string value) => AdvancedFilterChanged();
+    partial void OnCarrierFilterChanged(string value) => AdvancedFilterChanged();
+    partial void OnPhotoFilterChanged(string value) => AdvancedFilterChanged();
+    partial void OnDateFromChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnDateToChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnPhotoOptionChanged(string value)
+        => PhotoFilter = value == "Có ảnh" ? "with" : value == "Chưa có ảnh" ? "without" : "all";
+
+    [RelayCommand]
+    private void ToggleAdvancedFilters() => ShowAdvancedFilters = !ShowAdvancedFilters;
+
+    private bool MatchesAdvanced(ReturnOrderRowViewModel row)
+    {
+        if (CarrierFilter != AllCarriers && !row.Carrier.Equals(CarrierFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        if (PhotoFilter == "with" && !row.HasPhoto) return false;
+        if (PhotoFilter == "without" && row.HasPhoto) return false;
+        if (_productKw.Length > 0 && !row.ItemsBlob.Contains(_productKw, StringComparison.Ordinal)) return false;
+        if (DateFrom.HasValue || DateTo.HasValue)
+        {
+            var d = row.ReturnDateParsed ?? row.ArrivedAtDate ?? row.ShipDateParsed;
+            if (d is null) return false;
+            if (DateFrom.HasValue && d.Value.Date < DateFrom.Value.Date) return false;
+            if (DateTo.HasValue && d.Value.Date > DateTo.Value.Date) return false;
+        }
+        return true;
+    }
+
+    private string _productKw = string.Empty;
+
+    private void RebuildCarrierOptions()
+    {
+        var set = _allRows.Select(r => r.Carrier?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var keep = CarrierFilter;
+        CarrierOptions = new ObservableCollection<string>([AllCarriers, .. set]);
+        CarrierFilter = CarrierOptions.Contains(keep) ? keep : AllCarriers;
+    }
+
+    // ---- Bấm tiêu đề cột để sắp xếp: tự sắp bằng so sánh trực tiếp (nhanh với 50.000 dòng) ----
+    private string? _colSortMember;
+    private bool _colSortDesc;
+
+    public bool SortByColumn(string? member, out ListSortDirection direction)
+    {
+        direction = ListSortDirection.Ascending;
+        if (string.IsNullOrWhiteSpace(member) || ColumnComparison(member, false) is null) return false;
+        if (_colSortMember == member) _colSortDesc = !_colSortDesc; else { _colSortMember = member; _colSortDesc = false; }
+        direction = _colSortDesc ? ListSortDirection.Descending : ListSortDirection.Ascending;
+        ApplyFiltersAndSort();
+        return true;
+    }
+
+    private static Comparison<ReturnOrderRowViewModel>? ColumnComparison(string member, bool desc)
+    {
+        static int S(string? a, string? b) => string.Compare(a, b, StringComparison.CurrentCultureIgnoreCase);
+        static int D(DateTime? a, DateTime? b) => a.HasValue && b.HasValue ? a.Value.CompareTo(b.Value) : a.HasValue ? -1 : b.HasValue ? 1 : 0;
+        Comparison<ReturnOrderRowViewModel>? c = member switch
+        {
+            "Stt" => (a, b) => a.Stt.CompareTo(b.Stt),
+            "AlertPriority" => (a, b) => { var p = a.AlertPriority.CompareTo(b.AlertPriority); return p != 0 ? p : a.ElapsedHours.CompareTo(b.ElapsedHours); },
+            "Platform" => (a, b) => S(a.Platform, b.Platform),
+            "OrderType" => (a, b) => S(a.OrderType, b.OrderType),
+            "OrderId" => (a, b) => S(a.OrderId, b.OrderId),
+            "DisplayTracking" => (a, b) => S(a.DisplayTracking, b.DisplayTracking),
+            "Status" => (a, b) => S(a.Status, b.Status),
+            "PlatformStatus" => (a, b) => S(a.PlatformStatus, b.PlatformStatus),
+            "ShipDateParsed" => (a, b) => D(a.ShipDateParsed, b.ShipDateParsed),
+            "ReturnDateParsed" => (a, b) => D(a.ReturnDateParsed, b.ReturnDateParsed),
+            "ArrivedAtDate" => (a, b) => D(a.ArrivedAtDate, b.ArrivedAtDate),
+            "RecvDate" => (a, b) => S(a.RecvDate, b.RecvDate),
+            "Carrier" => (a, b) => S(a.Carrier, b.Carrier),
+            "ItemsSummary" => (a, b) => S(a.ItemsSummary, b.ItemsSummary),
+            "TotalQty" => (a, b) => a.TotalQty.CompareTo(b.TotalQty),
+            "Price" => (a, b) => a.Price.CompareTo(b.Price),
+            "HasPhoto" => (a, b) => a.HasPhoto.CompareTo(b.HasPhoto),
+            "NoteDisplay" => (a, b) => S(a.NoteDisplay, b.NoteDisplay),
+            _ => null
+        };
+        if (c is null || !desc) return c;
+        var asc = c;
+        return (a, b) => asc(b, a);
+    }
+
     [ObservableProperty]
     private SortOptionItem _selectedSortOption;
 
@@ -358,6 +474,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
     partial void OnSelectedSortOptionChanged(SortOptionItem value)
     {
+        _colSortMember = null;
         if (!_suppressFilterRefresh) ApplyFiltersAndSort();
     }
 
@@ -378,6 +495,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
         var previousId = SelectedRow?.Source.Id;
         _allRows = rows;
+        RebuildCarrierOptions();
         sw.Stop();
         _lastLoadMs = sw.ElapsedMilliseconds;
 
@@ -444,6 +562,12 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             OrderTypeFilter = "all";
             StatusFilter = "all";
             SearchText = string.Empty;
+            ProductFilter = string.Empty;
+            CarrierFilter = AllCarriers;
+            PhotoOption = "Ảnh: tất cả";
+            DateFrom = null;
+            DateTo = null;
+            _colSortMember = null;
             SelectedSortOption = SortOptions[0];
         }
         finally
@@ -494,6 +618,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             sw.Stop();
             _lastLoadMs = sw.ElapsedMilliseconds;
             _allRows = rows;
+            RebuildCarrierOptions();
 
             RecalculatePlatformAndOrderTypeCounts();
             RecalculateStatusCounts();
@@ -580,6 +705,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         var sw = Stopwatch.StartNew();
         var kw = AlertThresholds.NormalizeForSearch(SearchText).Trim();
         var hasKw = kw.Length > 0;
+        _productKw = AlertThresholds.NormalizeForSearch(ProductFilter).Trim();
 
         var filtered = new List<ReturnOrderRowViewModel>(_allRows.Count);
         foreach (var row in _allRows)
@@ -587,11 +713,18 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             if (!MatchesPlatform(row)) continue;
             if (!MatchesOrderType(row)) continue;
             if (!MatchesStatus(row)) continue;
+            if (!MatchesAdvanced(row)) continue;
             if (hasKw && !row.SearchBlob.Contains(kw, StringComparison.Ordinal)) continue;
             filtered.Add(row);
         }
 
         var sortKey = SelectedSortOption?.Key ?? "default";
+        var colCmp = _colSortMember is null ? null : ColumnComparison(_colSortMember, _colSortDesc);
+        if (colCmp is not null)
+        {
+            filtered.Sort((a, b) => { var r = colCmp(a, b); return r != 0 ? r : a.Stt.CompareTo(b.Stt); });
+            sortKey = "column";
+        }
         switch (sortKey)
         {
             case "alert_desc":

@@ -306,6 +306,42 @@
                     </Border>
                 </Grid>
 
+                <!-- Section 2b: Sản phẩm bị hoàn nhiều nhất -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="Chi tiết màu/size: mục Thống kê đơn &amp; sản phẩm" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="🛍️ Sản phẩm bị hoàn nhiều nhất" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding ProductSummaryText}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,8" />
+                        <ItemsControl ItemsSource="{Binding TopProducts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="26" />
+                                            <ColumnDefinition Width="2.2*" />
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="1.4*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Rank}" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource InkPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,10,0" ToolTip="{Binding Name}" />
+                                        <Border Grid.Column="2" Background="{DynamicResource SurfaceSubtleBgBrush}" Height="8" CornerRadius="4" VerticalAlignment="Center" HorizontalAlignment="Left" Width="150">
+                                            <Border Width="{Binding BarWidth}" HorizontalAlignment="Left" CornerRadius="4" Background="#EE4D2D" />
+                                        </Border>
+                                        <TextBlock Grid.Column="3" Text="{Binding Units, StringFormat='{}{0:N0} cái'}" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <TextBlock Grid.Column="4" Text="{Binding ShareText}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="5" Text="{Binding PremiumText}" FontSize="11.5" Foreground="{DynamicResource InkTertiaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="Chưa có sản phẩm hoàn nào." Visibility="{Binding HasTopProducts, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" Foreground="{DynamicResource InkMutedBrush}" FontSize="12.5" />
+                    </StackPanel>
+                </Border>
+
                 <!-- Section 3: Urgent Action List & Quick Report Export -->
                 <Grid>
                     <Grid.ColumnDefinitions>

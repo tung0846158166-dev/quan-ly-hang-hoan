@@ -65,6 +65,7 @@ public sealed class ReturnOrderRowViewModel
             ? $"{source.UserNote} • {source.Note}".Trim(' ', '•')
             : source.Note;
 
+        ItemsBlob = AlertThresholds.NormalizeForSearch(ItemsSummary);
         SearchBlob = AlertThresholds.NormalizeForSearch(
             $"{source.OrderId} {source.ReturnOrderId} {source.Track} {source.ReturnTrack} {source.ForwardTrack} {source.AltTrack} " +
             $"{source.Platform} {source.Carrier} {source.Status} {source.PlatformStatus} {source.OrderType} " +
@@ -113,6 +114,9 @@ public sealed class ReturnOrderRowViewModel
 
     /// <summary>Chuỗi đã bỏ dấu tiếng Việt & viết thường để tìm kiếm siêu nhanh.</summary>
     public string SearchBlob { get; }
+
+    /// <summary>Tên sản phẩm đã bỏ dấu, dùng cho bộ lọc "Sản phẩm".</summary>
+    public string ItemsBlob { get; }
 
     private static string BuildTrackingDisplay(Order o)
     {

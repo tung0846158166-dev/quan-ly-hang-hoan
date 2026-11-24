@@ -153,4 +153,70 @@ public sealed class AiFallbackTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    // ---------------- mô hình treo (không phản hồi) ----------------
+
+    private sealed class Hanging(string hangModel) : HttpMessageHandler
+    {
+        public readonly List<string> Calls = new();
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var body = (JsonObject)JsonNode.Parse(await request.Content!.ReadAsStringAsync(ct))!;
+            var model = body["model"]!.GetValue<string>();
+            Calls.Add(model);
+            if (model == hangModel) await Task.Delay(Timeout.Infinite, ct);   // treo tới khi bị hủy
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Ok("bởi " + model), Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact]
+    public async Task A_hanging_model_times_out_then_falls_back_and_is_skipped_afterwards()
+    {
+        var h = new Hanging("openai/gpt-oss-120b");
+        var svc = new AiChatService(new HttpClient(h), Chain(), new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now)
+        { RequestTimeout = TimeSpan.FromMilliseconds(300) };
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var a1 = await svc.AskAsync("câu 1");
+        Assert.Equal("bởi qwen/qwen3.8-27b", a1.Text);
+        Assert.True(sw.ElapsedMilliseconds < 5000, "không được chờ quá lâu khi một mô hình treo");
+        var a2 = await svc.AskAsync("câu 2");
+        Assert.Equal("bởi qwen/qwen3.8-27b", a2.Text);
+        Assert.Equal(new[] { "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "qwen/qwen3.8-27b" }, h.Calls.ToArray());   // câu 2 bỏ qua mô hình đang treo
+    }
+
+    [Fact]
+    public async Task All_models_hanging_gives_a_clear_timeout_message()
+    {
+        var h = new Hanging("only");
+        var one = new List<AiEndpoint> { new("groq", AiChatService.GroqBaseUrl, "k", "only") };
+        var svc = new AiChatService(new HttpClient(h), one, new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now)
+        { RequestTimeout = TimeSpan.FromMilliseconds(200) };
+        var ex = await Assert.ThrowsAnyAsync<AiException>(() => svc.AskAsync("hi"));
+        Assert.Contains("không phản hồi", ex.Message);
+    }
+
+    [Fact]
+    public async Task Test_connection_runs_all_models_in_parallel_so_one_hanging_model_does_not_block_the_rest()
+    {
+        var h = new Hanging("qwen/qwen3.8-27b");
+        var svc = new AiChatService(new HttpClient(h), Chain(), new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now)
+        { RequestTimeout = TimeSpan.FromMilliseconds(300) };
+        var seen = new List<string>();
+        var progress = new SyncProgress<(string Label, string? Error)>(r => { lock (seen) seen.Add(r.Label); });
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var res = await svc.TestAllAsync(default, progress);
+        Assert.True(sw.ElapsedMilliseconds < 3000);
+        Assert.Equal(4, res.Count);
+        Assert.Equal(4, seen.Count);                                          // mỗi mô hình báo kết quả một lần
+        Assert.Null(res[0].Error);
+        Assert.Contains("không phản hồi", res[1].Error);                      // mô hình treo báo quá thời gian
+        Assert.Null(res[2].Error);
+        Assert.Null(res[3].Error);
+        Assert.Equal(new[] { "groq/openai/gpt-oss-120b", "groq/qwen/qwen3.8-27b", "groq/openai/gpt-oss-20b", "gemini/gemini-2.5-flash" }, res.Select(r => r.Label).ToArray());
+    }
+
+    private sealed class SyncProgress<T>(Action<T> onReport) : IProgress<T>
+    {
+        public void Report(T value) => onReport(value);
+    }
 }

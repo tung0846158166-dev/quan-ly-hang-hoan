@@ -102,7 +102,9 @@ public sealed partial class AiChatViewModel : ObservableObject
     [ObservableProperty] private bool _hasKey;
     [ObservableProperty] private bool _isPanelOpen;
 
-    partial void OnIsBusyChanged(bool value) => SendCommand.NotifyCanExecuteChanged();
+    partial void OnIsBusyChanged(bool value) { SendCommand.NotifyCanExecuteChanged(); OnPropertyChanged(nameof(IsNotBusy)); }
+
+    public bool IsNotBusy => !IsBusy;
     partial void OnInputChanged(string value) => SendCommand.NotifyCanExecuteChanged();
     partial void OnHasKeyChanged(bool value) { SendCommand.NotifyCanExecuteChanged(); OnPropertyChanged(nameof(NeedsKey)); }
 
@@ -220,15 +222,23 @@ public sealed partial class AiChatViewModel : ObservableObject
         HasKey = _store.HasKey;
         if (!HasKey) { StatusText = "Chưa có khóa API."; return; }
         IsBusy = true;
-        StatusText = "Đang thử kết nối từng mô hình...";
+        var usedSaved = string.IsNullOrWhiteSpace(groqKey) && string.IsNullOrWhiteSpace(geminiKey) ? "Dùng khóa đã lưu. " : "";
+        var endpoints = _store.BuildEndpoints();
+        StatusText = $"{usedSaved}Đang thử {endpoints.Count} mô hình cùng lúc (mỗi mô hình tối đa 20 giây)...";
         try
         {
-            var svc = new AiChatService(SharedHttp, _store.BuildEndpoints(), new AiOrderTools(() => Array.Empty<StoredOrder>(), _clock), _clock);
-            var results = await Task.Run(() => svc.TestAllAsync());
+            var svc = new AiChatService(SharedHttp, endpoints, new AiOrderTools(() => Array.Empty<StoredOrder>(), _clock), _clock) { RequestTimeout = TimeSpan.FromSeconds(20) };
+            var done = new List<string>();
+            // Progress tạo trên luồng giao diện nên báo từng mô hình ngay khi có kết quả.
+            var progress = new Progress<(string Label, string? Error)>(r =>
+            {
+                done.Add((r.Error is null ? "✓ " : "✗ ") + r.Label + (r.Error is null ? "" : ": " + r.Error));
+                StatusText = $"{usedSaved}Đã thử {done.Count}/{endpoints.Count} mô hình...\n" + string.Join("\n", done);
+            });
+            var results = await Task.Run(() => svc.TestAllAsync(default, progress));
             var ok = results.Count(r => r.Error is null);
             var lines = results.Select(r => (r.Error is null ? "✓ " : "✗ ") + r.Label + (r.Error is null ? "" : ": " + r.Error));
-            StatusText = (ok > 0 ? $"Dùng được {ok}/{results.Count} mô hình. " : "Không mô hình nào dùng được. ") + "\n" + string.Join("\n", lines);
-
+            StatusText = usedSaved + (ok > 0 ? $"Dùng được {ok}/{results.Count} mô hình." : "Không mô hình nào dùng được.") + "\n" + string.Join("\n", lines);
         }
         catch (Exception ex) { StatusText = "Không dùng được: " + ex.Message; }
         finally { IsBusy = false; }

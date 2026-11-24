@@ -24,9 +24,13 @@
         <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-            <Button Content="Lưu và thử kết nối" Click="Save_Click" Padding="12,6" Margin="0,0,8,0" Cursor="Hand" />
-            <Button Content="Xóa các khóa khỏi máy" Click="Forget_Click" Padding="12,6" Cursor="Hand" />
+            <Button Content="Lưu và thử kết nối" Click="Save_Click" Padding="12,6" Margin="0,0,8,0" Cursor="Hand"
+                    IsEnabled="{Binding IsNotBusy}" />
+            <Button Content="Xóa các khóa khỏi máy" Click="Forget_Click" Padding="12,6" Cursor="Hand"
+                    IsEnabled="{Binding IsNotBusy}" />
         </StackPanel>
+        <ProgressBar IsIndeterminate="True" Height="4" Margin="0,10,0,0" Foreground="#8B5CF6" Background="Transparent" BorderThickness="0"
+                     Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
         <TextBlock Text="{Binding StatusText}" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,10,0,0" />
         <TextBlock Style="{x:Null}" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
                    Text="Dữ liệu gửi cho nhà cung cấp AI không có tên, số điện thoại, địa chỉ người nhận. Câu hỏi và kết quả truy vấn vẫn đi qua internet tới Groq/Google." />

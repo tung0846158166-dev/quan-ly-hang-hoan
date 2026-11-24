@@ -8,6 +8,9 @@ namespace QuanLyHangHoan.Data.Ai;
 
 public class AiException(string message) : Exception(message);
 
+/// <summary>Mô hình không phản hồi trong thời gian cho phép (treo/chậm): chuyển sang mô hình kế tiếp thay vì chờ mãi.</summary>
+public sealed class AiTimeoutException(string message) : AiException(message);
+
 /// <summary>Lỗi HTTP từ nhà cung cấp AI (để quyết định có chuyển sang mô hình dự phòng không).</summary>
 public sealed class AiHttpException(string message, HttpStatusCode code, TimeSpan? retryAfter, string body) : AiException(message)
 {
@@ -79,6 +82,9 @@ public sealed class AiChatService : IAiChat
 
     public static List<AiEndpoint> BuildEndpoints(string provider, string baseUrl, string apiKey, string? models, string fallbackModel) =>
         SplitModels(models, fallbackModel).Select(m => new AiEndpoint(provider, baseUrl.TrimEnd('/'), apiKey, m)).ToList();
+
+    /// <summary>Thời gian chờ tối đa cho MỘT yêu cầu tới MỘT mô hình. Quá hạn thì bỏ qua mô hình đó (cho nghỉ 2 phút) và thử mô hình kế tiếp.</summary>
+    public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(45);
 
     public void Reset() => _history.Clear();
 
@@ -169,11 +175,13 @@ public sealed class AiChatService : IAiChat
         while (_history.Count > MaxHistoryMessages) _history.RemoveAt(0);
     }
 
-    /// <summary>Thử kết nối TỪNG mô hình (một yêu cầu rất nhỏ). Trả về danh sách (nhãn, lỗi hoặc null nếu dùng được).</summary>
-    public async Task<IReadOnlyList<(string Label, string? Error)>> TestAllAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Thử kết nối TẤT CẢ mô hình CÙNG LÚC (một yêu cầu rất nhỏ cho mỗi mô hình, mỗi mô hình tối đa <see cref="RequestTimeout"/>), nên một mô hình treo không làm cả bước thử bị đứng.
+    /// Báo từng kết quả ngay khi có qua <paramref name="progress"/>. Trả về danh sách theo thứ tự mô hình: (nhãn, lỗi hoặc null nếu dùng được).
+    /// </summary>
+    public async Task<IReadOnlyList<(string Label, string? Error)>> TestAllAsync(CancellationToken ct = default, IProgress<(string Label, string? Error)>? progress = null)
     {
-        var res = new List<(string, string?)>();
-        foreach (var ep in _endpoints)
+        async Task<(string Label, string? Error)> One(AiEndpoint ep)
         {
             var body = new JsonObject
             {
@@ -181,11 +189,15 @@ public sealed class AiChatService : IAiChat
                 ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = "Trả lời đúng một từ: ok" }),
                 ["max_tokens"] = 16,
             };
-            try { await PostAsync(ep, body, ct).ConfigureAwait(false); res.Add((ep.Label, null)); }
+            (string, string?) r;
+            try { await PostAsync(ep, body, ct).ConfigureAwait(false); r = (ep.Label, null); }
             catch (OperationCanceledException) { throw; }
-            catch (AiException ex) { res.Add((ep.Label, ex.Message)); }
+            catch (AiException ex) { r = (ep.Label, ex.Message); }
+            progress?.Report(r);
+            return r;
         }
-        return res;
+        var results = await Task.WhenAll(_endpoints.Select(One)).ConfigureAwait(false);
+        return results;
     }
 
     private DateTime Now() => _clock();
@@ -207,6 +219,11 @@ public sealed class AiChatService : IAiChat
             catch (AiHttpException ex) when (ShouldFallback(ex))
             {
                 _restUntil[ep.Label] = Now() + RestTime(ex);
+                errors.Add((ep, ex));
+            }
+            catch (AiTimeoutException ex)
+            {
+                _restUntil[ep.Label] = Now() + TimeSpan.FromMinutes(2);   // treo/chậm: cho nghỉ để câu hỏi sau không chờ lại vô ích
                 errors.Add((ep, ex));
             }
             catch (AiException ex) when (ex is not AiHttpException)
@@ -254,14 +271,21 @@ public sealed class AiChatService : IAiChat
             Content = new StringContent(body.ToJsonString(AiOrderTools.Json), Encoding.UTF8, "application/json"),
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ep.ApiKey);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(RequestTimeout);
+        var token = timeoutCts.Token;
+        AiTimeoutException TimedOut() => new($"{ep.Label} không phản hồi sau {RequestTimeout.TotalSeconds:0} giây.");
         HttpResponseMessage resp;
-        try { resp = await _http.SendAsync(req, ct).ConfigureAwait(false); }
+        try { resp = await _http.SendAsync(req, token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw TimedOut(); }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) { throw new AiException($"Không kết nối được tới {ep.Provider} (kiểm tra mạng): " + ex.Message); }
 
         using (resp)
         {
-            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            string text;
+            try { text = await resp.Content.ReadAsStringAsync(token).ConfigureAwait(false); }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw TimedOut(); }
             if (!resp.IsSuccessStatusCode)
             {
                 TimeSpan? ra = resp.Headers.RetryAfter?.Delta;

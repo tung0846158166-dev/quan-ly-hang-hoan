@@ -131,17 +131,75 @@ public sealed partial class HomeViewModel : ObservableObject
     public bool HasTopProducts => TopProducts.Count > 0;
     partial void OnTopProductsChanged(IReadOnlyList<HomeProductItem> value) => OnPropertyChanged(nameof(HasTopProducts));
 
-    private void BuildTopProducts(IReadOnlyList<Order> orders)
+    public IReadOnlyList<(string Key, string Label)> ProductPeriods { get; } =
+        [("day", "Hôm nay"), ("week", "Tuần này"), ("month", "Tháng này"), ("7d", "7 ngày"), ("30d", "30 ngày"), ("all", "Tất cả")];
+
+    [ObservableProperty]
+    private string _productPeriod = "all";
+
+    public string ProductPeriodLabel => ProductPeriods.First(p => p.Key == ProductPeriod).Label;
+
+    [RelayCommand]
+    private void SetProductPeriod(string? key)
     {
+        ProductPeriod = string.IsNullOrWhiteSpace(key) ? "all" : key;
+    }
+
+    partial void OnProductPeriodChanged(string value)
+    {
+        OnPropertyChanged(nameof(ProductPeriodLabel));
+        OnPropertyChanged(nameof(IsPeriodDay)); OnPropertyChanged(nameof(IsPeriodWeek)); OnPropertyChanged(nameof(IsPeriodMonth));
+        OnPropertyChanged(nameof(IsPeriod7)); OnPropertyChanged(nameof(IsPeriod30)); OnPropertyChanged(nameof(IsPeriodAll));
+        BuildTopProducts(_orders);
+    }
+
+    public bool IsPeriodDay => ProductPeriod == "day";
+    public bool IsPeriodWeek => ProductPeriod == "week";
+    public bool IsPeriodMonth => ProductPeriod == "month";
+    public bool IsPeriod7 => ProductPeriod == "7d";
+    public bool IsPeriod30 => ProductPeriod == "30d";
+    public bool IsPeriodAll => ProductPeriod == "all";
+
+    /// <summary>Khoảng ngày [từ, đến] của kỳ đã chọn (theo ngày hoàn; thiếu thì ngày hàng về, rồi ngày giao).</summary>
+    public static (DateTime From, DateTime To)? PeriodRange(string key, DateTime now)
+    {
+        var today = now.Date;
+        return key switch
+        {
+            "day" => (today, today),
+            "week" => (today.AddDays(-(((int)today.DayOfWeek + 6) % 7)), today),
+            "month" => (new DateTime(today.Year, today.Month, 1), today),
+            "7d" => (today.AddDays(-6), today),
+            "30d" => (today.AddDays(-29), today),
+            _ => null
+        };
+    }
+
+    public static IReadOnlyList<Order> FilterByPeriod(IReadOnlyList<Order> orders, string key, DateTime now)
+    {
+        var range = PeriodRange(key, now);
+        if (range is null) return orders;
+        return orders.Where(o =>
+        {
+            var d = AlertThresholds.TryParseVietnamDateTime(o.ReturnDate)
+                    ?? AlertThresholds.TryParseVietnamDateTime(o.ReturnedAt)
+                    ?? AlertThresholds.TryParseVietnamDateTime(o.ShipDate);
+            return d is not null && d.Value.Date >= range.Value.From && d.Value.Date <= range.Value.To;
+        }).ToList();
+    }
+
+    private void BuildTopProducts(IReadOnlyList<Order> allOrders)
+    {
+        var orders = FilterByPeriod(allOrders, ProductPeriod, _snapshotTime == default ? DateTime.Now : _snapshotTime);
         var r = QuanLyHangHoan.Core.Stats.ProductStatistics.Compute(orders);
-        if (r.Products.Count == 0) { TopProducts = Array.Empty<HomeProductItem>(); ProductSummaryText = "Chưa có sản phẩm hoàn nào."; return; }
+        if (r.Products.Count == 0) { TopProducts = Array.Empty<HomeProductItem>(); ProductSummaryText = $"Chưa có sản phẩm hoàn nào ({ProductPeriodLabel.ToLowerInvariant()})."; return; }
         var top = r.Products.Take(6).ToList();
         var max = Math.Max(1, top[0].Units);
         TopProducts = top.Select((p, i) => new HomeProductItem(
             i + 1, p.Name, p.Units, p.Orders, p.Share.ToString("P1", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")),
             Math.Max(8, p.Units * 150.0 / max),
             p.PremiumUnits > 0 ? $"Premium {p.PremiumUnits:N0} • Thường {p.StandardUnits:N0}" : "")).ToList();
-        ProductSummaryText = $"{r.Products.Count:N0} sản phẩm • {r.TotalUnits:N0} cái bị hoàn trong {r.OrdersWithItems:N0} đơn";
+        ProductSummaryText = $"{ProductPeriodLabel}: {r.Products.Count:N0} sản phẩm • {r.TotalUnits:N0} cái bị hoàn trong {r.OrdersWithItems:N0} đơn";
     }
 
     [ObservableProperty]

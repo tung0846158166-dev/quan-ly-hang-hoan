@@ -120,4 +120,17 @@ public class T037TableFiltersTests
         del.Filters.ProductFilter = "khoac";
         Assert.Equal("D2", del.VisibleOrders.Single().OrderId);
     }
+
+    [Fact]
+    public void HomeProductPeriods_FilterByDayWeekMonth()
+    {
+        var now = new DateTime(2026, 11, 25, 12, 0, 0); // thứ Tư
+        Order Mk(string id, string d) => new() { OrderId = id, Track = id, Platform = "Shopee", ReturnDate = d, Items = [new OrderItem { Product = "Áo", Qty = 1 }] };
+        IReadOnlyList<Order> all = [Mk("a", "25/11/2026 08:00"), Mk("b", "23/11/2026 08:00"), Mk("c", "10/11/2026 08:00"), Mk("d", "31/10/2026 08:00")];
+        Assert.Equal(["a"], HomeViewModel.FilterByPeriod(all, "day", now).Select(o => o.OrderId));
+        Assert.Equal(["a", "b"], HomeViewModel.FilterByPeriod(all, "week", now).Select(o => o.OrderId)); // tuần bắt đầu thứ Hai 23/11
+        Assert.Equal(["a", "b", "c"], HomeViewModel.FilterByPeriod(all, "month", now).Select(o => o.OrderId));
+        Assert.Equal(["a", "b"], HomeViewModel.FilterByPeriod(all, "7d", now).Select(o => o.OrderId));
+        Assert.Equal(["a", "b", "c", "d"], HomeViewModel.FilterByPeriod(all, "all", now).Select(o => o.OrderId));
+    }
 }

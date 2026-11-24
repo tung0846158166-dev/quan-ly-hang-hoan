@@ -12,6 +12,7 @@ struct ScannerApp: App {
             ContentView()
                 .environmentObject(engine)
                 .environmentObject(engine.snapshot)
+                .environmentObject(engine.photoManager)
                 .environmentObject(router)
                 .task { router.store = engine.snapshot; engine.start(); engine.snapshot.refreshAuthorization() }
                 .onChange(of: scenePhase) { phase in
@@ -51,6 +52,9 @@ struct ContentView: View {
                     .tabItem { Label("Lịch sử", systemImage: "clock.arrow.circlepath") }
                     .badge(engine.pendingCount)
                     .tag(NotificationRouter.historyTab)
+                AIChatView()
+                    .tabItem { Label("Hỏi AI", systemImage: "sparkles") }
+                    .tag(99)
                 SettingsView()
                     .tabItem { Label("Cài đặt", systemImage: "gearshape.fill") }
                     .tag(NotificationRouter.settingsTab)

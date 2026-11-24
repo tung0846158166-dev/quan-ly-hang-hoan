@@ -72,6 +72,16 @@ public enum TrackingCode {
         return matches("^[A-Z0-9][A-Z0-9._\\-]*$", c)
     }
 
+    /// Nhiều mã cùng lúc trên một nhãn (mã vận đơn, mã đơn hàng, QR...): chọn mã vận đơn.
+    /// Thứ tự ưu tiên: (1) mã đã có trong dữ liệu trên máy, (2) mã đúng dạng một hãng vận chuyển, (3) mã đầu tiên trông hợp lệ.
+    /// Trả về chuỗi gốc (chưa làm sạch) của mã được chọn; nil nếu không mã nào đáng tin.
+    public static func pickBest(_ raws: [String], isKnown: (String) -> Bool) -> String? {
+        let plausible = raws.filter { isPlausibleScan($0) }
+        if let known = plausible.first(where: { isKnown(clean($0)) }) { return known }
+        if let carrierCode = plausible.first(where: { !carrier(for: clean($0)).isEmpty }) { return carrierCode }
+        return plausible.first
+    }
+
     /// Port của detectCarrierFromCode.
     public static func carrier(for code: String) -> String {
         let c = code.trimmingCharacters(in: .whitespaces).uppercased()

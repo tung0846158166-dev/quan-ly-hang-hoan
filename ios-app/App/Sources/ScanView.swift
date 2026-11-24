@@ -67,7 +67,7 @@ struct ScanView: View {
         }
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
-            camera.onCode = { engine.handleCameraCode($0) }
+            camera.onCodes = { engine.handleCameraCodes($0) }
             engine.snapshotProvider = { camera.snapshotJPEG() }
             camera.start()
             UIApplication.shared.isIdleTimerDisabled = true

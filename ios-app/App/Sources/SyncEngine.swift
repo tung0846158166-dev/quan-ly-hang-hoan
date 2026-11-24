@@ -402,6 +402,13 @@ final class SyncEngine: ObservableObject {
     // MARK: quét
     private var lastCameraCode = ""
     private var lastCameraTime = Date.distantPast
+    /// Camera thấy nhiều mã cùng lúc trên một nhãn: chọn đúng mã vận đơn (mã có trong dữ liệu trên máy trước, rồi mã đúng dạng hãng vận chuyển).
+    func handleCameraCodes(_ raws: [String]) {
+        let store = snapshot
+        guard let best = TrackingCode.pickBest(raws, isKnown: { code in store.lookup(TrackingCode.clean(code)) != nil }) else { return }
+        handleCameraCode(best)
+    }
+
     func handleCameraCode(_ raw: String) {
         // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
         guard TrackingCode.isPlausibleScan(raw) else { return }

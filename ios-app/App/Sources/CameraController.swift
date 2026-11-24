@@ -6,6 +6,8 @@ import SwiftUI
 final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutputObjectsDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     var onCode: ((String) -> Void)?
+    /// Nếu đặt, nhận TẤT CẢ mã đang thấy trong một lần quét (ưu tiên hơn onCode).
+    var onCodes: (([String]) -> Void)?
     @Published var torchOn = false
     @Published var running = false
     @Published var denied = false
@@ -185,6 +187,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     private var weakCandidate: (code: String, hits: Int, last: Date)?
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        // Nhãn thường có nhiều mã cùng lúc (mã vận đơn, mã đơn, QR): gom TẤT CẢ mã hợp lệ đang thấy rồi để bộ chọn quyết định mã nào là mã vận đơn.
+        var found: [String] = []
         for obj in metadataObjects {
             guard let m = obj as? AVMetadataMachineReadableCodeObject, let s = m.stringValue, !s.isEmpty else { continue }
             // Giới hạn khoảng cách (gần đúng): mã ở xa thì chiếm phần nhỏ của khung hình, bỏ qua mã nhỏ hơn ngưỡng người dùng đặt.
@@ -200,14 +204,16 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                 guard (weakCandidate?.hits ?? 0) >= 4 else { continue }
                 weakCandidate = nil
             }
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
-                self.lastCodeAt = Date()
-                if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
-                self.onCode?(s)
-            }
-            return
+            if !found.contains(s) { found.append(s) }
+        }
+        guard !found.isEmpty else { return }
+        let candidates = found
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
+            self.lastCodeAt = Date()
+            if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
+            if let many = self.onCodes { many(candidates) } else { self.onCode?(candidates[0]) }
         }
     }
 

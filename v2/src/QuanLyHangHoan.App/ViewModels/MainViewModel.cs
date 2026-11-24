@@ -233,7 +233,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             openSettings: () => { SettingsVm.SelectTab(SettingsViewModel.GeneralTabKey); NavigateByKey("settings"); },
             activityLoader: aiActivityLoader,
             statusProvider: BuildAiStatus,
-            returnWatchProvider: aiReturnWatch);
+            returnWatchProvider: aiReturnWatch,
+            notificationsProvider: BuildAiNotices);
         SettingsVm.AiChat = AiChatVm;
         HelpVm = new HelpViewModel(
             diagnosticsProvider ?? new FakeDiagnosticsProvider(),
@@ -1237,6 +1238,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(photoId)) return;
         _photoViewerService?.ShowPhoto(photoId, orderId, tracking);
     }
+
+    /// <summary>Thông báo trong trung tâm thông báo cho trợ lý AI (công cụ notifications).</summary>
+    private IReadOnlyList<QuanLyHangHoan.Data.Ai.AiOrderTools.AiNotice> BuildAiNotices() =>
+        _notificationCenter.Snapshot()
+            .Select(e => new QuanLyHangHoan.Data.Ai.AiOrderTools.AiNotice(e.Time, e.Level.ToString(), e.Source, e.Title, e.Detail, e.Read))
+            .ToList();
 
     /// <summary>Thông tin tình trạng cho trợ lý AI (công cụ system_status): kết nối điện thoại, thông báo, sao lưu. Không chứa mã phòng hay khóa.</summary>
     private IReadOnlyDictionary<string, object?> BuildAiStatus()

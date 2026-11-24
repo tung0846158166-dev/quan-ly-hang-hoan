@@ -164,7 +164,8 @@ public sealed class AiToolsExtendedTests
         var arr = JsonNode.Parse(AiOrderTools.DefinitionsJson)!.AsArray();
         var names = arr.Select(t => t!["function"]!["name"]!.GetValue<string>()).ToArray();
         Assert.Equal(new[] { "overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats", "recent_activity",
-            "compare_periods", "order_groups", "return_watch", "system_status", "app_guide" }, names);
+            "compare_periods", "order_groups", "return_watch", "system_status", "app_guide",
+            "search_orders", "turnaround_stats", "data_health", "duplicates", "activity_stats", "notifications" }, names);
         foreach (var t in arr)
         {
             Assert.False(string.IsNullOrWhiteSpace(t!["function"]!["description"]!.GetValue<string>()));
@@ -294,5 +295,150 @@ public sealed class AiToolsExtendedTests
         var reason = J(Tools().Execute("aggregate", """{"group_by":"reason"}"""))["groups"]![0]!["group"]!.GetValue<string>();
         Assert.Equal("(không ghi lý do)", reason);
         Assert.NotEmpty(J(Tools().Execute("aggregate", """{"group_by":"weekday"}"""))["groups"]!.AsArray());
+    }
+
+    // ---------------- đợt công cụ ngầm thứ hai ----------------
+
+    private static Order Timed(string id, string track, string arrived, string recv, string carrier = "SPX Express", string platform = "Shopee", decimal price = 10_000) =>
+        O(id, track, "Hàng đã trả", price, platform: platform, carrier: carrier, arrived: arrived, recv: recv);
+
+    [Fact]
+    public void Search_matches_all_keywords_across_fields_and_rejects_short_queries()
+    {
+        var r = Tools().Execute("search_orders", """{"query":"áo thun spx"}""");
+        Assert.Equal(new[] { "VN001", "VN005", "VN007" }, r.Refs.Select(x => x.Track).OrderBy(x => x).ToArray());
+        Assert.Single(Tools().Execute("search_orders", """{"query":"vn004 váy"}""").Refs);
+        Assert.Empty(Tools().Execute("search_orders", """{"query":"váy vn001"}""").Refs);      // phải khớp tất cả từ
+        Assert.Contains("error", Tools().Execute("search_orders", """{"query":"a"}""").Json);
+        foreach (var banned in new[] { "0912345678", "Nguyễn Trãi" }) Assert.DoesNotContain(banned, r.Json);
+    }
+
+    [Fact]
+    public void Turnaround_computes_average_median_p90_and_percent_within_limits_by_carrier()
+    {
+        var rows = new[]
+        {
+            S(Timed("1", "T1", "24/11/2026 08:00:00", "24/11/2026 10:00:00")),                         // 2 giờ
+            S(Timed("2", "T2", "24/11/2026 08:00:00", "24/11/2026 18:00:00", carrier: "GHN")),         // 10 giờ
+            S(Timed("3", "T3", "24/11/2026 08:00:00", "25/11/2026 14:00:00")),                         // 30 giờ
+            S(O("4", "T4", "Chưa trả", 5_000)),                                                         // chưa nhận: không tính
+        };
+        var t = new AiOrderTools(() => rows, () => Now);
+        var j = J(t.Execute("turnaround_stats", """{"scope":"all"}"""));
+        var o = j["overall"]!;
+        Assert.Equal(3, o["samples"]!.GetValue<int>());
+        Assert.Equal(14.0, o["avgHours"]!.GetValue<double>());
+        Assert.Equal(10.0, o["medianHours"]!.GetValue<double>());
+        Assert.Equal(30.0, o["p90Hours"]!.GetValue<double>());
+        Assert.Equal(2.0, o["minHours"]!.GetValue<double>());
+        Assert.Equal(66.7, o["within24hPercent"]!.GetValue<double>());
+        var byCarrier = J(t.Execute("turnaround_stats", """{"scope":"all","group_by":"carrier"}"""))["groups"]!.AsArray();
+        Assert.Equal("SPX Express", byCarrier[0]!["group"]!.GetValue<string>());
+        Assert.Equal(16.0, byCarrier[0]!["avgHours"]!.GetValue<double>());
+        var slow = t.Execute("turnaround_stats", """{"scope":"all"}""");
+        Assert.Equal("T3", slow.Refs[0].Track);
+    }
+
+    [Fact]
+    public void Data_health_reports_each_issue_with_examples()
+    {
+        var bad1 = O("31", "H1", "Hàng đã trả", 0, carrier: "");               // thiếu giá + vận chuyển + ngày nhận
+        var dupA = O("32", "SAMETRACK", "Chưa trả", 1_000, arrived: "25/11/2026 10:00:00");
+        var dupB = O("33", "sametrack", "Chưa trả", 1_000, arrived: "25/11/2026 10:00:00");
+        var noItems = O("34", "H4", "Chưa trả", 1_000, arrived: "25/11/2026 10:00:00");
+        noItems.Items = new();
+        var rows = new[] { S(bad1), S(dupA), S(dupB), S(noItems) };
+        var t = new AiOrderTools(() => rows, () => Now);
+        var r = t.Execute("data_health", "{}");
+        var checks = J(r)["checks"]!.AsArray().ToDictionary(x => x!["issue"]!.GetValue<string>(), x => x!["count"]!.GetValue<int>());
+        Assert.Equal(1, checks["Thiếu giá trị đơn"]);
+        Assert.Equal(1, checks["Thiếu đơn vị vận chuyển"]);
+        Assert.Equal(1, checks["Đã nhận nhưng thiếu ngày nhận"]);
+        Assert.Equal(1, checks["Không có sản phẩm"]);
+        Assert.Equal(2, checks["Mã vận đơn trùng giữa nhiều dòng"]);
+        Assert.Equal(0, checks["Đang chờ nhưng chưa có giờ hàng về"]);        // cả 3 đơn đang chờ đều có giờ hàng về
+        Assert.NotEmpty(r.Refs);
+    }
+
+    [Fact]
+    public void Duplicates_finds_same_track_across_rows_but_not_abc_parcels_of_one_order()
+    {
+        var a = O("41", "DUP1", "Chưa trả", 1_000);
+        var b = O("42", "dup1 ", "Chưa trả", 2_000);
+        var p1 = O("43", "PARCEL-A", "Chưa trả", 1_000);
+        var p2 = O("44", "PARCEL-B", "Chưa trả", 1_000);
+        p1.OrderId = "SAME"; p2.OrderId = "SAME";
+        var rows = new[] { S(a), S(b), S(p1), S(p2) };
+        var t = new AiOrderTools(() => rows, () => Now);
+        var r = t.Execute("duplicates", "{}");
+        var j = J(r);
+        Assert.Equal(1, j["duplicateGroups"]!.GetValue<int>());
+        Assert.Equal("DUP1", j["groups"]![0]!["code"]!.GetValue<string>());
+        Assert.Equal(2, r.Refs.Count);
+    }
+
+    [Fact]
+    public void Activity_stats_counts_by_type_and_day_within_range_and_reports_when_unavailable()
+    {
+        IReadOnlyList<AuditEntry> Fake(int limit, string type, string text) => new[]
+        {
+            new AuditEntry(5, "25/11/2026 13:50:00", "scan", "Quét nhận kiện", "a"),
+            new AuditEntry(4, "25/11/2026 09:00:00", "scan", "Quét nhận kiện", "b"),
+            new AuditEntry(3, "25/11/2026 08:00:00", "import", "Nạp đơn", "c"),
+            new AuditEntry(2, "24/11/2026 08:00:00", "import", "Nạp đơn", "d"),
+            new AuditEntry(1, "01/10/2026 08:00:00", "import", "Nạp đơn", "ngoài khoảng"),
+        };
+        var t = new AiOrderTools(() => Data, () => Now, Fake);
+        var j = J(t.Execute("activity_stats", """{"from":"today","to":"today"}"""));
+        Assert.Equal(3, j["total"]!.GetValue<int>());
+        Assert.Equal(2, j["byType"]!["Quét nhận kiện"]!.GetValue<int>());
+        Assert.Equal(1, j["byType"]!["Nạp đơn"]!.GetValue<int>());
+        Assert.Equal(3, j["byDay"]!["2026-11-25"]!.GetValue<int>());
+        Assert.Equal(4, J(t.Execute("activity_stats", "{}"))["total"]!.GetValue<int>());      // mặc định 30 ngày gần nhất
+        Assert.Contains("error", Tools().Execute("activity_stats", "{}").Json);
+    }
+
+    [Fact]
+    public void Notifications_lists_masked_entries_and_filters_unread()
+    {
+        IReadOnlyList<AiOrderTools.AiNotice> Fake() => new[]
+        {
+            new AiOrderTools.AiNotice(new DateTime(2026, 11, 25, 13, 0, 0), "Red", "alert", "Đơn quá 24h", "Gọi 0987654321", false),
+            new AiOrderTools.AiNotice(new DateTime(2026, 11, 25, 9, 0, 0), "Yellow", "phone", "Từ điện thoại", "ok", true),
+        };
+        var t = new AiOrderTools(() => Data, () => Now, null, null, null, Fake);
+        var raw = t.Execute("notifications", "{}").Json;
+        Assert.DoesNotContain("0987654321", raw);
+        Assert.Contains("ẩn SĐT", raw);
+        var j = JsonNode.Parse(raw)!;
+        Assert.Equal(2, j["total"]!.GetValue<int>());
+        Assert.Equal(1, j["unread"]!.GetValue<int>());
+        Assert.Equal(1, J(t.Execute("notifications", """{"unread_only":true}"""))["shown"]!.GetValue<int>());
+        Assert.Contains("error", Tools().Execute("notifications", "{}").Json);
+    }
+
+    [Fact]
+    public void Item_level_group_by_color_size_variant_and_watch_reason()
+    {
+        var a = O("51", "C1", "Chưa trả", 10_000);
+        a.Items = new() { new OrderItem { Product = "Áo", Color = "Đen", Size = "M", Qty = 2, Sku = "SKU-A" }, new OrderItem { Product = "Áo", Color = "Trắng", Size = "L", Qty = 1, Sku = "SKU-B" } };
+        var b = O("52", "C2", "Chưa trả", 20_000, watch: true);
+        b.Items = new() { new OrderItem { Product = "Quần", Color = "Đen", Size = "M", Qty = 3, Sku = "SKU-A" } };
+        b.WatchlistReason = "khách báo gọi 0987654321";
+        var rows = new[] { S(a), S(b) };
+        var t = new AiOrderTools(() => rows, () => Now);
+        var color = J(t.Execute("aggregate", """{"group_by":"color","metric":"quantity"}"""))["groups"]!.AsArray();
+        Assert.Equal("Đen", color[0]!["group"]!.GetValue<string>());
+        Assert.Equal(5, color[0]!["quantity"]!.GetValue<int>());              // 2 + 3
+        Assert.Equal(2, color[0]!["count"]!.GetValue<int>());
+        var size = J(t.Execute("aggregate", """{"group_by":"size"}"""))["groups"]!.AsArray().Select(x => x!["group"]!.GetValue<string>()).ToArray();
+        Assert.Contains("M", size);
+        Assert.Contains("L", size);
+        var variant = J(t.Execute("aggregate", """{"group_by":"variant","metric":"quantity"}"""))["groups"]![0]!["group"]!.GetValue<string>();
+        Assert.Equal("Quần / Đen / M", variant);                               // 3 cái: nhiều nhất
+        Assert.Equal("SKU-A", J(t.Execute("aggregate", """{"group_by":"sku","metric":"quantity"}"""))["groups"]![0]!["group"]!.GetValue<string>());
+        var reason = t.Execute("aggregate", """{"group_by":"watch_reason"}""").Json;
+        Assert.DoesNotContain("0987654321", reason);
+        Assert.Contains("ẩn SĐT", reason);
     }
 }

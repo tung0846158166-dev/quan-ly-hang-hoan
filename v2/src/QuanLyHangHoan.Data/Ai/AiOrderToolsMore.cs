@@ -13,18 +13,35 @@ public sealed partial class AiOrderTools
     {
         "none", "status", "platform", "carrier", "order_type", "platform_status", "product", "day", "week", "month", "alert",
         "reason", "sku", "forward_carrier", "return_carrier", "weekday", "arrival_hour", "waiting_age", "watching", "partial", "price_range",
+        "color", "size", "variant", "watch_reason",
     };
 
     private const string GroupByHelp =
         "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, sku, " +
         "day/week/month (theo date_field), alert (mức cảnh báo), reason (lý do hoàn/ghi chú), forward_carrier (hãng giao đi), return_carrier (hãng trả về), " +
         "weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), " +
-        "watching (có/không theo dõi), partial (hoàn một phần hay toàn bộ), price_range (khoảng giá trị), none (chỉ tổng).";
+        "watching (có/không theo dõi), watch_reason (lý do theo dõi), partial (hoàn một phần hay toàn bộ), price_range (khoảng giá trị), " +
+        "color (màu), size, variant (sản phẩm + màu + size), none (chỉ tổng).";
 
     private static readonly HashSet<string> ExtraGroupKeys = new(StringComparer.Ordinal)
     {
         "reason", "sku", "forward_carrier", "return_carrier", "weekday", "arrival_hour", "waiting_age", "watching", "partial", "price_range",
+        "watch_reason",
     };
+
+    /// <summary>Gom nhóm theo TỪNG SẢN PHẨM trong đơn (một đơn nhiều sản phẩm xuất hiện ở nhiều nhóm).</summary>
+    private static Func<OrderItem, string>? ItemKey(string groupBy) => groupBy switch
+    {
+        "product" => i => Label(i.Product.Trim()),
+        "sku" => i => Label((i.Sku ?? "").Trim()),
+        "color" => i => Label((i.Color ?? "").Trim()),
+        "size" => i => Label((i.Size ?? "").Trim()),
+        "variant" => i => Label($"{i.Product.Trim()} / {(i.Color ?? "").Trim()} / {(i.Size ?? "").Trim()}".Trim(' ', '/')),
+        _ => null,
+    };
+
+    private static IEnumerable<OrderItem> ItemsOrPlaceholder(Order o) =>
+        o.Items.Count == 0 ? new[] { new OrderItem { Product = "(không có sản phẩm)", Qty = 1 } } : o.Items;
 
     private static readonly string[] Weekdays = { "Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy" };
 
@@ -52,6 +69,12 @@ public sealed partial class AiOrderTools
                     return h < 12 ? "<12h" : h < 24 ? "12-24h" : h < 48 ? "24-48h" : h < 72 ? "48-72h" : ">72h";
                 }
             case "watching": return o.IsWatchlist ? "đang theo dõi" : "không theo dõi";
+            case "watch_reason":
+                {
+                    if (!o.IsWatchlist) return "(không theo dõi)";
+                    var r = MaskPhones((o.WatchlistReason ?? "").Trim());
+                    return r.Length == 0 ? "(không ghi lý do)" : (r.Length > 60 ? r[..60] : r);
+                }
             case "partial": return o.IsPartialReturn ? "hoàn một phần" : "hoàn toàn bộ";
             case "price_range":
                 return o.Price <= 0 ? "(chưa có giá)" : o.Price < 100_000 ? "dưới 100k" : o.Price < 300_000 ? "100k-300k" : o.Price < 500_000 ? "300k-500k" : "từ 500k";

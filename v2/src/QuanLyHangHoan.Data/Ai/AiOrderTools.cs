@@ -27,19 +27,22 @@ public sealed partial class AiOrderTools
     private readonly Func<int, string, string, IReadOnlyList<AuditEntry>>? _activity;
     private readonly Func<IReadOnlyDictionary<string, object?>>? _status;
     private readonly Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? _returnWatch;
+    private readonly Func<IReadOnlyList<AiNotice>>? _notifications;
     private readonly Dictionary<string, Order> _seen = new(StringComparer.Ordinal);
 
     /// <param name="activity">Đọc nhật ký hoạt động (giới hạn, loại, chữ lọc). null = công cụ nhật ký báo chưa có.</param>
     public AiOrderTools(Func<IReadOnlyList<StoredOrder>> loader, Func<DateTime>? clock = null,
         Func<int, string, string, IReadOnlyList<AuditEntry>>? activity = null,
         Func<IReadOnlyDictionary<string, object?>>? status = null,
-        Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? returnWatch = null)
+        Func<IEnumerable<StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? returnWatch = null,
+        Func<IReadOnlyList<AiNotice>>? notifications = null)
     {
         _loader = loader;
         _clock = clock ?? (() => DateTime.Now);
         _activity = activity;
         _status = status;
         _returnWatch = returnWatch;
+        _notifications = notifications;
     }
 
     private IReadOnlyList<StoredOrder>? _cache;
@@ -174,6 +177,7 @@ public sealed partial class AiOrderTools
                 }),
         };
         foreach (var t in ExtraTools()) tools.Add(t);
+        foreach (var t in Extra2Tools()) tools.Add(t);
         return tools.ToJsonString(Json);
     }
 
@@ -191,6 +195,12 @@ public sealed partial class AiOrderTools
             {
                 "overview" => Overview(),
                 "compare_periods" => ComparePeriods(args),
+                "search_orders" => Search(args),
+                "turnaround_stats" => Turnaround(args),
+                "data_health" => DataHealth(args),
+                "duplicates" => Duplicates(args),
+                "activity_stats" => ActivityStats(args),
+                "notifications" => Notifications(args),
                 "order_groups" => OrderGroups(args),
                 "return_watch" => ReturnWatch(args),
                 "system_status" => SystemStatus(),
@@ -448,9 +458,8 @@ public sealed partial class AiOrderTools
             "order_type" => rows.GroupBy(o => Label(o.OrderType)),
             "platform_status" => rows.GroupBy(o => Label(o.PlatformStatus)),
             "alert" => rows.GroupBy(o => LevelName(LevelOf(o))),
+            var g when ItemKey(g) is not null => rows.SelectMany(o => ItemsOrPlaceholder(o).Select(i => (Key: ItemKey(g)!(i), Order: o))).GroupBy(x => x.Key, x => x.Order),
             var g when ExtraGroupKeys.Contains(g) => rows.GroupBy(o => ExtraGroupKey(g, o)),
-            "product" => rows.SelectMany(o => (o.Items.Count == 0 ? new List<OrderItem> { new() { Product = "(không có sản phẩm)", Qty = 1 } } : o.Items)
-                              .Select(i => (Key: Label(i.Product.Trim()), Order: o))).GroupBy(x => x.Key, x => x.Order),
             "day" => rows.GroupBy(o => DayKey(o, f.DateField, "yyyy-MM-dd")),
             "week" => rows.GroupBy(o => WeekKey(o, f.DateField)),
             "month" => rows.GroupBy(o => DayKey(o, f.DateField, "yyyy-MM")),
@@ -460,8 +469,9 @@ public sealed partial class AiOrderTools
         var list = groups.Select(g =>
         {
             var os = g.Distinct().ToList();
-            var qty = groupBy == "product"
-                ? os.Sum(o => o.Items.Where(i => Label(i.Product.Trim()) == g.Key).Sum(i => i.Qty > 0 ? i.Qty : 1))
+            var itemKey = ItemKey(groupBy);
+            var qty = itemKey is not null
+                ? os.Sum(o => ItemsOrPlaceholder(o).Where(i => itemKey(i) == g.Key).Sum(i => i.Qty > 0 ? i.Qty : 1))
                 : os.Sum(Quantity);
             return (Key: g.Key, Count: os.Count, Value: Value(os), Qty: qty);
         }).ToList();

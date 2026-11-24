@@ -193,7 +193,11 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         _onGoToMainTable = onGoToMainTable;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
         _lastNow = _clock();
+        Pager = new Pager<ReturnWatchRowViewModel>(p => VisibleOrders = p);
     }
+
+    /// <summary>Chia trang 100 kiện/trang (thay cho giới hạn 1.500 dòng trước đây).</summary>
+    public Pager<ReturnWatchRowViewModel> Pager { get; private set; } = null!;
 
     public event Action? CountsUpdated;
 
@@ -487,11 +491,11 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         YellowAlertCount = yellow;
         RedAlertCount = red;
 
-        ApplyFiltersAndSort(previousId);
+        ApplyFiltersAndSort(previousId, resetPage: false);
         CountsUpdated?.Invoke();
     }
 
-    private void ApplyFiltersAndSort(string? preferredOrderId = null)
+    private void ApplyFiltersAndSort(string? preferredOrderId = null, bool resetPage = true)
     {
         var prevId = preferredOrderId ?? SelectedRow?.OrderIdKey;
         var normQuery = AlertThresholds.NormalizeForSearch(SearchText);
@@ -519,25 +523,15 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
             .ToList();
 
         var totalMatched = filtered.Count;
-        if (totalMatched > MaxDisplayRows)
-        {
-            var remaining = totalMatched - MaxDisplayRows;
-            filtered = filtered.Take(MaxDisplayRows).ToList();
-            HasOverflow = true;
-            OverflowMessage = $"Đang hiển thị {MaxDisplayRows:N0} / {totalMatched:N0} dòng — còn {remaining:N0} dòng, hãy lọc/tìm.";
-        }
-        else
-        {
-            HasOverflow = false;
-            OverflowMessage = string.Empty;
-        }
+        HasOverflow = false;            // không còn cắt bớt dòng: chia trang thay thế
+        OverflowMessage = string.Empty;
 
         for (var i = 0; i < filtered.Count; i++)
         {
             filtered[i].Stt = i + 1;
         }
 
-        VisibleOrders = filtered;
+        Pager.SetItems(filtered, resetPage);
         IsEmpty = filtered.Count == 0;
 
         if (!string.IsNullOrEmpty(prevId))
@@ -549,8 +543,6 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
             SelectedRow = null;
         }
 
-        StatusBarText = HasOverflow
-            ? $"Hiển thị {filtered.Count:N0} / {totalMatched:N0} kiện • Đang theo dõi (1-3): {TrackingCount:N0}"
-            : $"Hiển thị {filtered.Count:N0} / {TotalCount:N0} kiện • Đang theo dõi (1-3): {TrackingCount:N0}";
+        StatusBarText = $"Hiển thị {Pager.RangeText} kiện (tổng {TotalCount:N0}) • Đang theo dõi (1-3): {TrackingCount:N0}";
     }
 }

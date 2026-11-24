@@ -159,7 +159,11 @@ public sealed partial class WatchlistViewModel : ObservableObject
         _onNotify = onNotify;
         _onOpenDetail = onOpenDetail;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
+        Pager = new Pager<WatchlistRowViewModel>(p => VisibleOrders = p);
     }
+
+    /// <summary>Chia trang 100 kiện/trang.</summary>
+    public Pager<WatchlistRowViewModel> Pager { get; private set; } = null!;
 
     public event Action? CountsUpdated;
 
@@ -271,11 +275,11 @@ public sealed partial class WatchlistViewModel : ObservableObject
         ShopeeCount = shopee;
         TikTokCount = tiktok;
 
-        ApplyFiltersAndSort(previousId);
+        ApplyFiltersAndSort(previousId, resetPage: false);
         CountsUpdated?.Invoke();
     }
 
-    public void ApplyFiltersAndSort(string? preserveOrderId = null)
+    public void ApplyFiltersAndSort(string? preserveOrderId = null, bool resetPage = true)
     {
         var sw = Stopwatch.StartNew();
         var kw = AlertThresholds.NormalizeForSearch(SearchText).Trim();
@@ -304,7 +308,7 @@ public sealed partial class WatchlistViewModel : ObservableObject
         });
 
         sw.Stop();
-        VisibleOrders = filtered;
+        Pager.SetItems(filtered, resetPage);
         VisibleCount = filtered.Count;
         IsEmpty = filtered.Count == 0;
 
@@ -318,7 +322,7 @@ public sealed partial class WatchlistViewModel : ObservableObject
             SelectedRow = null;
         }
 
-        StatusBarText = $"Đang theo dõi {filtered.Count:N0} / {_allRows.Count:N0} kiện  •  Lọc: {sw.ElapsedMilliseconds} ms";
+        StatusBarText = $"Đang theo dõi {Pager.RangeText} kiện (tổng {_allRows.Count:N0})  •  Lọc: {sw.ElapsedMilliseconds} ms";
     }
 
     [RelayCommand]

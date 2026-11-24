@@ -417,7 +417,7 @@ public sealed class T026ReturnWatchUiTests : IDisposable
     }
 
     [Fact]
-    public void OverflowCap_1500Rows_ShowsRemainingMessage()
+    public void Paging_1520Rows_ArePagedBy100_NothingIsDropped()
     {
         var entries = Enumerable.Range(1, 1520)
             .Select(i => new ReturnWatchEntry(
@@ -429,9 +429,15 @@ public sealed class T026ReturnWatchUiTests : IDisposable
         var vm = new ReturnWatchViewModel(new FakeReturnWatchService(entries), () => FixedNow);
         vm.LoadEntries(entries, FixedNow);
 
-        Assert.Equal(ReturnWatchViewModel.MaxDisplayRows, vm.VisibleOrders.Count);
-        Assert.True(vm.HasOverflow);
-        Assert.Contains("còn 20 dòng", vm.OverflowMessage);
+        Assert.Equal(100, vm.VisibleOrders.Count);                  // một trang 100 kiện
+        Assert.Equal(1520, vm.Pager.All.Count);                     // không còn cắt bớt: đủ 1.520 kiện
+        Assert.Equal(16, vm.Pager.TotalPages);
+        Assert.False(vm.HasOverflow);
+        vm.Pager.LastPageCommand.Execute(null);
+        Assert.Equal(20, vm.VisibleOrders.Count);                   // trang cuối còn 20 kiện
+        vm.Pager.PageInput = "5"; vm.Pager.GoToPageInputCommand.Execute(null);
+        Assert.Equal(5, vm.Pager.CurrentPage);
+        Assert.Equal(401, vm.VisibleOrders[0].Stt);                 // số thứ tự liên tục qua các trang
     }
 
     [Fact]

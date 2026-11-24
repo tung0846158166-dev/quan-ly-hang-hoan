@@ -224,4 +224,20 @@ public class T037TableFiltersTests
         del.Pager.LastPageCommand.Execute(null);
         Assert.Equal(20, del.VisibleOrders.Count);
     }
+
+    [Fact]
+    public void Watchlist_PagesBy100()
+    {
+        var vm = new WatchlistViewModel();
+        var many = Enumerable.Range(1, 140).Select(i => new Order { Id = "w" + i, OrderId = "W" + i, Track = "TW" + i, Platform = "Shopee", IsWatchlist = true, ReturnedAt = Now.AddHours(-i).ToString("dd/MM/yyyy HH:mm") }).ToList();
+        vm.LoadOrders(many, [], Now);
+        Assert.Equal(2, vm.Pager.TotalPages);
+        Assert.Equal(100, vm.VisibleOrders.Count);
+        Assert.Equal(140, vm.Pager.All.Count);
+        vm.Pager.LastPageCommand.Execute(null);
+        Assert.Equal(40, vm.VisibleOrders.Count);
+        vm.SearchText = "W13";
+        Assert.Equal(1, vm.Pager.CurrentPage);
+        Assert.False(vm.Pager.ShowPager);
+    }
 }

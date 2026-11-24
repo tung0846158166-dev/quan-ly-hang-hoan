@@ -10,9 +10,20 @@ namespace QuanLyHangHoan.App.ViewModels;
 
 public sealed record AiChatMessage(bool IsUser, string Text, IReadOnlyList<AiOrderRef> Refs, string Trace)
 {
+    /// <summary>Thời điểm gửi (câu hỏi) hoặc nhận (câu trả lời).</summary>
+    public DateTime Time { get; init; } = DateTime.Now;
+    /// <summary>Với câu trả lời: thời gian chờ AI.</summary>
+    public TimeSpan Elapsed { get; init; }
+    /// <summary>Lỗi (hiện màu cảnh báo, không có danh sách đơn).</summary>
+    public bool IsError => !IsUser && Text.StartsWith("⚠", StringComparison.Ordinal);
+
     public bool HasRefs => Refs.Count > 0;
     public string RefsHeader => $"Đơn liên quan ({Refs.Count}) — bấm để xem chi tiết";
-    public bool HasTrace => !string.IsNullOrEmpty(Trace);
+
+    /// <summary>Giờ hiển thị: hôm nay chỉ giờ:phút:giây, ngày khác thêm ngày/tháng.</summary>
+    public string TimeText => Time.Date == DateTime.Today ? Time.ToString("HH:mm:ss") : Time.ToString("dd/MM HH:mm:ss");
+    public string ElapsedText => Elapsed.TotalSeconds >= 0.5 ? $"trả lời sau {Elapsed.TotalSeconds:0.#} giây" : string.Empty;
+    public string Caption => IsUser ? TimeText : (ElapsedText.Length > 0 ? $"{TimeText} · {ElapsedText}" : TimeText);
 }
 
 /// <summary>
@@ -106,25 +117,27 @@ public sealed partial class AiChatViewModel : ObservableObject
         var chat = EnsureChat();
         if (chat is null || question.Length == 0) return;
         Input = string.Empty;
-        Messages.Add(new AiChatMessage(true, question, Array.Empty<AiOrderRef>(), ""));
+        var started = _clock();
+        Messages.Add(new AiChatMessage(true, question, Array.Empty<AiOrderRef>(), "") { Time = started });
         IsBusy = true;
         StatusText = "Đang hỏi AI...";
         _cts = new CancellationTokenSource();
         try
         {
             var answer = await Task.Run(() => chat.AskAsync(question, _cts.Token));
-            Messages.Add(new AiChatMessage(false, answer.Text, answer.Refs, string.Join("\n", answer.Trace.Select(t => "• " + t))));
+            var done = _clock();
+            Messages.Add(new AiChatMessage(false, answer.Text, answer.Refs, "") { Time = done, Elapsed = done - started });
             StatusText = "Sẵn sàng.";
         }
         catch (OperationCanceledException) { StatusText = "Đã hủy."; }
         catch (AiException ex)
         {
-            Messages.Add(new AiChatMessage(false, "⚠ " + ex.Message, Array.Empty<AiOrderRef>(), ""));
+            Messages.Add(new AiChatMessage(false, "⚠ " + ex.Message, Array.Empty<AiOrderRef>(), "") { Time = _clock() });
             StatusText = "Lỗi.";
         }
         catch (Exception ex)
         {
-            Messages.Add(new AiChatMessage(false, "⚠ Lỗi không mong muốn: " + ex.Message, Array.Empty<AiOrderRef>(), ""));
+            Messages.Add(new AiChatMessage(false, "⚠ Lỗi không mong muốn: " + ex.Message, Array.Empty<AiOrderRef>(), "") { Time = _clock() });
             StatusText = "Lỗi.";
         }
         finally { IsBusy = false; _cts?.Dispose(); _cts = null; }
@@ -132,6 +145,15 @@ public sealed partial class AiChatViewModel : ObservableObject
 
     [RelayCommand]
     private void Cancel() => _cts?.Cancel();
+
+    /// <summary>Sao chép nội dung một tin (chữ thuần, bỏ ký hiệu markdown).</summary>
+    [RelayCommand]
+    private void CopyMessage(AiChatMessage? m)
+    {
+        if (m is null) return;
+        try { System.Windows.Clipboard.SetText(ChatMarkdown.ToPlainText(m.Text)); StatusText = "Đã sao chép."; }
+        catch { StatusText = "Không sao chép được (clipboard đang bận)."; }
+    }
 
     [RelayCommand]
     private void Ask(string? suggestion)

@@ -58,7 +58,10 @@ public sealed class T041AiChatUiTests
                 Assert.True(r.Vm.Messages[0].IsUser);
                 Assert.Equal("Hôm nay có 2 kiện về.", r.Vm.Messages[1].Text);
                 Assert.Equal(2, r.Vm.Messages[1].Refs.Count);
-                Assert.Contains("count_orders", r.Vm.Messages[1].Trace);
+                Assert.Equal(string.Empty, r.Vm.Messages[1].Trace);   // "Xem cách tính" đã bỏ khỏi giao diện
+                Assert.True(r.Vm.Messages[1].Time >= r.Vm.Messages[0].Time);
+                Assert.False(string.IsNullOrEmpty(r.Vm.Messages[0].Caption));
+                Assert.False(string.IsNullOrEmpty(r.Vm.Messages[1].Caption));
                 Assert.Equal(string.Empty, r.Vm.Input);
 
                 r.Vm.OpenRefCommand.Execute(r.Vm.Messages[1].Refs[1]);
@@ -210,9 +213,13 @@ public sealed class T041AiChatUiTests
                     WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "04-main-floating-button.png"));
 
                     vm.AiChatVm.TogglePanelCommand.Execute(null);
-                    vm.AiChatVm.Messages.Add(new AiChatMessage(true, "hôm nay có bao nhiêu đơn về?", Array.Empty<AiOrderRef>(), ""));
-                    vm.AiChatVm.Messages.Add(new AiChatMessage(false, "Hôm nay có 2 kiện về.",
-                        new[] { new AiOrderRef("a1", "SHP-A1", "VN001", ReceiveStatus.Received), new AiOrderRef("a2", "SHP-A2", "VN002", ReceiveStatus.Received) }, "• Mô hình: groq/openai/gpt-oss-120b"));
+                    vm.AiChatVm.Messages.Add(new AiChatMessage(true, "hôm nay có bao nhiêu đơn về?", Array.Empty<AiOrderRef>(), "") { Time = new DateTime(2026, 11, 25, 14, 0, 5) });
+                    var md = "**Hôm nay (25/11/2026) có 2 kiện hàng đã về kho**:" + Environment.NewLine + Environment.NewLine
+                        + "| Mã đơn | Mã vận đơn |" + Environment.NewLine + "|--------|------------|" + Environment.NewLine
+                        + "| SHP-A1 | VN001 |" + Environment.NewLine + "| SHP-A2 | VN002 |" + Environment.NewLine + Environment.NewLine
+                        + "Bạn có thể bấm vào mã đơn để xem chi tiết.";
+                    vm.AiChatVm.Messages.Add(new AiChatMessage(false, md,
+                        new[] { new AiOrderRef("a1", "SHP-A1", "VN001", ReceiveStatus.Received), new AiOrderRef("a2", "SHP-A2", "VN002", ReceiveStatus.Received) }, "") { Time = new DateTime(2026, 11, 25, 14, 0, 7), Elapsed = TimeSpan.FromSeconds(2.4) });
                     WpfTestHost.PumpDispatcher();
                     Assert.True(vm.AiChatVm.IsPanelOpen);
                     WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "05-main-ai-popup.png"));

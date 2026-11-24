@@ -53,7 +53,27 @@ struct AIMessage: Identifiable {
     let isUser: Bool
     let text: String
     var refs: [AIOrderRef] = []
-    var trace: String = ""
+    /// Giờ gửi (câu hỏi) hoặc giờ nhận (câu trả lời).
+    var time: Date = Date()
+    /// Với câu trả lời: thời gian chờ AI (giây).
+    var elapsed: TimeInterval = 0
+
+    var isError: Bool { !isUser && text.hasPrefix("⚠") }
+
+    /// Giờ hiển thị: hôm nay chỉ giờ:phút:giây, ngày khác thêm ngày/tháng.
+    var timeText: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "vi_VN")
+        f.dateFormat = Calendar.current.isDateInToday(time) ? "HH:mm:ss" : "dd/MM HH:mm:ss"
+        return f.string(from: time)
+    }
+
+    var caption: String {
+        if isUser { return timeText }
+        guard elapsed >= 0.5 else { return timeText }
+        let s = String(format: "%.1f", elapsed).replacingOccurrences(of: ".", with: ",")
+        return timeText + " · trả lời sau " + s + " giây"
+    }
 }
 
 @MainActor
@@ -115,16 +135,19 @@ final class AIChatViewModel: ObservableObject {
         guard !q.isEmpty, !isBusy, let svc = ensureService() else { return }
         rowsBox.set(store?.rows ?? [])   // chụp danh sách đơn ngay trên luồng chính; công cụ chạy nền chỉ đọc bản chụp này
         input = ""
-        messages.append(AIMessage(isUser: true, text: q))
+        let started = Date()
+        messages.append(AIMessage(isUser: true, text: q, time: started))
         isBusy = true
         status = "Đang hỏi AI..."
         Task {
             do {
                 let a = try await svc.ask(q)
-                messages.append(AIMessage(isUser: false, text: a.text, refs: a.refs, trace: a.trace.map { "• " + $0 }.joined(separator: "\n")))
+                let done = Date()
+                messages.append(AIMessage(isUser: false, text: a.text, refs: a.refs, time: done, elapsed: done.timeIntervalSince(started)))
                 status = "Sẵn sàng."
             } catch {
-                messages.append(AIMessage(isUser: false, text: "⚠ " + ((error as? AIError)?.message ?? error.localizedDescription)))
+                let msg = (error as? AIError)?.message ?? error.localizedDescription
+                messages.append(AIMessage(isUser: false, text: "⚠ " + msg, time: Date()))
                 status = "Lỗi."
             }
             isBusy = false
@@ -218,9 +241,12 @@ struct AIChatView: View {
                     if !vm.hasKey { keyNotice }
                     if vm.messages.isEmpty { emptyState }
                     ForEach(vm.messages) { m in
-                        bubble(m).id(m.id)
+                        AIMessageRow(message: m) { ref in
+                            if let row = vm.row(for: ref) { openRow = row }
+                        }
+                        .id(m.id)
                     }
-                    if vm.isBusy { ProgressView().padding(.vertical, 6) }
+                    if vm.isBusy { AITypingBubble() }
                 }
                 .padding(14)
             }
@@ -289,53 +315,26 @@ struct AIChatView: View {
     private var inputBar: some View {
         HStack(spacing: 8) {
             TextField("Hỏi về đơn hàng...", text: $vm.input)
-                .textFieldStyle(.roundedBorder)
                 .focused($focused)
                 .submitLabel(.send)
                 .onSubmit { vm.send() }
                 .disabled(!vm.hasKey)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(Capsule())
             Button {
                 vm.send()
             } label: {
-                Image(systemName: "paperplane.fill").font(.title3)
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(vm.canSend ? Color(red: 0.31, green: 0.27, blue: 0.90) : Color.gray.opacity(0.4)))
             }
             .disabled(!vm.canSend)
         }
         .padding(12)
-    }
-
-    @ViewBuilder
-    private func bubble(_ m: AIMessage) -> some View {
-        VStack(alignment: m.isUser ? .trailing : .leading, spacing: 6) {
-            Text(m.text)
-                .font(.subheadline)
-                .textSelection(.enabled)
-                .padding(.horizontal, 12).padding(.vertical, 9)
-                .background(m.isUser ? Theme.accent.opacity(0.18) : Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            if !m.refs.isEmpty {
-                Text("Đơn liên quan (\(m.refs.count)) — chạm để xem chi tiết")
-                    .font(.caption.bold()).foregroundColor(.secondary)
-                ForEach(m.refs) { r in
-                    Button {
-                        if let row = vm.row(for: r) { openRow = row }
-                    } label: {
-                        Text("\(r.orderCode) · \(r.track) · \(r.status)")
-                            .font(.system(.caption, design: .monospaced))
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Color(.tertiarySystemBackground))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            }
-            if !m.trace.isEmpty {
-                DisclosureGroup("Xem cách tính") {
-                    Text(m.trace).font(.system(.caption2, design: .monospaced)).foregroundColor(.secondary)
-                }
-                .font(.caption)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: m.isUser ? .trailing : .leading)
     }
 }
 

@@ -178,11 +178,11 @@ struct AIChatView: View {
     @EnvironmentObject var store: SnapshotStore
     @EnvironmentObject var vm: AIChatViewModel
     @EnvironmentObject var router: NotificationRouter
-    @Environment(.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     @State private var openRow: OrderRow?
     @FocusState private var focused: Bool
 
-    private let suggestions = [
+    private let suggestions: [String] = [
         "Hôm nay có bao nhiêu đơn về?",
         "Liệt kê đơn chưa trả của Shopee",
         "Sản phẩm nào hoàn nhiều nhất tuần này?",
@@ -192,66 +192,9 @@ struct AIChatView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 10) {
-                            if !vm.hasKey {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Chưa có khóa API. Hãy nhập khóa Groq và/hoặc Google trong Cài đặt.")
-                                        .font(.subheadline)
-                                    Button("Mở Cài đặt trợ lý AI") {
-                                        dismiss()
-                                        router.tab = NotificationRouter.settingsTab
-                                    }
-                                    .font(.subheadline.bold())
-                                }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.yellow.opacity(0.22))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                            if vm.messages.isEmpty {
-                                Text("AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài. Dữ liệu là bản đã đồng bộ gần nhất từ máy tính.")
-                                    .font(.footnote)
-                                    .foregroundColor(.secondary)
-                                Text("Gợi ý câu hỏi:").font(.footnote.bold()).padding(.top, 6)
-                                ForEach(suggestions, id: \.self) { s in
-                                    Button { vm.send(s) } label: {
-                                        Text(s).font(.subheadline).padding(.horizontal, 12).padding(.vertical, 8)
-                                            .background(Theme.accent.opacity(0.12)).clipShape(RoundedRectangle(cornerRadius: 10))
-                                    }
-                                    .disabled(!vm.hasKey || vm.isBusy)
-                                }
-                            }
-                            ForEach(vm.messages) { m in bubble(m).id(m.id) }
-                            if vm.isBusy { ProgressView().padding(.vertical, 6) }
-                        }
-                        .padding(14)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: vm.messages.count) { _ in
-                        if let last = vm.messages.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
-                    }
-                }
-                Text(vm.status)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 4)
-                HStack(spacing: 8) {
-                    TextField("Hỏi về đơn hàng...", text: $vm.input)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($focused)
-                        .submitLabel(.send)
-                        .onSubmit { vm.send() }
-                        .disabled(!vm.hasKey)
-                    Button { vm.send() } label: {
-                        Image(systemName: "paperplane.fill").font(.title3)
-                    }
-                    .disabled(!vm.canSend)
-                }
-                .padding(12)
+                messagesScroll
+                statusLine
+                inputBar
             }
             .navigationTitle("Hỏi AI")
             .navigationBarTitleDisplayMode(.inline)
@@ -263,9 +206,102 @@ struct AIChatView: View {
                     Button("Đóng") { dismiss() }
                 }
             }
-            .sheet(item: $openRow) { DetailView(row: $0) }
+            .sheet(item: $openRow) { row in DetailView(row: row) }
             .onAppear { vm.bind(store) }
         }
+    }
+
+    private var messagesScroll: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if !vm.hasKey { keyNotice }
+                    if vm.messages.isEmpty { emptyState }
+                    ForEach(vm.messages) { m in
+                        bubble(m).id(m.id)
+                    }
+                    if vm.isBusy { ProgressView().padding(.vertical, 6) }
+                }
+                .padding(14)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: vm.messages.count) { _ in
+                if let last = vm.messages.last {
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+            }
+        }
+    }
+
+    private var keyNotice: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Chưa có khóa API. Hãy nhập khóa Groq và/hoặc Google trong Cài đặt.")
+                .font(.subheadline)
+            Button("Mở Cài đặt trợ lý AI") {
+                dismiss()
+                router.tab = NotificationRouter.settingsTab
+            }
+            .font(.subheadline.bold())
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.yellow.opacity(0.22))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài. Dữ liệu là bản đã đồng bộ gần nhất từ máy tính.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+            Text("Gợi ý câu hỏi:")
+                .font(.footnote.bold())
+                .padding(.top, 6)
+            ForEach(suggestions, id: \.self) { s in
+                suggestionButton(s)
+            }
+        }
+    }
+
+    private func suggestionButton(_ s: String) -> some View {
+        Button {
+            vm.send(s)
+        } label: {
+            Text(s)
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.accent.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .disabled(!vm.hasKey || vm.isBusy)
+    }
+
+    private var statusLine: some View {
+        Text(vm.status)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.top, 4)
+    }
+
+    private var inputBar: some View {
+        HStack(spacing: 8) {
+            TextField("Hỏi về đơn hàng...", text: $vm.input)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .submitLabel(.send)
+                .onSubmit { vm.send() }
+                .disabled(!vm.hasKey)
+            Button {
+                vm.send()
+            } label: {
+                Image(systemName: "paperplane.fill").font(.title3)
+            }
+            .disabled(!vm.canSend)
+        }
+        .padding(12)
     }
 
     @ViewBuilder

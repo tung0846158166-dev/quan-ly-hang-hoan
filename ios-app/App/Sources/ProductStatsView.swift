@@ -165,6 +165,18 @@ struct ProductStatsView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundColor(Theme.accent)
                     }
+
+                    if item.premiumUnits > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                                .font(.caption2.bold())
+                                .foregroundColor(Theme.warning)
+                            Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(Theme.warning)
+                                .monospacedDigit()
+                        }
+                    }
                 }
 
                 Spacer(minLength: 4)
@@ -275,6 +287,9 @@ struct ProductStatDetailView: View {
         ScrollView {
             VStack(spacing: 14) {
                 headerCard
+                if stat.premiumUnits > 0 {
+                    premiumBreakdownCard
+                }
                 platformBreakdownCard
                 if !stat.variants.isEmpty {
                     variantsCard
@@ -340,6 +355,90 @@ struct ProductStatDetailView: View {
         .padding(10)
         .background(Theme.subtleFill)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    // MARK: - Tách Premium / Thường
+    private var premiumBreakdownCard: some View {
+        let total = max(1, stat.premiumUnits + stat.standardUnits)
+        let premRatio = Double(stat.premiumUnits) / Double(total)
+        let premPct = Int((premRatio * 100.0).rounded())
+        let stdPct = max(0, 100 - premPct)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionTitleRow(
+                title: "Premium / Thường",
+                icon: "sparkles",
+                iconColor: Theme.warning
+            )
+
+            // Thanh ngang 2 phần (Premium vs Thường)
+            GeometryReader { geo in
+                let w = geo.size.width
+                HStack(spacing: 2) {
+                    if stat.standardUnits <= 0 {
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Theme.warning, Theme.accent],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        let premWidth = max(8, min(w - 10, w * CGFloat(premRatio)))
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Theme.warning, Theme.accent],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: premWidth)
+                        Rectangle()
+                            .fill(Theme.info.opacity(0.75))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .clipShape(Capsule())
+            }
+            .frame(height: 10)
+
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Theme.warning)
+                        .frame(width: 8, height: 8)
+                    Text("Premium \(stat.premiumUnits)")
+                        .font(.caption.bold())
+                        .foregroundColor(.primary)
+                        .monospacedDigit()
+                    Text("(\(premPct)%)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Theme.info.opacity(0.85))
+                        .frame(width: 8, height: 8)
+                    Text("Thường \(stat.standardUnits)")
+                        .font(.caption.bold())
+                        .foregroundColor(.primary)
+                        .monospacedDigit()
+                    Text("(\(stdPct)%)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: 16, radius: 18)
     }
 
     // MARK: - Tách theo sàn

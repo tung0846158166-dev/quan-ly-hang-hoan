@@ -98,7 +98,10 @@ public enum DemoData {
         let colors = ["Đen", "Trắng", "Be", "Xanh navy", "Xám", "Nâu"]
         let sizes = ["S", "M", "L", "XL", "Freesize"]
 
-        func prod(_ idx: Int) -> String { products[idx % products.count] }
+        func prod(_ idx: Int, premium: Bool = false) -> String {
+            let base = products[idx % products.count]
+            return premium ? "\(base) - Premium Cao Cấp" : base
+        }
         func col(_ idx: Int) -> String { colors[idx % colors.count] }
         func sz(_ idx: Int) -> String { sizes[idx % sizes.count] }
 
@@ -120,7 +123,8 @@ public enum DemoData {
             "Hàng lỗi nhẹ đường may"
         ]
         for (i, s) in overdueSpecs.enumerated() {
-            let name = s.6 ? "\(s.7) | \(prod(i + 2)) | \(prod(i + 4))" : prod(i)
+            let isPrem = (i == 0 || i == 6)
+            let name = s.6 ? "\(s.7) | \(prod(i + 2)) | \(prod(i + 4))" : prod(i, premium: isPrem)
             let colorStr = s.6 ? "\(col(i)) | \(col(i + 1)) | \(col(i + 2))" : col(i)
             let sizeStr = s.6 ? "\(sz(i)) | \(sz(i + 1)) | \(sz(i + 2))" : sz(i)
             var r = OrderRow(
@@ -154,13 +158,14 @@ public enum DemoData {
             ("DEMO-LZ-1010", "DHM-1010", "Lazada", 6, false, "", "", 2),
             ("DEMO-SPX-1011", "DHM-1011", "Shopee", 9, true, "Đối chiếu màu thực tế", "", 3),
             ("DEMO-TT-1012", "DHM-1012", "TikTok", 12, false, "", "", 2),
-            ("DEMO-SPX-1013", "DHM-1013", "Shopee", 15, false, "", "Áo polo dệt kim", 1),
+            ("DEMO-SPX-1013", "DHM-1013", "Shopee", 15, false, "", "Áo polo dệt kim - Premium Cao Cấp", 1),
             ("DEMO-LZ-1014", "DHM-1014", "Lazada", 18, false, "", "", 1),
             ("DEMO-TT-1015", "DHM-1015", "TikTok", 21, false, "", "", 2)
         ]
         for (i, s) in soonSpecs.enumerated() {
             let isPartial = !s.6.isEmpty
-            let name = isPartial ? "\(s.6) | \(prod(i + 3))" : prod(i + 1)
+            let isPrem = (i == 0)
+            let name = isPartial ? "\(s.6) | \(prod(i + 3))" : prod(i + 1, premium: isPrem)
             let colorStr = isPartial ? "\(col(i + 2)) | \(col(i + 3))" : col(i + 2)
             let sizeStr = isPartial ? "\(sz(i + 1)) | \(sz(i + 2))" : sz(i + 1)
             var r = OrderRow(
@@ -191,7 +196,8 @@ public enum DemoData {
             let plat = normalPlatforms[i]
             let prefix = plat == "Shopee" ? "DEMO-SPX" : (plat == "TikTok" ? "DEMO-TT" : "DEMO-LZ")
             let isPartial = (i == 1 || i == 6)
-            let p1 = prod(i + 3)
+            let isPrem = (i == 3 || i == 7)
+            let p1 = prod(i + 3, premium: isPrem)
             let name = isPartial ? "\(p1) | \(prod(i + 5)) | \(prod(i + 7))" : p1
             let colorStr = isPartial ? "\(col(i)) | \(col(i + 1)) | \(col(i + 2))" : col(i)
             let sizeStr = isPartial ? "\(sz(i)) | \(sz(i + 1)) | \(sz(i + 2))" : sz(i)
@@ -232,7 +238,8 @@ public enum DemoData {
             let prefix = plat == "Shopee" ? "DEMO-SPX" : (plat == "TikTok" ? "DEMO-TT" : "DEMO-LZ")
             let recvDate = dateOffset(dayOff, hour: 8 + (i % 9), minute: (i * 7) % 60, from: now, calendar: calendar)
             let isPartial = (i == 0 || i == 7)
-            let p1 = prod(i)
+            let isPrem = (i == 0 || i == 1 || i == 16)
+            let p1 = prod(i, premium: isPrem)
             let name = isPartial ? "\(p1) | \(prod(i + 2))" : p1
             let colorStr = isPartial ? "\(col(i + 1)) | \(col(i + 2))" : col(i + 1)
             let sizeStr = isPartial ? "\(sz(i + 2)) | \(sz(i + 3))" : sz(i + 2)
@@ -264,7 +271,7 @@ public enum DemoData {
             let plat = i % 2 == 0 ? "Shopee" : "TikTok"
             let received = i >= 5
             var r = OrderRow(
-                k: "c", c: "DEMO-CXL-\(num)", o: "DHM-\(num)", p: plat, n: prod(i + 4),
+                k: "c", c: "DEMO-CXL-\(num)", o: "DHM-\(num)", p: plat, n: prod(i + 4, premium: i == 2),
                 co: col(i), sz: sz(i), q: 1,
                 rd: formatDate(dateOffset(-(i % 4), hour: 11, from: now, calendar: calendar), withTime: false, calendar: calendar),
                 due: 0,

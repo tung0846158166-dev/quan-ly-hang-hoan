@@ -854,7 +854,7 @@ struct HomeView: View {
                         showSelectedProductStat = true
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 8) {
+                            HStack(alignment: .top, spacing: 8) {
                                 Text("\(rank)")
                                     .font(.system(.caption2, design: .rounded).bold())
                                     .foregroundColor(rank <= 3 ? .white : .secondary)
@@ -862,10 +862,20 @@ struct HomeView: View {
                                     .background(rank <= 3 ? barColor : Theme.subtleFill)
                                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                                Text(item.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundColor(.primary)
-                                    .lineLimit(1)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+
+                                    if item.premiumUnits > 0 {
+                                        Text("Premium \(item.premiumUnits) • Thường \(item.standardUnits)")
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundColor(Theme.warning)
+                                            .monospacedDigit()
+                                            .lineLimit(1)
+                                    }
+                                }
 
                                 Spacer(minLength: 4)
 

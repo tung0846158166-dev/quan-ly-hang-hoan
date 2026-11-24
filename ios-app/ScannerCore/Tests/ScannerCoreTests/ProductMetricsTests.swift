@@ -194,6 +194,64 @@ final class ProductMetricsTests: XCTestCase {
         XCTAssertEqual(matchingOrders.map { $0.c }, ["DEMO-F1", "DEMO-F2", "DEMO-F4"])
     }
 
+    func testPremiumAndStandardVersionsMergeIntoOneRowWithSplit() throws {
+        let rows = [
+            makeRow(c: "DEMO-PR1", p: "TikTok", n: "Áo Polo Len Lavi / STRIPES Nam Nữ Unisex - Premium Cao Cấp", co: "Nâu", sz: "L", q: 2),
+            makeRow(c: "DEMO-PR2", p: "TikTok", n: "Áo Polo Len Lavi / STRIPES Nam Nữ Unisex", co: "Nâu", sz: "L", q: 3),
+            makeRow(c: "DEMO-PR3", p: "TikTok", n: "Áo Polo Len Lavi / STRIPES Nam Nữ Unisex Premium Cao Cấp", co: "Xám", sz: "M", q: 1),
+            makeRow(c: "DEMO-PR4", p: "TikTok", n: "Áo Sweater Ronan", co: "Nâu", sz: "L", q: 1)
+        ]
+
+        let result = ProductMetrics.compute(rows: rows)
+
+        XCTAssertEqual(result.products.count, 2)
+        let polo = try XCTUnwrap(result.products.first)
+        XCTAssertEqual(polo.name, "Áo Polo Len Lavi / STRIPES Nam Nữ Unisex")
+        XCTAssertEqual(polo.units, 6)
+        XCTAssertEqual(polo.premiumUnits, 3)
+        XCTAssertEqual(polo.standardUnits, 3)
+        XCTAssertEqual(polo.variants.first, ProductVariantStat(color: "Nâu", size: "L", units: 5))
+
+        let sweater = result.products[1]
+        XCTAssertEqual(sweater.premiumUnits, 0)
+        XCTAssertEqual(sweater.standardUnits, 1)
+
+        // Tra danh sách đơn theo sản phẩm gộp phải trả đủ cả đơn Premium lẫn đơn thường
+        let matching = ProductMetrics.orders(forProductKey: polo.key, in: rows)
+        XCTAssertEqual(matching.map { $0.c }, ["DEMO-PR1", "DEMO-PR2", "DEMO-PR3"])
+    }
+
+    func testPremiumMarkedInSizeOrColorCountsAsPremiumWithoutChangingName() throws {
+        let rows = [
+            makeRow(c: "DEMO-SZ1", p: "TikTok", n: "Áo Len", co: "Nâu", sz: "L - Premium", q: 2),
+            makeRow(c: "DEMO-SZ2", p: "TikTok", n: "Áo Len", co: "Nâu", sz: "L", q: 1),
+            makeRow(c: "DEMO-CO1", p: "Shopee", n: "Áo Len", co: "Đen Premium", sz: "M", q: 1)
+        ]
+
+        let result = ProductMetrics.compute(rows: rows)
+        let only = try XCTUnwrap(result.products.first)
+        XCTAssertEqual(result.products.count, 1)
+        XCTAssertEqual(only.name, "Áo Len")
+        XCTAssertEqual(only.units, 4)
+        XCTAssertEqual(only.premiumUnits, 3)
+        XCTAssertEqual(only.standardUnits, 1)
+    }
+
+    func testNameThatIsOnlyWordPremiumIsKeptAndNeverBecomesEmpty() throws {
+        let rows = [
+            makeRow(c: "DEMO-ONLYP", p: "Shopee", n: "Premium", co: "", sz: "", q: 1)
+        ]
+
+        let result = ProductMetrics.compute(rows: rows)
+        let only = try XCTUnwrap(result.products.first)
+        XCTAssertEqual(result.products.count, 1)
+        XCTAssertEqual(only.name, "Premium")
+        XCTAssertEqual(only.units, 1)
+        XCTAssertEqual(only.premiumUnits, 1)
+        XCTAssertEqual(only.standardUnits, 0)
+        XCTAssertEqual(result.unknownUnits, 0)
+    }
+
     func testDemoDataProducesValidProductStats() {
         let now = fixedNow()
         let snap = DemoData.snapshot(now: now, calendar: cal)
@@ -202,9 +260,11 @@ final class ProductMetricsTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(summary.products.count, 5)
         XCTAssertGreaterThan(summary.totalUnits, 0)
         XCTAssertEqual(summary.unknownUnits, 0)
+        XCTAssertTrue(summary.products.contains { $0.premiumUnits > 0 && $0.standardUnits > 0 })
         for p in summary.products {
             XCTAssertGreaterThan(p.units, 0)
             XCTAssertGreaterThan(p.orders, 0)
+            XCTAssertEqual(p.premiumUnits + p.standardUnits, p.units)
             XCTAssertFalse(p.share.isNaN)
         }
     }

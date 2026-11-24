@@ -35,6 +35,8 @@ public struct ProductStatItem: Identifiable, Equatable, Hashable {
     public var otherUnits: Int
     public var variants: [ProductVariantStat]
     public var orderIds: [String]
+    public var premiumUnits: Int
+    public var standardUnits: Int
 
     public var id: String { key }
 
@@ -50,7 +52,9 @@ public struct ProductStatItem: Identifiable, Equatable, Hashable {
         lazadaUnits: Int = 0,
         otherUnits: Int = 0,
         variants: [ProductVariantStat] = [],
-        orderIds: [String] = []
+        orderIds: [String] = [],
+        premiumUnits: Int = 0,
+        standardUnits: Int = 0
     ) {
         self.key = key
         self.name = name
@@ -64,6 +68,8 @@ public struct ProductStatItem: Identifiable, Equatable, Hashable {
         self.otherUnits = otherUnits
         self.variants = variants
         self.orderIds = orderIds
+        self.premiumUnits = premiumUnits
+        self.standardUnits = standardUnits
     }
 }
 
@@ -161,6 +167,32 @@ public enum ProductMetrics {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return [] }
         return trimmed.components(separatedBy: " | ").map { clean($0) }
+    }
+
+    /// Regex khớp đuôi "- Premium Cao Cấp" / "Premium" ở cuối tên sản phẩm (tương đương PC `ProductStatistics.PremiumTail`).
+    private static let premiumTailRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: #"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*$"#,
+        options: [.caseInsensitive]
+    )
+
+    /// Premium = tên (đã làm sạch), size hoặc màu chứa "premium" không phân biệt hoa/thường.
+    public static func isPremium(name: String, color: String = "", size: String = "") -> Bool {
+        let cleanedName = clean(name)
+        return cleanedName.range(of: "premium", options: .caseInsensitive) != nil
+            || size.range(of: "premium", options: .caseInsensitive) != nil
+            || color.range(of: "premium", options: .caseInsensitive) != nil
+    }
+
+    /// Bỏ đuôi "- Premium Cao Cấp" để hai bản của cùng một mẫu gộp thành một dòng; nếu bỏ xong rỗng thì giữ nguyên tên gốc.
+    public static func stripPremium(_ name: String) -> String {
+        let cleaned = clean(name)
+        guard !cleaned.isEmpty, let regex = premiumTailRegex else { return cleaned }
+        let nfc = cleaned.precomposedStringWithCanonicalMapping
+        let range = NSRange(nfc.startIndex..., in: nfc)
+        let stripped = regex
+            .stringByReplacingMatches(in: nfc, options: [], range: range, withTemplate: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return stripped.isEmpty ? cleaned : stripped
     }
 
     /// Sản phẩm rỗng hoặc giữ chỗ "Chưa rõ sản phẩm..." không tính vào danh sách xếp hạng.
@@ -291,35 +323,38 @@ public enum ProductMetrics {
             let unitsPerItem = names.count == 1 ? rowQty : 1
             var countedOrder = false
 
-            for (idx, name) in names.enumerated() {
+            for (idx, rawName) in names.enumerated() {
                 if isPartial {
-                    let key = groupKey(name)
-                    if !returnedKeys.contains(key) { continue }
+                    let rawKey = groupKey(rawName)
+                    if !returnedKeys.contains(rawKey) { continue }
                 }
 
-                if isUnknownProduct(name) {
+                let color = colorsAligned ? colors[idx] : ""
+                let size = sizesAligned ? sizes[idx] : ""
+                let premium = isPremium(name: rawName, color: color, size: size)
+                let mergedName = stripPremium(rawName)
+
+                if isUnknownProduct(mergedName) {
                     unknownUnits += unitsPerItem
                     continue
                 }
 
-                let key = groupKey(name)
+                let key = groupKey(mergedName)
                 if key.isEmpty {
                     unknownUnits += unitsPerItem
                     continue
                 }
 
-                let color = colorsAligned ? colors[idx] : ""
-                let size = sizesAligned ? sizes[idx] : ""
-
                 var acc = groups[key] ?? Accumulator(key: key)
                 acc.add(
-                    spelling: name,
+                    spelling: mergedName,
                     units: unitsPerItem,
                     orderId: row.id,
                     platform: plat,
                     reason: validReason,
                     color: color,
-                    size: size
+                    size: size,
+                    isPremium: premium
                 )
                 groups[key] = acc
                 totalUnits += unitsPerItem
@@ -356,11 +391,12 @@ public enum ProductMetrics {
             let isPartial = !returnedRaw.isEmpty
             let returnedKeys = Set(returnedRaw.map { groupKey($0) }.filter { !$0.isEmpty })
 
-            for name in names {
-                let k = groupKey(name)
-                if k != key { continue }
-                if isPartial && !returnedKeys.contains(k) { continue }
-                return true
+            for rawName in names {
+                if isPartial && !returnedKeys.contains(groupKey(rawName)) { continue }
+                let mergedName = stripPremium(rawName)
+                if isUnknownProduct(mergedName) { continue }
+                let k = groupKey(mergedName)
+                if k == key { return true }
             }
             return false
         }
@@ -381,6 +417,7 @@ public enum ProductMetrics {
         var reasonDisplay: [String: String] = [:]
         var variants: [VariantKey: Int] = [:]
         var units = 0
+        var premiumUnits = 0
         var shopeeUnits = 0
         var tiktokUnits = 0
         var lazadaUnits = 0
@@ -393,10 +430,12 @@ public enum ProductMetrics {
             platform: String,
             reason: String,
             color: String,
-            size: String
+            size: String,
+            isPremium: Bool
         ) {
             spellings[spelling, default: 0] += 1
             units += u
+            if isPremium { premiumUnits += u }
 
             if orderIdSet.insert(orderId).inserted {
                 orderIds.append(orderId)
@@ -459,7 +498,9 @@ public enum ProductMetrics {
                 lazadaUnits: lazadaUnits,
                 otherUnits: otherUnits,
                 variants: variantList,
-                orderIds: orderIds
+                orderIds: orderIds,
+                premiumUnits: premiumUnits,
+                standardUnits: units - premiumUnits
             )
         }
     }

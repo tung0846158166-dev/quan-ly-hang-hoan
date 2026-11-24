@@ -136,7 +136,8 @@ final class AIToolsExtendedTests: XCTestCase {
             return XCTFail("định nghĩa phải là mảng JSON")
         }
         let names = arr.compactMap { ($0["function"] as? [String: Any])?["name"] as? String }
-        XCTAssertEqual(Set(names), ["overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats"])
+        XCTAssertEqual(Set(names), ["overview", "count_orders", "aggregate", "list_orders", "find_order", "order_detail", "product_stats",
+                                   "compare_periods", "order_groups", "return_watch", "scan_history", "system_status", "app_guide"])
         XCTAssertTrue(AIOrderTools.definitionsJSON.contains("Đang chờ"))
     }
 
@@ -149,5 +150,115 @@ final class AIToolsExtendedTests: XCTestCase {
         let r2 = try JSONDecoder().decode(OrderRow.self, from: Data(old.utf8))
         XCTAssertEqual(r2.pr, 0)
         XCTAssertEqual(r2.cr, "")
+    }
+
+    // MARK: công cụ chạy ngầm bổ sung
+
+    func testCompareTodayVsYesterdayGivesCountsValueAndPercent() {
+        let j = obj(tools().execute(name: "compare_periods", argsJSON: #"{"preset":"today_vs_yesterday","status":"Đã nhận"}"#).json)
+        let a = j["periodA"] as? [String: Any]
+        let b = j["periodB"] as? [String: Any]
+        XCTAssertEqual(a?["count"] as? Int, 1)
+        XCTAssertEqual(a?["value"] as? Int, 70_000)
+        XCTAssertEqual(b?["count"] as? Int, 1)
+        XCTAssertEqual(b?["value"] as? Int, 30_000)
+        let v = (j["change"] as? [String: Any])?["value"] as? [String: Any]
+        XCTAssertEqual(v?["diff"] as? Int, 40_000)
+        XCTAssertEqual(v?["percent"] as? Double, 133.3)
+    }
+
+    func testCompareCustomRangesDefaultPreviousPeriodIsEqualLengthBefore() {
+        let j = obj(tools().execute(name: "compare_periods", argsJSON: #"{"a_from":"2026-11-24","a_to":"2026-11-25","status":"Đã nhận"}"#).json)
+        XCTAssertEqual((j["periodA"] as? [String: Any])?["count"] as? Int, 2)
+        XCTAssertEqual((j["periodB"] as? [String: Any])?["from"] as? String, "2026-11-22")
+        XCTAssertEqual((j["periodB"] as? [String: Any])?["to"] as? String, "2026-11-23")
+        XCTAssertEqual((j["periodB"] as? [String: Any])?["count"] as? Int, 0)
+        XCTAssertTrue(tools().execute(name: "compare_periods", argsJSON: "{}").json.contains("error"))
+    }
+
+    func testOrderGroupsListsMultiParcelOrders() {
+        var a = row("A1", st: "Hàng đã trả", rv: true, pr: 10_000, rcd: "25/11/2026 09:00:00")
+        var b = row("A2", st: "Chưa trả", rv: false, pr: 20_000)
+        let c = row("B1", st: "Chưa trả", rv: false, pr: 5_000)
+        a.o = "SAME"
+        b.o = "SAME"
+        let rows = [a, b, c]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let r = t.execute(name: "order_groups", argsJSON: "{}")
+        let g = (obj(r.json)["groups"] as? [[String: Any]])?.first
+        XCTAssertEqual(g?["orderId"] as? String, "SAME")
+        XCTAssertEqual(g?["parcels"] as? Int, 2)
+        XCTAssertEqual(g?["received"] as? Int, 1)
+        XCTAssertEqual(g?["waiting"] as? Int, 1)
+        XCTAssertEqual(g?["value"] as? Int, 30_000)
+        XCTAssertEqual(r.refs.count, 2)
+        XCTAssertEqual(obj(r.json)["groupsTotal"] as? Int, 1)
+    }
+
+    func testReturnWatchCountsByStage() {
+        var a = row("W1", st: "Chưa trả", rv: false, pr: 10_000)
+        a.rw = ms(24, 8)
+        a.rws = 2
+        var b = row("W2", st: "Chưa trả", rv: false, pr: 20_000)
+        b.rw = ms(25, 8)
+        b.rws = 3
+        var c = row("W3", st: "Chưa trả", rv: false, pr: 30_000)
+        c.rw = ms(25, 9)
+        c.rws = 3
+        let outside = row("W4", st: "Chưa trả", rv: false, pr: 99_000)
+        let rows = [a, b, c, outside]
+        let t = AIOrderTools(rows: { rows }, now: { self.now }, calendar: cal)
+        let j = obj(t.execute(name: "return_watch", argsJSON: "{}").json)
+        XCTAssertEqual(j["total"] as? Int, 3)
+        XCTAssertEqual(((j["byStage"] as? [String: Any])?["Đang về"] as? [String: Any])?["count"] as? Int, 1)
+        XCTAssertEqual(((j["byStage"] as? [String: Any])?["Đã về shop"] as? [String: Any])?["count"] as? Int, 2)
+        XCTAssertEqual((obj(t.execute(name: "return_watch", argsJSON: #"{"stage":"3"}"#).json)["orders"] as? [[String: Any]])?.count, 2)
+    }
+
+    func testScanHistoryAndSystemStatusUseProvidersAndReportWhenMissing() {
+        let d = data
+        let scans: [[String: Any]] = [
+            ["time": ms(25, 13), "code": "VN001", "kind": "returnScan", "status": "success", "detail": "Nhận VN001, gọi 0987654321", "confirmed": true],
+            ["time": ms(25, 12), "code": "VN999", "kind": "returnScan", "status": "pending", "detail": "Đang chờ", "confirmed": false],
+        ]
+        let t = AIOrderTools(rows: { d }, now: { self.now }, calendar: cal,
+                             statusProvider: { ["pcConnection": "đang kết nối", "pendingScans": 1] }, scanHistory: { scans })
+        let h = t.execute(name: "scan_history", argsJSON: #"{"limit":5}"#).json
+        XCTAssertFalse(h.contains("0987654321"))
+        XCTAssertTrue(h.contains("ẩn SĐT"))
+        XCTAssertEqual(obj(h)["total"] as? Int, 2)
+        XCTAssertEqual((obj(t.execute(name: "scan_history", argsJSON: #"{"text":"pending"}"#).json)["total"] as? Int), 1)
+        let s = obj(t.execute(name: "system_status", argsJSON: "{}").json)
+        XCTAssertEqual(s["pcConnection"] as? String, "đang kết nối")
+        XCTAssertEqual(s["pendingScans"] as? Int, 1)
+        XCTAssertEqual((s["orders"] as? [String: Any])?["active"] as? Int, 6)
+        XCTAssertEqual((s["orders"] as? [String: Any])?["archived"] as? Int, 1)
+        XCTAssertTrue(tools().execute(name: "scan_history", argsJSON: "{}").json.contains("error"))
+        XCTAssertNotNil(obj(tools().execute(name: "system_status", argsJSON: "{}").json)["orders"])
+    }
+
+    func testAppGuideListsTopicsFindsByKeywordAndNeverInvents() {
+        let t = tools()
+        let idx = obj(t.execute(name: "app_guide", argsJSON: "{}").json)["topics"] as? [[String: Any]]
+        XCTAssertGreaterThanOrEqual(idx?.count ?? 0, 7)
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"ảnh"}"#).json.contains("điện thoại"))
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"quet"}"#).json.contains("camera"))
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"zzzzqqqq"}"#).json.contains("error"))
+    }
+
+    func testExtraGroupByOptionsWork() {
+        func first(_ g: String) -> String? {
+            let j = obj(tools().execute(name: "aggregate", argsJSON: "{\"status\":\"Đang chờ\",\"group_by\":\"" + g + "\"}").json)
+            return (j["groups"] as? [[String: Any]])?.first?["group"] as? String
+        }
+        XCTAssertEqual(first("waiting_age"), "12-24h")          // 4 nhóm cùng 1 đơn: hòa điểm thì xếp theo tên
+        XCTAssertEqual(first("price_range"), "100k-300k")       // 100k và 250k cùng khoảng
+        XCTAssertEqual(first("watching"), "không theo dõi")      // 3 đơn không theo dõi, 1 đang theo dõi
+        let ages = (obj(tools().execute(name: "aggregate", argsJSON: #"{"status":"Đang chờ","group_by":"waiting_age"}"#).json)["groups"] as? [[String: Any]])?
+            .compactMap { $0["group"] as? String } ?? []
+        XCTAssertTrue(ages.contains("24-48h"))
+        XCTAssertTrue(ages.contains("<12h"))
+        XCTAssertNotNil(first("weekday"))
+        XCTAssertNotNil(first("arrival_hour"))
     }
 }

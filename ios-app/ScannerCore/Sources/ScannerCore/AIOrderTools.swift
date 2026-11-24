@@ -26,9 +26,14 @@ public final class AIOrderTools {
     private let calendar: Calendar
     private var seen: [String: OrderRow] = [:]
     private var cache: [OrderRow]?
+    private let statusProvider: (() -> [String: Any])?
+    private let scanHistory: (() -> [[String: Any]])?
 
-    public init(rows: @escaping () -> [OrderRow], now: @escaping () -> Date = { Date() }, calendar: Calendar = .current) {
+    public init(rows: @escaping () -> [OrderRow], now: @escaping () -> Date = { Date() }, calendar: Calendar = .current,
+                statusProvider: (() -> [String: Any])? = nil, scanHistory: (() -> [[String: Any]])? = nil) {
         self.rows = rows
+        self.statusProvider = statusProvider
+        self.scanHistory = scanHistory
         self.now = now
         self.calendar = calendar
     }
@@ -107,13 +112,12 @@ public final class AIOrderTools {
         listProps["limit"] = prop("integer", "Số dòng tối đa, mặc định 20, tối đa 50.")
 
         var aggProps = filterProps()
-        aggProps["group_by"] = prop("string", "Gom nhóm theo: status, platform, carrier, order_type, platform_status, product, day, week, month (theo date_field), alert (mức cảnh báo), none (chỉ tổng).",
-                                    ["none", "status", "platform", "carrier", "order_type", "platform_status", "product", "day", "week", "month", "alert"])
+        aggProps["group_by"] = prop("string", groupByHelp, aggregateGroups)
         aggProps["metric"] = prop("string", "Sắp xếp nhóm theo: count (số kiện), value (tổng giá trị), quantity (tổng số lượng). Mặc định count. Gom theo ngày/tuần/tháng luôn xếp theo thời gian.",
                                   ["count", "value", "quantity"])
         aggProps["top"] = prop("integer", "Số nhóm tối đa, mặc định 20, tối đa 60.")
 
-        let tools: [[String: Any]] = [
+        let baseTools: [[String: Any]] = [
             tool("overview", "Tổng quan nhanh: hôm nay nhận bao nhiêu, đang chờ bao nhiêu và tổng giá trị, số đơn cảnh báo vàng/đỏ, đơn đang theo dõi. Dùng khi hỏi chung 'tình hình hôm nay', 'có gì cần xử lý'.", [:]),
             tool("count_orders", "Đếm kiện hoàn theo bộ lọc. Trả về tổng số kiện, tổng giá trị (đồng), tổng số lượng và phân loại theo trạng thái, sàn. 'Đơn về hôm nay' = status 'Đã nhận', date_field 'recv', from=to=today.", filterProps()),
             tool("aggregate", "Thống kê gom nhóm: đếm kiện / tổng giá trị / tổng số lượng theo trạng thái, sàn, đơn vị vận chuyển, loại đơn, sản phẩm, ngày, tuần, tháng hoặc mức cảnh báo. Dùng cho 'bao nhiêu ... theo ...', 'tổng tiền ...', 'nhiều nhất', 'xu hướng'.", aggProps),
@@ -123,6 +127,7 @@ public final class AIOrderTools {
                  ["code": prop("string", "Mã đơn hoặc mã vận đơn (khớp một phần)."), "id": prop("string", "Mã nội bộ của đơn (từ list_orders/find_order).")]),
             tool("product_stats", "Thống kê sản phẩm: số lượng và số đơn theo từng sản phẩm, giảm dần (tối đa 20). Dùng cho 'sản phẩm nào ... nhiều nhất'.", filterProps(withProduct: false)),
         ]
+        let tools: [[String: Any]] = baseTools + extraTools()
         guard JSONSerialization.isValidJSONObject(tools),
               let data = try? JSONSerialization.data(withJSONObject: tools, options: [.withoutEscapingSlashes]),
               let s = String(data: data, encoding: .utf8) else { return "[]" }
@@ -144,6 +149,12 @@ public final class AIOrderTools {
         }
         switch name {
         case "overview": return overview()
+        case "compare_periods": return comparePeriods(args)
+        case "order_groups": return orderGroups(args)
+        case "return_watch": return returnWatch(args)
+        case "scan_history": return scanHistoryTool(args)
+        case "system_status": return systemStatus()
+        case "app_guide": return appGuide(args)
         case "count_orders": return count(args)
         case "aggregate": return aggregate(args)
         case "list_orders": return list(args)
@@ -447,6 +458,7 @@ public final class AIOrderTools {
             case "day": key = dayKey(r, f.dateField, "yyyy-MM-dd")
             case "week": key = weekKey(r, f.dateField)
             case "month": key = dayKey(r, f.dateField, "yyyy-MM")
+            case "weekday", "arrival_hour", "waiting_age", "watching", "price_range", "return_stage": key = extraGroupKey(groupBy, r)
             default: key = "tất cả"
             }
             buckets[key, default: []].append(r)
@@ -602,5 +614,335 @@ public final class AIOrderTools {
         let top = qty.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(20)
         let arr: [[String: Any]] = top.map { ["product": Self.maskPhones($0.key), "qty": $0.value, "orders": orders[$0.key] ?? 0] }
         return AIToolResult(json: Self.json(["ordersCounted": rows.count, "products": arr]))
+    }
+
+    // MARK: công cụ bổ sung (chạy ngầm, người dùng không thấy)
+
+    static let aggregateGroups: [String] = [
+        "none", "status", "platform", "carrier", "order_type", "platform_status", "product", "day", "week", "month", "alert",
+        "weekday", "arrival_hour", "waiting_age", "watching", "price_range", "return_stage",
+    ]
+
+    static let groupByHelp = "Gom nhóm theo: status, platform (sàn), carrier (đơn vị vận chuyển), order_type, platform_status, product, day/week/month (theo date_field), alert (mức cảnh báo), weekday (thứ trong tuần), arrival_hour (giờ hàng về trong ngày), waiting_age (đã chờ bao lâu: <12h, 12-24h, 24-48h, 48-72h, >72h), watching (có/không theo dõi), price_range (khoảng giá trị), return_stage (chặng trong bảng Hàng hoàn về), none (chỉ tổng)."
+
+    private static let weekdayNames = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"]
+
+    private static func extraTools() -> [[String: Any]] {
+        var compare = filterProps()
+        compare["preset"] = prop("string",
+            "Kỳ so sánh có sẵn: today_vs_yesterday, this_week_vs_last_week (tuần này tới hôm nay so với cùng số ngày tuần trước), this_month_vs_last_month, last_7_days_vs_previous_7_days.",
+            ["today_vs_yesterday", "this_week_vs_last_week", "this_month_vs_last_month", "last_7_days_vs_previous_7_days"])
+        compare["a_from"] = prop("string", "Kỳ A (kỳ hiện tại) từ ngày yyyy-MM-dd/today/yesterday. Dùng thay cho preset khi so sánh khoảng tùy ý.")
+        compare["a_to"] = prop("string", "Kỳ A đến ngày.")
+        compare["b_from"] = prop("string", "Kỳ B (kỳ để so) từ ngày. Bỏ trống = khoảng cùng độ dài ngay trước kỳ A.")
+        compare["b_to"] = prop("string", "Kỳ B đến ngày.")
+        compare.removeValue(forKey: "from")
+        compare.removeValue(forKey: "to")
+
+        var groups = filterProps()
+        groups["min_parcels"] = prop("integer", "Số kiện tối thiểu của một mã đơn, mặc định 2.")
+        groups["limit"] = prop("integer", "Số mã đơn tối đa, mặc định 15, tối đa 30.")
+
+        let watchProps: [String: Any] = [
+            "stage": prop("string", "Chỉ một chặng: 1/2/3/4 (để trống = tất cả).", ["1", "2", "3", "4"]),
+            "limit": prop("integer", "Số dòng tối đa, mặc định 15, tối đa 50."),
+        ]
+        let scanProps: [String: Any] = [
+            "limit": prop("integer", "Số lượt quét gần đây, mặc định 15, tối đa 50."),
+            "text": prop("string", "Lọc theo chữ trong mã, trạng thái hoặc chi tiết."),
+        ]
+        let guideProps: [String: Any] = [
+            "topic": prop("string", "Chủ đề hoặc từ khóa, ví dụ 'quét', 'ảnh', 'đồng bộ'. Để trống để xem danh sách."),
+        ]
+
+        return [
+            tool("compare_periods", "So sánh hai kỳ (hôm nay với hôm qua, tuần này với tuần trước, tháng này với tháng trước, hoặc hai khoảng tùy ý) theo số kiện, tổng giá trị, số lượng và phần trăm thay đổi. Dùng cho 'so với', 'tăng hay giảm'.", compare),
+            tool("order_groups", "Các mã đơn có NHIỀU KIỆN hoàn (kiện A/B/C): mỗi mã đơn liệt kê từng kiện với mã vận đơn, trạng thái, giá trị riêng.", groups),
+            tool("return_watch", "Bảng 'Hàng hoàn về' theo 4 chặng (1 Đã đồng ý, 2 Đang về, 3 Đã về shop, 4 Đã nhận kho): số đơn theo chặng và danh sách.", watchProps),
+            tool("scan_history", "Lịch sử các lượt quét gần đây trên chính điện thoại này: mã, giờ quét, kết quả, đã được máy tính xác nhận chưa.", scanProps),
+            tool("system_status", "Tình trạng hệ thống: kết nối máy tính, số lượt quét đang chờ gửi, lần cập nhật danh sách gần nhất, thông báo, số đơn theo từng nơi.", [:]),
+            tool("app_guide", "Hướng dẫn sử dụng app (quét, ảnh, đồng bộ, thông báo, lịch sử, trợ lý AI...). Dùng khi hỏi 'làm sao', 'ở đâu', 'app có tính năng gì'. Chỉ nói những gì có trong hướng dẫn, không bịa.", guideProps),
+        ]
+    }
+
+    private func extraGroupKey(_ g: String, _ r: OrderRow) -> String {
+        switch g {
+        case "weekday":
+            let d = dateOf(r, "recv") ?? dateOf(r, "arrived")
+            guard let day = d else { return "(không có ngày)" }
+            let idx = max(1, min(7, calendar.component(.weekday, from: day))) - 1
+            return Self.weekdayNames[idx]
+        case "arrival_hour":
+            guard let ms = arrivedMs(r) else { return "(chưa có giờ hàng về)" }
+            let h = calendar.component(.hour, from: Date(timeIntervalSince1970: Double(ms) / 1000))
+            return String(format: "%02dh", h)
+        case "waiting_age":
+            if !Self.isWaiting(r) { return "đã xử lý" }
+            guard let ms = arrivedMs(r) else { return "chưa có giờ hàng về" }
+            let nowMs = Int(now().timeIntervalSince1970 * 1000)
+            let h = Double(nowMs - ms) / 3_600_000
+            if h < 12 { return "<12h" }
+            if h < 24 { return "12-24h" }
+            if h < 48 { return "24-48h" }
+            return h < 72 ? "48-72h" : ">72h"
+        case "watching":
+            return r.wl ? "đang theo dõi" : "không theo dõi"
+        case "price_range":
+            if r.pr <= 0 { return "(chưa có giá)" }
+            if r.pr < 100_000 { return "dưới 100k" }
+            if r.pr < 300_000 { return "100k-300k" }
+            return r.pr < 500_000 ? "300k-500k" : "từ 500k"
+        case "return_stage":
+            return r.inReturnWatch ? r.returnWatchStageName : "không nằm trong bảng"
+        default:
+            return "tất cả"
+        }
+    }
+
+    private func dayText(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = calendar
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: d)
+    }
+
+    private func periodsFor(_ a: [String: Any]) -> (Date, Date, Date, Date)? {
+        let today = calendar.startOfDay(for: now())
+        func add(_ d: Date, _ n: Int) -> Date { calendar.date(byAdding: .day, value: n, to: d) ?? d }
+        let preset: String = str(a, "preset")?.lowercased() ?? ""
+        switch preset {
+        case "today_vs_yesterday":
+            return (today, today, add(today, -1), add(today, -1))
+        case "this_week_vs_last_week":
+            let wd = calendar.component(.weekday, from: today)
+            let sinceMonday = (wd + 5) % 7
+            let mon = add(today, -sinceMonday)
+            let bFrom = add(mon, -7)
+            return (mon, today, bFrom, add(bFrom, sinceMonday))
+        case "this_month_vs_last_month":
+            let comps = calendar.dateComponents([.year, .month], from: today)
+            guard let first = calendar.date(from: comps), let prevFirst = calendar.date(byAdding: .month, value: -1, to: first) else { return nil }
+            let span = calendar.dateComponents([.day], from: first, to: today).day ?? 0
+            let prevLast = add(first, -1)
+            let candidate = add(prevFirst, span)
+            return (first, today, prevFirst, candidate > prevLast ? prevLast : candidate)
+        case "last_7_days_vs_previous_7_days":
+            return (add(today, -6), today, add(today, -13), add(today, -7))
+        default:
+            break
+        }
+        guard let af = parseDay(str(a, "a_from")) else { return nil }
+        let at: Date = parseDay(str(a, "a_to")) ?? af
+        if at < af { return nil }
+        if let bf = parseDay(str(a, "b_from")) {
+            let bt: Date = parseDay(str(a, "b_to")) ?? bf
+            return (af, at, bf, bt)
+        }
+        let len = (calendar.dateComponents([.day], from: af, to: at).day ?? 0) + 1
+        let bt = add(af, -1)
+        return (af, at, add(bt, -(len - 1)), bt)
+    }
+
+    private func comparePeriods(_ a: [String: Any]) -> AIToolResult {
+        guard let p = periodsFor(a) else { return Self.error("Cần chọn preset hoặc a_from/a_to hợp lệ.") }
+        let f = readFilter(a)
+        func period(_ from: Date, _ to: Date) -> [String: Any] {
+            var g = f
+            g.from = from
+            g.to = to
+            let rows = select(g)
+            var o: [String: Any] = [:]
+            o["from"] = dayText(from)
+            o["to"] = dayText(to)
+            o["count"] = rows.count
+            o["value"] = Self.totalValue(rows)
+            o["quantity"] = Self.totalQty(rows)
+            return o
+        }
+        let cur = period(p.0, p.1)
+        let prev = period(p.2, p.3)
+        func delta(_ k: String) -> [String: Any] {
+            let c = cur[k] as? Int ?? 0
+            let b = prev[k] as? Int ?? 0
+            var d: [String: Any] = ["diff": c - b]
+            if b != 0 { d["percent"] = (Double(c - b) * 100 / Double(b) * 10).rounded() / 10 }
+            return d
+        }
+        var change: [String: Any] = [:]
+        change["count"] = delta("count")
+        change["value"] = delta("value")
+        change["quantity"] = delta("quantity")
+        var res: [String: Any] = [:]
+        res["dateField"] = f.dateField
+        res["periodA"] = cur
+        res["periodB"] = prev
+        res["change"] = change
+        return AIToolResult(json: Self.json(res))
+    }
+
+    private func orderGroups(_ a: [String: Any]) -> AIToolResult {
+        let rows = select(readFilter(a))
+        let minParcels = max(2, min(20, int(a, "min_parcels") ?? 2))
+        let limit = max(1, min(30, int(a, "limit") ?? 15))
+        var buckets: [String: [OrderRow]] = [:]
+        for r in rows where !r.o.isEmpty { buckets[r.o, default: []].append(r) }
+        let groups = buckets.filter { $0.value.count >= minParcels }
+            .sorted { $0.value.count != $1.value.count ? $0.value.count > $1.value.count : $0.key < $1.key }
+        var arr: [[String: Any]] = []
+        var refs: [AIOrderRef] = []
+        for (orderCode, parcels) in groups.prefix(limit) {
+            var items: [[String: Any]] = []
+            for r in parcels {
+                seen[r.id] = r
+                if refs.count < 50 { refs.append(AIOrderRef(id: r.id, orderCode: r.o, track: r.c, status: Self.statusText(r))) }
+                var it: [String: Any] = [:]
+                it["id"] = r.id
+                it["track"] = r.c
+                it["status"] = Self.statusText(r)
+                it["value"] = r.pr
+                it["product"] = Self.maskPhones(r.n)
+                items.append(it)
+            }
+            var g: [String: Any] = [:]
+            g["orderId"] = orderCode
+            g["parcels"] = parcels.count
+            g["received"] = parcels.filter { $0.rv }.count
+            g["waiting"] = parcels.filter { Self.isWaiting($0) }.count
+            g["value"] = Self.totalValue(parcels)
+            g["items"] = items
+            arr.append(g)
+        }
+        var res: [String: Any] = [:]
+        res["groupsTotal"] = groups.count
+        res["shown"] = arr.count
+        res["truncated"] = groups.count > arr.count
+        res["groups"] = arr
+        return AIToolResult(json: Self.json(res), refs: refs)
+    }
+
+    private func returnWatch(_ a: [String: Any]) -> AIToolResult {
+        let all = load().filter { $0.inReturnWatch && !$0.isArchived }
+        var stageFilter: Int?
+        if let s = str(a, "stage"), let n = Int(s), (1...4).contains(n) { stageFilter = n }
+        var byStage: [String: Any] = [:]
+        for st in 1...4 {
+            let inStage = all.filter { $0.returnWatchStage == st }
+            var b: [String: Any] = [:]
+            b["count"] = inStage.count
+            b["value"] = Self.totalValue(inStage)
+            byStage[OrderRow.returnWatchStageNames[st]] = b
+        }
+        let shown = all.filter { stageFilter == nil || $0.returnWatchStage == stageFilter }
+            .sorted { $0.returnWatchStage != $1.returnWatchStage ? $0.returnWatchStage < $1.returnWatchStage : $0.rw < $1.rw }
+        let limit = max(1, min(50, int(a, "limit") ?? 15))
+        let f = DateFormatter()
+        f.calendar = calendar
+        f.locale = Locale(identifier: "vi_VN")
+        f.dateFormat = "dd/MM/yyyy HH:mm"
+        var arr: [[String: Any]] = []
+        var refs: [AIOrderRef] = []
+        for r in shown.prefix(limit) {
+            seen[r.id] = r
+            refs.append(AIOrderRef(id: r.id, orderCode: r.o, track: r.c, status: Self.statusText(r)))
+            var o: [String: Any] = [:]
+            o["id"] = r.id
+            o["orderCode"] = r.o
+            o["track"] = r.c
+            o["platform"] = r.p
+            o["stage"] = r.returnWatchStageName
+            o["enteredTable"] = f.string(from: Date(timeIntervalSince1970: Double(r.rw) / 1000))
+            o["value"] = r.pr
+            o["platformStatus"] = r.ps
+            arr.append(o)
+        }
+        var res: [String: Any] = [:]
+        res["total"] = all.count
+        res["byStage"] = byStage
+        res["shown"] = arr.count
+        res["truncated"] = shown.count > arr.count
+        res["orders"] = arr
+        return AIToolResult(json: Self.json(res), refs: refs)
+    }
+
+    private func scanHistoryTool(_ a: [String: Any]) -> AIToolResult {
+        guard let provider = scanHistory else { return Self.error("Chưa đọc được lịch sử quét.") }
+        let limit = max(1, min(50, int(a, "limit") ?? 15))
+        let text = (str(a, "text") ?? "").lowercased()
+        var items = provider()
+        if !text.isEmpty {
+            items = items.filter { it in
+                let blob = "\(it["code"] ?? "") \(it["status"] ?? "") \(it["detail"] ?? "")".lowercased()
+                return blob.contains(text)
+            }
+        }
+        var byStatus: [String: Int] = [:]
+        for it in items { byStatus[(it["status"] as? String) ?? "?", default: 0] += 1 }
+        let f = DateFormatter()
+        f.calendar = calendar
+        f.locale = Locale(identifier: "vi_VN")
+        f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        var shown: [[String: Any]] = []
+        for it in items.prefix(limit) {
+            var o: [String: Any] = [:]
+            if let ms = it["time"] as? Int { o["time"] = f.string(from: Date(timeIntervalSince1970: Double(ms) / 1000)) }
+            o["code"] = it["code"] ?? ""
+            o["kind"] = it["kind"] ?? ""
+            o["status"] = it["status"] ?? ""
+            o["detail"] = Self.maskPhones((it["detail"] as? String) ?? "")
+            o["confirmedByPC"] = it["confirmed"] ?? false
+            shown.append(o)
+        }
+        var res: [String: Any] = [:]
+        res["total"] = items.count
+        res["byStatus"] = byStatus
+        res["recent"] = shown
+        return AIToolResult(json: Self.json(res))
+    }
+
+    private func systemStatus() -> AIToolResult {
+        let all = load()
+        var orders: [String: Any] = [:]
+        orders["active"] = all.filter { !$0.isArchived }.count
+        orders["archived"] = all.filter { $0.isArchived }.count
+        var res: [String: Any] = [:]
+        res["orders"] = orders
+        if let facts = statusProvider?() { for (k, v) in facts { res[k] = v } }
+        return AIToolResult(json: Self.json(res))
+    }
+
+    private static let guide: [(key: String, title: String, text: String)] = [
+        ("tong_quan", "App làm gì",
+         "App iPhone quét hàng hoàn, dùng cùng phần mềm trên máy tính qua mã phòng. Có 5 tab: Tổng quan, Quét, Đơn, Lịch sử, Cài đặt. Nút ✨ ở góc phải dưới mọi màn hình mở cửa sổ hỏi đáp AI. Mỗi kiện hoàn là một dòng riêng (kiện A/B/C của cùng một mã đơn không lẫn nhau)."),
+        ("quet", "Quét nhận hàng",
+         "Tab Quét dùng camera quét mã vạch hoặc QR của mã vận đơn. Quét xong app gửi cho máy tính; máy tính xác nhận sau khi đã lưu bền. Mất mạng thì lượt quét xếp hàng và tự gửi lại. Mã mơ hồ (nhiều ứng viên) báo cần kiểm tra thay vì tự đoán."),
+        ("anh", "Ảnh lúc quét",
+         "Ảnh chụp lúc quét lưu ngay trên điện thoại trong chi tiết đơn (tối đa 5 ảnh mỗi kiện), không gửi sang máy tính. Chỉ giữ ảnh khi lượt quét được xác nhận đúng một kiện; quét sai, không tìm thấy hoặc mã mơ hồ thì ảnh bị bỏ. Chạm ảnh để xem toàn màn hình, phóng to bằng hai ngón hoặc chạm đúp. Cài đặt có dung lượng ảnh đã lưu và nút dọn ảnh đơn cũ."),
+        ("dong_bo", "Đồng bộ với máy tính",
+         "Cài đặt: nhập mã phòng lấy từ phần mềm máy tính. Có ô 'Máy chủ MQTT riêng' (cùng địa chỉ với máy tính). Nút 'Cập nhật danh sách từ PC' xin máy tính gửi lại danh sách ngay; 'Đối chiếu số đơn với PC' kiểm tra số đơn hai bên có khớp không. Danh sách đơn trên điện thoại là bản nhận từ máy tính ở lần đồng bộ gần nhất."),
+        ("thong_bao", "Thông báo nhắc hạn",
+         "App tự đặt thông báo nhắc: trước hạn 12 giờ, đúng hạn xử lý, và bản tóm tắt lúc 8:30 sáng. Lịch thông báo được tính lại mỗi khi nhận danh sách mới từ máy tính nên có thể còn thông báo của đơn đã xử lý trên máy tính cho tới lần đồng bộ sau. Đơn đang chờ chuyển vàng sau 12 giờ, đỏ sau 24 giờ kể từ lúc hàng về."),
+        ("lich_su", "Lịch sử quét",
+         "Tab Lịch sử liệt kê các lượt quét, trạng thái đã được máy tính xác nhận hay còn chờ gửi. Số trên tab là số lượt đang chờ."),
+        ("don", "Danh sách đơn",
+         "Tab Đơn xem các kiện máy tính gửi sang, lọc theo trạng thái, mở chi tiết đơn (sản phẩm, mã, mốc thời gian, ghi chú, ảnh)."),
+        ("tro_ly_ai", "Trợ lý AI",
+         "Nút ✨ mở cửa sổ hỏi đáp. Khóa API (Groq, Google) và danh sách mô hình nhập ở Cài đặt > Trợ lý AI, lưu trong Keychain của điện thoại. Trợ lý chỉ đọc dữ liệu, không gửi tên, số điện thoại, địa chỉ người nhận. Hết hạn mức mô hình này thì tự chuyển mô hình khác."),
+    ]
+
+    private func appGuide(_ a: [String: Any]) -> AIToolResult {
+        guard let topic = str(a, "topic"), topic.lowercased() != "all" else {
+            let idx: [[String: Any]] = Self.guide.map { ["topic": $0.key, "title": $0.title] }
+            return AIToolResult(json: Self.json(["topics": idx, "note": "Gọi lại app_guide với topic cụ thể để xem chi tiết."]))
+        }
+        let t = topic.lowercased()
+        var hits = Self.guide.filter { $0.key == t || $0.title.lowercased().contains(t) || $0.text.lowercased().contains(t) }
+        if hits.isEmpty {
+            let words = t.split(separator: " ").map(String.init).filter { $0.count >= 3 }
+            hits = Self.guide.filter { g in words.contains { (g.title + " " + g.text).lowercased().contains($0) } }
+        }
+        if hits.isEmpty { return Self.error("Chưa có hướng dẫn cho chủ đề này. Gọi app_guide không có topic để xem danh sách.") }
+        let arr: [[String: Any]] = hits.prefix(3).map { ["topic": $0.key, "title": $0.title, "guide": $0.text] }
+        return AIToolResult(json: Self.json(["matches": arr]))
     }
 }

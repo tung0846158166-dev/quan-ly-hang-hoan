@@ -48,6 +48,16 @@ final class AIRowsBox: @unchecked Sendable {
     func get() -> [OrderRow] { lock.lock(); defer { lock.unlock() }; return rows }
 }
 
+/// Dữ kiện (tình trạng kết nối, lịch sử quét) chụp trên luồng chính cho công cụ AI chạy nền.
+final class AIFactsBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var statusFacts: [String: Any] = [:]
+    private var scanFacts: [[String: Any]] = []
+    func set(status: [String: Any], scans: [[String: Any]]) { lock.lock(); statusFacts = status; scanFacts = scans; lock.unlock() }
+    func status() -> [String: Any] { lock.lock(); defer { lock.unlock() }; return statusFacts }
+    func scans() -> [[String: Any]] { lock.lock(); defer { lock.unlock() }; return scanFacts }
+}
+
 struct AIMessage: Identifiable {
     let id = UUID()
     let isUser: Bool
@@ -91,6 +101,8 @@ final class AIChatViewModel: ObservableObject {
     private var tools: AIOrderTools?
     private weak var store: SnapshotStore?
     private let rowsBox = AIRowsBox()
+    private let factsBox = AIFactsBox()
+    private weak var engine: SyncEngine?
 
     init() {
         groqModels = UserDefaults.standard.string(forKey: "ai.models.groq") ?? AIEndpoint.defaultGroqModels
@@ -100,6 +112,7 @@ final class AIChatViewModel: ObservableObject {
     }
 
     func bind(_ store: SnapshotStore) { self.store = store }
+    func bindEngine(_ engine: SyncEngine) { self.engine = engine }
 
     private func refreshKeys() {
         hasKey = AIKeychain.load("groq") != nil || AIKeychain.load("gemini") != nil
@@ -121,7 +134,8 @@ final class AIChatViewModel: ObservableObject {
         let eps = endpoints()
         if eps.isEmpty { return nil }
         let box = rowsBox
-        let t = AIOrderTools(rows: { box.get() })
+        let fbox = factsBox
+        let t = AIOrderTools(rows: { box.get() }, statusProvider: { fbox.status() }, scanHistory: { fbox.scans() })
         tools = t
         let s = AIChatService(endpoints: eps, tools: t)
         service = s
@@ -134,6 +148,7 @@ final class AIChatViewModel: ObservableObject {
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !isBusy, let svc = ensureService() else { return }
         rowsBox.set(store?.rows ?? [])   // chụp danh sách đơn ngay trên luồng chính; công cụ chạy nền chỉ đọc bản chụp này
+        factsBox.set(status: currentStatus(), scans: currentScans())
         input = ""
         let started = Date()
         messages.append(AIMessage(isUser: true, text: q, time: started))
@@ -155,6 +170,50 @@ final class AIChatViewModel: ObservableObject {
     }
 
     func row(for ref: AIOrderRef) -> OrderRow? { tools?.row(forId: ref.id) }
+
+    /// Tình trạng kết nối và danh sách (cho công cụ system_status). Không chứa mã phòng hay khóa.
+    private func currentStatus() -> [String: Any] {
+        var d: [String: Any] = [:]
+        if let e = engine {
+            d["pcConnection"] = e.channelUp ? "đang kết nối" : "chưa kết nối"
+            d["mqttConnected"] = e.mqttConnected
+            d["ntfyConnected"] = e.sseConnected
+            d["pendingScans"] = e.pendingCount
+        }
+        if let s = store {
+            d["listRows"] = s.rows.count
+            d["notificationsAllowed"] = s.notificationsAllowed
+            d["demoMode"] = s.isDemoMode
+            if let u = s.updatedAt {
+                let f = DateFormatter()
+                f.locale = Locale(identifier: "vi_VN")
+                f.dateFormat = "dd/MM/yyyy HH:mm"
+                d["listUpdatedAt"] = f.string(from: u)
+            } else {
+                d["listUpdatedAt"] = "chưa nhận danh sách"
+            }
+        }
+        d["appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        return d
+    }
+
+    /// Các lượt quét gần đây (mới nhất trước) cho công cụ scan_history.
+    private func currentScans() -> [[String: Any]] {
+        guard let e = engine else { return [] }
+        let sorted = e.items.sorted { $0.time > $1.time }
+        var out: [[String: Any]] = []
+        for it in sorted.prefix(200) {
+            var o: [String: Any] = [:]
+            o["time"] = it.time
+            o["code"] = it.code
+            o["kind"] = String(describing: it.kind)
+            o["status"] = String(describing: it.status)
+            o["detail"] = it.detail
+            o["confirmed"] = it.scanConfirmed
+            out.append(o)
+        }
+        return out
+    }
 
     func newChat() {
         messages.removeAll()

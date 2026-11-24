@@ -67,7 +67,7 @@ struct ContentView: View {
             }
         }
         .environmentObject(aiVM)
-        .onAppear { aiVM.bind(store) }
+        .onAppear { aiVM.bind(store); aiVM.bindEngine(engine) }
         .sheet(isPresented: $showAI) {
             // Cửa sổ chat dạng popup: kéo xuống để đóng; cuộc trò chuyện giữ nguyên khi đổi tab.
             AIChatView()

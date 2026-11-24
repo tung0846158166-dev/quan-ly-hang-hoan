@@ -80,7 +80,8 @@ public class T037TableFiltersTests
     {
         var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now));
         vm.LoadFakeBatchAsync(50_000).GetAwaiter().GetResult();
-        Assert.True(vm.VisibleOrders.Count > 1000);
+        Assert.True(vm.FilteredOrders.Count > 1000);
+        Assert.Equal(ReturnOrdersViewModel.PageSize, vm.VisibleOrders.Count);
         var sw = System.Diagnostics.Stopwatch.StartNew();
         vm.SortByColumn("Price", out _);
         vm.SortByColumn("OrderId", out _);
@@ -151,5 +152,45 @@ public class T037TableFiltersTests
         Assert.False(vm.HasRow("KHONG-CO", "TA"));
         Assert.True(vm.SelectOrder("OD2", "TC"));
         Assert.Equal("guid-3", vm.SelectedRow!.Source.Id);
+    }
+
+    [Fact]
+    public void Paging_100PerPage_NavigationAndQuickJump()
+    {
+        var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now));
+        vm.LoadOrders(Enumerable.Range(1, 250).Select(i => new Order { OrderId = "P" + i, Track = "TP" + i, Platform = "Shopee", OrderType = "Đơn hủy" }).ToList(), Now);
+        Assert.Equal(3, vm.TotalPages);
+        Assert.Equal(100, vm.VisibleOrders.Count);
+        Assert.Equal(250, vm.VisibleCount);
+        Assert.True(vm.ShowPager);
+        Assert.False(vm.CanGoPrev);
+        vm.NextPageCommand.Execute(null);
+        Assert.Equal(2, vm.CurrentPage);
+        Assert.Equal("P101", vm.VisibleOrders[0].OrderId);
+        vm.LastPageCommand.Execute(null);
+        Assert.Equal(50, vm.VisibleOrders.Count);
+        Assert.Equal("P201", vm.VisibleOrders[0].OrderId);
+        Assert.False(vm.CanGoNext);
+        vm.PageInput = "1"; vm.GoToPageInputCommand.Execute(null);
+        Assert.Equal("P1", vm.VisibleOrders[0].OrderId);
+        vm.PageInput = "99"; vm.GoToPageInputCommand.Execute(null);     // vượt quá: về trang cuối
+        Assert.Equal(3, vm.CurrentPage);
+        vm.PageInput = "abc"; vm.GoToPageInputCommand.Execute(null);    // nhập sai: giữ nguyên, ô trả về trang hiện tại
+        Assert.Equal(3, vm.CurrentPage);
+        Assert.Equal("3", vm.PageInput);
+        // Lọc → về trang 1; xuất file lấy cả các trang.
+        vm.SearchText = "P2";
+        Assert.Equal(1, vm.CurrentPage);
+        Assert.Equal(vm.VisibleCount, vm.FilteredOrders.Count);
+        // Chọn đơn bằng lệnh (từ Trang chủ / tìm kiếm) tự nhảy tới đúng trang.
+        vm.ResetAllFiltersCommand.Execute(null);
+        Assert.True(vm.SelectOrder("P230", "TP230"));
+        Assert.Equal(3, vm.CurrentPage);
+        Assert.Equal("P230", vm.SelectedRow!.OrderId);
+        Assert.Contains(vm.SelectedRow, vm.VisibleOrders);
+        // Ít hơn một trang: không hiện thanh chuyển trang.
+        vm.SearchText = "P7";
+        Assert.True(vm.VisibleCount <= 100);
+        Assert.False(vm.ShowPager);
     }
 }

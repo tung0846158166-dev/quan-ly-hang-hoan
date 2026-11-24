@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -152,8 +152,8 @@ public sealed class T033UiCleanupTests
                 window.Show();
                 WpfTestHost.PumpDispatcher();
                 vm.ShopeeReturnVm.LoadOrders(d.GetReturnOrders(3000), Now);           // bảng dài: đơn cần tìm nằm sâu, ngoài màn hình
-                var target = vm.ShopeeReturnVm.VisibleOrders[300];
-                Assert.True(vm.ShopeeReturnVm.VisibleOrders.Count > 301);
+                var target = vm.ShopeeReturnVm.FilteredOrders[300];
+                Assert.True(vm.ShopeeReturnVm.FilteredOrders.Count > 301);
                 vm.NavigateByKey("home");
                 WpfTestHost.PumpDispatcher();
 
@@ -166,6 +166,7 @@ public sealed class T033UiCleanupTests
                 Assert.NotNull(grid);
                 Assert.Same(target, grid!.SelectedItem);                               // đúng đơn được chọn
                 Assert.Same(target, vm.ShopeeReturnVm.SelectedRow);
+                Assert.Equal(4, vm.ShopeeReturnVm.CurrentPage);                        // đơn thứ 301 nằm ở trang 4: bảng tự nhảy tới đúng trang
                 var container = grid.ItemContainerGenerator.ContainerFromItem(target);
                 Assert.NotNull(container);                                             // đã cuộn tới nên dòng được dựng (không còn ngoài màn hình)
                 Assert.True(grid.IsKeyboardFocusWithin);                               // bảng có tiêu điểm: dòng chọn hiện màu chọn rõ

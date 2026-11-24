@@ -61,7 +61,10 @@ public partial class ReturnOrdersView : UserControl
     {
         if (e.PropertyName == nameof(ReturnOrdersViewModel.VisibleOrders))
         {
-            _savedScrollOffset = FindScrollViewer(OrdersGrid)?.VerticalOffset;
+            // Chuyển trang / đổi bộ lọc: cuộn về đầu; nạp lại dữ liệu cùng trang: giữ vị trí đang xem.
+            _savedScrollOffset = (sender as ReturnOrdersViewModel)?.ResetScrollOnNextVisibleChange == true
+                ? null
+                : FindScrollViewer(OrdersGrid)?.VerticalOffset;
         }
     }
 

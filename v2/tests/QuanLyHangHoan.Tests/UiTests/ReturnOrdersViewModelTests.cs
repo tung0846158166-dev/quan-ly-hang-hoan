@@ -1,4 +1,4 @@
-﻿using QuanLyHangHoan.App.Services;
+using QuanLyHangHoan.App.Services;
 using QuanLyHangHoan.App.ViewModels;
 using QuanLyHangHoan.Core.Alerts;
 using QuanLyHangHoan.Core.Models;
@@ -174,13 +174,16 @@ public class ReturnOrdersViewModelTests
         await vm.LoadFakeBatchAsync(50_000);
 
         Assert.Equal(50_000, vm.TotalCount);
-        Assert.Equal(50_000, vm.VisibleOrders.Count);
+        Assert.Equal(50_000, vm.FilteredOrders.Count);
+        Assert.Equal(ReturnOrdersViewModel.PageSize, vm.VisibleOrders.Count);   // bảng chỉ dựng một trang 100 dòng
+        Assert.Equal(500, vm.TotalPages);
         Assert.True(vm.RedAlertCount > 0);
         Assert.True(vm.YellowAlertCount > 0);
 
         vm.PlatformFilter = "Shopee";
-        Assert.All(vm.VisibleOrders, r => Assert.Equal("Shopee", r.Platform));
-        Assert.True(vm.VisibleOrders.Count > 20_000);
+        Assert.All(vm.FilteredOrders, r => Assert.Equal("Shopee", r.Platform));
+        Assert.True(vm.FilteredOrders.Count > 20_000);
+        Assert.Equal(1, vm.CurrentPage);
     }
 
     [Fact]

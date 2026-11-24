@@ -735,6 +735,48 @@
         <!-- Row 5: Bottom Status & Performance Dock -->
         <Border Grid.Row="5" Background="#0F172A" Padding="18,8">
             <DockPanel>
+                <!-- Chuyển trang: ⏮ ◀ [ô số trang] / tổng ▶ ⏭ (mỗi trang 100 đơn) -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0"
+                            Visibility="{Binding ShowPager, Converter={StaticResource BoolToVis}}">
+                    <StackPanel.Resources>
+                        <Style x:Key="PagerBtn" TargetType="Button">
+                            <Setter Property="Foreground" Value="#E2E8F0" />
+                            <Setter Property="Background" Value="#1E293B" />
+                            <Setter Property="BorderBrush" Value="#475569" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Setter Property="Padding" Value="9,2" />
+                            <Setter Property="Margin" Value="2,0" />
+                            <Setter Property="FontSize" Value="12" />
+                            <Setter Property="Cursor" Value="Hand" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#334155" /></Trigger>
+                                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </StackPanel.Resources>
+                    <Button Content="⏮" Style="{StaticResource PagerBtn}" Command="{Binding FirstPageCommand}" ToolTip="Trang đầu" />
+                    <Button Content="◀" Style="{StaticResource PagerBtn}" Command="{Binding PrevPageCommand}" ToolTip="Trang trước" />
+                    <TextBlock Text="Trang" Foreground="#CBD5E1" FontSize="12" VerticalAlignment="Center" Margin="8,0,5,0" />
+                    <TextBox Width="52" Height="24" Text="{Binding PageInput, UpdateSourceTrigger=PropertyChanged}" TextAlignment="Center" VerticalContentAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                             ToolTip="Gõ số trang rồi nhấn Enter để nhảy tới trang đó">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding GoToPageInputCommand}" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <TextBlock Text="{Binding TotalPages, StringFormat='/ {0:N0}'}" Foreground="#CBD5E1" FontSize="12" VerticalAlignment="Center" Margin="5,0,8,0" />
+                    <Button Content="Đi" Style="{StaticResource PagerBtn}" Command="{Binding GoToPageInputCommand}" ToolTip="Nhảy tới trang đã gõ" />
+                    <Button Content="▶" Style="{StaticResource PagerBtn}" Command="{Binding NextPageCommand}" ToolTip="Trang sau" />
+                    <Button Content="⏭" Style="{StaticResource PagerBtn}" Command="{Binding LastPageCommand}" ToolTip="Trang cuối" />
+                </StackPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Cảnh báo Đỏ: " Foreground="#FCA5A5" FontSize="12" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding RedAlertCount, StringFormat='{}{0:N0}'}" Foreground="#FECACA" FontSize="12" FontWeight="Bold" Margin="0,0,14,0" />

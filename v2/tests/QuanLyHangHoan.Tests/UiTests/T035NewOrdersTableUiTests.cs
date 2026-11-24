@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -234,14 +234,14 @@ public sealed class T035NewOrdersTableUiTests
                 r.Vm.ShopeeCancelledVm.LoadOrders(many, Now);
                 WpfTestHost.PumpDispatcher();
                 var grid = FindGrid(window);
-                Assert.True(grid.Items.Count > 1000);
+                Assert.Equal(100, grid.Items.Count);                       // chỉ dựng 1 trang 100 dòng
                 var picked = new[] { grid.Items[1], grid.Items[2] };
                 foreach (var p in picked) grid.SelectedItems.Add(p);
                 WpfTestHost.PumpDispatcher();
                 Assert.Equal(2, grid.SelectedItems.Count);
                 Assert.Equal(2, r.Vm.ShopeeCancelledVm.SelectedCount);
                 // Cuộn xuống rồi cuộn lên nhiều lần như người dùng kéo thanh cuộn.
-                foreach (var idx in new[] { 400, 900, 1500, 60, 2500, 5, 2900, 0, grid.Items.Count - 1, 10, 200 })
+                foreach (var idx in new[] { 40, 90, 15, 60, 5, 99, 0, grid.Items.Count - 1, 10, 70 })
                 {
                     grid.ScrollIntoView(grid.Items[idx]);
                     grid.UpdateLayout();
@@ -254,6 +254,37 @@ public sealed class T035NewOrdersTableUiTests
             }
             finally { window.Close(); WpfTestHost.PumpDispatcher(); }
         });
+    }
+
+    [Fact]
+    public void RenderScreenshots_Pager_ToReportsFolder()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !(Directory.Exists(Path.Combine(dir.FullName, "tasks")) && Directory.Exists(Path.Combine(dir.FullName, "v2")))) dir = dir.Parent;
+        var outDir = Path.Combine(dir!.FullName, "tasks", "reports", "T035-screens");
+        Directory.CreateDirectory(outDir);
+        WpfTestHost.Run(() =>
+        {
+            var r = NewRig();
+            var window = new MainWindow
+            {
+                DataContext = r.Vm, Width = 1360, Height = 820, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false,
+            };
+            try
+            {
+                window.Show();
+                WpfTestHost.PumpDispatcher();
+                r.Vm.SetTheme(ThemeService.LightTheme);
+                r.Vm.NavigateByKey("shopee_cancelled");
+                r.Vm.ShopeeCancelledVm.LoadOrders(r.Data.GetReturnOrders(2_500), Now);
+                r.Vm.ShopeeCancelledVm.GoToPageNumber(7);
+                WpfTestHost.PumpDispatcher();
+                WpfTestHost.SaveWindowPng(window, Path.Combine(outDir, "07-pager.png"));
+            }
+            finally { window.Close(); WpfTestHost.PumpDispatcher(); }
+        });
+        Assert.True(File.Exists(Path.Combine(outDir, "07-pager.png")));
     }
 
     [Fact]

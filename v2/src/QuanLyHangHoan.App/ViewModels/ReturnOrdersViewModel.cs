@@ -169,7 +169,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     [ObservableProperty] private bool _isExporting;
 
     [RelayCommand]
-    private Task ExportVisibleAsync(string? format) => ExportAsync(VisibleOrders.Select(r => r.Source).ToList(), format);
+    private Task ExportVisibleAsync(string? format) => ExportAsync(_filtered.Select(r => r.Source).ToList(), format);   // xuất tất cả đơn đã lọc, không chỉ trang đang xem
 
     [RelayCommand]
     private Task ExportSelectedAsync(string? format) => ExportAsync(SelectedRows.Select(r => r.Source).ToList(), format);
@@ -501,7 +501,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
         RecalculatePlatformAndOrderTypeCounts();
         RecalculateStatusCounts();
-        ApplyFiltersAndSort(previousId);
+        ApplyFiltersAndSort(previousId, resetPage: false);   // nạp lại dữ liệu: giữ nguyên trang đang xem
         CountsUpdated?.Invoke();
     }
 
@@ -528,9 +528,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     {
         ResetAllFilters();
 
-        var match = FindRow(VisibleOrders, orderId, track);
+        var match = FindRow(_filtered, orderId, track);
 
         if (match is null) return false;
+        GoToPageNumber(_filtered.IndexOf(match) / PageSize + 1);   // nhảy tới đúng trang chứa đơn
         SelectedRow = match;
         PendingReveal = match;
         StatusBarText = $"📍 Đang chọn đơn {match.OrderId} • {match.DisplayTracking} — dòng này được tô nổi bật trong bảng";
@@ -716,7 +717,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         CountsUpdated?.Invoke();
     }
 
-    public void ApplyFiltersAndSort(string? preserveOrderId = null)
+    public void ApplyFiltersAndSort(string? preserveOrderId = null, bool resetPage = true)
     {
         var sw = Stopwatch.StartNew();
         var kw = AlertThresholds.NormalizeForSearch(SearchText).Trim();
@@ -775,7 +776,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         }
 
         sw.Stop();
-        VisibleOrders = filtered;
+        _filtered = filtered;
+        TotalPages = Math.Max(1, (filtered.Count + PageSize - 1) / PageSize);
+        if (resetPage) _currentPage = 1;
+        RefreshPage(scrollTop: resetPage);
         VisibleCount = filtered.Count;
         IsEmpty = filtered.Count == 0;
         var targetId = preserveOrderId ?? SelectedRow?.Source.Id;
@@ -787,8 +791,100 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         {
             SelectedRow = null;
         }
+        _filterMs = sw.ElapsedMilliseconds;
+        UpdateStatusText();
+    }
+
+    // ---------------- Phân trang: mỗi trang 100 đơn cho nhẹ ----------------
+
+    /// <summary>Số đơn mỗi trang. Bảng chỉ dựng đúng chừng này dòng nên 50.000 đơn vẫn mượt.</summary>
+    public const int PageSize = 100;
+
+    private List<ReturnOrderRowViewModel> _filtered = [];
+    private int _currentPage = 1;
+    private long _filterMs;
+
+    /// <summary>Tất cả đơn sau khi lọc (mọi trang), dùng để xuất file và tìm đơn.</summary>
+    public IReadOnlyList<ReturnOrderRowViewModel> FilteredOrders => _filtered;
+
+    /// <summary>Đặt khi chuyển trang: giao diện cuộn bảng về đầu thay vì giữ vị trí cũ.</summary>
+    public bool ResetScrollOnNextVisibleChange { get; set; }
+
+    [ObservableProperty] private int _totalPages = 1;
+    [ObservableProperty] private string _pageInput = "1";
+    [ObservableProperty] private string _pageInfoText = "";
+
+    public int CurrentPage
+    {
+        get => _currentPage;
+        set => GoToPageNumber(value);
+    }
+
+    public bool ShowPager => _filtered.Count > PageSize;
+    public bool CanGoPrev => _currentPage > 1;
+    public bool CanGoNext => _currentPage < TotalPages;
+
+    /// <summary>Chuyển tới trang n (tự cắt về 1..TotalPages). Trả về trang thực sự đã chuyển tới.</summary>
+    public int GoToPageNumber(int page)
+    {
+        var p = Math.Clamp(page, 1, TotalPages);
+        if (p != _currentPage)
+        {
+            _currentPage = p;
+            RefreshPage(scrollTop: true);
+            UpdateStatusText();
+        }
+        else
+        {
+            PageInput = p.ToString();
+        }
+        return p;
+    }
+
+    private void RefreshPage(bool scrollTop)
+    {
+        _currentPage = Math.Clamp(_currentPage, 1, TotalPages);
+        ResetScrollOnNextVisibleChange = scrollTop;
+        var skip = (_currentPage - 1) * PageSize;
+        VisibleOrders = _filtered.Count <= PageSize ? _filtered : _filtered.Skip(skip).Take(PageSize).ToList();
+        PageInput = _currentPage.ToString();
+        OnPropertyChanged(nameof(CurrentPage));
+        OnPropertyChanged(nameof(ShowPager));
+        OnPropertyChanged(nameof(CanGoPrev));
+        OnPropertyChanged(nameof(CanGoNext));
+        FirstPageCommand.NotifyCanExecuteChanged();
+        PrevPageCommand.NotifyCanExecuteChanged();
+        NextPageCommand.NotifyCanExecuteChanged();
+        LastPageCommand.NotifyCanExecuteChanged();
+    }
+
+    private void UpdateStatusText()
+    {
+        var from = _filtered.Count == 0 ? 0 : (_currentPage - 1) * PageSize + 1;
+        var to = Math.Min(_currentPage * PageSize, _filtered.Count);
+        PageInfoText = $"Trang {_currentPage:N0}/{TotalPages:N0}";
         StatusBarText =
-            $"Đang hiển thị {filtered.Count:N0} / {_allRows.Count:N0} đơn  •  Nạp: {_lastLoadMs} ms  •  Lọc/Sắp xếp: {sw.ElapsedMilliseconds} ms  •  Virtualization: BẬT";
+            $"Đang hiển thị đơn {from:N0}–{to:N0} / {_filtered.Count:N0} đơn đã lọc (tổng {_allRows.Count:N0})  •  Nạp: {_lastLoadMs} ms  •  Lọc/Sắp xếp: {_filterMs} ms";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanGoPrev))]
+    private void FirstPage() => GoToPageNumber(1);
+
+    [RelayCommand(CanExecute = nameof(CanGoPrev))]
+    private void PrevPage() => GoToPageNumber(_currentPage - 1);
+
+    [RelayCommand(CanExecute = nameof(CanGoNext))]
+    private void NextPage() => GoToPageNumber(_currentPage + 1);
+
+    [RelayCommand(CanExecute = nameof(CanGoNext))]
+    private void LastPage() => GoToPageNumber(TotalPages);
+
+    /// <summary>Nhảy tới trang gõ trong ô số trang (nhấn Enter). Nhập sai thì trả ô về trang hiện tại.</summary>
+    [RelayCommand]
+    private void GoToPageInput()
+    {
+        if (int.TryParse(PageInput?.Trim().Replace(".", "").Replace(",", ""), out var n)) GoToPageNumber(n);
+        else PageInput = _currentPage.ToString();
     }
 
     // ---------------- Thao tác thủ công trên đơn (T013) ----------------

@@ -37,6 +37,8 @@ public sealed class T019PhoneActionsUiTests : IDisposable
 
     private sealed class StubSyncController : ISyncController
     {
+        public string PrivateBroker => "";
+        public void SetPrivateBroker(string url) { }
         public string Room => "TEST-ROOM-1234567890123456";
         public bool SyncEnabled => true;
         public bool NtfyEnabled => false;

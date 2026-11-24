@@ -21,10 +21,16 @@ public enum MQTTPacket {
         return out
     }
 
-    public static func connect(clientId: String, keepAlive: Int) -> Data {
-        var body: [UInt8] = [0x00, 0x04, 0x4D, 0x51, 0x54, 0x54, 0x04, 0x02]
+    public static func connect(clientId: String, keepAlive: Int, username: String? = nil, password: String? = nil) -> Data {
+        // Cờ: 0x02 = clean session, 0x80 = có tên người dùng, 0x40 = có mật khẩu (broker riêng).
+        var flags: UInt8 = 0x02
+        if username != nil { flags |= 0x80 }
+        if username != nil && password != nil { flags |= 0x40 }
+        var body: [UInt8] = [0x00, 0x04, 0x4D, 0x51, 0x54, 0x54, 0x04, flags]
         body += [UInt8(keepAlive >> 8 & 0xFF), UInt8(keepAlive & 0xFF)]
         body += string(clientId)
+        if let u = username { body += string(u) }
+        if username != nil, let p = password { body += string(p) }
         return Data([0x10] + remainingLength(body.count) + body)
     }
 
@@ -127,6 +133,8 @@ public struct MQTTDecoder {
 public final class MQTTClient: @unchecked Sendable {
     public let name: String
     private let url: URL?
+    private let username: String?
+    private let password: String?
     private let lock = NSLock()
     private var task: URLSessionWebSocketTask?
     private var connected = false
@@ -134,7 +142,18 @@ public final class MQTTClient: @unchecked Sendable {
 
     public init(name: String, url: String) {
         self.name = name
-        self.url = URL(string: url)
+        // Địa chỉ broker riêng có thể mang tên:mật-khẩu (wss://tên:mật-khẩu@máy-chủ/mqtt): tách ra, không gửi trong URL.
+        if var comps = URLComponents(string: url), comps.user != nil {
+            self.username = comps.user
+            self.password = comps.password
+            comps.user = nil
+            comps.password = nil
+            self.url = comps.url
+        } else {
+            self.username = nil
+            self.password = nil
+            self.url = URL(string: url)
+        }
     }
 
     public var isConnected: Bool {
@@ -199,7 +218,7 @@ public final class MQTTClient: @unchecked Sendable {
             await withTaskCancellationHandler {
                 do {
                     let clientId = "ql" + String(UUID().uuidString.prefix(8)).lowercased()
-                    try await ws.send(.data(MQTTPacket.connect(clientId: clientId, keepAlive: 30)))
+                    try await ws.send(.data(MQTTPacket.connect(clientId: clientId, keepAlive: 30, username: username, password: password)))
                     var decoder = MQTTDecoder()
                     while !Task.isCancelled {
                         let msg = try await ws.receive()
@@ -262,7 +281,16 @@ public extension SyncProtocol {
         "agy_shopee_return_scanner_2026/" + room
     }
 
-    static let mqttBrokers: [(name: String, url: String)] = [
+    /// Broker riêng do người dùng nhập (UserDefaults "privateBroker"); rỗng = dùng 3 broker công cộng.
+    static var mqttBrokers: [(name: String, url: String)] {
+        let custom = (UserDefaults.standard.string(forKey: "privateBroker") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !custom.isEmpty, let u = URL(string: custom), u.scheme == "wss" || u.scheme == "ws" {
+            return [("riêng", custom)]
+        }
+        return publicMqttBrokers
+    }
+
+    static let publicMqttBrokers: [(name: String, url: String)] = [
         ("emqx", "wss://broker.emqx.io:8084/mqtt"),
         ("hivemq", "wss://broker.hivemq.com:8884/mqtt"),
         ("mosquitto", "wss://test.mosquitto.org:8081/")

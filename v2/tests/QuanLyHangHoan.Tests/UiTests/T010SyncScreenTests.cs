@@ -351,6 +351,8 @@ public sealed class T010SyncScreenTests : IDisposable
 
     private sealed class StubStatusSyncController(string room, int connected, int total, string lastError) : ISyncController
     {
+        public string PrivateBroker => "";
+        public void SetPrivateBroker(string url) { }
         public string Room { get; private set; } = room;
         public bool SyncEnabled { get; private set; } = true;
         public bool NtfyEnabled { get; private set; } = true;

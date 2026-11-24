@@ -54,3 +54,24 @@ public sealed class MqttTransportTests
         Assert.False(string.IsNullOrEmpty(t.LastError));
     }
 }
+
+public sealed class MqttPrivateBrokerTests
+{
+    [Fact]
+    public void Credentials_are_split_from_uri_and_masked()
+    {
+        var (uri, user, pass) = MqttTransport.SplitCredentials("wss://kho:p%40ss@mq.example.com/mqtt");
+        Assert.Equal("wss://mq.example.com/mqtt", uri);
+        Assert.Equal("kho", user);
+        Assert.Equal("p@ss", pass);
+        Assert.DoesNotContain("p%40ss", MqttTransport.MaskUri("wss://kho:p%40ss@mq.example.com/mqtt"));
+    }
+
+    [Fact]
+    public void Public_uri_has_no_credentials()
+    {
+        var (uri, user, _) = MqttTransport.SplitCredentials("wss://broker.emqx.io:8084/mqtt");
+        Assert.Equal("wss://broker.emqx.io:8084/mqtt", uri);
+        Assert.Null(user);
+    }
+}

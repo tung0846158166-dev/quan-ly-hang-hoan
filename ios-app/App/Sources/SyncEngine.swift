@@ -241,6 +241,14 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Đổi broker MQTT riêng (rỗng = broker công cộng) và nối lại.
+    func setPrivateBroker(_ raw: String) {
+        let v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if v.isEmpty { UserDefaults.standard.removeObject(forKey: "privateBroker") }
+        else { UserDefaults.standard.set(v, forKey: "privateBroker") }
+        startMQTT()
+    }
+
     func setRoom(_ raw: String) {
         let r = SyncProtocol.normalizeRoom(raw)
         guard r != room else { return }

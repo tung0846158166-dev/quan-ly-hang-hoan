@@ -205,6 +205,23 @@ public sealed partial class PhoneSyncViewModel : ObservableObject, IDisposable
         _syncController.SetSyncEnabled(!SyncEnabled);
     }
 
+    [ObservableProperty]
+    private string _privateBrokerText = string.Empty;
+
+    [RelayCommand]
+    private void SavePrivateBroker()
+    {
+        _syncController.SetPrivateBroker(PrivateBrokerText);
+        PrivateBrokerText = _syncController.PrivateBroker;
+    }
+
+    [RelayCommand]
+    private void ClearPrivateBroker()
+    {
+        PrivateBrokerText = string.Empty;
+        _syncController.SetPrivateBroker(string.Empty);
+    }
+
     [RelayCommand]
     private void ToggleNtfy()
     {
@@ -241,6 +258,7 @@ public sealed partial class PhoneSyncViewModel : ObservableObject, IDisposable
         MqttLastError = _syncController.MqttLastError;
         NtfyLastError = _syncController.NtfyLastError;
         LastError = _syncController.LastError;
+        if (string.IsNullOrEmpty(PrivateBrokerText)) PrivateBrokerText = _syncController.PrivateBroker;
     }
 
     private void AppendLogCore(SyncHandled item)

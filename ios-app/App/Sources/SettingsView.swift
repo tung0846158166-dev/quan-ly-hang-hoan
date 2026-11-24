@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var engine: SyncEngine
     @EnvironmentObject var store: SnapshotStore
     @State private var roomText = ""
+    @State private var brokerText = UserDefaults.standard.string(forKey: "privateBroker") ?? ""
     @State private var savedToast = ""
     @AppStorage("soundOn") private var soundOn = true
     @AppStorage("hapticOn") private var hapticOn = true
@@ -130,6 +131,20 @@ struct SettingsView: View {
                         Text(engine.brokerUp.isEmpty ? "Chưa nối" : "\(engine.brokerUp.count)/\(SyncProtocol.mqttBrokers.count) máy chủ")
                             .font(.subheadline)
                             .foregroundColor(engine.brokerUp.isEmpty ? .secondary : Theme.success)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Máy chủ MQTT riêng (để trống = công cộng)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("wss://tên:mật-khẩu@may-chu/mqtt", text: $brokerText)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            .keyboardType(.URL)
+                            .font(.system(.footnote, design: .monospaced))
+                            .onSubmit { engine.setPrivateBroker(brokerText) }
+                        Button("Lưu máy chủ và nối lại") { engine.setPrivateBroker(brokerText) }
+                            .font(.footnote.bold())
                     }
 
                     settingsRow(icon: "tray.and.arrow.up.fill", color: Theme.warning, title: "Hàng chờ gửi PC") {

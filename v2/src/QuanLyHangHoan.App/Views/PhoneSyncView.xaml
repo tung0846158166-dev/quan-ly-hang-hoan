@@ -309,6 +309,20 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Broker riêng -->
+                <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="MÁY CHỦ MQTT RIÊNG (khuyên dùng)" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,8" />
+                        <TextBox x:Name="PrivateBrokerBox" Text="{Binding PrivateBrokerText, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" FontSize="12.5" Padding="6,5" />
+                        <TextBlock Text="Dạng wss://tên:mật-khẩu@may-chu.example.com/mqtt. Để trống = dùng 3 broker công cộng. Điện thoại phải nhập cùng địa chỉ."
+                                   Foreground="{DynamicResource InkMutedBrush}" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,8" />
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Lưu và kết nối lại" Command="{Binding SavePrivateBrokerCommand}" Padding="12,5" Margin="0,0,8,0" />
+                            <Button Content="Về broker công cộng" Command="{Binding ClearPrivateBrokerCommand}" Padding="12,5" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <!-- Phone Setup Info -->
                 <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="18,16">
                     <StackPanel>

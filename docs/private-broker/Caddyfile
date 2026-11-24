@@ -1,0 +1,3 @@
+mq.example.com {
+    reverse_proxy /mqtt mosquitto:9001
+}

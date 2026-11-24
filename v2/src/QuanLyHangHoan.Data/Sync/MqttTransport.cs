@@ -19,6 +19,22 @@ public sealed class MqttTransport : ISyncTransport, IDisposable
         "wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt", "wss://test.mosquitto.org:8081/",
     };
 
+    /// <summary>Tách "wss://user:pass@host/mqtt" thành địa chỉ không chứa mật khẩu + tên người dùng + mật khẩu (broker riêng).</summary>
+    public static (string Uri, string? User, string? Pass) SplitCredentials(string uri)
+    {
+        if (!Uri.TryCreate(uri, UriKind.Absolute, out var u) || string.IsNullOrEmpty(u.UserInfo)) return (uri, null, null);
+        var parts = u.UserInfo.Split(':', 2);
+        var clean = new UriBuilder(u) { UserName = "", Password = "" }.Uri.ToString();
+        return (clean, Uri.UnescapeDataString(parts[0]), parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : "");
+    }
+
+    /// <summary>Che mật khẩu khi hiển thị lỗi/nhật ký.</summary>
+    public static string MaskUri(string uri)
+    {
+        var (clean, user, _) = SplitCredentials(uri);
+        return user is null ? uri : clean;
+    }
+
     public static string TopicFor(string room) => TopicPrefix + room;
 
     private sealed class Link
@@ -78,14 +94,16 @@ public sealed class MqttTransport : ISyncTransport, IDisposable
         {
             try
             {
-                var options = new MqttClientOptionsBuilder()
+                var (cleanUri, user, pass) = SplitCredentials(link.Uri);
+                var builder = new MqttClientOptionsBuilder()
                     .WithClientId(_clientId)
-                    .WithWebSocketServer(o => o.WithUri(link.Uri))
+                    .WithWebSocketServer(o => o.WithUri(cleanUri))
                     .WithTlsOptions(o => o.UseTls())
                     .WithCleanSession()
                     .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
-                    .WithTimeout(TimeSpan.FromSeconds(8))
-                    .Build();
+                    .WithTimeout(TimeSpan.FromSeconds(8));
+                if (user is not null) builder = builder.WithCredentials(user, pass ?? "");
+                var options = builder.Build();
                 await link.Client.ConnectAsync(options, _cts.Token);
                 foreach (var room in _handlers.Where(kv => !kv.Value.IsEmpty).Select(kv => kv.Key))
                     await SubscribeTopic(link, room);
@@ -93,7 +111,7 @@ public sealed class MqttTransport : ISyncTransport, IDisposable
                 return;
             }
             catch (OperationCanceledException) { return; }
-            catch (Exception ex) { LastError = $"{link.Uri}: {ex.Message}"; }
+            catch (Exception ex) { LastError = $"{MaskUri(link.Uri)}: {ex.Message}"; }
 
             try { await Task.Delay(TimeSpan.FromSeconds(3), _cts.Token); }
             catch (OperationCanceledException) { return; }
@@ -117,7 +135,7 @@ public sealed class MqttTransport : ISyncTransport, IDisposable
                     .WithTopic(TopicFor(room)).WithPayload(message).Build(), _cts.Token);
                 sent++;
             }
-            catch (Exception ex) { LastError = $"{link.Uri}: {ex.Message}"; }
+            catch (Exception ex) { LastError = $"{MaskUri(link.Uri)}: {ex.Message}"; }
         }
         if (sent == 0 && string.IsNullOrEmpty(LastError)) LastError = "Chưa kết nối broker nào.";
         else if (sent == 0 && ConnectedBrokers == 0) LastError = "Chưa kết nối broker nào. " + LastError;

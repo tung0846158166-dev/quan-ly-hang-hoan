@@ -36,6 +36,10 @@ public interface ISyncController : IDisposable
     void SetSyncEnabled(bool enabled);
     void SetNtfyEnabled(bool enabled);
     void RegenerateRoom();
+
+    /// <summary>Địa chỉ broker riêng (wss://tên:mật-khẩu@máy-chủ/mqtt); rỗng = dùng 3 broker công cộng.</summary>
+    string PrivateBroker { get; }
+    void SetPrivateBroker(string url);
 }
 
 /// <summary>
@@ -204,6 +208,31 @@ public sealed class RealSyncController : ISyncController
             {
                 StartCoreLocked();
             }
+        }
+        StatusChanged?.Invoke();
+    }
+
+    public string PrivateBroker
+    {
+        get
+        {
+            lock (_gate)
+                return _settings.Brokers.Count == 1 && !MqttTransport.DefaultBrokers.Contains(_settings.Brokers[0])
+                    ? _settings.Brokers[0] : string.Empty;
+        }
+    }
+
+    public void SetPrivateBroker(string url)
+    {
+        url = (url ?? "").Trim();
+        if (url.Length > 0 && !(Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == "wss" || u.Scheme == "ws")))
+            return;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            SaveSyncSettingsLocked(s => s.Brokers = url.Length == 0 ? new(MqttTransport.DefaultBrokers) : new List<string> { url });
+            StopCoreLocked();
+            if (_settings.SyncEnabled) StartCoreLocked();
         }
         StatusChanged?.Invoke();
     }
@@ -386,6 +415,14 @@ public sealed class FakeSyncController : ISyncController
             ConnectedBrokers = 0;
             NtfyConnected = false;
         }
+        StatusChanged?.Invoke();
+    }
+
+    public string PrivateBroker { get; private set; } = string.Empty;
+
+    public void SetPrivateBroker(string url)
+    {
+        PrivateBroker = (url ?? "").Trim();
         StatusChanged?.Invoke();
     }
 

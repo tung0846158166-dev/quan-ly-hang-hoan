@@ -10,6 +10,7 @@ public partial class DeletedOrdersView : UserControl
     public DeletedOrdersView()
     {
         InitializeComponent();
+        ClickToCopy.Attach(DeletedGrid);
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is DeletedOrdersViewModel o) o.RevealRequested -= OnRevealRequested;

@@ -44,6 +44,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Views.ClickToCopy.Notify = m => (DataContext as ViewModels.MainViewModel)?.ShowToast(m, false);   // bấm mã đơn/mã vận đơn trong bảng: báo "Đã sao chép"
         _saveDebounceTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(400)

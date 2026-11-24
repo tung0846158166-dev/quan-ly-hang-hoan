@@ -10,6 +10,7 @@ public partial class ArchivedOrdersView : UserControl
     public ArchivedOrdersView()
     {
         InitializeComponent();
+        ClickToCopy.Attach(ArchivedGrid);
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is ArchivedOrdersViewModel o) o.RevealRequested -= OnRevealRequested;

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using QuanLyHangHoan.App;
 using QuanLyHangHoan.App.Services;
@@ -251,6 +251,69 @@ public sealed class T035NewOrdersTableUiTests
                     Assert.Contains(picked[1], grid.SelectedItems.Cast<object>());
                     Assert.Equal(2, r.Vm.ShopeeCancelledVm.SelectedCount);
                 }
+            }
+            finally { window.Close(); WpfTestHost.PumpDispatcher(); }
+        });
+    }
+
+    [Theory]
+    [InlineData("SPXFAKE0000023  (Giao: SPXFWD0000023)", "SPXFAKE0000023")]
+    [InlineData("  2611DEMO0000023 ", "2611DEMO0000023")]
+    [InlineData("GHNCXL000110", "GHNCXL000110")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void ClickToCopy_ExtractsTheFirstCode(string? cellText, string expected)
+        => Assert.Equal(expected, QuanLyHangHoan.App.Views.ClickToCopy.ExtractCode(cellText));
+
+    [Theory]
+    [InlineData("Mã đơn hàng", true)]
+    [InlineData("Mã đơn", true)]
+    [InlineData("Mã vận đơn (Hoàn / Giao)", true)]
+    [InlineData("Mã vận đơn hoàn", true)]
+    [InlineData("Ngày giao", false)]
+    [InlineData("Sàn", false)]
+    [InlineData(null, false)]
+    public void ClickToCopy_OnlyOrderAndTrackingColumns(string? header, bool expected)
+        => Assert.Equal(expected, QuanLyHangHoan.App.Views.ClickToCopy.IsCodeColumn(header));
+
+    [Fact]
+    public void Clicking_the_order_id_cell_copies_it_and_shows_a_toast()
+    {
+        WpfTestHost.Run(() =>
+        {
+            var r = NewRig();
+            var window = new MainWindow
+            {
+                DataContext = r.Vm, Width = 1360, Height = 820, WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false,
+            };
+            try
+            {
+                window.Show();
+                WpfTestHost.PumpDispatcher();
+                r.Vm.NavigateByKey("shopee_cancelled");
+                WpfTestHost.PumpDispatcher();
+                var grid = FindGrid(window);
+                var row = (QuanLyHangHoan.App.ViewModels.ReturnOrderRowViewModel)grid.Items[2];
+                // Dựng đúng đường đi của chuột: bấm vào ô "Mã đơn hàng" của dòng thứ 3.
+                grid.ScrollIntoView(row); grid.UpdateLayout();
+                var col = grid.Columns.First(c => c.Header?.ToString() == "Mã đơn hàng");
+                var cell = (System.Windows.Controls.DataGridCell)col.GetCellContent(row).Parent;
+                var args = new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+                {
+                    RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonUpEvent,
+                    Source = cell,
+                };
+                string? shown = null;
+                QuanLyHangHoan.App.Views.ClickToCopy.Notify = m => shown = m;
+                var reached = false;
+                grid.PreviewMouseLeftButtonUp += (_, _) => reached = true;
+                Assert.Equal(System.Windows.Input.ModifierKeys.None, System.Windows.Input.Keyboard.Modifiers);
+                grid.RaiseEvent(args);          // Source = ô được bấm; sự kiện đi qua bộ xử lý của bảng
+                Assert.True(reached, "sự kiện chuột không tới bảng");
+                Assert.NotNull(shown);
+                Assert.Contains(row.OrderId, shown!);
+                Assert.Equal(row.OrderId, System.Windows.Clipboard.GetText());
             }
             finally { window.Close(); WpfTestHost.PumpDispatcher(); }
         });

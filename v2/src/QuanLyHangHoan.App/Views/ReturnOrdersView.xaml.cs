@@ -15,6 +15,7 @@ public partial class ReturnOrdersView : UserControl
     public ReturnOrdersView()
     {
         InitializeComponent();
+        ClickToCopy.Attach(OrdersGrid);
         DataContextChanged += OnDataContextChanged;
         Loaded += (_, _) => TryReveal();
     }

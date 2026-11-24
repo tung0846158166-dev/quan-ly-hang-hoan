@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,6 +15,7 @@ public partial class ReturnWatchView : UserControl
     public ReturnWatchView()
     {
         InitializeComponent();
+        ClickToCopy.Attach(ReturnWatchGrid);
         DataContextChanged += OnDataContextChanged;
     }
 

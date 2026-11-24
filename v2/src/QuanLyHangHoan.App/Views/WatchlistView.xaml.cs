@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using QuanLyHangHoan.App.ViewModels;
@@ -10,6 +10,7 @@ public partial class WatchlistView : UserControl
     public WatchlistView()
     {
         InitializeComponent();
+        ClickToCopy.Attach(WatchlistGrid);
     }
 
     private void WatchlistGrid_PreviewKeyDown(object sender, KeyEventArgs e)

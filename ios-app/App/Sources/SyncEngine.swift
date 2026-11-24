@@ -517,6 +517,9 @@ final class SyncEngine: ObservableObject {
             if isDuplicate("a|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(stage)|\(cap)|\(saved)|\(extra)") { return }
             guard let i = items.firstIndex(where: { $0.requestId == ack.requestId }) else { return }
             if items[i].apply(ack) {
+                if !items[i].isCancelledOrder, items[i].kind == .returnScan, let r = snapshot.lookup(items[i].code), r.isCancelled {
+                    items[i].isCancelledOrder = true   // PC cũ không báo cờ đơn hủy
+                }
                 // T040: Áp dụng quy tắc giữ/xóa ảnh ngay khi có kết quả từ PC.
                 reconcileScanPhotos()
                 persist()
@@ -530,14 +533,8 @@ final class SyncEngine: ObservableObject {
     }
 
     private func describe(_ it: ScanItem) -> (String, Color) {
-        switch it.status {
-        case .success: return (it.kind == .returnScan ? "Hợp lệ, PC đã ghi nhận" : "Đã tạo đơn mới trên PC", Theme.success)
-        case .duplicate: return ("Mã này đã quét trùng trước đó", Theme.warning)
-        case .notFound: return ("Không tìm thấy đơn trên hệ thống", Theme.danger)
-        case .ambiguous: return ("Trùng nhiều đơn, cần kiểm tra trên PC", Theme.danger)
-        case .error: return (it.scanConfirmed ? "PC từ chối, cần kiểm tra lại" : "PC chưa lưu được, đang tự thử lại", Theme.danger)
-        case .pending: return ("Đang chờ máy tính xác nhận", Theme.warning)
-        }
+        let m = ScanDisplay.message(for: it)
+        return (m.label, toneColor(m.tone))
     }
 
     private func showResult(_ it: ScanItem) {
@@ -655,7 +652,7 @@ final class SyncEngine: ObservableObject {
         // Tạo đơn mới: đơn đã có trên điện thoại (bảng chính, kho lưu trữ hoặc bảng đơn hủy) thì báo luôn, không tạo lại.
         if kind != .returnScan, snapshot.hasData, let r = snapshot.lookup(code) {
             let where_ = r.k == "a" ? "Kho lưu trữ" : (r.k == "c" ? "Bảng đơn hủy" : "Bảng chính")
-            banner = Banner(code: code, text: "Đơn đã có ở \(where_), không tạo lại", color: Theme.warning, sub: r.n)
+            banner = Banner(code: code, text: "Đã tạo rồi: đơn đã có ở \(where_), không tạo lại", color: Theme.danger, sub: r.n)
             if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
             return false
         }
@@ -687,12 +684,12 @@ final class SyncEngine: ObservableObject {
         if kind == .returnScan && snapshot.hasData && snapshot.isAmbiguousPending(code) {
             banner = Banner(code: code, text: "Trùng nhiều đơn đang chờ, chờ PC kiểm tra", color: Theme.danger, sub: hint)
         } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
-            banner = Banner(code: code, text: "Quét trùng: đơn đã nhận hoàn kho trước đó", color: Theme.danger, sub: hint)
+            banner = Banner(code: code, text: r.isCancelled ? "Đơn hủy: đã quét trước đó" : "Quét trùng: đơn đã nhận hoàn kho trước đó", color: Theme.danger, sub: hint)
         } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.pd {
             snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"], receivedAt: scanDate)
-            banner = Banner(code: code, text: "Đã nhận hoàn kho, chờ PC ghi nhận", color: Theme.success, sub: hint)
+            banner = Banner(code: code, text: r.isCancelled ? "Đơn hủy: chờ PC ghi nhận" : "Thành công: chờ PC ghi nhận", color: Theme.success, sub: hint)
         } else {
-            banner = Banner(code: code, text: "Chưa có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)
+            banner = Banner(code: code, text: "Không có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)
         }
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         // T040: Chỉ gửi LỆNH QUÉT sang PC; giữ ảnh TẠM trong hàng đợi cho tới khi PC trả ACK (đúng -> gắn vào đơn, sai -> xóa ngay).

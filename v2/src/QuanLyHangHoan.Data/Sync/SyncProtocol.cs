@@ -43,12 +43,15 @@ public static class SyncProtocol
             ScanOutcome.Ambiguous => "ambiguous",
             _ => "error", // NeedsManualCheck, Error: phone phải coi là CHƯA nhận
         };
-        return JsonSerializer.Serialize(new
+        var ack = new Dictionary<string, object?>
         {
-            type = "pc_ack", room = req.Room, requestId = req.RequestId, code = req.Code,
-            outcome, extra = result.Message, ackStage = "scan",
-            captureId = req.CaptureId.Length > 0 ? req.CaptureId : null,
-        });
+            ["type"] = "pc_ack", ["room"] = req.Room, ["requestId"] = req.RequestId, ["code"] = req.Code,
+            ["outcome"] = outcome, ["extra"] = result.Message, ["ackStage"] = "scan",
+            ["captureId"] = req.CaptureId.Length > 0 ? req.CaptureId : null,
+        };
+        // Kiện thuộc loại "Đơn hủy": điện thoại hiện nhãn "Đơn hủy" (chữ xanh nếu mới quét, đỏ nếu đã quét trước đó).
+        if (result.Order is { } o && o.OrderType == PhoneSnapshot.CancelType) ack["cancelled"] = true;
+        return JsonSerializer.Serialize(ack);
     }
 
     // ---- Ảnh từ điện thoại (bản tin đến từ mạng công cộng: kiểm tra chặt) ----

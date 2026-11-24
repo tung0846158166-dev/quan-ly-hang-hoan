@@ -441,4 +441,27 @@ public sealed class AiToolsExtendedTests
         Assert.DoesNotContain("0987654321", reason);
         Assert.Contains("ẩn SĐT", reason);
     }
+
+    // ---------------- ACK quét báo đơn hủy cho điện thoại ----------------
+
+    [Fact]
+    public void Scan_ack_flags_cancelled_orders_only()
+    {
+        var req = new QuanLyHangHoan.Data.Sync.ScanRequest("ROOM", "r1", "VN001", "c1");
+        var normal = new QuanLyHangHoan.Data.ScanResult(QuanLyHangHoan.Data.ScanOutcome.Received, true, "ok", O("1", "VN001", "Chưa trả", 1));
+        var cancelledOrder = O("2", "VN002", "Chưa trả", 1, type: "Đơn hủy");
+        var cancelledOk = new QuanLyHangHoan.Data.ScanResult(QuanLyHangHoan.Data.ScanOutcome.Received, true, "ok", cancelledOrder);
+        var cancelledDup = new QuanLyHangHoan.Data.ScanResult(QuanLyHangHoan.Data.ScanOutcome.AlreadyReceived, true, "đã nhận", cancelledOrder);
+        var missing = new QuanLyHangHoan.Data.ScanResult(QuanLyHangHoan.Data.ScanOutcome.NotFound, false, "không có", null);
+
+        Assert.False(JsonNode.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildAck(req, normal))!.AsObject().ContainsKey("cancelled"));
+        var j1 = JsonNode.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildAck(req, cancelledOk))!;
+        Assert.True(j1["cancelled"]!.GetValue<bool>());
+        Assert.Equal("success", j1["outcome"]!.GetValue<string>());
+        var j2 = JsonNode.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildAck(req, cancelledDup))!;
+        Assert.True(j2["cancelled"]!.GetValue<bool>());
+        Assert.Equal("duplicate", j2["outcome"]!.GetValue<string>());
+        Assert.False(JsonNode.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildAck(req, missing))!.AsObject().ContainsKey("cancelled"));
+        Assert.Equal("not_found", JsonNode.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildAck(req, missing))!["outcome"]!.GetValue<string>());
+    }
 }

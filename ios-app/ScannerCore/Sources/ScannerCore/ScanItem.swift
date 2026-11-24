@@ -30,6 +30,8 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
     public var attachedPhotoId: String? = nil
     /// Giữ trường cũ từ T039 để giải mã tương thích ngược với `scan_items.json` đã lưu; không còn dùng ở T040.
     public var photoAttachDismissed: Bool = false
+    /// Kiện thuộc loại "Đơn hủy" trên hệ thống (PC báo trong ACK, hoặc suy từ danh sách trên điện thoại): đổi nhãn kết quả thành "Đơn hủy".
+    public var isCancelledOrder: Bool = false
 
     public init(requestId: String, code: String, kind: ScanKind, time: Int, photoFile: String?, note: String = "") {
         self.requestId = requestId
@@ -46,7 +48,7 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         case scanConfirmed, photoConfirmed, reviewRequired
         case photoFile, photoSentAt, photoAttempts, lastSendAt, attempts
         case orderNum, detail, note
-        case attachedOrderId, attachedPhotoId, photoAttachDismissed
+        case attachedOrderId, attachedPhotoId, photoAttachDismissed, isCancelledOrder
     }
 
     /// Giải mã tương thích ngược với tệp `scan_items.json` cũ (giữ các trường ảnh cũ để đọc không lỗi, thêm trường mới tùy chọn).
@@ -73,6 +75,7 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         self.attachedOrderId = try? c.decodeIfPresent(String.self, forKey: .attachedOrderId)
         self.attachedPhotoId = try? c.decodeIfPresent(String.self, forKey: .attachedPhotoId)
         self.photoAttachDismissed = (try? c.decodeIfPresent(Bool.self, forKey: .photoAttachDismissed)) ?? false
+        self.isCancelledOrder = (try? c.decodeIfPresent(Bool.self, forKey: .isCancelledOrder)) ?? false
     }
 
     /// T040: Lượt quét đang giữ ảnh tạm trong hàng đợi (chờ PC xác nhận hoặc chờ gắn vào kho đơn).
@@ -117,6 +120,7 @@ public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
         scanConfirmed = true
         status = ScanStatus(rawValue: ack.outcome) ?? .success
         orderNum = ack.orderNum
+        if ack.cancelled == true { isCancelledOrder = true }
 
         if unmatched {
             reviewRequired = true

@@ -5,7 +5,7 @@ import ScannerCore
 
 private enum HistoryFilter: String, CaseIterable {
     case all = "Tất cả"
-    case valid = "Hợp lệ"
+    case valid = "Thành công"
     case duplicate = "Quét trùng"
     case missing = "Không có"
     case pending = "Chờ PC"
@@ -14,8 +14,8 @@ private enum HistoryFilter: String, CaseIterable {
         switch self {
         case .all: return Theme.accent
         case .valid: return Theme.success
-        case .duplicate: return Theme.warning
-        case .missing: return Theme.danger
+        case .duplicate: return Theme.danger
+        case .missing: return Theme.warning
         case .pending: return Theme.accent
         }
     }

@@ -14,9 +14,11 @@ public struct PcAck: Equatable {
     public var captureId: String?
     public var orderNum: String?
     public var extra: String?
+    /// v2: kiện thuộc loại "Đơn hủy" trên hệ thống (PC cũ không gửi trường này).
+    public var cancelled: Bool?
 
     public init(requestId: String, code: String, outcome: String, ackStage: String? = nil,
-                photoSaved: Bool? = nil, captureId: String? = nil, orderNum: String? = nil, extra: String? = nil) {
+                photoSaved: Bool? = nil, captureId: String? = nil, orderNum: String? = nil, extra: String? = nil, cancelled: Bool? = nil) {
         self.requestId = requestId
         self.code = code
         self.outcome = outcome
@@ -25,6 +27,7 @@ public struct PcAck: Equatable {
         self.captureId = captureId
         self.orderNum = orderNum
         self.extra = extra
+        self.cancelled = cancelled
     }
 }
 
@@ -155,7 +158,8 @@ public enum SyncProtocol {
             if let n = d["orderNum"] as? Int { order = String(n) } else if let s = d["orderNum"] as? String { order = s }
             return .ack(PcAck(requestId: rid, code: TrackingCode.clean(code), outcome: outcome,
                               ackStage: d["ackStage"] as? String, photoSaved: d["photoSaved"] as? Bool,
-                              captureId: d["captureId"] as? String, orderNum: order, extra: d["extra"] as? String))
+                              captureId: d["captureId"] as? String, orderNum: order, extra: d["extra"] as? String,
+                              cancelled: d["cancelled"] as? Bool))
         default: return .other
         }
     }

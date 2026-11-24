@@ -2,26 +2,18 @@ import SwiftUI
 import UIKit
 import ScannerCore
 
-func scanLabel(_ it: ScanItem) -> String {
-    if !it.scanConfirmed { return it.status == .error ? "Lỗi, đang thử lại" : "Chờ nạp PC" }
-    switch it.status {
-    case .success: return it.kind == .returnScan ? "Hợp lệ" : "Đã tạo"
-    case .duplicate: return "Quét trùng"
-    case .notFound: return "Không có"
-    case .ambiguous: return "Trùng nhiều đơn"
-    case .error: return "PC từ chối"
-    case .pending: return "Chờ nạp PC"
+func scanLabel(_ it: ScanItem) -> String { ScanDisplay.make(for: it).label }
+
+/// Xanh = thành công / tạo thành công; đỏ = quét trùng / đã tạo rồi / lỗi; vàng = không có / đang chờ.
+func toneColor(_ tone: ScanTone) -> Color {
+    switch tone {
+    case .success: return Theme.success
+    case .danger: return Theme.danger
+    case .warning: return Theme.warning
     }
 }
 
-func scanColor(_ it: ScanItem) -> Color {
-    if !it.scanConfirmed { return Theme.warning }
-    switch it.status {
-    case .success: return Theme.success
-    case .duplicate: return Theme.warning
-    default: return Theme.danger
-    }
-}
+func scanColor(_ it: ScanItem) -> Color { toneColor(ScanDisplay.make(for: it).tone) }
 
 /// Chi tiết một lần quét (T040): ảnh đã lưu vào đơn (chạm để zoom toàn màn hình) hoặc ảnh tạm đang chờ PC ACK,
 /// cảnh báo nếu treo quá 7 ngày cho người dùng quyết định bỏ ảnh tạm (KHÔNG tự xóa lượt quét), gửi lại lệnh quét, sao chép.

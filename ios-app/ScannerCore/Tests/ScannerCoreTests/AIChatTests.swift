@@ -10,12 +10,18 @@ final class AIChatTests: XCTestCase {
     }
     private var now: Date { cal.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 14))! }
 
-    private func row(_ k: String = "m", c: String, o: String, n: String = "Áo thun", q: Int = 1, rv: Bool, rcd: String = "", nt: String = "") -> OrderRow {
+    private func row(_ k: String = "m", c: String, o: String, n: String = "Áo thun", q: Int = 1, rv: Bool, rcd: String = "", nt: String = "",
+                     pr: Int = 0, cr: String = "", ar: Int = 0, lv: Int = -1, wl: Bool = false) -> OrderRow {
         var r = OrderRow(k: k, c: c, o: o, p: "Shopee", n: n, co: "", sz: "", q: q, rd: "20/11/2026", due: 0, st: rv ? "Hàng đã trả" : "Chưa trả")
         r.rv = rv
         r.pd = !rv
         r.rcd = rcd
         r.nt = nt
+        r.pr = pr
+        r.cr = cr
+        r.ar = ar
+        r.lv = lv
+        r.wl = wl
         return r
     }
 
@@ -55,7 +61,8 @@ final class AIChatTests: XCTestCase {
         let t = tools()
         let r = t.execute(name: "list_orders", argsJSON: #"{"status":"Hàng đã trả","from":"today","to":"today"}"#)
         XCTAssertEqual(r.refs.count, 2)
-        XCTAssertEqual(t.row(forId: r.refs[0].id)?.c, "VN001")
+        XCTAssertEqual(Set(r.refs.map { $0.track }), ["VN001", "VN002"])
+        XCTAssertEqual(r.refs[0].track, "VN002")   // mới nhất trước (11:30 sau 09:00)
         XCTAssertFalse(r.json.contains("0912345678"))
     }
 

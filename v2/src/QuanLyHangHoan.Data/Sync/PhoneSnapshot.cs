@@ -97,6 +97,8 @@ public static class PhoneSnapshot
         if (ty.Length > 0) row["ty"] = ty;
         if (!string.IsNullOrEmpty(o.RecvDate)) row["rcd"] = Clip(o.RecvDate, 24);
         if (!string.IsNullOrEmpty(o.PlatformStatus)) row["ps"] = Clip(o.PlatformStatus, 60);
+        if (o.Price > 0) row["pr"] = (long)Math.Round(o.Price);                        // giá trị đơn (đồng), để AI trên điện thoại tính tổng tiền
+        if (!string.IsNullOrEmpty(o.Carrier)) row["cr"] = Clip(o.Carrier, 30);          // đơn vị vận chuyển
 
         // Các mã KHÁC của chính kiện này (không gồm mã giao đi dùng chung, quy tắc 2/3) để điện thoại tra được khi quét kiện hoàn.
         var own = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { c.ToUpperInvariant(), (o.OrderId ?? "").Trim().ToUpperInvariant() };

@@ -29,6 +29,8 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var rws: Int = 0         // Bảng Hàng Hoàn Về: chặng 1 Đã đồng ý, 2 Đang về, 3 Đã về shop, 4 Đã nhận kho
     public var ar: Int = 0          // giờ hàng về shop (ms epoch) nếu sàn đã ghi nhận; 0 = chưa có
     public var rn: String = ""      // v2: hoàn MỘT PHẦN: tên các sản phẩm ĐÃ HOÀN, cách nhau " | " (n vẫn chứa đủ mọi sản phẩm); rỗng = không phân biệt
+    public var pr: Int = 0          // v2: giá trị đơn (đồng); 0 = chưa có; PC cũ không gửi
+    public var cr: String = ""      // v2: đơn vị vận chuyển; PC cũ không gửi
 
     /// Đơn nằm trong Bảng Hàng Hoàn Về (khách yêu cầu hoàn, kiện đã "Đã đồng ý").
     public var inReturnWatch: Bool { k == "m" && rw > 0 }
@@ -166,7 +168,7 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps, x, rw, rws, ar, rn }
+private enum RowKeys: String, CodingKey { case k, c, o, p, n, co, sz, q, rd, due, st, ty, pre, pd, rv, wl, wr, nt, lv, rcd, ci, ps, x, rw, rws, ar, rn, pr, cr }
 private enum PayloadKeys: String, CodingKey { case time, count, rows, stats, sid }
 
 extension OrderRow {
@@ -178,7 +180,8 @@ extension OrderRow {
                   ty: c.flexString(.ty), pre: c.flexBool(.pre, default: false), pd: c.flexBool(.pd, default: true), rv: c.flexBool(.rv, default: false),
                   wl: c.flexBool(.wl, default: false), wr: c.flexString(.wr), nt: c.flexString(.nt), rcd: c.flexString(.rcd), lv: c.flexInt(.lv, default: -1),
                   ci: c.flexString(.ci), ps: c.flexString(.ps), x: c.flexString(.x),
-                  rw: c.flexInt(.rw), rws: c.flexInt(.rws), ar: c.flexInt(.ar), rn: c.flexString(.rn))
+                  rw: c.flexInt(.rw), rws: c.flexInt(.rws), ar: c.flexInt(.ar), rn: c.flexString(.rn),
+                  pr: c.flexInt(.pr), cr: c.flexString(.cr))
     }
 }
 

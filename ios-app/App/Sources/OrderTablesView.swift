@@ -9,8 +9,8 @@ struct CancelledTableView: View {
     @State private var show: Show = .pending
     @State private var picked: Set<String> = []
     @State private var confirmAll = false
+    @State private var all: [OrderRow] = []
 
-    private var all: [OrderRow] { store.rows.filter { $0.k == "c" } }
     private var list: [OrderRow] {
         switch show {
         case .pending: return all.filter { !$0.rv }
@@ -22,6 +22,7 @@ struct CancelledTableView: View {
     private var selectable: [OrderRow] { list.filter { !$0.ci.isEmpty } }
     private var allPicked: Bool { !selectable.isEmpty && selectable.allSatisfy { picked.contains($0.ci) } }
     private var pendingIds: [String] { all.filter { !$0.rv && !$0.ci.isEmpty }.map { $0.ci } }
+    private var dataToken: String { "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.rows.count)" }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -111,7 +112,19 @@ struct CancelledTableView: View {
             }
         }
         .onChange(of: show) { _ in picked = [] }
-        .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+        .task(id: dataToken) {
+            let rowsSnapshot = store.rows
+            let filtered = await Task.detached(priority: .userInitiated) {
+                rowsSnapshot.filter { $0.k == "c" }
+            }.value
+            guard !Task.isCancelled else { return }
+            all = filtered
+        }
+        .refreshable {
+            guard !store.isDemoMode else { return }
+            engine.requestSnapshot()
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
     }
 
     private func count(_ s: Show) -> Int {
@@ -163,8 +176,8 @@ struct CancelAfterPrepView: View {
     @State private var show: Show = .pending
     @State private var picked: Set<String> = []
     @State private var detail: OrderRow?
+    @State private var all: [OrderRow] = []
 
-    private var all: [OrderRow] { store.rows.filter { $0.k == "m" && $0.isCancelAfterPrep } }
     private var list: [OrderRow] {
         switch show {
         case .pending: return all.filter { !$0.rv }
@@ -173,6 +186,7 @@ struct CancelAfterPrepView: View {
         }
     }
     private var allPicked: Bool { !list.isEmpty && list.allSatisfy { picked.contains($0.id) } }
+    private var dataToken: String { "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.rows.count)" }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -244,7 +258,19 @@ struct CancelAfterPrepView: View {
         }
         .sheet(item: $detail) { DetailView(row: $0) }
         .onChange(of: show) { _ in picked = [] }
-        .refreshable { engine.requestSnapshot(); try? await Task.sleep(nanoseconds: 2_000_000_000) }
+        .task(id: dataToken) {
+            let rowsSnapshot = store.rows
+            let filtered = await Task.detached(priority: .userInitiated) {
+                rowsSnapshot.filter { $0.k == "m" && $0.isCancelAfterPrep }
+            }.value
+            guard !Task.isCancelled else { return }
+            all = filtered
+        }
+        .refreshable {
+            guard !store.isDemoMode else { return }
+            engine.requestSnapshot()
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
     }
 
     private func count(_ s: Show) -> Int {
@@ -325,8 +351,9 @@ struct ReturnWatchView: View {
 
     @State private var filter: StageFilter = .active
     @State private var detail: OrderRow?
+    @State private var all: [OrderRow] = []
 
-    private var all: [OrderRow] { store.rows.filter { $0.inReturnWatch } }
+    private var dataToken: String { "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.rows.count)" }
 
     private func matches(_ r: OrderRow, _ f: StageFilter) -> Bool {
         switch f {
@@ -380,8 +407,16 @@ struct ReturnWatchView: View {
         }
         .background(Theme.pageBackground.ignoresSafeArea())
         .navigationTitle("Hàng hoàn về")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $detail) { DetailView(row: $0) }
+        .task(id: dataToken) {
+            let rowsSnapshot = store.rows
+            let filtered = await Task.detached(priority: .userInitiated) {
+                rowsSnapshot.filter { $0.inReturnWatch }
+            }.value
+            guard !Task.isCancelled else { return }
+            all = filtered
+        }
         .refreshable {
             guard !store.isDemoMode else { return }
             engine.requestSnapshot()
@@ -495,7 +530,7 @@ struct ReturnWatchView: View {
                     .foregroundColor(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                StatusPill(text: OrderRow.returnWatchStageNames[stage], color: color)
+                StatusPill(text: r.returnWatchStageName, color: color)
             }
 
             // Thanh tiến trình 4 điểm nối liền

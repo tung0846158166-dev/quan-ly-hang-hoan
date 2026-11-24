@@ -1,14 +1,18 @@
 import SwiftUI
+import UIKit
 import ScannerCore
 
 struct ScanView: View {
     @EnvironmentObject var engine: SyncEngine
+    @EnvironmentObject var router: NotificationRouter
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var camera = CameraController()
     @State private var manual = ""
     @State private var zoom: CGFloat = 1
     @State private var detail: ScanItem?
     @State private var showBannerCard = false
+    @State private var isVisible = false
 
     private var connectionStatus: (text: String, color: Color) {
         if engine.isDemoMode {
@@ -25,6 +29,26 @@ struct ScanView: View {
 
     private var todayScannedCount: Int {
         engine.todayStats(kind: engine.mode).total
+    }
+
+    @MainActor
+    private func syncCameraLifecycle() {
+        let shouldRun = isVisible && scenePhase == .active && router.tab == NotificationRouter.scanTab
+        if shouldRun {
+            let eng = engine
+            let cam = camera
+            camera.onCodes = { [weak eng] codes in
+                Task { @MainActor in eng?.handleCameraCodes(codes) }
+            }
+            engine.snapshotProvider = { [weak cam] in cam?.snapshotJPEG() }
+            if !camera.running && camera.restReason == nil {
+                camera.start()
+            }
+            UIApplication.shared.isIdleTimerDisabled = true
+        } else {
+            camera.stop()
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
     }
 
     var body: some View {
@@ -67,15 +91,16 @@ struct ScanView: View {
         }
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
-            camera.onCodes = { engine.handleCameraCodes($0) }
-            engine.snapshotProvider = { camera.snapshotJPEG() }
-            camera.start()
-            UIApplication.shared.isIdleTimerDisabled = true
+            isVisible = true
+            syncCameraLifecycle()
         }
         .onDisappear {
+            isVisible = false
             camera.stop()
             UIApplication.shared.isIdleTimerDisabled = false
         }
+        .onChange(of: scenePhase) { _ in syncCameraLifecycle() }
+        .onChange(of: router.tab) { _ in syncCameraLifecycle() }
         .task(id: engine.banner) {
             guard engine.banner != nil else {
                 showBannerCard = false
@@ -126,7 +151,7 @@ struct ScanView: View {
                 CameraPreview(controller: camera)
 
                 if camera.denied {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 8) {
                         Image(systemName: "camera.fill")
                             .font(.title2)
                             .foregroundColor(Theme.accent)
@@ -136,6 +161,15 @@ struct ScanView: View {
                             .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
+                        Button("Mở Cài đặt iPhone") {
+                            Haptics.tap()
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .font(Theme.Typography.captionBold)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
                     }
                     .padding(14)
                     .background(.ultraThinMaterial)
@@ -281,7 +315,7 @@ struct ScanView: View {
 
             VStack(spacing: 2) {
                 PasteButton(payloadType: String.self) { texts in
-                    let codes = PasteCodes.split(texts.joined(separator: "\n"))
+                    let codes = TrackingCode.extractPasteCodes(texts.joined(separator: "\n"))
                     DispatchQueue.main.async {
                         if codes.isEmpty {
                             engine.banner = Banner(code: "", text: "Không thấy mã vận đơn trong nội dung đã sao chép", color: Theme.warning)
@@ -412,7 +446,7 @@ struct ScanView: View {
     }
 
     private func sendManual() {
-        let v = manual.trimmingCharacters(in: .whitespaces)
+        let v = manual.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !v.isEmpty else { return }
         Haptics.tap()
         engine.submitManual(v)
@@ -437,18 +471,5 @@ struct ScanGuide: Shape {
             p.addLine(to: CGPoint(x: pt.x, y: pt.y + dy * l))
         }
         return p
-    }
-}
-
-/// Tách các mã từ nội dung đã chép (bỏ chữ thừa, mã ngắn hơn 6 ký tự, mã trùng).
-enum PasteCodes {
-    static func split(_ text: String) -> [String] {
-        var seen = Set<String>(), out: [String] = []
-        for tok in text.components(separatedBy: CharacterSet(charactersIn: " \t\r\n,;|")) {
-            let c = TrackingCode.clean(tok)
-            guard c.count >= 6, c.contains(where: { $0.isNumber }), !seen.contains(c) else { continue }
-            seen.insert(c); out.append(c)
-        }
-        return out
     }
 }

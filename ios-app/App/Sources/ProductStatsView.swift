@@ -40,36 +40,53 @@ struct ProductStatsView: View {
         _customTo = State(initialValue: now)
     }
 
-    private func recompute() {
+    private var recomputeToken: String {
+        let dayKey = selectedDay?.timeIntervalSince1970 ?? -1
+        return "\(platformFilter.rawValue)|\(dateRange.rawValue)|\(dateBasis.rawValue)|\(customFrom.timeIntervalSince1970)|\(customTo.timeIntervalSince1970)|\(dayKey)|\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.rows.count)"
+    }
+
+    @MainActor
+    private func runRecompute() async {
         let all = store.rows
-        let datesAvailable = ProductMetrics.hasAnyDate(rows: all)
-        hasDates = datesAvailable
-        let activeRange: ProductDateRange = datesAvailable ? dateRange : .all
-
-        let rangeRows = ProductMetrics.filter(
-            rows: all,
-            platform: platformFilter,
-            dateRange: activeRange,
-            customFrom: customFrom,
-            customTo: customTo,
-            dateBasis: dateBasis,
-            now: Date()
-        )
-        dailyBuckets = ProductMetrics.groupByDay(rows: rangeRows, dateBasis: dateBasis)
-
-        let effectiveRows: [OrderRow]
-        if let day = selectedDay {
-            effectiveRows = ProductMetrics.filter(
+        let plat = platformFilter
+        let range = dateRange
+        let basis = dateBasis
+        let from = customFrom
+        let to = customTo
+        let pickedDay = selectedDay
+        let now = Date()
+        let result = await Task.detached(priority: .userInitiated) { () -> (Bool, [DailyProductBucket], [OrderRow], ProductStatsSummary) in
+            let datesAvailable = ProductMetrics.hasAnyDate(rows: all)
+            let activeRange: ProductDateRange = datesAvailable ? range : .all
+            let rangeRows = ProductMetrics.filter(
                 rows: all,
-                onDay: day,
-                platform: platformFilter,
-                dateBasis: dateBasis
+                platform: plat,
+                dateRange: activeRange,
+                customFrom: from,
+                customTo: to,
+                dateBasis: basis,
+                now: now
             )
-        } else {
-            effectiveRows = rangeRows
-        }
-        filteredRows = effectiveRows
-        summary = ProductMetrics.compute(rows: effectiveRows)
+            let buckets = ProductMetrics.groupByDay(rows: rangeRows, dateBasis: basis)
+            let effectiveRows: [OrderRow]
+            if let day = pickedDay {
+                effectiveRows = ProductMetrics.filter(
+                    rows: all,
+                    onDay: day,
+                    platform: plat,
+                    dateBasis: basis
+                )
+            } else {
+                effectiveRows = rangeRows
+            }
+            let stats = ProductMetrics.compute(rows: effectiveRows)
+            return (datesAvailable, buckets, effectiveRows, stats)
+        }.value
+        guard !Task.isCancelled else { return }
+        hasDates = result.0
+        dailyBuckets = result.1
+        filteredRows = result.2
+        summary = result.3
     }
 
     private var activeRangeDescription: String {
@@ -128,17 +145,7 @@ struct ProductStatsView: View {
         .background(Theme.pageBackground.ignoresSafeArea())
         .navigationTitle("Thống kê sản phẩm")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { recompute() }
-        .onChange(of: platformFilter) { _ in recompute() }
-        .onChange(of: dateRange) { _ in recompute() }
-        .onChange(of: dateBasis) { _ in recompute() }
-        .onChange(of: customFrom) { _ in recompute() }
-        .onChange(of: customTo) { _ in recompute() }
-        .onChange(of: selectedDay) { _ in recompute() }
-        .onChange(of: store.updatedAt) { _ in recompute() }
-        .onChange(of: store.revision) { _ in recompute() }
-        .onChange(of: store.rows.count) { _ in recompute() }
-        .onChange(of: store.isDemoMode) { _ in recompute() }
+        .task(id: recomputeToken) { await runRecompute() }
     }
 
     // MARK: - Bộ lọc chế độ xem, khoảng thời gian, căn cứ ngày & sàn
@@ -181,37 +188,37 @@ struct ProductStatsView: View {
                     customDatePickerCard
                 }
 
-                // Hàng chọn căn cứ ngày (mặc định Ngày hoàn, có thể đổi sang Ngày nhận kho)
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption2.bold())
-                        .foregroundStyle(.secondary)
-                    Text("Tính theo:")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
+                // Hàng chọn căn cứ ngày (mặc định Ngày hoàn, có thể đổi sang Ngày nhận kho; cuộn ngang nếu chữ lớn)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.caption2.bold())
+                            .foregroundStyle(.secondary)
+                        Text("Tính theo:")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.secondary)
 
-                    ForEach(ProductDateBasis.allCases) { basis in
-                        let on = dateBasis == basis
-                        Button {
-                            Haptics.tap()
-                            if reduceMotion {
-                                dateBasis = basis
-                            } else {
-                                withAnimation(.easeInOut(duration: 0.16)) { dateBasis = basis }
+                        ForEach(ProductDateBasis.allCases) { basis in
+                            let on = dateBasis == basis
+                            Button {
+                                Haptics.tap()
+                                if reduceMotion {
+                                    dateBasis = basis
+                                } else {
+                                    withAnimation(.easeInOut(duration: 0.16)) { dateBasis = basis }
+                                }
+                            } label: {
+                                Text(basis.rawValue)
+                                    .font(Theme.Typography.microBold)
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(on ? Theme.teal : Theme.subtleFill)
+                                    .foregroundColor(on ? .white : .secondary)
+                                    .clipShape(Capsule())
                             }
-                        } label: {
-                            Text(basis.rawValue)
-                                .font(Theme.Typography.microBold)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(on ? Theme.teal : Theme.subtleFill)
-                                .foregroundColor(on ? .white : .secondary)
-                                .clipShape(Capsule())
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
-
-                    Spacer(minLength: 0)
                 }
             }
 
@@ -273,34 +280,46 @@ struct ProductStatsView: View {
     }
 
     private var customDatePickerCard: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Từ ngày")
-                    .font(Theme.Typography.microBold)
-                    .foregroundStyle(.secondary)
-                DatePicker("Từ ngày", selection: $customFrom, displayedComponents: .date)
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, Locale(identifier: "vi_VN"))
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                fromDatePicker
+                Image(systemName: "arrow.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.tertiary)
+                toDatePicker
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Image(systemName: "arrow.right")
-                .font(.caption.bold())
-                .foregroundStyle(.tertiary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Đến ngày")
-                    .font(Theme.Typography.microBold)
-                    .foregroundStyle(.secondary)
-                DatePicker("Đến ngày", selection: $customTo, displayedComponents: .date)
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .environment(\.locale, Locale(identifier: "vi_VN"))
+            VStack(alignment: .leading, spacing: 8) {
+                fromDatePicker
+                toDatePicker
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .card(padding: 10, radius: Theme.cardRadius)
+    }
+
+    private var fromDatePicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Từ ngày")
+                .font(Theme.Typography.microBold)
+                .foregroundStyle(.secondary)
+            DatePicker("Từ ngày", selection: $customFrom, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .environment(\.locale, Locale(identifier: "vi_VN"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var toDatePicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Đến ngày")
+                .font(Theme.Typography.microBold)
+                .foregroundStyle(.secondary)
+            DatePicker("Đến ngày", selection: $customTo, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .environment(\.locale, Locale(identifier: "vi_VN"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func selectedDayBanner(_ day: Date) -> some View {
@@ -547,18 +566,21 @@ struct ProductStatsView: View {
 
             // Thanh tỷ trọng ngang
             GeometryReader { geo in
+                let w = max(0, geo.size.width)
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Theme.subtleFill)
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [rankColor, rankColor.opacity(0.70)],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                    if w > 0 {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [rankColor, rankColor.opacity(0.70)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
-                        )
-                        .frame(width: max(8, geo.size.width * CGFloat(min(1.0, item.share))))
+                            .frame(width: min(w, max(8, w * CGFloat(max(0.0, min(1.0, item.share))))))
+                    }
                 }
             }
             .frame(height: 6)
@@ -654,10 +676,7 @@ struct ProductStatDetailView: View {
     let sourceRows: [OrderRow]
 
     @State private var selectedRow: OrderRow?
-
-    private var matchingOrders: [OrderRow] {
-        ProductMetrics.orders(forProductKey: stat.key, in: sourceRows)
-    }
+    @State private var matchingOrders: [OrderRow] = []
 
     var body: some View {
         ScrollView {
@@ -680,6 +699,15 @@ struct ProductStatDetailView: View {
         .navigationTitle("Chi tiết sản phẩm")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selectedRow) { DetailView(row: $0) }
+        .task(id: "\(stat.key)|\(sourceRows.count)") {
+            let key = stat.key
+            let rows = sourceRows
+            let matched = await Task.detached(priority: .userInitiated) {
+                ProductMetrics.orders(forProductKey: key, in: rows)
+            }.value
+            guard !Task.isCancelled else { return }
+            matchingOrders = matched
+        }
     }
 
     private var headerCard: some View {
@@ -749,9 +777,11 @@ struct ProductStatDetailView: View {
 
             // Thanh ngang 2 phần (Premium vs Thường)
             GeometryReader { geo in
-                let w = geo.size.width
+                let w = max(0, geo.size.width)
                 HStack(spacing: 2) {
-                    if stat.standardUnits <= 0 {
+                    if w <= 0 {
+                        Capsule().fill(Theme.subtleFill)
+                    } else if stat.standardUnits <= 0 {
                         Rectangle()
                             .fill(
                                 LinearGradient(
@@ -762,7 +792,8 @@ struct ProductStatDetailView: View {
                             )
                             .frame(maxWidth: .infinity)
                     } else {
-                        let premWidth = max(8, min(w - 10, w * CGFloat(premRatio)))
+                        let maxPrem = max(0, w - 10)
+                        let premWidth = min(maxPrem, max(min(8, maxPrem), w * CGFloat(premRatio)))
                         Rectangle()
                             .fill(
                                 LinearGradient(
@@ -892,11 +923,14 @@ struct ProductStatDetailView: View {
                     .monospacedDigit()
             }
             GeometryReader { geo in
+                let w = max(0, geo.size.width)
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.subtleFill)
-                    Capsule()
-                        .fill(color.opacity(0.85))
-                        .frame(width: max(8, geo.size.width * CGFloat(min(1.0, ratio))))
+                    if w > 0 {
+                        Capsule()
+                            .fill(color.opacity(0.85))
+                            .frame(width: min(w, max(8, w * CGFloat(max(0.0, min(1.0, ratio))))))
+                    }
                 }
             }
             .frame(height: 8)

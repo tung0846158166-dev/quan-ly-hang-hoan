@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using QuanLyHangHoan.Data;
@@ -56,6 +56,7 @@ public sealed class SyncPhotoTests : IDisposable
         Assert.Equal("photo", ack.GetProperty("ackStage").GetString());
         Assert.Equal("cap1", ack.GetProperty("captureId").GetString());
         Assert.Equal("success", ack.GetProperty("outcome").GetString());
+        Assert.True(ack.GetProperty("photoSaved").GetBoolean());        // điện thoại chỉ coi ảnh đã lưu khi thấy cờ này (quy tắc 6)
         var o = Order("A");
         Assert.Equal("Chưa trả", o.Order.Status);                 // ảnh KHÔNG tự đổi trạng thái nhận kiện
         Assert.Equal(Jpg, PhotoRepository.Get(Db, o.Order.PhotoId)!.Bytes);
@@ -151,6 +152,7 @@ public sealed class SyncPhotoTests : IDisposable
         var ack = J(SyncReceiver.Handle(Db, Room, Chunk("ph1", "cap1", "A", 1, 3, parts[1]), Now));
         Assert.Equal("photo", ack.GetProperty("ackStage").GetString());
         Assert.Equal("success", ack.GetProperty("outcome").GetString());
+        Assert.True(ack.GetProperty("photoSaved").GetBoolean());
         Assert.Equal("cap1", ack.GetProperty("captureId").GetString());
         Assert.Equal(1, PhotoRows());
         Assert.Equal(Jpg, PhotoRepository.Get(Db, Order("A").Order.PhotoId)!.Bytes);
@@ -182,5 +184,15 @@ public sealed class SyncPhotoTests : IDisposable
 
         Assert.Contains(inbox, m => m.Contains("\"ackStage\":\"photo\""));
         Assert.Equal("photo", events.Single().Stage);
+    }
+    [Theory]
+    [InlineData("success", true)]
+    [InlineData("error", false)]
+    [InlineData("not_found", false)]
+    [InlineData("ambiguous", false)]
+    public void PhotoAck_photoSaved_is_true_only_when_the_photo_was_really_saved(string outcome, bool expected)
+    {
+        var ack = JsonDocument.Parse(QuanLyHangHoan.Data.Sync.SyncProtocol.BuildPhotoAck("R", "rq", "cap", "CODE", outcome, "m")).RootElement;
+        Assert.Equal(expected, ack.GetProperty("photoSaved").GetBoolean());
     }
 }

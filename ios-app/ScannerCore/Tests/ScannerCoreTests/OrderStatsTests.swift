@@ -22,6 +22,9 @@ final class OrderStatsTests: XCTestCase {
         XCTAssertNil(OrderStats.parseDate("", calendar: cal))
         XCTAssertNil(OrderStats.parseDate("dd/mm/yyyy", calendar: cal))
         XCTAssertNil(OrderStats.parseDate("32/13/2026", calendar: cal))
+        XCTAssertNil(OrderStats.parseDate("31/02/2026", calendar: cal), "ngày không tồn tại không được tự dồn sang tháng 3")
+        XCTAssertNil(OrderStats.parseDate("29/02/2026", calendar: cal), "2026 không phải năm nhuận")
+        XCTAssertNotNil(OrderStats.parseDate("2026-11-24T14:30:45Z", calendar: cal))
         let d = OrderStats.parseDate("05/01/2026", calendar: cal)!
         XCTAssertEqual(cal.component(.day, from: d), 5)
         XCTAssertEqual(cal.component(.month, from: d), 1)

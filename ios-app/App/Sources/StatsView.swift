@@ -41,9 +41,10 @@ struct StatsView: View {
                     ForEach(StatsPeriod.allCases) { Text($0.title).tag($0) }
                 }.pickerStyle(.segmented)
                 Picker("Sàn", selection: $platform) {
-                    Text("Cả 2 sàn").tag("all")
+                    Text("Tất cả sàn").tag("all")
                     Text("Shopee").tag("Shopee")
-                    Text("TikTok Shop").tag("TikTok Shop")
+                    Text("TikTok").tag("TikTok Shop")
+                    Text("Lazada").tag("Lazada")
                 }.pickerStyle(.segmented)
                 Text(scope == "main"
                      ? "Bảng chính: khớp số trên các tab của máy tính (Tất cả, Đã nhận, Chưa nhận…) khi máy tính không bật bộ lọc. Đơn đã nhận quá 24 giờ đã sang kho lưu trữ nên không còn ở đây."
@@ -191,16 +192,23 @@ struct StatsView: View {
         }
     }
 
+    private static let dayFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "vi_VN"); f.dateFormat = "EEE dd/MM/yyyy"; return f
+    }()
+    private static let monthFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "vi_VN"); f.dateFormat = "MM/yyyy"; return f
+    }()
+    private static let weekFmt: DateFormatter = {
+        let f = DateFormatter(); f.locale = Locale(identifier: "vi_VN"); f.dateFormat = "dd/MM"; return f
+    }()
+
     private func label(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "vi_VN")
         switch period {
-        case .day: f.dateFormat = "EEE dd/MM/yyyy"; return f.string(from: d)
-        case .month: f.dateFormat = "MM/yyyy"; return "Tháng " + f.string(from: d)
+        case .day: return Self.dayFmt.string(from: d)
+        case .month: return "Tháng " + Self.monthFmt.string(from: d)
         case .week:
-            f.dateFormat = "dd/MM"
             let end = Calendar.current.date(byAdding: .day, value: 6, to: d) ?? d
-            return "Tuần \(f.string(from: d)) – \(f.string(from: end))"
+            return "Tuần \(Self.weekFmt.string(from: d)) – \(Self.weekFmt.string(from: end))"
         }
     }
 }

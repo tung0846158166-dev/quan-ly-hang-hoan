@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using QuanLyHangHoan.Core.Tracking;
 
 namespace QuanLyHangHoan.Data.Sync;
@@ -131,6 +131,8 @@ public static class SyncProtocol
         JsonSerializer.Serialize(new
         {
             type = "pc_ack", room, requestId, code, outcome, extra = message, ackStage = "photo",
+            // Điện thoại chỉ coi ảnh là đã lưu khi thấy photoSaved=true (quy tắc 6): chỉ báo true khi PC thực sự đã lưu ảnh bền.
+            photoSaved = outcome == "success",
             captureId = captureId.Length > 0 ? captureId : null,
         });
 

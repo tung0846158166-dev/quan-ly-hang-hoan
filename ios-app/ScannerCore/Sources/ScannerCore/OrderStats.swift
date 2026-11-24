@@ -57,10 +57,25 @@ public enum OrderStats {
         var comps = DateComponents()
         comps.year = y; comps.month = m; comps.day = d
         if parts.count > 1 {
-            let t = parts[1].split(separator: ":").compactMap { Int($0) }
-            if t.count >= 2 { comps.hour = t[0]; comps.minute = t[1]; if t.count > 2 { comps.second = t[2] } }
+            let rawTime = parts[1]
+            let timeParts = rawTime.split(separator: ":")
+            if timeParts.count >= 2,
+               let hh = Int(timeParts[0]),
+               let mm = Int(timeParts[1]),
+               (0...23).contains(hh), (0...59).contains(mm) {
+                comps.hour = hh
+                comps.minute = mm
+                if timeParts.count > 2 {
+                    let secDigits = String(timeParts[2].prefix(while: { $0.isNumber }))
+                    if let ss = Int(secDigits), (0...59).contains(ss) { comps.second = ss }
+                }
+            }
         }
-        return calendar.date(from: comps)
+        guard let date = calendar.date(from: comps) else { return nil }
+        // Chặn ngày không có thật (vd 31/02/2026) bị Calendar tự cộng dồn sang tháng sau.
+        let check = calendar.dateComponents([.year, .month, .day], from: date)
+        guard check.year == y, check.month == m, check.day == d else { return nil }
+        return date
     }
 
     public static func bucketStart(_ date: Date, period: StatsPeriod, calendar: Calendar = .current) -> Date {

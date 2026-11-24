@@ -3,6 +3,7 @@ import UIKit
 import SwiftUI
 
 /// Camera + bộ quét mã gốc của iPhone (AVCaptureMetadataOutput).
+/// Mọi thao tác cấu hình phần cứng camera (`device.lockForConfiguration`, `session`, `metaOutput`) đều chạy tuần tự trên `queue`.
 final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutputObjectsDelegate, AVCaptureVideoDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     var onCode: ((String) -> Void)?
@@ -11,32 +12,85 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var torchOn = false
     @Published var running = false
     @Published var denied = false
-    /// Camera tự nghỉ (lâu không quét được mã, hoặc máy quá nóng); chạm để quét tiếp.
+    /// Camera tự nghỉ (lâu không quét được mã, máy quá nóng, hoặc có cuộc gọi); chạm để quét tiếp.
     @Published var restReason: String?
 
     // ---- Chống nóng máy ----
     // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 15 giây không thấy mã nào thì 15 hình/giây;
     // 30 giây không thấy mã thì tạm dừng camera. Máy nóng (thermalState .serious) thì 12 hình/giây, quá nóng (.critical) thì dừng.
     private let activeFPS: Int32 = 24, idleFPS: Int32 = 15, hotFPS: Int32 = 12
-    private var currentFPS: Int32 = 0
-    private var lastCodeAt = Date()
-    private var idleTimer: Timer?
-    private var thermalObserver: NSObjectProtocol?
+    private var currentFPS: Int32 = 0           // CHỈ đọc/ghi trên `queue`
+    private var desiredZoom: CGFloat = 1        // CHỈ đọc/ghi trên `queue`
+    private var lastCodeAt = Date()             // CHỈ đọc/ghi trên main thread
+    private var wantsRunning = false            // CHỈ đọc/ghi trên main thread
+    private var pausedBySystem = false          // CHỈ đọc/ghi trên main thread
+    private var idleTimer: Timer?               // CHỈ đọc/ghi trên main thread
+    private weak var attachedPreviewLayer: AVCaptureVideoPreviewLayer? // CHỈ đọc/ghi trên main thread
+    private var observers: [NSObjectProtocol] = []
+
+    private let queue = DispatchQueue(label: "camera.session")
+    private let frameLock = NSLock()
+    private var latestBuffer: CVPixelBuffer?
+    private var configured = false              // CHỈ đọc/ghi trên `queue`
+    private var device: AVCaptureDevice?        // CHỈ đọc/ghi trên `queue`
+    private var metaOutput: AVCaptureMetadataOutput? // CHỈ đọc/ghi trên `queue`
+    private let ciContext = CIContext()
+    private var lastRegion = CGRect.zero        // CHỈ đọc/ghi trên main thread
+    private let metaQueue = DispatchQueue(label: "camera.meta", qos: .userInteractive)
 
     override init() {
         super.init()
-        thermalObserver = NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+        let nc = NotificationCenter.default
+        observers.append(nc.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.applyThermalAndIdle()
-        }
+        })
+        observers.append(nc.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.pausedBySystem = true
+            self.idleTimer?.invalidate()
+            self.idleTimer = nil
+            self.running = false
+            self.torchOn = false
+            self.restReason = "Camera tạm dừng do có cuộc gọi hoặc ứng dụng khác đang dùng."
+        })
+        observers.append(nc.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: .main) { [weak self] _ in
+            guard let self = self, self.pausedBySystem else { return }
+            self.pausedBySystem = false
+            if self.wantsRunning {
+                self.start()
+            }
+        })
+        observers.append(nc.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.running = false
+            self.torchOn = false
+            if self.wantsRunning {
+                self.begin()
+            }
+        })
+        observers.append(nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            let status = AVCaptureDevice.authorizationStatus(for: .video)
+            if status == .authorized && self.denied {
+                self.denied = false
+                if self.wantsRunning { self.begin() }
+            }
+        })
     }
+
     deinit {
-        if let o = thermalObserver { NotificationCenter.default.removeObserver(o) }
+        let nc = NotificationCenter.default
+        for o in observers { nc.removeObserver(o) }
         idleTimer?.invalidate()
+        let s = session
+        queue.async {
+            if s.isRunning { s.stopRunning() }
+        }
     }
 
     private func setFPS(_ fps: Int32) {
-        queue.async {
-            guard let dev = self.device, fps != self.currentFPS else { return }
+        queue.async { [weak self] in
+            guard let self = self, let dev = self.device, fps != self.currentFPS else { return }
             let ok = dev.activeFormat.videoSupportedFrameRateRanges.contains { Double(fps) >= $0.minFrameRate && Double(fps) <= $0.maxFrameRate }
             guard ok, (try? dev.lockForConfiguration()) != nil else { return }
             dev.activeVideoMinFrameDuration = CMTime(value: 1, timescale: fps)
@@ -52,62 +106,100 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         let thermal = ProcessInfo.processInfo.thermalState
         if thermal == .critical {
             restReason = "Máy đang quá nóng nên camera tạm nghỉ. Để máy nguội một chút rồi chạm để quét tiếp."
-            stop(); return
+            stop()
+            return
         }
         let idle = Date().timeIntervalSince(lastCodeAt)
         let restAfter = UserDefaults.standard.object(forKey: "cameraRestAfterSec") as? Double ?? 30
         if restAfter > 0, idle > restAfter {
             restReason = "Camera tạm nghỉ vì \(Int(restAfter)) giây không quét mã (đỡ nóng máy, đỡ tốn pin). Chạm để quét tiếp."
-            stop(); return
+            stop()
+            return
         }
         if thermal == .serious { setFPS(hotFPS) }
         else if idle > 15 { setFPS(idleFPS) }
         else { setFPS(activeFPS) }
     }
 
-    private let queue = DispatchQueue(label: "camera.session")
-    private let frameLock = NSLock()
-    private var latestBuffer: CVPixelBuffer?
-    private var configured = false
-    private var device: AVCaptureDevice?
-    private var metaOutput: AVCaptureMetadataOutput?
-    private let ciContext = CIContext()
-    private var lastRegion = CGRect.zero
-    private let metaQueue = DispatchQueue(label: "camera.meta", qos: .userInteractive)
-
     func start() {
+        wantsRunning = true
+        pausedBySystem = false
         restReason = nil
         lastCodeAt = Date()
-        idleTimer?.invalidate()
-        idleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.applyThermalAndIdle() }
         switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .authorized: begin()
+        case .authorized:
+            denied = false
+            begin()
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { ok in
-                DispatchQueue.main.async { if ok { self.begin() } else { self.denied = true } }
+            denied = false
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] ok in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    if ok {
+                        self.denied = false
+                        if self.wantsRunning { self.begin() }
+                    } else {
+                        self.denied = true
+                        self.wantsRunning = false
+                    }
+                }
             }
         default:
             denied = true
+            idleTimer?.invalidate()
+            idleTimer = nil
         }
     }
 
     private func begin() {
-        queue.async {
+        idleTimer?.invalidate()
+        idleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            self?.applyThermalAndIdle()
+        }
+        queue.async { [weak self] in
+            guard let self = self else { return }
             if !self.configured { self.configure() }
             if !self.session.isRunning { self.session.startRunning() }
-            DispatchQueue.main.async {
-                self.running = self.session.isRunning
-                self.currentFPS = 0
+            self.currentFPS = 0
+            let isRunning = self.session.isRunning
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if !self.wantsRunning {
+                    // Đã có lệnh stop() trong lúc chờ startRunning() trên `queue`: dừng ngay để không rò camera.
+                    self.stop()
+                    return
+                }
+                self.running = isRunning
+                self.lastRegion = .zero
+                if let layer = self.attachedPreviewLayer {
+                    self.updateScanRegion(layer)
+                }
                 self.applyThermalAndIdle()
             }
         }
     }
 
     func stop() {
-        idleTimer?.invalidate(); idleTimer = nil
-        queue.async {
+        wantsRunning = false
+        pausedBySystem = false
+        idleTimer?.invalidate()
+        idleTimer = nil
+        running = false
+        torchOn = false
+        lastRegion = .zero
+        frameLock.lock()
+        latestBuffer = nil
+        frameLock.unlock()
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            if let dev = self.device, dev.hasTorch, dev.torchMode != .off {
+                if (try? dev.lockForConfiguration()) != nil {
+                    dev.torchMode = .off
+                    dev.unlockForConfiguration()
+                }
+            }
             if self.session.isRunning { self.session.stopRunning() }
-            DispatchQueue.main.async { self.running = false; self.torchOn = false }
+            self.currentFPS = 0
         }
     }
 
@@ -116,7 +208,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         if session.canSetSessionPreset(.hd1920x1080) { session.sessionPreset = .hd1920x1080 }
         guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: dev), session.canAddInput(input) else {
-            session.commitConfiguration(); return
+            session.commitConfiguration()
+            return
         }
         session.addInput(input)
         device = dev
@@ -125,7 +218,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         if session.canAddOutput(meta) {
             session.addOutput(meta)
             metaOutput = meta
-            meta.setMetadataObjectsDelegate(self, queue: metaQueue)   // không dùng luồng giao diện: giao diện bận cũng không làm trễ việc dò mã
+            meta.setMetadataObjectsDelegate(self, queue: metaQueue)
             let wanted: [AVMetadataObject.ObjectType] = [.code128, .code39, .code93, .ean13, .ean8, .upce, .qr, .itf14, .interleaved2of5, .dataMatrix, .pdf417]
             meta.metadataObjectTypes = wanted.filter { meta.availableMetadataObjectTypes.contains($0) }
         }
@@ -144,6 +237,9 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             if dev.isFocusModeSupported(.continuousAutoFocus) { dev.focusMode = .continuousAutoFocus }
             if dev.isAutoFocusRangeRestrictionSupported { dev.autoFocusRangeRestriction = .near }
             if dev.isExposureModeSupported(.continuousAutoExposure) { dev.exposureMode = .continuousAutoExposure }
+            if desiredZoom > 1 {
+                dev.videoZoomFactor = max(1, min(desiredZoom, dev.activeFormat.videoMaxZoomFactor, 6))
+            }
             dev.unlockForConfiguration()
         } catch {}
         configured = true
@@ -151,34 +247,62 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
 
     /// Chỉ nhận mã nằm trong khung đang nhìn thấy (khung nhỏ hơn toàn màn hình). Nếu tính ra giá trị lạ thì giữ nguyên toàn khung hình.
     func updateScanRegion(_ layer: AVCaptureVideoPreviewLayer) {
-        guard let meta = metaOutput, layer.bounds.width > 20, layer.bounds.height > 20 else { return }
+        attachedPreviewLayer = layer
+        guard layer.bounds.width > 20, layer.bounds.height > 20 else { return }
         let r = layer.metadataOutputRectConverted(fromLayerRect: layer.bounds)
-        guard r.width > 0.1, r.height > 0.1, r.minX >= -0.01, r.minY >= -0.01, r.maxX <= 1.01, r.maxY <= 1.01 else { return }
-        // Đặt lại vùng quét làm bộ dò mã khởi động lại và có thể mất vài giây mới nhận được mã: chỉ đặt khi vùng thật sự đổi
-        // (bố cục chạy lại mỗi lần đổi chế độ quét, trước đây cũng đặt lại vùng mỗi lần).
+        guard r.minX.isFinite, r.minY.isFinite, r.width.isFinite, r.height.isFinite,
+              r.width > 0.1, r.height > 0.1,
+              r.minX >= -0.01, r.minY >= -0.01, r.maxX <= 1.01, r.maxY <= 1.01 else { return }
+        let clamped = CGRect(
+            x: max(0, min(1, r.minX)),
+            y: max(0, min(1, r.minY)),
+            width: max(0.1, min(1, r.width)),
+            height: max(0.1, min(1, r.height))
+        )
         let l = lastRegion
-        if abs(l.minX - r.minX) < 0.004, abs(l.minY - r.minY) < 0.004, abs(l.width - r.width) < 0.004, abs(l.height - r.height) < 0.004 { return }
-        lastRegion = r
-        queue.async { meta.rectOfInterest = r }
+        if abs(l.minX - clamped.minX) < 0.004,
+           abs(l.minY - clamped.minY) < 0.004,
+           abs(l.width - clamped.width) < 0.004,
+           abs(l.height - clamped.height) < 0.004 { return }
+        lastRegion = clamped
+        queue.async { [weak self] in
+            guard let meta = self?.metaOutput else { return }
+            meta.rectOfInterest = clamped
+        }
     }
 
     func setTorch(_ on: Bool) {
-        guard let dev = device, dev.hasTorch else { return }
-        do {
-            try dev.lockForConfiguration()
-            dev.torchMode = on ? .on : .off
-            dev.unlockForConfiguration()
-            torchOn = on
-        } catch {}
+        queue.async { [weak self] in
+            guard let self = self, let dev = self.device, dev.hasTorch else {
+                DispatchQueue.main.async { self?.torchOn = false }
+                return
+            }
+            var applied = false
+            do {
+                try dev.lockForConfiguration()
+                dev.torchMode = on ? .on : .off
+                dev.unlockForConfiguration()
+                applied = (dev.torchMode == .on)
+            } catch {
+                applied = (dev.torchMode == .on)
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.torchOn = applied
+            }
+        }
     }
 
     func setZoom(_ factor: CGFloat) {
-        guard let dev = device else { return }
-        do {
-            try dev.lockForConfiguration()
-            dev.videoZoomFactor = max(1, min(factor, dev.activeFormat.videoMaxZoomFactor, 6))
-            dev.unlockForConfiguration()
-        } catch {}
+        queue.async { [weak self] in
+            guard let self = self else { return }
+            self.desiredZoom = max(1, factor)
+            guard let dev = self.device else { return }
+            do {
+                try dev.lockForConfiguration()
+                dev.videoZoomFactor = max(1, min(self.desiredZoom, dev.activeFormat.videoMaxZoomFactor, 6))
+                dev.unlockForConfiguration()
+            } catch {}
+        }
     }
 
     // MARK: delegates
@@ -187,12 +311,10 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     private var weakCandidate: (code: String, hits: Int, last: Date)?
 
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        // Nhãn thường có nhiều mã cùng lúc (mã vận đơn, mã đơn, QR): gom TẤT CẢ mã hợp lệ đang thấy rồi để bộ chọn quyết định mã nào là mã vận đơn.
+        let minSize = UserDefaults.standard.object(forKey: "minCodeSize") as? Double ?? 0.12
         var found: [String] = []
         for obj in metadataObjects {
             guard let m = obj as? AVMetadataMachineReadableCodeObject, let s = m.stringValue, !s.isEmpty else { continue }
-            // Giới hạn khoảng cách (gần đúng): mã ở xa thì chiếm phần nhỏ của khung hình, bỏ qua mã nhỏ hơn ngưỡng người dùng đặt.
-            let minSize = UserDefaults.standard.object(forKey: "minCodeSize") as? Double ?? 0.12
             if minSize > 0, Double(max(m.bounds.width, m.bounds.height)) < minSize { continue }
             if weakTypes.contains(m.type) {
                 let now = Date()
@@ -209,29 +331,39 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         guard !found.isEmpty else { return }
         let candidates = found
         DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, self.running, self.wantsRunning else { return }
             let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
             self.lastCodeAt = Date()
             if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
-            if let many = self.onCodes { many(candidates) } else { self.onCode?(candidates[0]) }
+            if let many = self.onCodes {
+                many(candidates)
+            } else if let first = candidates.first {
+                self.onCode?(first)
+            }
         }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let px = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        frameLock.lock(); latestBuffer = px; frameLock.unlock()
+        frameLock.lock()
+        latestBuffer = px
+        frameLock.unlock()
     }
 
     /// Ảnh khung hình hiện tại, thu nhỏ để gửi nhanh qua 4G.
     func snapshotJPEG(maxDim: CGFloat = 560, quality: CGFloat = 0.55) -> Data? {
-        frameLock.lock(); let px = latestBuffer; frameLock.unlock()
+        frameLock.lock()
+        let px = latestBuffer
+        frameLock.unlock()
         guard let px = px else { return nil }
         let ci = CIImage(cvPixelBuffer: px)
         guard let cg = ciContext.createCGImage(ci, from: ci.extent) else { return nil }
         let w = CGFloat(cg.width), h = CGFloat(cg.height)
+        guard w > 0, h > 0 else { return nil }
         let scale = min(1, maxDim / max(w, h))
-        let size = CGSize(width: (w * scale).rounded(), height: (h * scale).rounded())
-        let fmt = UIGraphicsImageRendererFormat.default(); fmt.scale = 1
+        let size = CGSize(width: max(1, (w * scale).rounded()), height: max(1, (h * scale).rounded()))
+        let fmt = UIGraphicsImageRendererFormat.default()
+        fmt.scale = 1
         let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
             UIImage(cgImage: cg).draw(in: CGRect(origin: .zero, size: size))
         }
@@ -241,14 +373,41 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
 
 final class PreviewUIView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
-    var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    var previewLayer: AVCaptureVideoPreviewLayer? { layer as? AVCaptureVideoPreviewLayer }
     var onLayout: ((AVCaptureVideoPreviewLayer) -> Void)?
+    private var delayedRelayout: DispatchWorkItem?
+
+    deinit {
+        delayedRelayout?.cancel()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        onLayout?(previewLayer)
-        // Phiên camera có thể chạy sau lần bố cục đầu; tính lại một lần nữa.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            if let self = self { self.onLayout?(self.previewLayer) }
+        guard let pl = previewLayer else { return }
+        updateOrientation(for: pl)
+        onLayout?(pl)
+        delayedRelayout?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self, let layer = self.previewLayer else { return }
+            self.updateOrientation(for: layer)
+            self.onLayout?(layer)
+        }
+        delayedRelayout = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
+    }
+
+    private func updateOrientation(for preview: AVCaptureVideoPreviewLayer) {
+        guard let conn = preview.connection, conn.isVideoOrientationSupported else { return }
+        let interfaceOrientation = window?.windowScene?.interfaceOrientation ?? .portrait
+        let mapped: AVCaptureVideoOrientation
+        switch interfaceOrientation {
+        case .portraitUpsideDown: mapped = .portraitUpsideDown
+        case .landscapeLeft: mapped = .landscapeLeft
+        case .landscapeRight: mapped = .landscapeRight
+        default: mapped = .portrait
+        }
+        if conn.videoOrientation != mapped {
+            conn.videoOrientation = mapped
         }
     }
 }
@@ -257,8 +416,8 @@ struct CameraPreview: UIViewRepresentable {
     let controller: CameraController
     func makeUIView(context: Context) -> PreviewUIView {
         let v = PreviewUIView()
-        v.previewLayer.session = controller.session
-        v.previewLayer.videoGravity = .resizeAspectFill
+        v.previewLayer?.session = controller.session
+        v.previewLayer?.videoGravity = .resizeAspectFill
         v.onLayout = { [weak controller] layer in controller?.updateScanRegion(layer) }
         return v
     }

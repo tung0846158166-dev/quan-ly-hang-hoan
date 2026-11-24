@@ -10,7 +10,7 @@ final class SnapshotStore: ObservableObject {
     @Published var notificationsAllowed = false
     @Published var assembleInfo = ""
     @Published var stats: [String: Int] = [:]
-    // Số đếm tính sẵn một lần mỗi khi danh sách đổi (trước đây mỗi lần giao diện vẽ lại đều quét cả ~3000 đơn).
+    // Số đếm tính sẵn một lần mỗi khi danh sách đổi (tránh quét lại ~5000 đơn trong body).
     @Published private(set) var overdueCount = 0
     @Published private(set) var soonCount = 0
     @Published private(set) var alertCount = 0
@@ -34,28 +34,62 @@ final class SnapshotStore: ObservableObject {
     private var lastDeltaSeq = 0
     /// Gói thay đổi không khớp bản gốc trên điện thoại: xin PC gửi lại danh sách đầy đủ.
     var onNeedFull: () -> Void = {}
-    /// Giải mã, dựng chỉ mục và ghi file chạy ở luồng nền để không làm đứng giao diện khi đang đồng bộ.
+    /// Giải mã, dựng chỉ mục và ghi file chạy ở luồng nền để không làm đứng giao diện khi đang đồng bộ 5.000+ đơn.
     private let work = DispatchQueue(label: "snapshot.work", qos: .userInitiated)
     private var progressReceived = 0
     private var progressTotal = 0
     private var progressError: String?
     private var lastInfoAt = Date.distantPast
-    private var index: [String: OrderRow] = [:]
-    private var fileURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("snapshot.json") }
-    private var baseURL: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("snapshot_base.json") }
+    private var index = SnapshotIndex()
+
+    private static var docsDir: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+    }
+    private var fileURL: URL { Self.docsDir.appendingPathComponent("snapshot.json") }
+    private var baseURL: URL { Self.docsDir.appendingPathComponent("snapshot_base.json") }
 
     init() {
-        if let data = try? Data(contentsOf: fileURL), let p = try? JSONDecoder().decode(SnapshotPayload.self, from: data) {
-            set(p, save: false)
-        }
-        if let data = try? Data(contentsOf: baseURL), let b = try? JSONDecoder().decode(SnapshotPayload.self, from: data) {
-            baseRows = b.rows; baseSid = b.sid
+        let fURL = fileURL
+        let bURL = baseURL
+        let savedSeq = UserDefaults.standard.integer(forKey: "snapshotLastDeltaSeq")
+        let savedSid = UserDefaults.standard.string(forKey: "snapshotLastDeltaSid") ?? ""
+        // Đọc cache JSON (~2-4 MB với 5.000 đơn) trên luồng nền để không đóng băng màn hình lúc mở app.
+        work.async { [weak self] in
+            let cached: SnapshotPayload? = (try? Data(contentsOf: fURL)).flatMap { try? JSONDecoder().decode(SnapshotPayload.self, from: $0) }
+            let cachedIdx = cached.map { SnapshotIndex(rows: $0.rows) }
+            let base: SnapshotPayload? = (try? Data(contentsOf: bURL)).flatMap { try? JSONDecoder().decode(SnapshotPayload.self, from: $0) }
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if self.baseSid.isEmpty, let b = base {
+                    self.baseRows = b.rows
+                    self.baseSid = b.sid
+                    if savedSid == b.sid && savedSeq > 0 { self.lastDeltaSeq = savedSeq }
+                }
+                // Chỉ nạp bản đĩa nếu chưa nhận gói mới từ mạng và không ở chế độ mẫu.
+                if self.updatedAt == nil, !self.isDemoMode, let p = cached, let idx = cachedIdx {
+                    self.apply(p, index: idx)
+                }
+            }
         }
     }
 
     var hasData: Bool { updatedAt != nil || isDemoMode }
     /// Đang ghép dở (thiếu mảnh, chưa lỗi).
     var incomplete: Bool { !isDemoMode && progressError == nil && progressTotal > 0 && progressReceived < progressTotal }
+
+    /// Xóa bộ ghép mảnh dở khi đổi mã phòng.
+    func resetAssemblers() {
+        progressReceived = 0
+        progressTotal = 0
+        progressError = nil
+        assembleInfo = ""
+        let asm = assembler, dasm = deltaAssembler
+        work.async {
+            asm.reset()
+            dasm.reset()
+        }
+    }
 
     /// Bật/tắt chế độ xem thử với dữ liệu mẫu. Dữ liệu thật được giữ nguyên trong bộ nhớ và trên đĩa.
     func setDemoMode(_ on: Bool) {
@@ -72,7 +106,7 @@ final class SnapshotStore: ObservableObject {
             stats = demo.stats
             updatedAt = Date(timeIntervalSince1970: Double(demo.time) / 1000)
             dismissed = []
-            index = Self.buildIndex(demo.rows)
+            index = SnapshotIndex(rows: demo.rows)
             recount()
             revision += 1
         } else {
@@ -86,7 +120,7 @@ final class SnapshotStore: ObservableObject {
             savedRealStats = [:]
             savedRealUpdatedAt = nil
             savedRealDismissed = []
-            index = Self.buildIndex(rows)
+            index = SnapshotIndex(rows: rows)
             recount()
             revision += 1
         }
@@ -98,9 +132,9 @@ final class SnapshotStore: ObservableObject {
         work.async { [weak self] in
             let p = asm.add(chunk)
             let received = asm.partsReceived, total = asm.partsTotal, error = asm.lastError
-            var built: [String: OrderRow]? = nil
+            var built: SnapshotIndex? = nil
             if let p = p {
-                built = Self.buildIndex(p.rows)
+                built = SnapshotIndex(rows: p.rows)
                 if let data = try? JSONEncoder().encode(p) {
                     try? data.write(to: url, options: .atomic)
                     try? data.write(to: burl, options: .atomic)
@@ -112,7 +146,7 @@ final class SnapshotStore: ObservableObject {
         }
     }
 
-    private func finishIngest(payload: SnapshotPayload?, index built: [String: OrderRow]?, received: Int, total: Int, error: String?) {
+    private func finishIngest(payload: SnapshotPayload?, index built: SnapshotIndex?, received: Int, total: Int, error: String?) {
         progressReceived = received; progressTotal = total; progressError = error
         // Chỉ cập nhật dòng tiến độ vài lần mỗi giây (mỗi mảnh một lần làm các màn hình vẽ lại liên tục).
         let now = Date()
@@ -121,7 +155,11 @@ final class SnapshotStore: ObservableObject {
             assembleInfo = error.map { "Lỗi giải mã: \($0)" } ?? "Đã ghép \(received)/\(total) mảnh"
         }
         if let p = payload, let idx = built {
-            baseRows = p.rows; baseSid = p.sid; lastDeltaSeq = 0
+            baseRows = p.rows
+            baseSid = p.sid
+            lastDeltaSeq = 0
+            UserDefaults.standard.set(p.sid, forKey: "snapshotLastDeltaSid")
+            UserDefaults.standard.set(0, forKey: "snapshotLastDeltaSeq")
             apply(p, index: idx)
         }
     }
@@ -139,44 +177,39 @@ final class SnapshotStore: ObservableObject {
             }
             let rows = d.apply(to: base)
             let p = SnapshotPayload(time: d.time, count: rows.count, rows: rows, stats: d.stats, sid: sid)
-            let built = Self.buildIndex(rows)
+            let built = SnapshotIndex(rows: rows)
             Task { @MainActor [weak self] in
                 guard let self = self, self.baseSid == sid, d.seq > self.lastDeltaSeq else { return }
                 self.lastDeltaSeq = d.seq
+                UserDefaults.standard.set(sid, forKey: "snapshotLastDeltaSid")
+                UserDefaults.standard.set(d.seq, forKey: "snapshotLastDeltaSeq")
                 self.apply(p, index: built)
-                self.work.async { if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) } }
+                self.work.async {
+                    if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) }
+                }
             }
         }
-    }
-
-    /// Đơn đứng trước thắng (danh sách đã xếp đơn đang chờ lên trước), nên mã trùng giữa bảng chính/lưu trữ ưu tiên đơn đang chờ.
-    nonisolated private static func buildIndex(_ rows: [OrderRow]) -> [String: OrderRow] {
-        var index: [String: OrderRow] = [:]
-        index.reserveCapacity(rows.count * 2)
-        for r in rows {
-            // Mã chính trước, rồi mã đơn và các mã khác (mã vận đơn hoàn trên kiện, mã yêu cầu trả hàng) — mã chính của đơn khác không bị đè.
-            let kc = r.c.uppercased()
-            if index[kc] == nil { index[kc] = r }
-        }
-        for r in rows {
-            for k in r.lookupCodes.dropFirst() where index[k] == nil { index[k] = r }
-        }
-        return index
     }
 
     /// Các mã đã quét hoàn kho trên điện thoại mà PC chưa xác nhận: danh sách mới từ PC chưa có lượt quét này nên không được ghi đè.
     var unconfirmedReturnCodes: () -> Set<String> = { [] }
     /// Thời điểm quét (ms epoch) theo mã vận đơn cho các lượt quét chưa được PC xác nhận để điền giờ nhận tại kho tức thì.
     var unconfirmedReturnScanTimes: () -> [String: Int] = { [:] }
+    /// Các thao tác sửa cục bộ chưa được PC xác nhận (ghi chú, đổi trạng thái, xóa, nhận đơn hủy).
+    var pendingLocalOverlays: () -> [LocalEditOverlay] = { [] }
 
-    private static func formatLocalTimestamp(_ date: Date) -> String {
+    private static let localTimeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "dd/MM/yyyy HH:mm:ss"
-        return f.string(from: date)
+        return f
+    }()
+
+    private static func formatLocalTimestamp(_ date: Date) -> String {
+        localTimeFormatter.string(from: date)
     }
 
-    private func apply(_ p: SnapshotPayload, index built: [String: OrderRow]) {
+    private func apply(_ p: SnapshotPayload, index built: SnapshotIndex) {
         if isDemoMode {
             // Đang xem dữ liệu mẫu: lưu nền dữ liệu thật vừa nhận để khi tắt mẫu sẽ thấy ngay bản mới nhất.
             savedRealRows = p.rows
@@ -184,27 +217,22 @@ final class SnapshotStore: ObservableObject {
             savedRealUpdatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
             return
         }
-        rows = p.rows
+        var waitingTimes = unconfirmedReturnScanTimes()
+        if waitingTimes.isEmpty {
+            for code in unconfirmedReturnCodes() { waitingTimes[code] = 0 }
+        }
+        let overlays = pendingLocalOverlays()
+        let merged = LocalEditOverlay.apply(
+            to: p.rows,
+            unconfirmedReturnScanTimes: waitingTimes,
+            overlays: overlays
+        )
+        rows = merged.rows
         stats = p.stats
         updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
-        index = built
-        let waitingTimes = unconfirmedReturnScanTimes()
-        let waiting = waitingTimes.isEmpty ? unconfirmedReturnCodes() : Set(waitingTimes.keys)
-        if !waiting.isEmpty {
-            var touched = false
-            for i in rows.indices where rows[i].pd {
-                if let matched = rows[i].lookupCodes.first(where: { waiting.contains($0) }) {
-                    rows[i].st = "Hàng đã trả"; rows[i].rv = true; rows[i].pd = false
-                    if rows[i].rcd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                       let ms = waitingTimes[matched], ms > 0 {
-                        rows[i].rcd = Self.formatLocalTimestamp(Date(timeIntervalSince1970: Double(ms) / 1000))
-                    }
-                    touched = true
-                }
-            }
-            if touched { index = Self.buildIndex(rows) }
-        }
+        index = merged.touched ? SnapshotIndex(rows: rows) : built
         recount()
+        revision += 1
         scheduleNotifications()
     }
 
@@ -224,55 +252,56 @@ final class SnapshotStore: ObservableObject {
         if alertCount != a { alertCount = a }
     }
 
-    private func set(_ p: SnapshotPayload, save: Bool) {
-        rows = p.rows
-        stats = p.stats
-        updatedAt = Date(timeIntervalSince1970: Double(p.time) / 1000)
-        index = Self.buildIndex(p.rows)
+    /// Tra cứu nhanh O(1) theo mã vận đơn / mã đơn / mã phụ.
+    func lookup(_ code: String) -> OrderRow? { index.lookup(code, in: rows) }
+
+    /// Tra cứu nhanh O(1) theo `OrderRow.id` (tránh duyệt tuyến tính 5.000 đơn trong DetailView/Router).
+    func row(byId id: String) -> OrderRow? { index.row(byId: id, in: rows) }
+
+    /// Kiểm tra mã có khớp từ 2 kiện đang chờ trở lên hay không (Quy tắc 2 & 3: tránh tự nhận nhầm kiện A/B).
+    func isAmbiguousPending(_ code: String) -> Bool { index.isAmbiguousPending(code) }
+
+    /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi thao tác cục bộ.
+    private func commit(rebuildIndex: Bool = false) {
+        if rebuildIndex {
+            index = SnapshotIndex(rows: rows)
+        }
         recount()
-        if save {
-            let url = fileURL
-            work.async { if let data = try? JSONEncoder().encode(p) { try? data.write(to: url, options: .atomic) } }
+        revision += 1
+        guard !isDemoMode else { return }
+        let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? nowMs()
+        let payload = SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats, sid: baseSid)
+        let url = fileURL
+        work.async {
+            if let data = try? JSONEncoder().encode(payload) { try? data.write(to: url, options: .atomic) }
         }
         scheduleNotifications()
     }
 
-    func lookup(_ code: String) -> OrderRow? { index[code.uppercased()] }
-
-    /// Ghi lại danh sách hiện tại (giữ nguyên thời điểm đồng bộ) sau khi một đơn đổi theo dõi/ghi chú.
-    private func commit() {
-        if isDemoMode {
-            index = Self.buildIndex(rows)
-            recount()
-            revision += 1
-            return
-        }
-        let t = updatedAt.map { Int($0.timeIntervalSince1970 * 1000) } ?? Int(Date().timeIntervalSince1970 * 1000)
-        set(SnapshotPayload(time: t, count: rows.count, rows: rows, stats: stats), save: true)
-        revision += 1
-    }
-
     /// Sửa ghi chú / theo dõi ngay trên điện thoại (PC nhận cùng nội dung và gửi lại danh sách theo dõi chính thức).
     func applyLocalNote(rowId: String, note: String, watch: Bool) {
-        guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
+        guard let i = index.idToIndex[rowId] ?? rows.firstIndex(where: { $0.id == rowId }), i < rows.count else { return }
         rows[i].wl = watch
         rows[i].wr = watch ? note : ""
-        commit()
+        commit(rebuildIndex: false)
     }
 
-    /// Sửa đơn ngay trên điện thoại (n, co, sz, q, st, ty); PC làm theo rồi gửi lại danh sách chính thức.
+    /// Sửa đơn ngay trên điện thoại (trạng thái `st`); PC làm theo rồi gửi lại danh sách chính thức.
     func applyLocalEdit(rowId: String, fields: [String: Any], receivedAt: Date = Date()) {
-        guard let i = rows.firstIndex(where: { $0.id == rowId }) else { return }
+        guard let i = index.idToIndex[rowId] ?? rows.firstIndex(where: { $0.id == rowId }), i < rows.count else { return }
+        var pdChanged = false
         if let v = fields["n"] as? String { rows[i].n = v }
         if let v = fields["co"] as? String { rows[i].co = v }
         if let v = fields["sz"] as? String { rows[i].sz = v }
         if let v = fields["q"] as? Int { rows[i].q = max(1, v) }
         if let v = fields["ty"] as? String, !v.isEmpty { rows[i].ty = v }
         if let v = fields["st"] as? String {
+            let oldPd = rows[i].pd
             rows[i].st = v
             let received = v == "Hàng đã trả" || v == "Đã nhận"
             rows[i].rv = received
-            rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất" || v == "Hư hỏng")
+            rows[i].pd = !(received || v == "Không cần nhận" || v == "Bị mất")
+            pdChanged = (oldPd != rows[i].pd)
             if received {
                 if rows[i].rcd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     rows[i].rcd = Self.formatLocalTimestamp(receivedAt)
@@ -281,7 +310,7 @@ final class SnapshotStore: ObservableObject {
                 rows[i].rcd = ""
             }
         }
-        commit()
+        commit(rebuildIndex: pdChanged)
     }
 
     /// Đánh dấu đã nhận / chưa nhận ngay trên điện thoại cho các đơn hủy đã chọn.
@@ -295,30 +324,46 @@ final class SnapshotStore: ObservableObject {
             rows[i].rcd = received ? stamp : ""
             changed = true
         }
-        if changed { commit() }
+        if changed { commit(rebuildIndex: true) }
     }
 
     func removeLocal(rowId: String) {
+        let before = rows.count
         rows.removeAll { $0.id == rowId }
-        commit()
+        if rows.count != before { commit(rebuildIndex: true) }
     }
 
     /// PC báo danh sách đơn đang theo dõi + ghi chú đã đổi: cập nhật các đơn ở bảng chính cho khớp.
+    /// Quy tắc 2: ưu tiên khớp đúng mã vận đơn `c`; chỉ fallback sang `o` khi bản ghi theo dõi không có `c` (tránh gán nhầm kiện anh em A/B).
     func applyWatchSync(_ items: [WatchItem]) {
-        var byKey: [String: String] = [:]
+        var byTrack: [String: String] = [:]
+        var byOrderOnly: [String: String] = [:]
         for it in items {
-            if !it.c.isEmpty { byKey[it.c.uppercased()] = it.r }
-            if !it.o.isEmpty && byKey[it.o.uppercased()] == nil { byKey[it.o.uppercased()] = it.r }
+            let tc = it.c.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            let oc = it.o.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            if !tc.isEmpty {
+                byTrack[tc] = it.r
+            } else if !oc.isEmpty {
+                byOrderOnly[oc] = it.r
+            }
         }
         var changed = false
         for i in rows.indices where rows[i].k == "m" {
-            var reason: String? = byKey[rows[i].c.uppercased()]
-            if reason == nil && !rows[i].o.isEmpty { reason = byKey[rows[i].o.uppercased()] }
+            let rc = rows[i].c.uppercased()
+            let ro = rows[i].o.uppercased()
+            var reason: String? = rc.isEmpty ? nil : byTrack[rc]
+            if reason == nil && !ro.isEmpty {
+                reason = byOrderOnly[ro]
+            }
             let wl = reason != nil
             let wr = reason ?? ""
-            if rows[i].wl != wl || rows[i].wr != wr { rows[i].wl = wl; rows[i].wr = wr; changed = true }
+            if rows[i].wl != wl || rows[i].wr != wr {
+                rows[i].wl = wl
+                rows[i].wr = wr
+                changed = true
+            }
         }
-        if changed { commit() }
+        if changed { commit(rebuildIndex: false) }
     }
 
     // MARK: bảng thông báo trên điện thoại
@@ -326,9 +371,14 @@ final class SnapshotStore: ObservableObject {
 
     /// Đơn đang chờ đã quá hạn / sắp đến hạn trong 24 giờ, bỏ các đơn đã ẩn.
     func alerts() -> (overdue: [OrderRow], soon: [OrderRow]) {
-        let now = nowMs()
+        Self.computeAlerts(rows: rows, dismissed: dismissed, now: nowMs())
+    }
+
+    nonisolated static func computeAlerts(rows: [OrderRow], dismissed: Set<String>, now: Int) -> (overdue: [OrderRow], soon: [OrderRow]) {
         var overdue: [OrderRow] = [], soon: [OrderRow] = []
-        for r in rows where r.pd && !dismissed.contains(dismissKey(r)) {
+        for r in rows where r.pd {
+            let key = "\(r.id)|\(r.due)"
+            if dismissed.contains(key) { continue }
             switch r.alertLevel(now: now) {
             case .overdue: overdue.append(r)
             case .soon: soon.append(r)
@@ -384,22 +434,22 @@ final class SnapshotStore: ObservableObject {
         guard !isDemoMode else { return }
         let pending = rows.filter { $0.pd }
         work.async {
-        let planned = NotificationPlanner.plan(rows: pending, now: Date())
-        let center = UNUserNotificationCenter.current()
-        center.getNotificationSettings { s in
-            guard s.authorizationStatus == .authorized || s.authorizationStatus == .provisional else { return }
-            center.removeAllPendingNotificationRequests()
-            for n in planned {
-                let content = UNMutableNotificationContent()
-                content.title = n.title
-                content.body = n.body
-                content.sound = .default
-                if let rid = Self.rowId(fromNoticeId: n.id) { content.userInfo = ["rowId": rid] }
-                let secs = max(5, n.fire.timeIntervalSinceNow)
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secs, repeats: false)
-                center.add(UNNotificationRequest(identifier: n.id, content: content, trigger: trigger))
+            let planned = NotificationPlanner.plan(rows: pending, now: Date())
+            let center = UNUserNotificationCenter.current()
+            center.getNotificationSettings { s in
+                guard s.authorizationStatus == .authorized || s.authorizationStatus == .provisional else { return }
+                center.removeAllPendingNotificationRequests()
+                for n in planned {
+                    let content = UNMutableNotificationContent()
+                    content.title = n.title
+                    content.body = n.body
+                    content.sound = .default
+                    if let rid = Self.rowId(fromNoticeId: n.id) { content.userInfo = ["rowId": rid] }
+                    let secs = max(5, n.fire.timeIntervalSinceNow)
+                    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secs, repeats: false)
+                    center.add(UNNotificationRequest(identifier: n.id, content: content, trigger: trigger))
+                }
             }
-        }
         }
     }
 

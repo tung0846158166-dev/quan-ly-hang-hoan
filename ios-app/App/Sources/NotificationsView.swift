@@ -6,14 +6,17 @@ import ScannerCore
 struct NotificationsView: View {
     @EnvironmentObject var store: SnapshotStore
     @EnvironmentObject var router: NotificationRouter
+    @State private var overdueRows: [OrderRow] = []
+    @State private var soonRows: [OrderRow] = []
+    @State private var upcoming: [PlannedNotice] = []
+    @State private var listNowMs = Int(Date().timeIntervalSince1970 * 1000)
 
-    private var upcoming: [PlannedNotice] {
-        Array(NotificationPlanner.plan(rows: store.rows.filter { $0.pd }, now: Date()).prefix(12))
+    private var refreshToken: String {
+        "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.dismissed.count)|\(store.rows.count)"
     }
 
     var body: some View {
-        let a = store.alerts()
-        let now = Int(Date().timeIntervalSince1970 * 1000)
+        let now = listNowMs
         return List {
             if !store.notificationsAllowed {
                 Section {
@@ -76,8 +79,8 @@ struct NotificationsView: View {
                 .listRowSeparator(.hidden)
 
                 HStack(spacing: 12) {
-                    StatTile(title: "Báo Đỏ · quá hạn", value: a.overdue.count, icon: "exclamationmark.triangle.fill", color: Theme.danger)
-                    StatTile(title: "Báo Vàng · sắp hạn", value: a.soon.count, icon: "clock.fill", color: Theme.warning)
+                    StatTile(title: "Báo Đỏ · quá hạn", value: overdueRows.count, icon: "exclamationmark.triangle.fill", color: Theme.danger)
+                    StatTile(title: "Báo Vàng · sắp hạn", value: soonRows.count, icon: "clock.fill", color: Theme.warning)
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
                 .listRowBackground(Color.clear)
@@ -85,29 +88,29 @@ struct NotificationsView: View {
             }
 
             Section {
-                if a.overdue.isEmpty {
+                if overdueRows.isEmpty {
                     Text("Không có đơn quá hạn")
                         .font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
-                ForEach(a.overdue) { alertRow($0, now: now) }
+                ForEach(overdueRows) { alertRow($0, now: now) }
             } header: {
-                Text("Quá hạn (\(a.overdue.count))")
+                Text("Quá hạn (\(overdueRows.count))")
                     .font(.subheadline.bold())
                     .foregroundColor(Theme.danger)
             }
 
             Section {
-                if a.soon.isEmpty {
+                if soonRows.isEmpty {
                     Text("Không có đơn sắp đến hạn")
                         .font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
-                ForEach(a.soon) { alertRow($0, now: now) }
+                ForEach(soonRows) { alertRow($0, now: now) }
             } header: {
-                Text("Sắp đến hạn trong 24 giờ (\(a.soon.count))")
+                Text("Sắp đến hạn trong 24 giờ (\(soonRows.count))")
                     .font(.subheadline.bold())
                     .foregroundColor(Theme.warning)
             }
@@ -144,12 +147,29 @@ struct NotificationsView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button("Ẩn tất cả thông báo đang hiện") { store.dismissAlerts(a.overdue + a.soon) }
+                    Button("Ẩn tất cả thông báo đang hiện") { store.dismissAlerts(overdueRows + soonRows) }
                     Button("Hiện lại các thông báo đã ẩn") { store.restoreDismissed() }
                 } label: { Image(systemName: "ellipsis.circle") }
             }
         }
         .sheet(item: $router.openRow) { DetailView(row: $0) }
+        .task(id: refreshToken) {
+            let rowsSnapshot = store.rows
+            let dismissedSnapshot = store.dismissed
+            let nowDate = Date()
+            let nowMs = Int(nowDate.timeIntervalSince1970 * 1000)
+            let result = await Task.detached(priority: .userInitiated) { () -> ([OrderRow], [OrderRow], [PlannedNotice]) in
+                let a = SnapshotStore.computeAlerts(rows: rowsSnapshot, dismissed: dismissedSnapshot, now: nowMs)
+                let pending = rowsSnapshot.filter { $0.pd }
+                let planned = Array(NotificationPlanner.plan(rows: pending, now: nowDate).prefix(12))
+                return (a.overdue, a.soon, planned)
+            }.value
+            guard !Task.isCancelled else { return }
+            overdueRows = result.0
+            soonRows = result.1
+            upcoming = result.2
+            listNowMs = nowMs
+        }
     }
 
     private func alertRow(_ r: OrderRow, now: Int) -> some View {
@@ -186,6 +206,6 @@ struct NotificationsView: View {
 
     private func openPlanned(_ n: PlannedNotice) {
         let rid = SnapshotStore.rowId(fromNoticeId: n.id)
-        if let rid = rid, let r = store.rows.first(where: { $0.id == rid }) { router.openRow = r }
+        if let rid = rid, let r = store.row(byId: rid) { router.openRow = r }
     }
 }

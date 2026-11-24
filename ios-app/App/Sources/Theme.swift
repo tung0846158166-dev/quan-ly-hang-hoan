@@ -66,7 +66,6 @@ enum Theme {
         switch k {
         case .returnScan: return accent
         case .newOrder: return teal
-        default: return danger
         }
     }
 

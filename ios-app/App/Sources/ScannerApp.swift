@@ -14,7 +14,13 @@ struct ScannerApp: App {
                 .environmentObject(engine.snapshot)
                 .environmentObject(router)
                 .task { router.store = engine.snapshot; engine.start(); engine.snapshot.refreshAuthorization() }
-                .onChange(of: scenePhase) { phase in if phase != .active { engine.flushPersist() } }
+                .onChange(of: scenePhase) { phase in
+                    if phase != .active {
+                        engine.flushPersist(background: true)
+                    } else {
+                        engine.handleForeground()
+                    }
+                }
         }
     }
 }

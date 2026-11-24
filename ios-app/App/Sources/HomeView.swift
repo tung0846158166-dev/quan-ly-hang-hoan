@@ -23,29 +23,49 @@ struct HomeView: View {
 
     private static let homeProductRanges: [ProductDateRange] = [.today, .days7, .days30, .thisMonth, .all]
 
-    private func recompute() {
-        let next = DashboardMetrics.compute(rows: store.rows, stats: store.stats, now: Date(), urgentLimit: 3)
-        let datesAvailable = ProductMetrics.hasAnyDate(rows: store.rows)
-        let activeRange: ProductDateRange = datesAvailable ? productDateRange : .all
-        let filteredProducts = ProductMetrics.filter(
-            rows: store.rows,
-            platform: .all,
-            dateRange: activeRange,
-            dateBasis: .returnDate,
-            now: Date()
-        )
-        let nextProducts = ProductMetrics.compute(rows: filteredProducts)
+    private static let todayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "vi_VN")
+        f.dateFormat = "EEE, dd/MM"
+        return f
+    }()
+
+    private var recomputeToken: String {
+        "\(productDateRange.rawValue)|\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.rows.count)"
+    }
+
+    @MainActor
+    private func runRecompute() async {
+        let rowsSnapshot = store.rows
+        let statsSnapshot = store.stats
+        let selectedRange = productDateRange
+        let now = Date()
+        let result = await Task.detached(priority: .userInitiated) { () -> (DashboardSummary, ProductStatsSummary, [OrderRow], Bool) in
+            let next = DashboardMetrics.compute(rows: rowsSnapshot, stats: statsSnapshot, now: now, urgentLimit: 3)
+            let datesAvailable = ProductMetrics.hasAnyDate(rows: rowsSnapshot)
+            let activeRange: ProductDateRange = datesAvailable ? selectedRange : .all
+            let filteredProducts = ProductMetrics.filter(
+                rows: rowsSnapshot,
+                platform: .all,
+                dateRange: activeRange,
+                dateBasis: .returnDate,
+                now: now
+            )
+            let nextProducts = ProductMetrics.compute(rows: filteredProducts)
+            return (next, nextProducts, filteredProducts, datesAvailable)
+        }.value
+        guard !Task.isCancelled else { return }
         if reduceMotion {
-            summary = next
-            productStats = nextProducts
-            productFilteredRows = filteredProducts
-            hasProductDates = datesAvailable
+            summary = result.0
+            productStats = result.1
+            productFilteredRows = result.2
+            hasProductDates = result.3
         } else {
             withAnimation(.easeOut(duration: 0.20)) {
-                summary = next
-                productStats = nextProducts
-                productFilteredRows = filteredProducts
-                hasProductDates = datesAvailable
+                summary = result.0
+                productStats = result.1
+                productFilteredRows = result.2
+                hasProductDates = result.3
             }
         }
     }
@@ -64,10 +84,7 @@ struct HomeView: View {
     }
 
     private var formattedToday: String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "vi_VN")
-        f.dateFormat = "EEE, dd/MM"
-        let s = f.string(from: Date())
+        let s = Self.todayFormatter.string(from: Date())
         return s.prefix(1).uppercased() + s.dropFirst()
     }
 
@@ -188,6 +205,7 @@ struct HomeView: View {
                         .font(Theme.Typography.secondaryBold)
                         .foregroundColor(.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -244,12 +262,7 @@ struct HomeView: View {
                 }
             }
             .sheet(item: $selectedRow) { DetailView(row: $0) }
-            .onAppear { recompute() }
-            .onChange(of: productDateRange) { _ in recompute() }
-            .onChange(of: store.updatedAt) { _ in recompute() }
-            .onChange(of: store.revision) { _ in recompute() }
-            .onChange(of: store.rows.count) { _ in recompute() }
-            .onChange(of: store.isDemoMode) { _ in recompute() }
+            .task(id: recomputeToken) { await runRecompute() }
         }
         .sheet(item: $router.openRow) { DetailView(row: $0) }
     }
@@ -420,8 +433,9 @@ struct HomeView: View {
                 Text(title)
                     .font(Theme.Typography.micro)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
             }
             .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
             .contentShape(Rectangle())
@@ -600,22 +614,22 @@ struct HomeView: View {
                 }
 
                 GeometryReader { geo in
-                    let w = geo.size.width
+                    let w = max(0, geo.size.width)
                     HStack(spacing: 2) {
-                        if rw.total == 0 {
+                        if rw.total == 0 || w <= 0 {
                             Capsule().fill(Color.gray.opacity(0.2))
                         } else {
                             if rw.stage1 > 0 {
-                                Rectangle().fill(Theme.info).frame(width: max(6, w * CGFloat(rw.stage1) / CGFloat(total)))
+                                Rectangle().fill(Theme.info).frame(width: min(w, max(6, w * CGFloat(rw.stage1) / CGFloat(total))))
                             }
                             if rw.stage2 > 0 {
-                                Rectangle().fill(Theme.teal).frame(width: max(6, w * CGFloat(rw.stage2) / CGFloat(total)))
+                                Rectangle().fill(Theme.teal).frame(width: min(w, max(6, w * CGFloat(rw.stage2) / CGFloat(total))))
                             }
                             if rw.stage3 > 0 {
-                                Rectangle().fill(Theme.warning).frame(width: max(6, w * CGFloat(rw.stage3) / CGFloat(total)))
+                                Rectangle().fill(Theme.warning).frame(width: min(w, max(6, w * CGFloat(rw.stage3) / CGFloat(total))))
                             }
                             if rw.stage4 > 0 {
-                                Rectangle().fill(Theme.success).frame(width: max(6, w * CGFloat(rw.stage4) / CGFloat(total)))
+                                Rectangle().fill(Theme.success).frame(width: min(w, max(6, w * CGFloat(rw.stage4) / CGFloat(total))))
                             }
                         }
                     }

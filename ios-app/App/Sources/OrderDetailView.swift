@@ -22,7 +22,7 @@ struct DetailView: View {
 
     private static let statuses = ["Chưa nhận", "Hàng đã trả", "Không cần nhận", "Bị mất"]
 
-    private var live: OrderRow { store.rows.first(where: { $0.id == row.id }) ?? row }
+    private var live: OrderRow { store.row(byId: row.id) ?? row }
 
     private var nowMs: Int { Int(Date().timeIntervalSince1970 * 1000) }
 
@@ -254,38 +254,17 @@ struct DetailView: View {
                 }
             }
 
-            // Viên thuốc trạng thái lớn + viên thuốc cảnh báo
-            HStack(spacing: 8) {
-                if live.k == "m" {
-                    Button {
-                        Haptics.tap()
-                        showStatusSheet = true
-                    } label: {
-                        largeStatusPill(text: st.text, color: st.color, showChevron: true)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Đổi trạng thái đơn: \(st.text)")
-                } else {
-                    largeStatusPill(text: st.text, color: st.color, showChevron: false)
+            // Viên thuốc trạng thái lớn + viên thuốc cảnh báo (tự xếp dọc ở Dynamic Type lớn)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    statusPillAction(st: st)
+                    if let alert = alertDisplay { alertPillView(alert) }
+                    Spacer(minLength: 0)
                 }
-
-                if let alert = alertDisplay {
-                    HStack(spacing: 5) {
-                        Image(systemName: alert.icon)
-                            .font(.caption.bold())
-                        Text(alert.text)
-                            .font(.caption.bold())
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(alert.color.opacity(0.16))
-                    .foregroundColor(alert.color)
-                    .clipShape(Capsule())
+                VStack(alignment: .leading, spacing: 6) {
+                    statusPillAction(st: st)
+                    if let alert = alertDisplay { alertPillView(alert) }
                 }
-
-                Spacer(minLength: 0)
             }
         }
         .padding(Theme.cardPadding)
@@ -340,6 +319,38 @@ struct DetailView: View {
             .clipShape(Capsule())
     }
 
+    @ViewBuilder
+    private func statusPillAction(st: (text: String, color: Color)) -> some View {
+        if live.k == "m" {
+            Button {
+                Haptics.tap()
+                showStatusSheet = true
+            } label: {
+                largeStatusPill(text: st.text, color: st.color, showChevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Đổi trạng thái đơn: \(st.text)")
+        } else {
+            largeStatusPill(text: st.text, color: st.color, showChevron: false)
+        }
+    }
+
+    private func alertPillView(_ alert: (text: String, color: Color, icon: String)) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: alert.icon)
+                .font(.caption.bold())
+            Text(alert.text)
+                .font(.caption.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(alert.color.opacity(0.16))
+        .foregroundColor(alert.color)
+        .clipShape(Capsule())
+    }
+
     private func largeStatusPill(text: String, color: Color, showChevron: Bool) -> some View {
         HStack(spacing: 5) {
             Circle().fill(color).frame(width: 7, height: 7)
@@ -380,7 +391,7 @@ struct DetailView: View {
                 icon: "note.text",
                 label: "Ghi chú",
                 color: Theme.info,
-                enabled: true
+                enabled: canEditMain
             ) {
                 Haptics.tap()
                 noteDraft = live.wr
@@ -572,21 +583,38 @@ struct DetailView: View {
     }
 
     // MARK: - 4. Thẻ "Hành trình hàng hoàn" (4 chặng)
+    private func stageColor(for stage: Int) -> Color {
+        switch stage {
+        case 1: return Theme.info
+        case 2: return Theme.teal
+        case 3: return Theme.warning
+        default: return Theme.success
+        }
+    }
+
+    private func stageTitle(for stage: Int) -> String {
+        switch stage {
+        case 1: return "Đã đồng ý"
+        case 2: return "Đang về"
+        case 3: return "Đã về shop"
+        default: return "Đã nhận kho"
+        }
+    }
+
     private var returnJourneyCard: some View {
         let stage = live.returnWatchStage
-        let stageTitles = ["Đã đồng ý", "Đang về", "Đã về shop", "Đã nhận kho"]
-        let stageColors: [Color] = [Theme.info, Theme.teal, Theme.warning, Theme.success]
+        let currentColor = stageColor(for: stage)
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
                 SectionTitleRow(
                     title: "Hành trình hàng hoàn",
                     icon: "arrow.uturn.backward",
-                    iconColor: stageColors[max(0, min(stage - 1, 3))]
+                    iconColor: currentColor
                 )
                 StatusPill(
-                    text: OrderRow.returnWatchStageNames[stage],
-                    color: stageColors[max(0, min(stage - 1, 3))]
+                    text: live.returnWatchStageName,
+                    color: currentColor
                 )
             }
 
@@ -594,7 +622,7 @@ struct DetailView: View {
                 ForEach(1...4, id: \.self) { idx in
                     let reached = idx <= stage
                     let isCurrent = idx == stage
-                    let c = stageColors[idx - 1]
+                    let c = stageColor(for: idx)
 
                     VStack(spacing: 6) {
                         ZStack {
@@ -613,7 +641,7 @@ struct DetailView: View {
                         }
                         .frame(height: 28)
 
-                        Text(stageTitles[idx - 1])
+                        Text(stageTitle(for: idx))
                             .font(.caption2.weight(isCurrent ? .bold : .medium))
                             .foregroundColor(isCurrent ? c : (reached ? .primary : .secondary))
                             .multilineTextAlignment(.center)
@@ -624,7 +652,7 @@ struct DetailView: View {
 
                     if idx < 4 {
                         Rectangle()
-                            .fill(idx < stage ? stageColors[idx] : Color.gray.opacity(0.22))
+                            .fill(idx < stage ? stageColor(for: idx + 1) : Color.gray.opacity(0.22))
                             .frame(height: 2.5)
                             .padding(.bottom, 22)
                     }
@@ -891,12 +919,22 @@ struct DetailView: View {
                                     Text(item.title)
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(.secondary)
-                                    HStack(spacing: 8) {
-                                        Text(item.value)
-                                            .font(item.isMuted ? Theme.Typography.primary : Theme.Typography.primaryBold)
-                                            .foregroundColor(item.isMuted ? .secondary : .primary)
-                                        if let detail = item.detail {
-                                            StatusPill(text: detail, color: item.color)
+                                    ViewThatFits(in: .horizontal) {
+                                        HStack(spacing: 8) {
+                                            Text(item.value)
+                                                .font(item.isMuted ? Theme.Typography.primary : Theme.Typography.primaryBold)
+                                                .foregroundColor(item.isMuted ? .secondary : .primary)
+                                            if let detail = item.detail {
+                                                StatusPill(text: detail, color: item.color)
+                                            }
+                                        }
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(item.value)
+                                                .font(item.isMuted ? Theme.Typography.primary : Theme.Typography.primaryBold)
+                                                .foregroundColor(item.isMuted ? .secondary : .primary)
+                                            if let detail = item.detail {
+                                                StatusPill(text: detail, color: item.color)
+                                            }
                                         }
                                     }
                                 }
@@ -925,21 +963,23 @@ struct DetailView: View {
                     icon: "note.text",
                     iconColor: Theme.warning
                 )
-                Button {
-                    Haptics.tap()
-                    noteDraft = live.wr
-                    watchDraft = live.wl
-                    showNoteSheet = true
-                } label: {
-                    Text(hasShopNote ? "Sửa" : "Thêm")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Theme.accent.opacity(0.15))
-                        .foregroundColor(Theme.accent)
-                        .clipShape(Capsule())
+                if live.k == "m" {
+                    Button {
+                        Haptics.tap()
+                        noteDraft = live.wr
+                        watchDraft = live.wl
+                        showNoteSheet = true
+                    } label: {
+                        Text(hasShopNote ? "Sửa" : "Thêm")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Theme.accent.opacity(0.15))
+                            .foregroundColor(Theme.accent)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
             if hasShopNote || live.wl {
@@ -1053,7 +1093,7 @@ struct DetailView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Sheet đổi Trạng thái đơn
@@ -1094,7 +1134,7 @@ struct DetailView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Helpers

@@ -22,6 +22,16 @@ struct OrderActionFeedback: Equatable {
     var message: String
 }
 
+/// Lệnh sửa đơn cục bộ đang chờ PC xác nhận (lưu bền xuống đĩa kèm `LocalEditOverlay` để không mất khi tắt app hoặc có snapshot mới).
+private struct PendingCommand: Codable {
+    var requestId: String
+    var room: String
+    var title: String
+    var body: String
+    var overlay: LocalEditOverlay
+    var attempts: Int = 0
+}
+
 @MainActor
 final class SyncEngine: ObservableObject {
     @Published var items: [ScanItem] = []
@@ -53,21 +63,45 @@ final class SyncEngine: ObservableObject {
     private var snapshotRetries = 0
     private var sseTask: Task<Void, Never>?
     private var tickTask: Task<Void, Never>?
+    private var started = false
     private var seq = 0
     private let sessionId = String(UUID().uuidString.prefix(6)).lowercased()
     private var lastRawCode = ""
     private var lastRawTime = Date.distantPast
     private var tickCount = 0
 
-    private let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    private let docs: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        ?? FileManager.default.temporaryDirectory
     private var storeURL: URL { docs.appendingPathComponent("scan_items.json") }
+    private var pendingCmdsURL: URL { docs.appendingPathComponent("pending_commands.json") }
     private var photosDir: URL { docs.appendingPathComponent("photos", isDirectory: true) }
+
+    /// Hàng đợi lệnh sửa đơn (`order_note`, `order_edit`, `order_delete`, `cancel_receive`) chờ PC xác nhận.
+    private var pendingCommands: [String: PendingCommand] = [:]
+    private static let maxPendingCommands = 200
+    private static let maxActionFeedbackEntries = 200
+    private static let maxConfirmedPhotoFiles = 200
+    private static let maxConfirmedPhotoBytes: Int64 = 30 * 1024 * 1024
+
+    var pendingNoteCount: Int { pendingCommands.count }
 
     init() {
         room = SyncProtocol.normalizeRoom(UserDefaults.standard.string(forKey: "room") ?? "")   // v2: không có mã phòng mặc định
         try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
         if let data = try? Data(contentsOf: storeURL), let list = try? JSONDecoder().decode([ScanItem].self, from: data) {
             items = list
+        }
+        if let data = try? Data(contentsOf: pendingCmdsURL),
+           let list = try? JSONDecoder().decode([PendingCommand].self, from: data) {
+            for cmd in list { pendingCommands[cmd.requestId] = cmd }
+        } else if let legacy = UserDefaults.standard.dictionary(forKey: "pendingNotes") as? [String: String], !legacy.isEmpty {
+            // Di chuyển hàng đợi cũ (nếu có) sang định dạng bền mới.
+            for (rid, body) in legacy {
+                let ov = LocalEditOverlay(requestId: rid, action: .note, timeMs: 0)
+                pendingCommands[rid] = PendingCommand(requestId: rid, room: room, title: "Shopee Note", body: body, overlay: ov)
+            }
+            savePendingCommands()
+            UserDefaults.standard.removeObject(forKey: "pendingNotes")
         }
     }
 
@@ -104,11 +138,11 @@ final class SyncEngine: ObservableObject {
 
     /// Gửi lại một mã chưa được PC xác nhận (và ảnh nếu có).
     func resend(_ requestId: String) {
-        guard !isDemoMode else { return }
+        guard !isDemoMode, !room.isEmpty else { return }
         guard let i = items.firstIndex(where: { $0.requestId == requestId }) else { return }
         let it = items[i]
         if it.photoFile != nil && !it.photoConfirmed { items[i].photoAttempts = 0 }   // cho phép tự thử gửi ảnh lại
-        transmit(requestId)
+        if !it.scanConfirmed { transmit(requestId) }
         if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired { transmitPhoto(requestId) }
         banner = Banner(code: it.code, text: "Đã gửi lại, đang chờ PC xác nhận", color: Theme.warning)
     }
@@ -150,8 +184,8 @@ final class SyncEngine: ObservableObject {
     var channelUp: Bool { sseConnected || mqttConnected }
     var pendingCount: Int { items.filter { !$0.isSettled }.count }
     var pcOnline: Bool { pcLastSeen.map { Date().timeIntervalSince($0) < 120 } ?? false }
-    /// Ghi nhận máy tính còn online. Chỉ cập nhật tối đa 5 giây một lần: mỗi mảnh danh sách đều gọi hàm này,
-    /// cập nhật liên tục làm mọi màn hình (cả màn Quét có camera) vẽ lại hàng trăm lần mỗi lần đồng bộ -> nóng máy, giật.
+
+    /// Ghi nhận máy tính còn online. Chỉ cập nhật tối đa 5 giây một lần để tránh vẽ lại liên tục khi đang đồng bộ.
     private func markPcSeen() {
         let now = Date()
         if let t = pcLastSeen, now.timeIntervalSince(t) < 5 { return }
@@ -174,7 +208,16 @@ final class SyncEngine: ObservableObject {
             }
             return map
         }
-        guard sseTask == nil else { return }
+        snapshot.pendingLocalOverlays = { [weak self] in
+            guard let self = self else { return [] }
+            let currentRoom = self.room
+            return self.pendingCommands.values
+                .filter { $0.room.isEmpty || $0.room == currentRoom }
+                .map { $0.overlay }
+        }
+        guard !started else { return }
+        started = true
+        cleanupPhotos()
         startSSE()
         startMQTT()
         tickTask = Task { [weak self] in
@@ -185,13 +228,34 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Gọi khi app trở lại foreground: kiểm tra lại quyền thông báo và đánh thức đồng bộ nếu cần.
+    func handleForeground() {
+        snapshot.refreshAuthorization()
+        guard !isDemoMode, !room.isEmpty else { return }
+        if !channelUp {
+            sseTask?.cancel(); sseTask = nil
+            startSSE()
+            startMQTT()
+        } else if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 {
+            requestSnapshot()
+        }
+    }
+
     func setRoom(_ raw: String) {
         let r = SyncProtocol.normalizeRoom(raw)
         guard r != room else { return }
         room = r
         UserDefaults.standard.set(r, forKey: "room")
         pcLastSeen = nil
+        seenMsgs.removeAll()
+        orderActionFeedback.removeAll()
+        snapshotRetries = 0
+        chunkCounter = 0
+        snapshotChunksSeen = 0
+        snapshotLastChunkAt = nil
+        snapshot.resetAssemblers()
         sseTask?.cancel(); sseTask = nil
+        sseConnected = false
         startSSE()
         startMQTT()
     }
@@ -226,7 +290,7 @@ final class SyncEngine: ObservableObject {
         brokerUp = []
         mqttGeneration += 1
         let gen = mqttGeneration
-        if room.isEmpty { return }   // v2: chưa cài mã phòng thì không nối (không có mã phòng mặc định)
+        if room.isEmpty { return }
         let topic = SyncProtocol.mqttTopic(room: room)
         for b in SyncProtocol.mqttBrokers {
             let c = MQTTClient(name: b.name, url: b.url)
@@ -257,25 +321,26 @@ final class SyncEngine: ObservableObject {
     }
 
     private func handleMQTT(_ raw: String) {
-        guard let msg = SyncProtocol.parseMessage(raw, room: room) else { return }
+        guard !room.isEmpty, let msg = SyncProtocol.parseMessage(raw, room: room) else { return }
         dispatch(msg)
     }
 
     /// Gửi một bản tin qua mọi kênh đang có. ntfy chỉ dùng khi nó đang nối, hoặc khi MQTT chưa nối được.
     private func broadcast(_ body: String, title: String, room r: String) {
-        guard !isDemoMode else { return }
+        guard !isDemoMode, !r.isEmpty else { return }
         for c in mqttClients { c.publish(topic: SyncProtocol.mqttTopic(room: r), body: body) }
         if sseConnected || !mqttConnected {
             Task { try? await client.post(topic: SyncProtocol.topic(room: r), title: title, body: body) }
         }
     }
 
-    /// Kênh vừa nối: báo cho PC biết, gửi lại hàng đợi, xin danh sách đơn nếu cũ.
+    /// Kênh vừa nối: báo cho PC biết, mở khóa lại hàng đợi (gồm cả ảnh từng chạm 6 lần thử khi mất mạng), xin danh sách đơn nếu cũ.
     private func channelOpened() {
+        guard !room.isEmpty else { return }
         let hello = SyncProtocol.json(["type": "phone_connected", "room": room, "time": nowMs()])
         broadcast(hello, title: "Shopee Connect", room: room)
-        resendAllPending()
-        resendPendingNotes()
+        resetPendingForReconnect()
+        resendPendingCommands()
         if snapshot.updatedAt == nil || Date().timeIntervalSince(snapshot.updatedAt ?? .distantPast) > 600 { requestSnapshot() }
     }
 
@@ -294,8 +359,9 @@ final class SyncEngine: ObservableObject {
             sseConnected = true
             channelOpened()
         }
-        // Giải mã JSON (mỗi mảnh danh sách đơn khá lớn) ở luồng nền, chỉ phần xử lý kết quả mới về luồng giao diện.
         let r = room
+        guard !r.isEmpty else { return }
+        // Giải mã JSON (mỗi mảnh danh sách đơn khá lớn) ở luồng nền, chỉ phần xử lý kết quả mới về luồng giao diện.
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let msg = SyncProtocol.parseIncoming(sseData: data, room: r) else { return }
             await self?.dispatch(msg)
@@ -324,46 +390,54 @@ final class SyncEngine: ObservableObject {
         case .ack(let ack) where ["note", "edit", "delete"].contains(ack.ackStage ?? ""):
             markPcSeen()
             if isDuplicate("n|\(ack.requestId)|\(ack.outcome)") { return }
-            // PC đã trả lời (thành công hay từ chối) thì thôi gửi lại.
-            pendingNotes[ack.requestId] = nil
-            UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+            let isTemporaryError = ack.outcome == "error"
+            if !isTemporaryError {
+                pendingCommands[ack.requestId] = nil
+                savePendingCommands()
+            } else if var cmd = pendingCommands[ack.requestId] {
+                cmd.attempts += 1
+                if cmd.attempts >= 8 {
+                    pendingCommands[ack.requestId] = nil
+                } else {
+                    pendingCommands[ack.requestId] = cmd
+                }
+                savePendingCommands()
+            }
             let ok = ack.outcome == "success" || ack.outcome == "duplicate"
             let msg = ack.extra ?? (ok ? "PC đã cập nhật" : "PC không thực hiện được")
-            banner = Banner(code: ack.code, text: msg, color: ok ? .green : .red)
+            banner = Banner(code: ack.code, text: msg, color: ok ? Theme.success : Theme.danger)
             let codeKey = ack.code.uppercased()
             if !codeKey.isEmpty {
-                orderActionFeedback[codeKey] = OrderActionFeedback(
+                storeActionFeedback(key: codeKey, feedback: OrderActionFeedback(
                     requestId: ack.requestId,
-                    state: ok ? .confirmed : .failed,
+                    state: ok ? .confirmed : (isTemporaryError ? .pending : .failed),
                     message: msg
-                )
+                ))
             }
             for (k, v) in orderActionFeedback where v.requestId == ack.requestId {
                 orderActionFeedback[k] = OrderActionFeedback(
                     requestId: ack.requestId,
-                    state: ok ? .confirmed : .failed,
+                    state: ok ? .confirmed : (isTemporaryError ? .pending : .failed),
                     message: msg
                 )
             }
-            if !ok { requestSnapshot() }   // lấy lại bản đúng từ PC nếu PC từ chối
+            if !ok && !isTemporaryError { requestSnapshot() }   // lấy lại bản đúng từ PC nếu PC từ chối dứt khoát
 
-        case .ack(let ack) where ack.ackStage == "push":
-            markPcSeen()
-            if isDuplicate("p|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(ack.extra ?? "")") { return }
-            let ok = ack.outcome == "success" || ack.outcome == "duplicate"
-            if ok { for i in items.indices where items[i].kind == .newOrder && items[i].code == ack.code { items[i].pushed = true } ; persist() }
-            banner = Banner(code: ack.code, text: ack.extra ?? (ok ? "Đã đẩy ra bảng chính" : "Chưa đẩy được"), color: ok ? .green : .red)
         case .ack(let ack):
             markPcSeen()
-            let saved = ack.photoSaved == true ? "1" : "0"
+            let saved = ack.photoSaved.map { $0 ? "1" : "0" } ?? "n"
             let stage = ack.ackStage ?? ""
             let cap = ack.captureId ?? ""
             let extra = ack.extra ?? ""
             if isDuplicate("a|\(ack.requestId)|\(ack.code)|\(ack.outcome)|\(stage)|\(cap)|\(saved)|\(extra)") { return }
             guard let i = items.firstIndex(where: { $0.requestId == ack.requestId }) else { return }
+            let wasPhotoConfirmed = items[i].photoConfirmed
             if items[i].apply(ack) {
                 persist()
                 showResult(items[i])
+                if !wasPhotoConfirmed && items[i].photoConfirmed {
+                    cleanupPhotos()
+                }
             }
         default:
             break
@@ -412,8 +486,6 @@ final class SyncEngine: ObservableObject {
     func handleCameraCode(_ raw: String) {
         // Camera hay đọc nhầm hoa văn thành mã vạch: bỏ kết quả không giống mã vận đơn (nhập tay không bị lọc).
         guard TrackingCode.isPlausibleScan(raw) else { return }
-        // Camera vẫn nhìn thấy cùng nhãn sau khi đã quét: không tạo thêm lượt "quét trùng" khi nhãn vẫn nằm trước camera.
-        // Khóa theo cả chế độ quét: đổi sang chế độ khác (Tạo đơn mới, Đơn hủy…) thì quét lại cùng nhãn phải nhận ngay.
         let c = "\(mode.rawValue)|" + TrackingCode.clean(raw), now = Date()
         // Mỗi lần camera còn thấy nhãn thì mốc được gia hạn: chỉ khi nhãn rời khung hình hơn 1 giây rồi quay lại mới tính là lượt quét mới.
         if c == lastCameraCode && now.timeIntervalSince(lastCameraTime) < 1.0 { lastCameraTime = now; return }
@@ -425,6 +497,11 @@ final class SyncEngine: ObservableObject {
         _ = submit(raw: raw, kind: mode, photo: nil, useSnapshot: true)
     }
 
+    private func nextRequestId(prefix: String) -> String {
+        seq += 1
+        return "\(prefix)-\(sessionId)-\(seq)-\(nowMs() % 100000)"
+    }
+
     @discardableResult
     func submit(raw: String, kind: ScanKind, photo: Data?, useSnapshot: Bool) -> Bool {
         let code = TrackingCode.clean(raw)
@@ -434,14 +511,22 @@ final class SyncEngine: ObservableObject {
         if rawKey == lastRawCode && now.timeIntervalSince(lastRawTime) < 1.2 { return false }
         lastRawCode = rawKey; lastRawTime = now
 
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+
         if isDemoMode {
             seq += 1
             let scanMs = nowMs()
             let scanDate = Date(timeIntervalSince1970: Double(scanMs) / 1000)
             let rid = "demo-\(seq)-\(scanMs % 100000)"
-            var item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: nil)
+            var item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: nil, note: kind == .newOrder ? trimmedNote : "")
             let hint = localHint(code: code, kind: kind)
-            if kind == .returnScan, let r = snapshot.lookup(code) {
+            if kind == .returnScan && snapshot.isAmbiguousPending(code) {
+                item.status = .ambiguous
+                item.scanConfirmed = true
+                item.reviewRequired = true
+                item.detail = "Dữ liệu mẫu: mã trùng nhiều kiện đang chờ, cần kiểm tra trên PC."
+                banner = Banner(code: code, text: "Trùng nhiều đơn, cần kiểm tra trên PC", color: Theme.danger, sub: hint)
+            } else if kind == .returnScan, let r = snapshot.lookup(code) {
                 if r.rv {
                     item.status = .duplicate
                     item.scanConfirmed = true
@@ -482,7 +567,7 @@ final class SyncEngine: ObservableObject {
             return true
         }
 
-        // Tạo đơn mới / đơn hủy: đơn đã có trên điện thoại (bảng chính, kho lưu trữ hoặc bảng đơn hủy) thì báo luôn, không tạo lại.
+        // Tạo đơn mới: đơn đã có trên điện thoại (bảng chính, kho lưu trữ hoặc bảng đơn hủy) thì báo luôn, không tạo lại.
         if kind != .returnScan, snapshot.hasData, let r = snapshot.lookup(code) {
             let where_ = r.k == "a" ? "Kho lưu trữ" : (r.k == "c" ? "Bảng đơn hủy" : "Bảng chính")
             banner = Banner(code: code, text: "Đơn đã có ở \(where_), không tạo lại", color: Theme.warning, sub: r.n)
@@ -490,27 +575,33 @@ final class SyncEngine: ObservableObject {
             return false
         }
 
-        seq += 1
-        let rid = "\(sessionId)-\(seq)-\(nowMs() % 100000)"
+        let rid = nextRequestId(prefix: "sc")
         var photoData = photo
         if kind != .newOrder && photoData == nil && useSnapshot && Self.pref("sendPhoto") { photoData = snapshotProvider?() }
         if kind == .newOrder { photoData = nil }  // đơn mới không cần ảnh; ảnh nằm ở bước quét hoàn kho
-        var file: String? = nil
-        if let d = photoData {
-            file = rid + ".jpg"
-            // File ảnh phải có trước khi gửi: ghi ngay (vài chục KB, nhanh) nhưng không mã hóa/ghi cả danh sách ở đây nữa.
-            try? d.write(to: photosDir.appendingPathComponent(file!))
+        var savedFile: String? = nil
+        if let d = photoData, !d.isEmpty {
+            let fileName = rid + ".jpg"
+            do {
+                try d.write(to: photosDir.appendingPathComponent(fileName), options: .atomic)
+                savedFile = fileName
+            } catch {
+                savedFile = nil
+            }
         }
         let scanMs = nowMs()
         let scanDate = Date(timeIntervalSince1970: Double(scanMs) / 1000)
-        let item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: file)
+        let item = ScanItem(requestId: rid, code: code, kind: kind, time: scanMs, photoFile: savedFile, note: kind == .newOrder ? trimmedNote : "")
         items.insert(item, at: 0)
         trimHistory()
-        persist()
-        // Dùng dữ liệu đã lưu trên điện thoại ngay cả khi máy tính tắt: có đơn đang chờ thì đánh dấu đã nhận luôn,
-        // lệnh quét vẫn nằm trong hàng chờ và tự gửi sang máy tính khi máy tính bật. Chưa có đơn trên điện thoại thì chờ máy tính xác nhận.
+        // Ghi bền ngay lập tức để tắt app đột ngột ngay sau lúc quét không bị mất lượt quét khỏi hàng đợi.
+        flushPersist()
+
+        // Quy tắc 2 & 3: chỉ đánh dấu cục bộ khi khớp DUY NHẤT 1 kiện đang chờ (trùng >= 2 kiện -> để PC báo ambiguous).
         let hint = localHint(code: code, kind: kind)
-        if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
+        if kind == .returnScan && snapshot.hasData && snapshot.isAmbiguousPending(code) {
+            banner = Banner(code: code, text: "Trùng nhiều đơn đang chờ, chờ PC kiểm tra", color: Theme.danger, sub: hint)
+        } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.rv {
             banner = Banner(code: code, text: "Quét trùng: đơn đã nhận hoàn kho trước đó", color: Theme.danger, sub: hint)
         } else if kind == .returnScan, snapshot.hasData, let r = snapshot.lookup(code), r.pd {
             snapshot.applyLocalEdit(rowId: r.id, fields: ["st": "Hàng đã trả"], receivedAt: scanDate)
@@ -520,13 +611,16 @@ final class SyncEngine: ObservableObject {
         }
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
         transmit(rid)
-        if file != nil { transmitPhoto(rid) }
+        if savedFile != nil { transmitPhoto(rid) }
         return true
     }
 
     /// Gợi ý tức thì từ danh sách PC gửi sang (PC vẫn là bên quyết định kết quả).
     private func localHint(code: String, kind: ScanKind) -> String {
         guard kind == .returnScan, snapshot.hasData else { return "" }
+        if snapshot.isAmbiguousPending(code) {
+            return "Mã này trùng nhiều kiện đang chờ hoàn"
+        }
         if let r = snapshot.lookup(code) {
             if r.rv { return "Đơn này đã nhận hoàn kho trước đó: \(r.n)" }
             let v = [r.co, r.sz].filter { !$0.isEmpty }.joined(separator: "/")
@@ -536,14 +630,40 @@ final class SyncEngine: ObservableObject {
         return "Không thấy trong danh sách chờ hoàn (đã nhận hoặc chưa có đơn)"
     }
 
-    // MARK: ghi chú đơn (gửi sang PC, giữ trong hàng đợi đến khi PC xác nhận)
-    private var pendingNotes: [String: String] = UserDefaults.standard.dictionary(forKey: "pendingNotes") as? [String: String] ?? [:]
-    var pendingNoteCount: Int { pendingNotes.count }
+    // MARK: thao tác đơn (gửi sang PC, giữ bền kèm overlay đến khi PC xác nhận)
+    private func storeActionFeedback(key: String, feedback: OrderActionFeedback) {
+        if orderActionFeedback.count >= Self.maxActionFeedbackEntries {
+            orderActionFeedback.removeAll()
+        }
+        orderActionFeedback[key] = feedback
+    }
 
     private func setOrderFeedback(for row: OrderRow, requestId: String, state: OrderActionState, message: String) {
         let fb = OrderActionFeedback(requestId: requestId, state: state, message: message)
-        if !row.c.isEmpty { orderActionFeedback[row.c.uppercased()] = fb }
-        if !row.o.isEmpty { orderActionFeedback[row.o.uppercased()] = fb }
+        if !row.c.isEmpty { storeActionFeedback(key: row.c.uppercased(), feedback: fb) }
+        if !row.o.isEmpty { storeActionFeedback(key: row.o.uppercased(), feedback: fb) }
+    }
+
+    private func enqueueCommand(_ cmd: PendingCommand) {
+        pendingCommands[cmd.requestId] = cmd
+        if pendingCommands.count > Self.maxPendingCommands {
+            let sorted = pendingCommands.values.sorted { $0.overlay.timeMs < $1.overlay.timeMs }
+            for old in sorted.prefix(pendingCommands.count - Self.maxPendingCommands) {
+                pendingCommands[old.requestId] = nil
+            }
+        }
+        savePendingCommands()
+    }
+
+    private func savePendingCommands() {
+        guard !isDemoMode else { return }
+        let list = Array(pendingCommands.values)
+        let url = pendingCmdsURL
+        persistQueue.async {
+            if let data = try? JSONEncoder().encode(list) {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
     }
 
     func sendOrderNote(_ row: OrderRow, note: String, watch: Bool = true) {
@@ -555,10 +675,10 @@ final class SyncEngine: ObservableObject {
             setOrderFeedback(for: row, requestId: "demo-note-\(nowMs())", state: .confirmed, message: msg)
             return
         }
-        let rid = "note-\(nowMs())"
+        let rid = nextRequestId(prefix: "note")
         let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, watch: watch, room: room, requestId: rid)
-        pendingNotes[rid] = body
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        let ov = LocalEditOverlay(requestId: rid, action: .note, rowId: row.id, note: t, watch: watch, timeMs: nowMs())
+        enqueueCommand(PendingCommand(requestId: rid, room: room, title: "Shopee Note", body: body, overlay: ov))
         broadcast(body, title: "Shopee Note", room: room)
         snapshot.applyLocalNote(rowId: row.id, note: t, watch: watch)
         let msg = "Đang chờ máy tính xác nhận ghi chú..."
@@ -574,10 +694,11 @@ final class SyncEngine: ObservableObject {
             setOrderFeedback(for: row, requestId: "demo-edit-\(nowMs())", state: .confirmed, message: msg)
             return
         }
-        let rid = "edit-\(nowMs())"
+        let rid = nextRequestId(prefix: "edit")
         let body = SyncProtocol.orderEdit(code: row.c, orderId: row.o, fields: fields, room: room, requestId: rid)
-        pendingNotes[rid] = body
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        let st = fields["st"] as? String
+        let ov = LocalEditOverlay(requestId: rid, action: .editStatus, rowId: row.id, status: st, timeMs: nowMs())
+        enqueueCommand(PendingCommand(requestId: rid, room: room, title: "Shopee Edit", body: body, overlay: ov))
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyLocalEdit(rowId: row.id, fields: fields)
         let msg = "Đang chờ máy tính xác nhận đổi trạng thái..."
@@ -593,15 +714,23 @@ final class SyncEngine: ObservableObject {
             banner = Banner(code: "\(rows.count) đơn", text: "Đã cập nhật cục bộ (dữ liệu mẫu)", color: Theme.accent)
             return
         }
-        let base = nowMs()
-        for (i, row) in rows.enumerated() {
-            let rid = "edit-\(base)-\(i)"
+        let st = fields["st"] as? String
+        let stamp = nowMs()
+        for row in rows {
+            let rid = nextRequestId(prefix: "edit")
             let body = SyncProtocol.orderEdit(code: row.c, orderId: row.o, fields: fields, room: room, requestId: rid)
-            pendingNotes[rid] = body
+            let ov = LocalEditOverlay(requestId: rid, action: .editStatus, rowId: row.id, status: st, timeMs: stamp)
+            pendingCommands[rid] = PendingCommand(requestId: rid, room: room, title: "Shopee Edit", body: body, overlay: ov)
             broadcast(body, title: "Shopee Edit", room: room)
             snapshot.applyLocalEdit(rowId: row.id, fields: fields)
         }
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        if pendingCommands.count > Self.maxPendingCommands {
+            let sorted = pendingCommands.values.sorted { $0.overlay.timeMs < $1.overlay.timeMs }
+            for old in sorted.prefix(pendingCommands.count - Self.maxPendingCommands) {
+                pendingCommands[old.requestId] = nil
+            }
+        }
+        savePendingCommands()
         banner = Banner(code: "\(rows.count) đơn", text: "Đã gửi cập nhật đơn, chờ PC xác nhận", color: Theme.warning)
     }
 
@@ -611,25 +740,28 @@ final class SyncEngine: ObservableObject {
             banner = Banner(code: row.c, text: "Đã xóa cục bộ (dữ liệu mẫu)", color: Theme.accent)
             return
         }
-        let rid = "del-\(nowMs())"
+        let rid = nextRequestId(prefix: "del")
         let body = SyncProtocol.orderDelete(code: row.c, orderId: row.o, room: room, requestId: rid)
-        pendingNotes[rid] = body
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        let ov = LocalEditOverlay(requestId: rid, action: .delete, rowId: row.id, timeMs: nowMs())
+        enqueueCommand(PendingCommand(requestId: rid, room: room, title: "Shopee Delete", body: body, overlay: ov))
         broadcast(body, title: "Shopee Delete", room: room)
         snapshot.removeLocal(rowId: row.id)
         banner = Banner(code: row.c, text: "Đã gửi xóa đơn, chờ PC xác nhận", color: Theme.warning)
         setOrderFeedback(for: row, requestId: rid, state: .pending, message: "Đang chờ máy tính xác nhận xóa đơn...")
     }
 
-    private func resendPendingNotes() {
-        guard !isDemoMode else { return }
-        for b in pendingNotes.values { broadcast(b, title: "Shopee Note", room: room) }
+    private func resendPendingCommands() {
+        guard !isDemoMode, !room.isEmpty else { return }
+        let currentRoom = room
+        for cmd in pendingCommands.values where (cmd.room.isEmpty || cmd.room == currentRoom) && cmd.attempts < 8 {
+            broadcast(cmd.body, title: cmd.title, room: currentRoom)
+        }
     }
 
     /// Gói thay đổi không khớp bản gốc: xin danh sách đầy đủ, nhưng không quá 1 lần mỗi 45 giây và không khi đang ghép dở.
     private var lastFullRequestAt = Date.distantPast
     private func requestFullIfNeeded() {
-        if isDemoMode { return }
+        if isDemoMode || room.isEmpty { return }
         if snapshot.incomplete { return }
         if Date().timeIntervalSince(lastFullRequestAt) < 45 { return }
         lastFullRequestAt = Date()
@@ -637,7 +769,7 @@ final class SyncEngine: ObservableObject {
     }
 
     func requestSnapshot() {
-        guard !isDemoMode else { return }
+        guard !isDemoMode, !room.isEmpty else { return }
         let r = room
         let body = SyncProtocol.snapshotRequest(room: r, now: nowMs())
         broadcast(body, title: "Shopee Snapshot Request", room: r)
@@ -651,10 +783,10 @@ final class SyncEngine: ObservableObject {
             banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "Đã đánh dấu đã nhận (dữ liệu mẫu)" : "Đã đánh dấu chưa nhận (dữ liệu mẫu)", color: Theme.accent)
             return
         }
-        let rid = "cxl-\(nowMs())"
+        let rid = nextRequestId(prefix: "cxl")
         let body = SyncProtocol.cancelReceive(ids: ids, received: received, room: room, requestId: rid)
-        pendingNotes[rid] = body
-        UserDefaults.standard.set(pendingNotes, forKey: "pendingNotes")
+        let ov = LocalEditOverlay(requestId: rid, action: .cancelReceive, cancelIds: ids, received: received, timeMs: nowMs())
+        enqueueCommand(PendingCommand(requestId: rid, room: room, title: "Shopee Edit", body: body, overlay: ov))
         broadcast(body, title: "Shopee Edit", room: room)
         snapshot.applyCancelledReceivedLocal(ids: Set(ids), received: received)
         banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "Đã gửi đánh dấu đã nhận, chờ PC" : "Đã gửi đánh dấu chưa nhận, chờ PC", color: Theme.warning)
@@ -663,14 +795,39 @@ final class SyncEngine: ObservableObject {
     // MARK: thống kê & xuất
     func todayStats(kind: ScanKind) -> (total: Int, valid: Int, dup: Int, missing: Int, pending: Int) {
         let start = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000)
-        let list = items.filter { $0.kind == kind && $0.time >= start }
-        return (list.count, list.filter { $0.status == .success }.count, list.filter { $0.status == .duplicate }.count,
-                list.filter { $0.status == .notFound || $0.status == .ambiguous }.count, items.filter { $0.kind == kind && !$0.isSettled }.count)
+        var total = 0, valid = 0, dup = 0, missing = 0, pending = 0
+        for it in items where it.kind == kind {
+            if !it.isSettled { pending += 1 }
+            if it.time >= start {
+                total += 1
+                switch it.status {
+                case .success: valid += 1
+                case .duplicate: dup += 1
+                case .notFound, .ambiguous: missing += 1
+                default: break
+                }
+            }
+        }
+        return (total, valid, dup, missing, pending)
     }
 
+    private static let csvFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        return f
+    }()
+
     func csv(kind: ScanKind) -> String {
-        let f = DateFormatter(); f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        Self.buildCSV(items: items, kind: kind)
+    }
+
+    nonisolated static func buildCSV(items: [ScanItem], kind: ScanKind) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "dd/MM/yyyy HH:mm:ss"
         var out = "Mã,Thời gian,Trạng thái,Chi tiết\n"
+        out.reserveCapacity(items.count * 64)
         for it in items where it.kind == kind {
             let t = f.string(from: Date(timeIntervalSince1970: Double(it.time) / 1000))
             let detail = it.detail.replacingOccurrences(of: "\"", with: "'")
@@ -681,27 +838,33 @@ final class SyncEngine: ObservableObject {
 
     // MARK: gửi
     private func transmit(_ id: String) {
-        guard !isDemoMode else { return }
+        guard !isDemoMode, !room.isEmpty else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }) else { return }
         items[i].lastSendAt = nowMs()
         items[i].attempts += 1
         let it = items[i]
         let r = room
         let body = SyncProtocol.json(SyncProtocol.scanPayload(kind: it.kind, code: it.code, requestId: it.requestId,
-            captureId: it.captureId, captureTime: it.time, time: it.time, room: r, note: note))
+            captureId: it.captureId, captureTime: it.time, time: it.time, room: r, note: it.note))
         persist()
         broadcast(body, title: "Shopee Scan", room: r)
     }
 
     private func transmitPhoto(_ id: String) {
-        guard !isDemoMode else { return }
+        guard !isDemoMode, !room.isEmpty else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }), let file = items[i].photoFile else { return }
+        let url = photosDir.appendingPathComponent(file)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            items[i].detail = "Không tìm thấy tệp ảnh trên máy; không thể gửi ảnh."
+            items[i].photoAttempts = 6
+            persist()
+            return
+        }
         items[i].photoSentAt = nowMs()
         items[i].photoAttempts += 1
         let it = items[i]
         let r = room
         persist()
-        let url = photosDir.appendingPathComponent(file)
         let stamp = nowMs()
         // Ảnh chỉ đi qua MỘT broker MQTT (không nhân ba); ntfy chỉ dùng khi nó đang nối hoặc MQTT chưa nối được.
         let mq = mqttClients.last(where: { $0.isConnected })
@@ -709,13 +872,20 @@ final class SyncEngine: ObservableObject {
         let mqTopic = SyncProtocol.mqttTopic(room: r)
         let ntfyTopic = SyncProtocol.topic(room: r)
         let client = self.client
-        // Đọc file, mã hóa base64 và cắt mảnh ở luồng nền (trước đây làm ngay trên luồng giao diện).
-        Task.detached(priority: .utility) {
-            guard let data = try? Data(contentsOf: url) else { return }
+        // Đọc file, mã hóa base64 và cắt mảnh ở luồng nền.
+        Task.detached(priority: .utility) { [weak self] in
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else { return }
             let dataURL = "data:image/jpeg;base64," + data.base64EncodedString()
             let chunks = SyncProtocol.photoChunks(dataURL: dataURL, code: it.code, kind: it.kind, requestId: it.requestId,
-                captureId: it.captureId, captureTime: it.time, room: r, now: stamp, photoId: "ph_\(stamp)_\(it.attempts)")
+                captureId: it.captureId, captureTime: it.time, room: r, now: stamp, photoId: "ph_\(stamp)_\(it.photoAttempts)")
             for c in chunks {
+                if Task.isCancelled { return }
+                let shouldContinue: Bool = await MainActor.run { [weak self] in
+                    guard let self = self, !self.isDemoMode, self.room == r else { return false }
+                    guard let cur = self.items.first(where: { $0.requestId == it.requestId }) else { return false }
+                    return !cur.photoConfirmed && !cur.reviewRequired
+                }
+                if !shouldContinue { return }
                 let body = SyncProtocol.json(c)
                 mq?.publish(topic: mqTopic, body: body)
                 if useNtfy {
@@ -728,14 +898,20 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    private func resendAllPending() {
-        for i in items.indices where !items[i].isSettled { items[i].lastSendAt = 0 }
+    private func resetPendingForReconnect() {
+        for i in items.indices where !items[i].isSettled {
+            items[i].lastSendAt = 0
+            if items[i].photoFile != nil && !items[i].photoConfirmed && !items[i].reviewRequired {
+                items[i].photoSentAt = 0
+                if items[i].photoAttempts >= 6 { items[i].photoAttempts = 0 }
+            }
+        }
     }
 
     private func tick() async {
         tickCount += 1
-        if tickCount % 30 == 0 { snapshot.recount() }   // quá hạn/sắp đến hạn đổi theo thời gian
-        if isDemoMode { return }
+        if tickCount % 20 == 0 { snapshot.recount() }   // quá hạn/sắp đến hạn đổi theo thời gian (~1 phút)
+        if isDemoMode || room.isEmpty { return }
         if snapshotChunksSeen != chunkCounter { snapshotChunksSeen = chunkCounter }
         // Danh sách đơn ghép dở và đã 10 giây không có mảnh mới: xin PC gửi lại (tối đa 4 lần mỗi đợt).
         if snapshot.incomplete, let t = snapshotLastChunkAt, Date().timeIntervalSince(t) > 10, snapshotRetries < 4 {
@@ -743,10 +919,14 @@ final class SyncEngine: ObservableObject {
             snapshotLastChunkAt = Date()
             requestSnapshot()
         } else if !snapshot.incomplete { snapshotRetries = 0 }
+
+        // Gửi lại lệnh sửa cục bộ chưa được PC xác nhận mỗi ~15 giây (5 nhịp).
+        if tickCount % 5 == 0 && !pendingCommands.isEmpty && channelUp {
+            resendPendingCommands()
+        }
+
         let n = nowMs()
         var needPoll = false
-        // Giới hạn số lượt gửi lại mỗi nhịp, ưu tiên lượt quét cũ nhất: tránh dồn hàng loạt cùng lúc khi nối lại kênh
-        // (nhiều lượt quét + ảnh bị đẩy cùng lúc làm kẹt luồng giao diện và có thể làm broker ngắt kết nối).
         var scanBudget = 6, photoBudget = 1
         let backlog = items.reduce(0) { $0 + (($1.isSettled || $1.scanConfirmed) ? 0 : 1) }
         for it in items.reversed() where !it.isSettled {
@@ -754,11 +934,18 @@ final class SyncEngine: ObservableObject {
                 needPoll = true
                 if scanBudget > 0 && n >= it.nextRetryDue() { scanBudget -= 1; transmit(it.requestId) }
             }
-            if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired && it.photoAttempts < 6
-                && n - it.photoSentAt > 30_000 && n - it.time > 8_000 {
-                needPoll = true
-                // Đang còn nhiều lượt quét chưa được xác nhận thì dành đường truyền cho lượt quét trước, ảnh gửi sau.
-                if photoBudget > 0 && backlog <= 10 { photoBudget -= 1; transmitPhoto(it.requestId) }
+            if it.photoFile != nil && !it.photoConfirmed && !it.reviewRequired {
+                if it.photoAttempts < 6 {
+                    if n - it.photoSentAt > 30_000 && n - it.time > 8_000 {
+                        needPoll = true
+                        if photoBudget > 0 && backlog <= 10 { photoBudget -= 1; transmitPhoto(it.requestId) }
+                    }
+                } else if it.scanConfirmed,
+                          let idx = items.firstIndex(where: { $0.requestId == it.requestId }),
+                          !items[idx].detail.contains("thử lại") && !items[idx].detail.contains("Không tìm thấy tệp ảnh") {
+                    items[idx].detail = "Ảnh chưa được PC xác nhận sau 6 lần thử; bấm \"Gửi lại\" khi mạng ổn định."
+                    persist()
+                }
             }
         }
         // Hỏi lại ntfy để bắt phản hồi bị lỡ khi mất kết nối.
@@ -770,7 +957,7 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    // MARK: lịch sử
+    // MARK: lịch sử & dọn ảnh
     func delete(_ item: ScanItem) {
         if !isDemoMode { removePhoto(item) }
         items.removeAll { $0.requestId == item.requestId }
@@ -788,15 +975,63 @@ final class SyncEngine: ObservableObject {
     }
 
     private func trimHistory() {
-        guard items.count > 800 else { return }
-        let drop = items.suffix(items.count - 800).filter { $0.isSettled }
-        drop.forEach(removePhoto)
-        let ids = Set(drop.map { $0.requestId })
-        items.removeAll { ids.contains($0.requestId) }
+        let res = ScanItem.trimHistory(items, limit: 800)
+        guard !res.dropped.isEmpty else { return }
+        res.dropped.forEach(removePhoto)
+        items = res.kept
+        cleanupPhotos()
     }
 
-    /// Ghi danh sách quét xuống máy: gom nhiều lần gọi liên tiếp thành một, mã hóa + ghi ở luồng nền
-    /// (trước đây mỗi lần gửi lại đều mã hóa cả ~800 dòng ngay trên luồng giao diện nên màn hình quét bị đứng khi quét nhiều).
+    /// Dọn tệp ảnh mồ côi và giới hạn dung lượng ảnh ĐÃ ĐƯỢC PC XÁC NHẬN (<= 30 MB / 200 tệp).
+    /// Quy tắc 6: TUYỆT ĐỐI không xóa tệp ảnh nào chưa `photoConfirmed`.
+    private func cleanupPhotos() {
+        guard !isDemoMode else { return }
+        let dir = photosDir
+        let snapshotItems = items
+        let maxFiles = Self.maxConfirmedPhotoFiles
+        let maxBytes = Self.maxConfirmedPhotoBytes
+        persistQueue.async { [weak self] in
+            let fm = FileManager.default
+            guard let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]) else { return }
+            let referenced = Set(snapshotItems.compactMap { $0.photoFile })
+            // 1. Xóa tệp mồ côi không có lượt quét nào tham chiếu.
+            for u in files where !referenced.contains(u.lastPathComponent) {
+                try? fm.removeItem(at: u)
+            }
+            // 2. Giới hạn dung lượng ảnh ĐÃ xác nhận lưu trên PC (giữ ảnh mới nhất, xóa ảnh cũ nhất vượt hạn mức).
+            let confirmed = snapshotItems
+                .filter { $0.photoConfirmed && $0.photoFile != nil }
+                .sorted { $0.time > $1.time }
+            var keptCount = 0
+            var keptBytes: Int64 = 0
+            var prunedIds: [String] = []
+            for it in confirmed {
+                guard let fname = it.photoFile else { continue }
+                let u = dir.appendingPathComponent(fname)
+                let size = Int64((try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+                if keptCount < maxFiles && (keptBytes + size) <= maxBytes {
+                    keptCount += 1
+                    keptBytes += size
+                } else {
+                    try? fm.removeItem(at: u)
+                    prunedIds.append(it.requestId)
+                }
+            }
+            guard !prunedIds.isEmpty else { return }
+            let idSet = Set(prunedIds)
+            Task { @MainActor [weak self] in
+                guard let self = self, !self.isDemoMode else { return }
+                var changed = false
+                for i in self.items.indices where idSet.contains(self.items[i].requestId) && self.items[i].photoConfirmed {
+                    self.items[i].photoFile = nil
+                    changed = true
+                }
+                if changed { self.persist() }
+            }
+        }
+    }
+
+    /// Ghi danh sách quét xuống máy: gom nhiều lần gọi liên tiếp thành một, mã hóa + ghi ở luồng nền.
     private var persistScheduled = false
     private let persistQueue = DispatchQueue(label: "items.persist", qos: .utility)
 
@@ -810,13 +1045,45 @@ final class SyncEngine: ObservableObject {
         }
     }
 
-    /// Ghi ngay (gọi khi app chuyển nền để không mất lượt quét cuối).
-    func flushPersist() {
+    /// Ghi ngay (gọi khi tạo lượt quét mới hoặc khi app chuyển nền để không mất dữ liệu).
+    func flushPersist(background: Bool = false) {
         guard !isDemoMode else { return }
         persistScheduled = false
-        let snapshot = items, url = storeURL
+        let itemsCopy = items, url = storeURL
+        let cmdsCopy = Array(pendingCommands.values), cmdURL = pendingCmdsURL
+        final class OneShotBgTask: @unchecked Sendable {
+            private let lock = NSLock()
+            private var id: UIBackgroundTaskIdentifier = .invalid
+            func set(_ newId: UIBackgroundTaskIdentifier) {
+                lock.lock(); id = newId; lock.unlock()
+            }
+            func finish() {
+                lock.lock()
+                let current = id
+                id = .invalid
+                lock.unlock()
+                if current != .invalid {
+                    DispatchQueue.main.async {
+                        UIApplication.shared.endBackgroundTask(current)
+                    }
+                }
+            }
+        }
+        let bg = OneShotBgTask()
+        if background {
+            let taskId = UIApplication.shared.beginBackgroundTask(withName: "FlushScanQueue") {
+                bg.finish()
+            }
+            bg.set(taskId)
+        }
         persistQueue.async {
-            if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: url, options: .atomic) }
+            if let data = try? JSONEncoder().encode(itemsCopy) {
+                try? data.write(to: url, options: .atomic)
+            }
+            if let cmdData = try? JSONEncoder().encode(cmdsCopy) {
+                try? cmdData.write(to: cmdURL, options: .atomic)
+            }
+            bg.finish()
         }
     }
 

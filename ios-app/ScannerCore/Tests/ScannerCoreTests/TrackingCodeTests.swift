@@ -38,4 +38,22 @@ final class TrackingCodeTests: XCTestCase {
         XCTAssertEqual(TrackingCode.carrier(for: "587152900046530012988"), "J&T Express")
         XCTAssertEqual(TrackingCode.carrier(for: "XYZ"), "")
     }
+
+    func testQRJSONMultilineInvisibleAndPasteCodes() {
+        // QR dạng JSON (phẳng và lồng nhau)
+        XCTAssertEqual(TrackingCode.clean(#"{"tracking_no":"ttvn1129574777"}"#), "TTVN1129574777")
+        XCTAssertEqual(TrackingCode.clean(#"{"data":{"waybill":"spxvn062176759678"}}"#), "SPXVN062176759678")
+        // QR nhiều dòng (chữ + mã vận đơn không thuộc regex cố định)
+        XCTAssertEqual(TrackingCode.clean("Shopee Express\nMã vận đơn: ttvn1129574777\nHCM"), "TTVN1129574777")
+        // URL có khoảng trắng, chữ thường, hoặc fragment
+        XCTAssertEqual(TrackingCode.clean("www.spx.vn/track?code=spxvn062176759678"), "SPXVN062176759678")
+        XCTAssertEqual(TrackingCode.clean("https://track.example.com/order#TTVN1129574777"), "TTVN1129574777")
+        // Ký tự vô hình BOM / zero-width space
+        XCTAssertEqual(TrackingCode.clean("\u{FEFF}\u{200B}spxvn067887279218\u{200C}"), "SPXVN067887279218")
+        XCTAssertTrue(TrackingCode.isPlausibleScan("\u{FEFF}spxvn067887279218"))
+        // Dán nhiều mã (lọc chữ thừa, bỏ trùng, tách URL/JSON)
+        let pasted = "Danh sách:\n  spxvn067887279218, https://spx.vn/track?code=SPXVN067887279218; TTVN1129574777 | abc"
+        XCTAssertEqual(TrackingCode.extractPasteCodes(pasted), ["SPXVN067887279218", "TTVN1129574777"])
+        XCTAssertEqual(TrackingCode.extractPasteCodes(#"{"tracking_number":"TTVN1129574777"}"#), ["TTVN1129574777"])
+    }
 }

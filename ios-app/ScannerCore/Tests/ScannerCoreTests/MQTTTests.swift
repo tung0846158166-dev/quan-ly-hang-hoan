@@ -28,12 +28,13 @@ final class MQTTTests: XCTestCase {
 
     func testPublishLongPayloadRoundTrip() {
         let payload = String(repeating: "x", count: 20000)
-        let wire = MQTTPacket.publish(topic: "agy_shopee_return_scanner_2026/SHP-2026", payload: Data(payload.utf8))
+        let topicName = "agy_shopee_return_scanner_2026/ROOM-MQTT-2026"
+        let wire = MQTTPacket.publish(topic: topicName, payload: Data(payload.utf8))
         var dec = MQTTDecoder()
         let out = dec.feed(wire)
         XCTAssertEqual(out.count, 1)
         guard case let .publish(topic, data, qos, _) = out[0] else { return XCTFail("không phải PUBLISH") }
-        XCTAssertEqual(topic, "agy_shopee_return_scanner_2026/SHP-2026")
+        XCTAssertEqual(topic, topicName)
         XCTAssertEqual(qos, 0)
         XCTAssertEqual(String(data: data, encoding: .utf8), payload)
     }
@@ -68,7 +69,20 @@ final class MQTTTests: XCTestCase {
         XCTAssertEqual([UInt8](MQTTPacket.puback(packetId: 0x0102)), [0x40, 0x02, 0x01, 0x02])
     }
 
+    func testDecoderDropsOversizedCorruptPacketAndRecovers() {
+        var dec = MQTTDecoder()
+        // Remaining length = 0xFF 0xFF 0xFF 0x7F (~268 MB > 8 MB limit)
+        XCTAssertEqual(dec.feed(Data([0x30, 0xFF, 0xFF, 0xFF, 0x7F])), [])
+        // Gói hợp lệ kế tiếp vẫn giải mã bình thường
+        XCTAssertEqual(dec.feed(Data([0xD0, 0x00])), [.pingResp])
+    }
+
+    func testClientRejectsInvalidURLWithoutCrash() {
+        let bad = MQTTClient(name: "bad", url: "ht tp://[invalid")
+        XCTAssertFalse(bad.isConnected)
+    }
+
     func testMqttTopicMatchesPcAndWebScanner() {
-        XCTAssertEqual(SyncProtocol.mqttTopic(room: SyncProtocol.normalizeRoom("shp-2026")), "agy_shopee_return_scanner_2026/SHP-2026")
+        XCTAssertEqual(SyncProtocol.mqttTopic(room: SyncProtocol.normalizeRoom("room-test-2026")), "agy_shopee_return_scanner_2026/ROOM-TEST-2026")
     }
 }

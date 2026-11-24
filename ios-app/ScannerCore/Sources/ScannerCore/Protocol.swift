@@ -1,9 +1,8 @@
 import Foundation
 
-public enum ScanKind: String, Codable, CaseIterable {
+public enum ScanKind: String, Codable, CaseIterable, Sendable {
     case returnScan   // quét hoàn kho  -> type "barcode"
-    case newOrder     // tạo đơn mới    -> type "new_order_scan"
-    case cancelOrder  // tạo đơn hủy    -> type "new_order_scan" + cancelled
+    case newOrder     // tạo đơn mới    -> type "new_order_scan" (đi thẳng vào bảng chính ở PC v2)
 }
 
 public struct PcAck: Equatable {
@@ -15,6 +14,18 @@ public struct PcAck: Equatable {
     public var captureId: String?
     public var orderNum: String?
     public var extra: String?
+
+    public init(requestId: String, code: String, outcome: String, ackStage: String? = nil,
+                photoSaved: Bool? = nil, captureId: String? = nil, orderNum: String? = nil, extra: String? = nil) {
+        self.requestId = requestId
+        self.code = code
+        self.outcome = outcome
+        self.ackStage = ackStage
+        self.photoSaved = photoSaved
+        self.captureId = captureId
+        self.orderNum = orderNum
+        self.extra = extra
+    }
 }
 
 public enum PcMessage: Equatable {
@@ -43,7 +54,7 @@ public enum SyncProtocol {
         return "agy_shopee_" + clean
     }
 
-    /// v2: không còn mã phòng mặc định (app cũ dùng SHP-2026, ai cũng đoán được). Rỗng = chưa cài.
+    /// v2: không còn mã phòng mặc định ngắn dễ đoán. Rỗng = chưa cài đặt.
     public static func normalizeRoom(_ raw: String) -> String {
         raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
@@ -70,12 +81,12 @@ public enum SyncProtocol {
         switch kind {
         case .returnScan:
             p["type"] = "barcode"
-        case .newOrder, .cancelOrder:
+        case .newOrder:
             p["type"] = "new_order_scan"
             p["track"] = code
             p["orderId"] = code
             p["platform"] = "auto"
-            p["cancelled"] = (kind == .cancelOrder)
+            p["cancelled"] = false
             p["carrier"] = TrackingCode.carrier(for: code)
             p["note"] = note.isEmpty ? "Đơn mới tạo từ máy quét điện thoại" : note
         }
@@ -85,17 +96,20 @@ public enum SyncProtocol {
     public static func photoChunks(dataURL: String, code: String, kind: ScanKind, requestId: String, captureId: String,
                                    captureTime: Int, room: String, now: Int, photoId: String,
                                    chunkSize: Int = 2400) -> [[String: Any]] {
+        let safeChunkSize = max(1, chunkSize)
         let chars = Array(dataURL)
-        let total = max(1, Int((Double(chars.count) / Double(chunkSize)).rounded(.up)))
+        let total = max(1, Int((Double(chars.count) / Double(safeChunkSize)).rounded(.up)))
         var out: [[String: Any]] = []
+        out.reserveCapacity(total)
         for i in 0..<total {
-            let start = i * chunkSize
-            let end = min(chars.count, start + chunkSize)
+            let start = i * safeChunkSize
+            let end = min(chars.count, start + safeChunkSize)
+            let slice = start < end ? String(chars[start..<end]) : ""
             out.append([
                 "type": "photo_chunk", "captureId": captureId, "captureTime": captureTime,
                 "requestId": requestId, "kind": kind == .returnScan ? "barcode" : "new_order_scan",
                 "photoOnly": false, "bypassScan": false, "photoId": photoId, "code": code,
-                "idx": i, "total": total, "chunk": String(chars[start..<end]), "room": room, "time": now + i
+                "idx": i, "total": total, "chunk": slice, "room": room, "time": now + i
             ])
         }
         return out
@@ -111,7 +125,7 @@ public enum SyncProtocol {
               "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
-    /// iPhone sửa đơn ở bảng chính: `fields` gồm n (sản phẩm), co (màu), sz, q, st (trạng thái), ty (loại đơn).
+    /// iPhone sửa trạng thái đơn ở bảng chính: PC v2 chỉ nhận trường `st` (trạng thái).
     public static func orderEdit(code: String, orderId: String, fields: [String: Any], room: String, requestId: String) -> String {
         json(["type": "order_edit", "code": code, "orderId": orderId, "fields": fields, "requestId": requestId, "room": room,
               "time": Int(Date().timeIntervalSince1970 * 1000)])
@@ -122,18 +136,9 @@ public enum SyncProtocol {
               "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
-    /// Đẩy nhiều đơn trong Hộp Đơn Mới (theo id trên PC) ra bảng chính.
-    public static func inboxPushMany(ids: [String], room: String, requestId: String) -> String {
-        json(["type": "inbox_push_many", "ids": ids, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
-    }
-
     /// Đánh dấu đã nhận / chưa nhận nhiều đơn trong bảng đơn hủy (theo id trên PC).
     public static func cancelReceive(ids: [String], received: Bool, room: String, requestId: String) -> String {
         json(["type": "cancel_receive", "ids": ids, "received": received, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
-    }
-
-    public static func inboxPush(code: String, room: String, requestId: String) -> String {
-        json(["type": "inbox_push", "code": code, "requestId": requestId, "room": room, "time": Int(Date().timeIntervalSince1970 * 1000)])
     }
 
     /// `sseData` là dòng "data:" của ntfy: {"event":"message","message":"<json>"}
@@ -144,7 +149,8 @@ public enum SyncProtocol {
     }
 
     public static func parseMessage(_ message: String, room: String) -> PcMessage? {
-        guard let d = (try? JSONSerialization.jsonObject(with: Data(message.utf8))) as? [String: Any],
+        guard !room.isEmpty,
+              let d = (try? JSONSerialization.jsonObject(with: Data(message.utf8))) as? [String: Any],
               (d["room"] as? String) == room, let type = d["type"] as? String else { return nil }
         switch type {
         case "pc_hello": return .hello

@@ -11,7 +11,7 @@ public enum MQTTPacket {
     /// Mã hoá độ dài còn lại (1-4 byte, 7 bit mỗi byte).
     public static func remainingLength(_ n: Int) -> [UInt8] {
         var out: [UInt8] = []
-        var x = n
+        var x = max(0, n)
         repeat {
             var d = UInt8(x % 128)
             x /= 128
@@ -57,6 +57,7 @@ public enum MQTTIncoming: Equatable {
 
 /// Ghép các mảnh dữ liệu WebSocket thành gói MQTT hoàn chỉnh (một gói có thể bị cắt hoặc nhiều gói dính nhau).
 public struct MQTTDecoder {
+    private static let maxPacketSize = 8 * 1024 * 1024
     private var buf: [UInt8] = []
     public init() {}
 
@@ -78,6 +79,10 @@ public struct MQTTDecoder {
             if !complete {
                 if idx > 4 { buf.removeAll(); break }   // dữ liệu hỏng
                 break                                      // chưa đủ byte độ dài
+            }
+            if value < 0 || value > Self.maxPacketSize {
+                buf.removeAll()
+                break
             }
             let total = idx + value
             guard buf.count >= total else { break }
@@ -101,7 +106,7 @@ public struct MQTTDecoder {
             let qos = (first >> 1) & 0x03
             guard body.count >= 2 else { return .other }
             let tlen = Int(body[0]) << 8 | Int(body[1])
-            guard body.count >= 2 + tlen else { return .other }
+            guard tlen >= 0, body.count >= 2 + tlen else { return .other }
             let topic = String(decoding: body[2..<(2 + tlen)], as: UTF8.self)
             var i = 2 + tlen
             var pid: UInt16 = 0
@@ -110,6 +115,7 @@ public struct MQTTDecoder {
                 pid = UInt16(body[i]) << 8 | UInt16(body[i + 1])
                 i += 2
             }
+            guard i <= body.count else { return .other }
             return .publish(topic: topic, payload: Data(body[i...]), qos: qos, packetId: pid)
         default:
             return .other
@@ -120,14 +126,15 @@ public struct MQTTDecoder {
 /// Một kết nối MQTT qua WebSocket (wss). Tự nối lại; mỗi broker một đối tượng.
 public final class MQTTClient: @unchecked Sendable {
     public let name: String
-    private let url: URL
+    private let url: URL?
     private let lock = NSLock()
     private var task: URLSessionWebSocketTask?
     private var connected = false
+    private var lastActivity = Date.distantPast
 
     public init(name: String, url: String) {
         self.name = name
-        self.url = URL(string: url)!
+        self.url = URL(string: url)
     }
 
     public var isConnected: Bool {
@@ -136,11 +143,29 @@ public final class MQTTClient: @unchecked Sendable {
     }
 
     private func set(task t: URLSessionWebSocketTask?, connected c: Bool) {
-        lock.lock(); task = t; connected = c; lock.unlock()
+        lock.lock()
+        task = t
+        connected = c
+        if c { lastActivity = Date() }
+        lock.unlock()
     }
 
     private func markConnected(_ c: Bool) {
-        lock.lock(); connected = c; lock.unlock()
+        lock.lock()
+        connected = c
+        if c { lastActivity = Date() }
+        lock.unlock()
+    }
+
+    private func touchActivity() {
+        lock.lock()
+        lastActivity = Date()
+        lock.unlock()
+    }
+
+    private func secondsSinceActivity() -> TimeInterval {
+        lock.lock(); defer { lock.unlock() }
+        return Date().timeIntervalSince(lastActivity)
     }
 
     /// Gửi một bản tin (QoS 0). Không làm gì nếu chưa nối. Gửi theo đúng thứ tự gọi.
@@ -152,13 +177,17 @@ public final class MQTTClient: @unchecked Sendable {
         t.send(.data(MQTTPacket.publish(topic: topic, payload: Data(body.utf8)))) { _ in }
     }
 
-    /// Chạy vòng lặp: nối, đăng ký topic, nhận bản tin; mất kết nối thì thử lại. Kết thúc khi Task bị huỷ.
+    /// Chạy vòng lặp: nối, đăng ký topic, nhận bản tin; mất kết nối (hoặc treo 4G) thì tự hủy và thử lại.
     public func run(topic: String,
                     onMessage: @escaping @Sendable (String) -> Void,
                     onState: @escaping @Sendable (Bool) -> Void) async {
+        guard let targetURL = url else {
+            onState(false)
+            return
+        }
         var backoff = 1.0
         while !Task.isCancelled {
-            let ws = URLSession.shared.webSocketTask(with: url, protocols: ["mqtt"])
+            let ws = URLSession.shared.webSocketTask(with: targetURL, protocols: ["mqtt"])
             ws.maximumMessageSize = 4 * 1024 * 1024
             set(task: ws, connected: false)
             ws.resume()
@@ -174,6 +203,7 @@ public final class MQTTClient: @unchecked Sendable {
                     var decoder = MQTTDecoder()
                     while !Task.isCancelled {
                         let msg = try await ws.receive()
+                        self.touchActivity()
                         let data: Data
                         switch msg {
                         case .data(let d): data = d
@@ -190,9 +220,15 @@ public final class MQTTClient: @unchecked Sendable {
                                 backoff = 1
                                 onState(true)
                                 pinger?.cancel()
-                                pinger = Task {
+                                pinger = Task { [weak self] in
                                     while !Task.isCancelled {
                                         try? await Task.sleep(nanoseconds: 25_000_000_000)
+                                        guard !Task.isCancelled, let self = self else { return }
+                                        // Phát hiện kết nối nửa chết (chuyển Wi-Fi/4G không gửi PINGRESP): hủy để nối lại ngay.
+                                        if self.secondsSinceActivity() > 55 {
+                                            ws.cancel(with: .goingAway, reason: nil)
+                                            return
+                                        }
                                         ws.send(.data(MQTTPacket.pingReq)) { _ in }
                                     }
                                 }

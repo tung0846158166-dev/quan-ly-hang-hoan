@@ -279,27 +279,55 @@ struct SettingsView: View {
     }
 }
 
-/// Màn chi tiết đối chiếu số đơn PC vs điện thoại (tách riêng khỏi trang Cài đặt chính cho gọn).
+/// Màn chi tiết đối chiếu số đơn PC vs điện thoại (tính một lượt trên luồng nền, tránh duyệt 12 lần trong `body`).
 struct ReconcileDetailView: View {
     @EnvironmentObject var store: SnapshotStore
+    @State private var items: [(String, Int, Int)] = []
 
-    private var reconcile: [(String, Int, Int)] {
-        let r = store.rows, s = store.stats
-        func n(_ f: (OrderRow) -> Bool) -> Int { r.filter(f).count }
+    private var token: String {
+        "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.rows.count)"
+    }
+
+    private static func compute(rows: [OrderRow], stats s: [String: Int]) -> [(String, Int, Int)] {
         let now = Int(Date().timeIntervalSince1970 * 1000)
+        var mTotal = 0, mRecv = 0, mPend = 0, mWatch = 0, mPre = 0, mCancelType = 0
+        var aTotal = 0, aRecv = 0, cTotal = 0, cRecv = 0, mDanger = 0, mWarn = 0
+        for r in rows {
+            if r.k == "m" {
+                mTotal += 1
+                if r.rv { mRecv += 1 }
+                if r.pd {
+                    mPend += 1
+                    switch r.alertLevel(now: now) {
+                    case .overdue: mDanger += 1
+                    case .soon: mWarn += 1
+                    default: break
+                    }
+                }
+                if r.wl { mWatch += 1 }
+                if r.pre { mPre += 1 }
+                if r.ty == "Đơn hủy" { mCancelType += 1 }
+            } else if r.k == "a" {
+                aTotal += 1
+                if r.rv { aRecv += 1 }
+            } else if r.k == "c" {
+                cTotal += 1
+                if r.rv { cRecv += 1 }
+            }
+        }
         return [
-            ("Bảng chính", s["m_total"] ?? 0, n { $0.k == "m" }),
-            ("Đã nhận (bảng chính)", s["m_recv"] ?? 0, n { $0.k == "m" && $0.rv }),
-            ("Đang chờ (bảng chính)", s["m_pend"] ?? 0, n { $0.k == "m" && $0.pd }),
-            ("Đang theo dõi", s["m_watch"] ?? 0, n { $0.k == "m" && $0.wl }),
-            ("Hàng đặt trước", s["m_pre"] ?? 0, n { $0.k == "m" && $0.pre }),
-            ("Loại đơn là Đơn hủy", s["m_cancelType"] ?? 0, n { $0.k == "m" && $0.ty == "Đơn hủy" }),
-            ("Kho lưu trữ", s["a_total"] ?? 0, n { $0.k == "a" }),
-            ("Lưu trữ đã nhận", s["a_recv"] ?? 0, n { $0.k == "a" && $0.rv }),
-            ("Bảng đơn hủy", s["c_total"] ?? 0, n { $0.k == "c" }),
-            ("Đơn hủy đã nhận", s["c_recv"] ?? 0, n { $0.k == "c" && $0.rv }),
-            ("Báo Đỏ (quá hạn)", s["m_danger"] ?? 0, n { $0.k == "m" && $0.pd && $0.alertLevel(now: now) == .overdue }),
-            ("Báo Vàng (sắp đến hạn)", s["m_warn"] ?? 0, n { $0.k == "m" && $0.pd && $0.alertLevel(now: now) == .soon })
+            ("Bảng chính", s["m_total"] ?? 0, mTotal),
+            ("Đã nhận (bảng chính)", s["m_recv"] ?? 0, mRecv),
+            ("Đang chờ (bảng chính)", s["m_pend"] ?? 0, mPend),
+            ("Đang theo dõi", s["m_watch"] ?? 0, mWatch),
+            ("Hàng đặt trước", s["m_pre"] ?? 0, mPre),
+            ("Loại đơn là Đơn hủy", s["m_cancelType"] ?? 0, mCancelType),
+            ("Kho lưu trữ", s["a_total"] ?? 0, aTotal),
+            ("Lưu trữ đã nhận", s["a_recv"] ?? 0, aRecv),
+            ("Bảng đơn hủy", s["c_total"] ?? 0, cTotal),
+            ("Đơn hủy đã nhận", s["c_recv"] ?? 0, cRecv),
+            ("Báo Đỏ (quá hạn)", s["m_danger"] ?? 0, mDanger),
+            ("Báo Vàng (sắp đến hạn)", s["m_warn"] ?? 0, mWarn)
         ]
     }
 
@@ -310,7 +338,7 @@ struct ReconcileDetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 Section("So sánh số liệu") {
-                    ForEach(Array(reconcile.enumerated()), id: \.offset) { _, item in
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                         let match = item.1 == item.2
                         HStack {
                             Text(item.0)
@@ -341,5 +369,14 @@ struct ReconcileDetailView: View {
         .background(Theme.pageBackground.ignoresSafeArea())
         .navigationTitle("Đối chiếu với PC")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: token) {
+            let rowsSnapshot = store.rows
+            let statsSnapshot = store.stats
+            let computed = await Task.detached(priority: .userInitiated) {
+                Self.compute(rows: rowsSnapshot, stats: statsSnapshot)
+            }.value
+            guard !Task.isCancelled else { return }
+            items = computed
+        }
     }
 }

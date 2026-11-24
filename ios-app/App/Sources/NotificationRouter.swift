@@ -38,7 +38,7 @@ final class NotificationRouter: ObservableObject {
 
     private func resolvePending() {
         guard let rid = pendingRowId, let store = store else { return }
-        if let r = store.rows.first(where: { $0.id == rid }) { openRow = r; pendingRowId = nil }
+        if let r = store.row(byId: rid) { openRow = r; pendingRowId = nil }
         else if !store.rows.isEmpty { pendingRowId = nil }   // đơn không còn trong danh sách
     }
 }

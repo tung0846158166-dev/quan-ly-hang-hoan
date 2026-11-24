@@ -8,16 +8,17 @@ func scanLabel(_ it: ScanItem) -> String {
     case .duplicate: return "Quét trùng"
     case .notFound: return "Không có"
     case .ambiguous: return "Trùng nhiều đơn"
-    default: return "Chờ nạp PC"
+    case .error: return "PC từ chối"
+    case .pending: return "Chờ nạp PC"
     }
 }
 
 func scanColor(_ it: ScanItem) -> Color {
-    if !it.scanConfirmed { return .orange }
+    if !it.scanConfirmed { return Theme.warning }
     switch it.status {
-    case .success: return .green
-    case .duplicate: return .orange
-    default: return .red
+    case .success: return Theme.success
+    case .duplicate: return Theme.warning
+    default: return Theme.danger
     }
 }
 

@@ -1,10 +1,10 @@
 import Foundation
 
-public enum ScanStatus: String, Codable {
+public enum ScanStatus: String, Codable, Sendable {
     case pending, success, duplicate, notFound = "not_found", ambiguous, error
 }
 
-public struct ScanItem: Codable, Identifiable, Equatable {
+public struct ScanItem: Codable, Identifiable, Equatable, Sendable {
     public var id: String { requestId }
     public var requestId: String
     public var captureId: String
@@ -22,18 +22,51 @@ public struct ScanItem: Codable, Identifiable, Equatable {
     public var attempts: Int = 0
     public var orderNum: String?
     public var detail: String = "Đang chờ máy tính xác nhận"
-    public var pushed = false
+    /// Ghi chú gắn lúc quét đơn mới (lưu bền cùng lượt quét để gửi lại đúng ghi chú khi mất mạng).
+    public var note: String = ""
 
-    public init(requestId: String, code: String, kind: ScanKind, time: Int, photoFile: String?) {
+    public init(requestId: String, code: String, kind: ScanKind, time: Int, photoFile: String?, note: String = "") {
         self.requestId = requestId
         self.captureId = requestId
         self.code = code
         self.kind = kind
         self.time = time
         self.photoFile = photoFile
+        self.note = note
     }
 
-    /// Đã xong hẳn: PC xác nhận quét và (nếu có ảnh) đã lưu ảnh, hoặc cần kiểm tra thủ công.
+    private enum CodingKeys: String, CodingKey {
+        case requestId, captureId, code, kind, time, status
+        case scanConfirmed, photoConfirmed, reviewRequired
+        case photoFile, photoSentAt, photoAttempts, lastSendAt, attempts
+        case orderNum, detail, note
+    }
+
+    /// Giải mã tương thích ngược với tệp `scan_items.json` cũ (chưa có trường `note`, hoặc từng có trường phụ).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rid = try c.decode(String.self, forKey: .requestId)
+        self.requestId = rid
+        self.captureId = (try? c.decodeIfPresent(String.self, forKey: .captureId)) ?? rid
+        self.code = try c.decode(String.self, forKey: .code)
+        self.kind = (try? c.decode(ScanKind.self, forKey: .kind)) ?? .returnScan
+        self.time = try c.decode(Int.self, forKey: .time)
+        self.status = (try? c.decodeIfPresent(ScanStatus.self, forKey: .status)) ?? .pending
+        self.scanConfirmed = (try? c.decodeIfPresent(Bool.self, forKey: .scanConfirmed)) ?? false
+        self.photoConfirmed = (try? c.decodeIfPresent(Bool.self, forKey: .photoConfirmed)) ?? false
+        self.reviewRequired = (try? c.decodeIfPresent(Bool.self, forKey: .reviewRequired)) ?? false
+        self.photoFile = try? c.decodeIfPresent(String.self, forKey: .photoFile)
+        self.photoSentAt = (try? c.decodeIfPresent(Int.self, forKey: .photoSentAt)) ?? 0
+        self.photoAttempts = (try? c.decodeIfPresent(Int.self, forKey: .photoAttempts)) ?? 0
+        self.lastSendAt = (try? c.decodeIfPresent(Int.self, forKey: .lastSendAt)) ?? 0
+        self.attempts = (try? c.decodeIfPresent(Int.self, forKey: .attempts)) ?? 0
+        self.orderNum = try? c.decodeIfPresent(String.self, forKey: .orderNum)
+        self.detail = (try? c.decodeIfPresent(String.self, forKey: .detail)) ?? "Đang chờ máy tính xác nhận"
+        self.note = (try? c.decodeIfPresent(String.self, forKey: .note)) ?? ""
+    }
+
+    /// Đã xong hẳn: PC xác nhận quét và (nếu có ảnh) đã xác nhận lưu ảnh, hoặc cần kiểm tra thủ công.
+    /// Quy tắc 6: ảnh chưa ACK không bao giờ coi là đã lưu.
     public var isSettled: Bool {
         scanConfirmed && (photoFile == nil || photoConfirmed || reviewRequired || status == .error)
     }
@@ -59,11 +92,21 @@ public struct ScanItem: Codable, Identifiable, Equatable {
 
         if ack.outcome == "error" {
             if !scanConfirmed { status = .error }
-            detail = "PC chưa lưu thành công; app giữ lại và sẽ thử lại."
+            detail = isPhoto
+                ? "PC chưa lưu ảnh thành công; app giữ ảnh và sẽ thử gửi lại."
+                : "PC chưa lưu thành công; app giữ lại và sẽ thử lại."
             return true
         }
         if isPhoto {
-            if ack.photoSaved == true { photoConfirmed = true } else if !unmatched { return false }
+            // Tương thích cả PC cũ (gửi photoSaved: true/false) và PC v2 (SyncProtocol.BuildPhotoAck: ackStage="photo", outcome="success", không gửi photoSaved).
+            // Quy tắc 6: photoSaved == false hoặc outcome khác success/duplicate tuyệt đối KHÔNG coi ảnh đã lưu.
+            if ack.photoSaved == true {
+                photoConfirmed = true
+            } else if ack.photoSaved == nil && (ack.outcome == "success" || ack.outcome == "duplicate") {
+                photoConfirmed = true
+            } else if !unmatched {
+                return false
+            }
         } else {
             scanConfirmed = true
             status = ScanStatus(rawValue: ack.outcome) ?? .success
@@ -86,7 +129,24 @@ public struct ScanItem: Codable, Identifiable, Equatable {
     /// Lần gửi lại kế tiếp (ms) theo bậc 1.5s, 3s, 6s, 15s, 30s, 60s.
     public static let retrySchedule: [Int] = [1500, 3000, 6000, 15000, 30000, 60000]
     public func nextRetryDue() -> Int {
-        let step = Self.retrySchedule[min(attempts, Self.retrySchedule.count - 1)]
-        return lastSendAt + step
+        let idx = max(0, min(attempts, Self.retrySchedule.count - 1))
+        return lastSendAt + Self.retrySchedule[idx]
+    }
+
+    /// Giới hạn lịch sử: giữ tối đa `limit` mục đã hoàn tất mới nhất; TUYỆT ĐỐI không bỏ lượt chưa hoàn tất (`!isSettled`).
+    public static func trimHistory(_ items: [ScanItem], limit: Int = 800) -> (kept: [ScanItem], dropped: [ScanItem]) {
+        let safeLimit = max(0, limit)
+        guard items.count > safeLimit else { return (items, []) }
+        let tailStart = safeLimit
+        var kept: [ScanItem] = Array(items.prefix(tailStart))
+        var dropped: [ScanItem] = []
+        for it in items.suffix(from: tailStart) {
+            if it.isSettled {
+                dropped.append(it)
+            } else {
+                kept.append(it)
+            }
+        }
+        return (kept, dropped)
     }
 }

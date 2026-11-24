@@ -14,23 +14,15 @@ final class SnapshotTests: XCTestCase {
         XCTAssertTrue(p.rows[1].isCancelled)
     }
 
-    func testDecodeInboxAndCancelledId() throws {
+    func testDecodeCancelledIdIgnoresLegacyInboxField() throws {
+        // PC v2 vẫn gửi `"inbox": []` (và PC cũ có thể gửi mảng); bộ giải mã bỏ qua an toàn không cần InboxRow.
         let json = """
         {"time":1,"count":1,"rows":[{"k":"c","c":"SPX1","o":"O1","p":"Shopee","n":"","co":"","sz":"","q":1,"rd":"","due":0,"st":"Đơn hủy","ci":"cxl_1"}],
-         "inbox":[{"id":"inbox_1","c":"SPX9","p":"Shopee","t":"18/11/2026 05:00:00","u":1},{"id":"inbox_2","c":863,"dup":1},{"c":"thiếu id"},"rác"]}
+         "inbox":[{"id":"legacy_1","c":"SPX9"}]}
         """
         let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
         XCTAssertEqual(p.rows[0].ci, "cxl_1")
-        XCTAssertEqual(p.inbox.map { $0.id }, ["inbox_1", "inbox_2"], "đơn lỗi / thiếu id bị bỏ, không bỏ cả hộp")
-        XCTAssertTrue(p.inbox[0].u)
-        XCTAssertEqual(p.inbox[1].c, "863")
-        XCTAssertTrue(p.inbox[1].dup)
-        // PC cũ không gửi hộp đơn mới
-        let old = try JSONDecoder().decode(SnapshotPayload.self, from: Data(#"{"time":1,"count":0,"rows":[]}"#.utf8))
-        XCTAssertTrue(old.inbox.isEmpty)
-        // lưu file rồi đọc lại vẫn giữ hộp
         let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
-        XCTAssertEqual(again.inbox, p.inbox)
         XCTAssertEqual(again.rows[0].ci, "cxl_1")
     }
 
@@ -49,7 +41,6 @@ final class SnapshotTests: XCTestCase {
         XCTAssertEqual(p.rows[0].n.components(separatedBy: " | ").count, 3)   // giữ đủ 3 sản phẩm
         XCTAssertEqual(p.rows[1].rn, "")                                       // không hoàn một phần: không phân biệt
         XCTAssertEqual(p.stats["dropped"], 0)
-        XCTAssertTrue(p.inbox.isEmpty)                                         // v2 không có Hộp Đơn Mới
         let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
         XCTAssertEqual(again.rows[0].rn, "Quần Jeans")
     }
@@ -59,20 +50,18 @@ final class SnapshotTests: XCTestCase {
         let p = try JSONDecoder().decode(SnapshotPayload.self, from: Data(json.utf8))
         XCTAssertEqual(p.rows.map { $0.inReturnWatch }, [true, true, false])
         XCTAssertEqual(p.rows[0].returnWatchStage, 3)
+        XCTAssertEqual(p.rows[0].returnWatchStageName, "Đã về shop")
         XCTAssertEqual(p.rows[0].ar, 1794990000000)
         XCTAssertEqual(p.rows[1].returnWatchStage, 4)   // điện thoại đã quét nhận thì là chặng 4
+        XCTAssertEqual(p.rows[1].returnWatchStageName, "Đã nhận kho")
         XCTAssertEqual(p.rows[2].rw, 0)                 // PC cũ không gửi
         let again = try JSONDecoder().decode(SnapshotPayload.self, from: JSONEncoder().encode(p))
         XCTAssertEqual(again.rows[0].rws, 3)
     }
 
-    func testInboxPushManyAndCancelReceiveMessages() throws {
-        let a = SyncProtocol.inboxPushMany(ids: ["inbox_1", "inbox_2"], room: "R", requestId: "q1")
-        let ja = try JSONSerialization.jsonObject(with: Data(a.utf8)) as! [String: Any]
-        XCTAssertEqual(ja["type"] as? String, "inbox_push_many")
-        XCTAssertEqual(ja["ids"] as? [String], ["inbox_1", "inbox_2"])
-        let b = SyncProtocol.cancelReceive(ids: ["cxl_1"], received: true, room: "R", requestId: "q2")
-        let jb = try JSONSerialization.jsonObject(with: Data(b.utf8)) as! [String: Any]
+    func testCancelReceiveMessage() throws {
+        let b = SyncProtocol.cancelReceive(ids: ["cxl_1"], received: true, room: "ROOM-TEST-2026", requestId: "q2")
+        let jb = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(b.utf8)) as? [String: Any])
         XCTAssertEqual(jb["type"] as? String, "cancel_receive")
         XCTAssertEqual(jb["received"] as? Bool, true)
     }
@@ -288,5 +277,123 @@ final class ReceivedTimeDisplayTests: XCTestCase {
 
         // 5. Đã nhận nhưng không có rcd và không có giờ quét cục bộ -> .receivedUnknownTime
         XCTAssertEqual(scannedLocal.resolvedReceivedTime(localScanTimeMs: nil, calendar: vnCal), .receivedUnknownTime)
+    }
+}
+
+final class SnapshotAuditSafetyTests: XCTestCase {
+    // Bản nén chuẩn từ SnapshotTests.fixture (2 dòng).
+    let fixture = "Zc9BTsJAFMbxq0y+9ST0DZ3OdHbWsKuAOBKMcUFKk5LKDArEKGHhDbyCblyZuGClSwz34CamoU1MfOv3Xn7/NZbTWQ5DKpZBMxyZX7kljOC49w8LmOs1ShjMwJHB4KI/GnaDSGmthIoFaXB4GIiIiNqqr5PBuQzAMa+WCz/Pc3A4GOyePev7W8/S3DFb7LbVx+p0NHYF6+7eVuBYPMEgBcfdkTCBAckWUUsEImIBmVAZSeCYrP7bF0sYnBb7zzFzxeHrw2HDj/ys5ls77BKJWKpQKVXbpVYkRRyQjttaizBSYR1gp6X1Jas6/lb00h5LTpIr2+k0EcmltZ1BU3B2LKC6oOE2xJ+X/atjxeH7/RGbm80v"
+
+    /// Lượt 1 có mảnh hỏng => giải mã lỗi NHƯNG KHÔNG khóa `lastDone` để lượt 2 của CÙNG `snapshotId` vẫn ghép thành công.
+    func testAssemblerRecoversOnSecondPassAfterCorruptChunk() {
+        let a = SnapshotAssembler()
+        let half = fixture.count / 2
+        let s = Array(fixture)
+        let p1 = String(s[0..<half]), p2 = String(s[half...])
+
+        // Lượt 1: mảnh 1 hỏng
+        XCTAssertNil(a.add(SnapshotChunk(snapshotId: "snap_500", idx: 0, total: 2, chunk: p1)))
+        XCTAssertNil(a.add(SnapshotChunk(snapshotId: "snap_500", idx: 1, total: 2, chunk: "!!!CORRUPT!!!")))
+        XCTAssertNotNil(a.lastError)
+
+        // Lượt 2 (PC gửi lặp cùng snap_500): phải ghép và giải mã thành công
+        XCTAssertNil(a.add(SnapshotChunk(snapshotId: "snap_500", idx: 0, total: 2, chunk: p1)))
+        let recovered = a.add(SnapshotChunk(snapshotId: "snap_500", idx: 1, total: 2, chunk: p2))
+        XCTAssertEqual(recovered?.rows.count, 2)
+        XCTAssertNil(a.lastError)
+    }
+
+    /// Mảnh sai `total` hoặc `total` vượt ngưỡng phải bị bỏ qua an toàn.
+    func testAssemblerRejectsInconsistentOrHugeTotal() {
+        let a = SnapshotAssembler()
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_huge", idx: 0, total: 999_999, chunk: "AA")))
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_1", idx: 0, total: 2, chunk: "AA")))
+        XCTAssertNil(a.addRaw(SnapshotChunk(snapshotId: "snap_1", idx: 1, total: 3, chunk: "BB")))
+        XCTAssertEqual(a.addRaw(SnapshotChunk(snapshotId: "snap_1", idx: 1, total: 2, chunk: "CC")), "AACC")
+    }
+
+    /// Quy tắc 1, 2, 3: 2 kiện anh em cùng mã đơn gốc `ORD1`:
+    /// - Quét mã vận đơn riêng `T1` chỉ nhận kiện A, KHÔNG nhận kiện B.
+    /// - Quét mã đơn gốc `ORD1` (khớp 2 kiện đang chờ => ambiguous) KHÔNG tự nhận kiện nào!
+    func testLocalOverlayEnforcesSiblingAndAmbiguousRules() {
+        let vnCal = ProductMetrics.vietnamCalendar
+        var a = OrderRow(k: "m", c: "T1", o: "ORD1", p: "Shopee", n: "Áo A", co: "", sz: "", q: 1, rd: "20/11/2026", due: 0, st: "Chưa trả")
+        a.pd = true; a.rv = false
+        var b = OrderRow(k: "m", c: "T2", o: "ORD1", p: "Shopee", n: "Quần B", co: "", sz: "", q: 1, rd: "20/11/2026", due: 0, st: "Chưa trả")
+        b.pd = true; b.rv = false
+        let rows = [a, b]
+
+        // Index phát hiện ORD1 là ambiguous, còn T1 và T2 là đơn nhất
+        let idx = SnapshotIndex(rows: rows)
+        XCTAssertTrue(idx.isAmbiguousPending("ORD1"))
+        XCTAssertFalse(idx.isAmbiguousPending("T1"))
+        XCTAssertFalse(idx.isAmbiguousPending("T2"))
+
+        // Quét ORD1 (ambiguous): KHÔNG đánh dấu kiện nào
+        let amb = LocalEditOverlay.apply(to: rows, unconfirmedReturnScanTimes: ["ORD1": 1_795_400_000_000], overlays: [], calendar: vnCal)
+        XCTAssertFalse(amb.touched)
+        XCTAssertFalse(amb.rows[0].rv)
+        XCTAssertFalse(amb.rows[1].rv)
+
+        // Quét T1: CHỈ đánh dấu kiện A, kiện B giữ nguyên chưa nhận
+        let single = LocalEditOverlay.apply(to: rows, unconfirmedReturnScanTimes: ["T1": 1_795_400_000_000], overlays: [], calendar: vnCal)
+        XCTAssertTrue(single.touched)
+        XCTAssertTrue(single.rows[0].rv)
+        XCTAssertFalse(single.rows[0].pd)
+        XCTAssertFalse(single.rows[0].rcd.isEmpty)
+        XCTAssertFalse(single.rows[1].rv)
+        XCTAssertTrue(single.rows[1].pd)
+    }
+
+    /// Ghép lệnh sửa cục bộ chưa được PC xác nhận (note, editStatus, delete, cancelReceive) khi snapshot mới từ PC về.
+    func testLocalOverlayPreservesPendingEditsAcrossFreshSnapshot() {
+        let vnCal = ProductMetrics.vietnamCalendar
+        var r1 = OrderRow(k: "m", c: "T1", o: "O1", p: "Shopee", n: "Áo", co: "", sz: "", q: 1, rd: "", due: 0, st: "Chưa trả")
+        r1.pd = true; r1.rv = false
+        var r2 = OrderRow(k: "m", c: "T2", o: "O2", p: "Shopee", n: "Quần", co: "", sz: "", q: 1, rd: "", due: 0, st: "Chưa trả")
+        r2.pd = true; r2.rv = false
+        var r3 = OrderRow(k: "m", c: "T3", o: "O3", p: "Shopee", n: "Nón", co: "", sz: "", q: 1, rd: "", due: 0, st: "Chưa trả")
+        r3.pd = true; r3.rv = false
+        var c1 = OrderRow(k: "c", c: "C1", o: "OC1", p: "Shopee", n: "Hủy", co: "", sz: "", q: 1, rd: "", due: 0, st: "Đơn hủy")
+        c1.ci = "cxl_99"; c1.pd = true; c1.rv = false
+
+        let overlays = [
+            LocalEditOverlay(requestId: "n1", action: .note, rowId: r1.id, note: "Chờ kiểm tra", watch: true, timeMs: 100),
+            LocalEditOverlay(requestId: "e1", action: .editStatus, rowId: r2.id, status: "Hàng đã trả", timeMs: 1_795_400_000_000),
+            LocalEditOverlay(requestId: "d1", action: .delete, rowId: r3.id, timeMs: 200),
+            LocalEditOverlay(requestId: "c1", action: .cancelReceive, cancelIds: ["cxl_99"], received: true, timeMs: 1_795_400_000_000)
+        ]
+
+        let res = LocalEditOverlay.apply(to: [r1, r2, r3, c1], unconfirmedReturnScanTimes: [:], overlays: overlays, calendar: vnCal)
+        XCTAssertTrue(res.touched)
+        XCTAssertEqual(res.rows.count, 3)   // r3 đã bị xóa cục bộ
+        XCTAssertTrue(res.rows[0].wl)
+        XCTAssertEqual(res.rows[0].wr, "Chờ kiểm tra")
+        XCTAssertTrue(res.rows[1].rv)
+        XCTAssertFalse(res.rows[1].pd)
+        XCTAssertFalse(res.rows[1].rcd.isEmpty)
+        XCTAssertTrue(res.rows[2].rv)
+        XCTAssertEqual(res.rows[2].ci, "cxl_99")
+    }
+
+    /// 5.000 đơn: SnapshotIndex dựng chỉ mục nhẹ và tra cứu O(1) theo mã lẫn theo `id`.
+    func testSnapshotIndexHandles5000RowsAndDistinctIds() {
+        var rows: [OrderRow] = []
+        rows.reserveCapacity(5000)
+        for i in 0..<5000 {
+            var r = OrderRow(k: "m", c: "SPXVN\(String(format: "%010d", i))", o: "ORD\(i)", p: "Shopee", n: "SP \(i)", co: "", sz: "", q: 1, rd: "20/11/2026", due: 0, st: "Chưa trả")
+            r.pd = true
+            rows.append(r)
+        }
+        let idx = SnapshotIndex(rows: rows)
+        XCTAssertEqual(idx.lookup("SPXVN0000004999", in: rows)?.o, "ORD4999")
+        XCTAssertEqual(idx.row(byId: rows[2500].id, in: rows)?.c, "SPXVN0000002500")
+
+        // Hai đơn hủy cùng mã vận đơn nhưng khác `ci` có `id` khác nhau (không trùng khóa SwiftUI ForEach)
+        var x1 = OrderRow(k: "c", c: "SAME", o: "O1", p: "Shopee", n: "", co: "", sz: "", q: 1, rd: "", due: 0, st: "Đơn hủy")
+        x1.ci = "id_1"
+        var x2 = OrderRow(k: "c", c: "SAME", o: "O2", p: "Shopee", n: "", co: "", sz: "", q: 1, rd: "", due: 0, st: "Đơn hủy")
+        x2.ci = "id_2"
+        XCTAssertNotEqual(x1.id, x2.id)
     }
 }

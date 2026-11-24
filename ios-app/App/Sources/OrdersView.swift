@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import ScannerCore
 
 enum OrderFilter: String, CaseIterable {
@@ -37,9 +38,28 @@ struct OrdersView: View {
     @State private var shown: [OrderRow] = []
     @State private var counts: [OrderFilter: Int] = [:]
     @State private var scanned: Set<String> = []
+    @State private var platforms: [String] = []
+    @State private var returnWatchActive = 0
+    @State private var cancelledPending = 0
+    @State private var afterPrepPending = 0
     @State private var productCount = 0
+    @State private var listNowMs = Int(Date().timeIntervalSince1970 * 1000)
 
-    private func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
+    private struct FilterOutput {
+        var shown: [OrderRow]
+        var counts: [OrderFilter: Int]
+        var nowMs: Int
+    }
+
+    private struct SummaryOutput {
+        var platforms: [String]
+        var returnWatchActive: Int
+        var cancelledPending: Int
+        var afterPrepPending: Int
+        var productCount: Int
+    }
+
+    private static func matches(_ r: OrderRow, _ q: String, _ qc: String) -> Bool {
         if q.isEmpty { return true }
         for f in [r.c, r.o, r.x, r.n, r.co, r.sz, r.wr, r.nt] {
             if f.localizedCaseInsensitiveContains(q) { return true }
@@ -48,7 +68,7 @@ struct OrdersView: View {
         return false
     }
 
-    private func belongs(_ r: OrderRow, _ f: OrderFilter, now: Int) -> Bool {
+    private static func belongs(_ r: OrderRow, _ f: OrderFilter, now: Int) -> Bool {
         switch f {
         case .all: return true
         case .main: return r.k == "m"
@@ -64,48 +84,78 @@ struct OrdersView: View {
         }
     }
 
-    private func compute() -> (shown: [OrderRow], counts: [OrderFilter: Int]) {
+    private static func computeFilter(rows: [OrderRow], query: String, platform: String, filter: OrderFilter) -> FilterOutput {
         let now = Int(Date().timeIntervalSince1970 * 1000)
-        let q = query.trimmingCharacters(in: .whitespaces)
-        let qc = TrackingCode.clean(q)
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let qc = q.isEmpty ? "" : TrackingCode.clean(q)
         let targetPlat = platform.isEmpty ? "" : DashboardMetrics.normalizedPlatform(platform)
         var counts: [OrderFilter: Int] = [:]
         var shown: [OrderRow] = []
-        for r in store.rows {
+        shown.reserveCapacity(min(rows.count, 512))
+        for r in rows {
             if !targetPlat.isEmpty && DashboardMetrics.normalizedPlatform(r.p) != targetPlat { continue }
             if !matches(r, q, qc) { continue }
-            for f in OrderFilter.allCases where belongs(r, f, now: now) { counts[f, default: 0] += 1 }
+            let isMain = r.k == "m"
+            let alert: DeadlineLevel = (isMain && r.pd) ? r.alertLevel(now: now) : .unknown
+            counts[.all, default: 0] += 1
+            if isMain {
+                counts[.main, default: 0] += 1
+                if r.pd {
+                    counts[.pending, default: 0] += 1
+                    if alert == .overdue { counts[.overdue, default: 0] += 1 }
+                    else if alert == .soon { counts[.soon, default: 0] += 1 }
+                }
+                if r.wl { counts[.watch, default: 0] += 1 }
+                if r.rv { counts[.received, default: 0] += 1 }
+            }
+            if DashboardMetrics.isPartialReturn(r) { counts[.partialReturn, default: 0] += 1 }
+            if r.isCancelled { counts[.cancelled, default: 0] += 1 }
+            if r.isArchived { counts[.archived, default: 0] += 1 }
+            if r.pre { counts[.pre, default: 0] += 1 }
             if belongs(r, filter, now: now) { shown.append(r) }
         }
-        return (shown, counts)
+        return FilterOutput(shown: shown, counts: counts, nowMs: now)
     }
 
-    private var platforms: [String] {
-        let set = Set(store.rows.map { DashboardMetrics.normalizedPlatform($0.p) }.filter { !$0.isEmpty && $0 != "Khác" })
-        return Array(set).sorted()
+    private static func computeSummaries(rows: [OrderRow]) -> SummaryOutput {
+        var platSet = Set<String>()
+        var rwActive = 0
+        var cxlPending = 0
+        var prepPending = 0
+        for r in rows {
+            let p = DashboardMetrics.normalizedPlatform(r.p)
+            if !p.isEmpty && p != "Khác" { platSet.insert(p) }
+            if r.inReturnWatch && r.returnWatchStage < 4 { rwActive += 1 }
+            if r.k == "c" && !r.rv { cxlPending += 1 }
+            if r.k == "m" && !r.rv && r.isCancelAfterPrep { prepPending += 1 }
+        }
+        let prodCount = ProductMetrics.compute(rows: rows).products.count
+        return SummaryOutput(
+            platforms: Array(platSet).sorted(),
+            returnWatchActive: rwActive,
+            cancelledPending: cxlPending,
+            afterPrepPending: prepPending,
+            productCount: prodCount
+        )
+    }
+
+    private var dataToken: String {
+        "\(store.revision)|\(store.isDemoMode ? 1 : 0)|\(store.updatedAt?.timeIntervalSince1970 ?? 0)|\(store.rows.count)"
+    }
+
+    private var filterToken: String {
+        "\(dataToken)|\(filter.rawValue)|\(platform)|\(query)|\(engine.items.count)"
     }
 
     private func applyPendingNavigation() {
-        var changed = false
         if let f = router.pendingOrdersFilter {
             filter = f
             router.pendingOrdersFilter = nil
-            changed = true
         }
         if let p = router.pendingOrdersPlatform {
             platform = p
             router.pendingOrdersPlatform = nil
-            changed = true
         }
-        if changed { refresh() }
-    }
-
-    private func refresh() {
-        let d = compute()
-        shown = d.shown
-        counts = d.counts
-        scanned = engine.scannedReturnCodes
-        productCount = ProductMetrics.compute(rows: store.rows).products.count
     }
 
     var body: some View {
@@ -124,7 +174,7 @@ struct OrdersView: View {
                         Haptics.tap()
                         selected = r
                     } label: {
-                        orderCard(r)
+                        orderCard(r, now: listNowMs)
                     }
                     .buttonStyle(.plain)
                     .listRowSeparator(.hidden)
@@ -158,20 +208,42 @@ struct OrdersView: View {
             .searchable(text: $query, prompt: "Tìm mã vận đơn, mã đơn, sản phẩm...")
             .navigationTitle("Đơn hàng")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                applyPendingNavigation()
-                refresh()
-            }
+            .onAppear { applyPendingNavigation() }
             .onChange(of: router.pendingOrdersFilter) { _ in applyPendingNavigation() }
             .onChange(of: router.pendingOrdersPlatform) { _ in applyPendingNavigation() }
-            .onChange(of: query) { _ in refresh() }
-            .onChange(of: filter) { _ in refresh() }
-            .onChange(of: platform) { _ in refresh() }
-            .onChange(of: store.updatedAt) { _ in refresh() }
-            .onChange(of: store.rows.count) { _ in refresh() }
-            .onChange(of: store.revision) { _ in refresh() }
-            .onChange(of: store.isDemoMode) { _ in refresh() }
-            .onChange(of: engine.items.count) { _ in refresh() }
+            // Chỉ tính lại số liệu chip lối tắt + danh sách sàn + số mặt hàng khi dữ liệu đơn đổi (không tính lại khi gõ tìm kiếm).
+            .task(id: dataToken) {
+                let rowsSnapshot = store.rows
+                let summary = await Task.detached(priority: .userInitiated) {
+                    Self.computeSummaries(rows: rowsSnapshot)
+                }.value
+                guard !Task.isCancelled else { return }
+                platforms = summary.platforms
+                returnWatchActive = summary.returnWatchActive
+                cancelledPending = summary.cancelledPending
+                afterPrepPending = summary.afterPrepPending
+                productCount = summary.productCount
+            }
+            // Lọc 5.000 đơn trên luồng nền + debounce nhẹ khi gõ tìm kiếm để cuộn/gõ mượt 60fps.
+            .task(id: filterToken) {
+                let q = query
+                if !q.isEmpty {
+                    try? await Task.sleep(nanoseconds: 120_000_000)
+                    guard !Task.isCancelled else { return }
+                }
+                let rowsSnapshot = store.rows
+                let plat = platform
+                let activeFilter = filter
+                let scannedNow = engine.scannedReturnCodes
+                let result = await Task.detached(priority: .userInitiated) {
+                    Self.computeFilter(rows: rowsSnapshot, query: q, platform: plat, filter: activeFilter)
+                }.value
+                guard !Task.isCancelled else { return }
+                shown = result.shown
+                counts = result.counts
+                listNowMs = result.nowMs
+                scanned = scannedNow
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button {
@@ -204,11 +276,17 @@ struct OrdersView: View {
             }
             .sheet(item: $selected) { DetailView(row: $0) }
             .sheet(isPresented: $showScanner) {
-                ScanSearchSheet { raw in
-                    query = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                ScanSearchSheet { cleanedCode in
+                    query = cleanedCode
                     filter = .all
-                    refresh()
-                    if shown.count == 1 { selected = shown[0] }
+                    let rowsSnapshot = store.rows
+                    let res = Self.computeFilter(rows: rowsSnapshot, query: cleanedCode, platform: platform, filter: .all)
+                    shown = res.shown
+                    counts = res.counts
+                    listNowMs = res.nowMs
+                    if res.shown.count == 1, let only = res.shown.first {
+                        selected = only
+                    }
                 }
             }
         }
@@ -216,11 +294,7 @@ struct OrdersView: View {
 
     // MARK: - Hàng chip lối tắt nhỏ gọn (Hoàn về / Sản phẩm / Đơn hủy / Sau CB)
     private var shortcutRow: some View {
-        let returnWatchActive = store.rows.filter { $0.inReturnWatch && $0.returnWatchStage < 4 }.count
-        let cancelledPending = store.rows.filter { $0.k == "c" && !$0.rv }.count
-        let afterPrepPending = store.rows.filter { $0.k == "m" && !$0.rv && $0.isCancelAfterPrep }.count
-
-        return ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
                 NavigationLink { ReturnWatchView() } label: {
                     shortcutChip(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
@@ -310,8 +384,7 @@ struct OrdersView: View {
     }
 
     // MARK: - Hàng đơn gọn 3 dòng
-    private func orderCard(_ r: OrderRow) -> some View {
-        let now = Int(Date().timeIntervalSince1970 * 1000)
+    private func orderCard(_ r: OrderRow, now: Int) -> some View {
         let level = r.pd ? r.alertLevel(now: now) : .unknown
         let isPartial = DashboardMetrics.isPartialReturn(r)
         let variantText = [r.co, r.sz].filter { !$0.isEmpty }.joined(separator: " · ")
@@ -410,7 +483,7 @@ struct OrdersView: View {
                         .fill(k <= st ? color : Color.gray.opacity(0.25))
                         .frame(width: 5, height: 5)
                 }
-                Text(OrderRow.returnWatchStageNames[st])
+                Text(r.returnWatchStageName)
                     .font(Theme.Typography.microBold)
                     .foregroundColor(color)
                     .lineLimit(1)
@@ -484,11 +557,13 @@ struct OrdersView: View {
     }
 }
 
-/// Quét QR / mã vạch để điền vào ô tìm kiếm.
+/// Quét QR / mã vạch để điền vào ô tìm kiếm (lọc mã rác bằng `pickBest`, làm sạch URL/JSON, dừng khi vào nền).
 struct ScanSearchSheet: View {
     let onCode: (String) -> Void
     var title: String = "Quét để tìm đơn"
     var hint: String = "Đưa mã vạch hoặc QR vào khung để tìm đơn"
+    @EnvironmentObject var store: SnapshotStore
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var camera = CameraController()
     @Environment(\.dismiss) private var dismiss
     @State private var done = false
@@ -511,7 +586,21 @@ struct ScanSearchSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.accent)
-                if camera.denied { Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.").font(Theme.Typography.caption).foregroundColor(Theme.danger) }
+                if camera.denied {
+                    VStack(spacing: 6) {
+                        Text("Chưa cho phép camera: vào Cài đặt iPhone để bật.")
+                            .font(Theme.Typography.caption)
+                            .foregroundColor(Theme.danger)
+                            .multilineTextAlignment(.center)
+                        Button("Mở Cài đặt iPhone") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .font(Theme.Typography.captionBold)
+                        .buttonStyle(.bordered)
+                    }
+                }
                 Spacer()
             }
             .padding(Theme.screenPadding)
@@ -519,14 +608,29 @@ struct ScanSearchSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Đóng") { dismiss() } } }
             .onAppear {
-                camera.onCode = { raw in
-                    guard !done else { return }
-                    done = true
-                    camera.stop()
-                    onCode(raw)
-                    dismiss()
+                camera.onCodes = { raws in
+                    Task { @MainActor in
+                        guard !done else { return }
+                        guard let best = TrackingCode.pickBest(raws, isKnown: { code in store.lookup(TrackingCode.clean(code)) != nil }) else { return }
+                        let cleaned = TrackingCode.clean(best)
+                        guard !cleaned.isEmpty else { return }
+                        done = true
+                        Haptics.medium()
+                        camera.stop()
+                        onCode(cleaned)
+                        dismiss()
+                    }
                 }
-                camera.start()
+                if scenePhase == .active {
+                    camera.start()
+                }
+            }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active && !done {
+                    camera.start()
+                } else {
+                    camera.stop()
+                }
             }
             .onDisappear { camera.stop() }
         }

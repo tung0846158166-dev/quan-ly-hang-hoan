@@ -7,13 +7,16 @@ public final class NtfyClient {
 
     public struct HTTPError: Error { public let status: Int }
 
-    private func url(_ topic: String, _ tail: String) -> URL {
-        URL(string: "https://ntfy.sh/\(topic)\(tail)")!
+    private func buildURL(_ topic: String, _ tail: String) throws -> URL {
+        guard !topic.isEmpty, let u = URL(string: "https://ntfy.sh/\(topic)\(tail)") else {
+            throw URLError(.badURL)
+        }
+        return u
     }
 
     public func post(topic: String, title: String, body: String) async throws {
         let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "Shopee"
-        var req = URLRequest(url: url(topic, "?title=\(encodedTitle)"))
+        var req = URLRequest(url: try buildURL(topic, "?title=\(encodedTitle)"))
         req.httpMethod = "POST"
         req.httpBody = Data(body.utf8)
         req.timeoutInterval = 20
@@ -26,7 +29,7 @@ public final class NtfyClient {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    var req = URLRequest(url: self.url(topic, "/sse"))
+                    var req = URLRequest(url: try self.buildURL(topic, "/sse"))
                     req.timeoutInterval = 120
                     req.setValue("text/event-stream", forHTTPHeaderField: "Accept")
                     let (bytes, resp) = try await self.session.bytes(for: req)
@@ -47,7 +50,7 @@ public final class NtfyClient {
 
     /// Lấy lại các bản tin gần đây (vd since = "10m") để bắt phản hồi bị lỡ khi mất kết nối.
     public func poll(topic: String, since: String) async throws -> [String] {
-        var req = URLRequest(url: url(topic, "/json?poll=1&since=\(since)"))
+        var req = URLRequest(url: try buildURL(topic, "/json?poll=1&since=\(since)"))
         req.timeoutInterval = 20
         let (data, _) = try await session.data(for: req)
         return String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init)

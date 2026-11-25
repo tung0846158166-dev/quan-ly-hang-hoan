@@ -45,7 +45,7 @@ async function stub() {
   return E.SHOP.get(E.SHOP.idFromName("main"));
 }
 
-const TABLES = ["devices", "pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
+const TABLES = ["return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
 
 // Trạng thái Durable Object được giữ giữa các test: xóa sạch bảng + ảnh trước mỗi test rồi tạo lại thiết bị.
 beforeEach(async () => {
@@ -252,6 +252,73 @@ describe("thao tác khác", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ action: "editNote" });
     expect(JSON.parse(rows[0]!.after as string)).toEqual({ userNote: "mới" });
+  });
+});
+
+describe("Bảng Hàng Hoàn Về", () => {
+  const watchChanges = async (since = 0) => ((await call("GET", `/sync?since=${since}`, undefined, owner)).data.changes as any[]).filter((c) => c.type === "returnWatch");
+
+  it("đơn 'Đã đồng ý' chưa nhận tự vào bảng một lần; đơn đã nhận/lưu trữ/không cần nhận thì không", async () => {
+    await importParcels([
+      parcel("a", { platformStatus: "Đã đồng ý" }),
+      parcel("b", { platformStatus: "Đã đồng ý", status: "Hàng đã trả" }),
+      parcel("c", { platformStatus: "Đã đồng ý", status: "Không cần nhận" }),
+      parcel("d", { platformStatus: "Đã đồng ý", isArchived: true }),
+      parcel("e", { platformStatus: "Đang xử lý" }),
+      parcel("t", { platform: "TikTok", platformStatus: "Chờ khách gửi hàng" }),
+    ]);
+    const w = await watchChanges();
+    expect(w.map((c) => c.key).sort()).toEqual(["a", "t"]);
+    expect(w[0]).toMatchObject({ off: false });
+    expect(w[0].since).toBeGreaterThan(1_700_000_000_000);
+
+    // nhập lại không tạo dòng mới / không đổi mốc vào bảng
+    const before = w.find((c) => c.key === "a").since;
+    await importParcels([parcel("a", { platformStatus: "Đã đồng ý", price: 5, hash: "x2" })]);
+    const after = await watchChanges();
+    expect(after).toHaveLength(2);
+    expect(after.find((c) => c.key === "a").since).toBe(before);
+  });
+
+  it("bỏ khỏi bảng rồi khôi phục (không xóa đơn); bỏ rồi nhập lại không tự vào lại; đơn ngoài bảng thì 404", async () => {
+    await importParcels([parcel("a", { platformStatus: "Đã đồng ý" }), parcel("z")]);
+    const run = (op: Record<string, unknown>) => call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), ...op }] }, phoneA).then((r) => r.data.results[0]);
+    expect((await run({ type: "rwRemove", id: "a" })).ok).toBe(true);
+    expect((await watchChanges()).find((c) => c.key === "a").off).toBe(true);
+    await importParcels([parcel("a", { platformStatus: "Đã đồng ý", price: 9, hash: "x3" })]);
+    expect((await watchChanges()).find((c) => c.key === "a").off).toBe(true);          // vẫn bị bỏ
+    expect((await run({ type: "rwRestore", id: "a" })).ok).toBe(true);
+    expect((await watchChanges()).find((c) => c.key === "a").off).toBe(false);
+    const nf = await run({ type: "rwRemove", id: "z" });
+    expect(nf).toMatchObject({ ok: false, error: { code: "not_found" } });
+    const p = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === "a");
+    expect(p.parcel.isDeleted).toBe(false);
+  });
+
+  it("nhập dấu của dữ liệu cũ: chỉ thêm khi chưa có, giữ cờ đã bỏ, bỏ qua kiện không tồn tại", async () => {
+    await importParcels([parcel("a"), parcel("b")]);
+    const r = await call("POST", "/import", { source: "file", signature: "s", parcels: [], returnWatch: [
+      { id: "a", since: 1_700_000_000_123, off: true }, { id: "b", since: 1_700_000_000_456, off: false }, { id: "khongco", since: 1 },
+    ] }, owner);
+    expect(r.data.returnWatchAdded).toBe(2);
+    const again = await call("POST", "/import", { source: "file", signature: "s", parcels: [], returnWatch: [{ id: "a", since: 5, off: false }] }, owner);
+    expect(again.data.returnWatchAdded).toBe(0);
+    const w = await watchChanges();
+    expect(w.find((c) => c.key === "a")).toMatchObject({ since: 1_700_000_000_123, off: true });
+    expect(w.find((c) => c.key === "b")).toMatchObject({ since: 1_700_000_000_456, off: false });
+  });
+
+  it("phân trang trộn kiện + bảng hoàn về theo rev: không sót, không lặp", async () => {
+    await importParcels([parcel("a", { platformStatus: "Đã đồng ý" }), parcel("b", { platformStatus: "Đã đồng ý" }), parcel("c")]);
+    const seen: string[] = [];
+    let since = 0;
+    for (let i = 0; i < 20; i++) {
+      const page = (await call("GET", `/sync?since=${since}&limit=2`, undefined, owner)).data;
+      for (const c of page.changes) seen.push(c.type === "parcel" ? "p:" + c.parcel.id : "w:" + c.key);
+      since = page.rev;
+      if (!page.more) break;
+    }
+    expect(seen.sort()).toEqual(["p:a", "p:b", "p:c", "w:a", "w:b"]);
   });
 });
 

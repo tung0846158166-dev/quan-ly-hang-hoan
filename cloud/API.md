@@ -47,9 +47,10 @@ Vai trò: `owner` (chủ) | `staff` (nhân viên). Điện thoại là ứng d�
 ```json
 { "rev": 1234, "more": false, "changes": [
   { "type": "parcel", "rev": 1201, "parcel": { "...Parcel + rev/updatedAt..." } },
-  { "type": "returnWatch", "rev": 1210, "key": "<id kiện>", "deleted": false, "data": { "stage": 2, "since": 1764000000000 } }
+  { "type": "returnWatch", "rev": 1210, "key": "<id kiện>", "since": 1764000000000, "off": false }
 ] }
 ```
+- **Bảng Hàng Hoàn Về** (`type: "returnWatch"`): chỉ đồng bộ phần TƯ CÁCH THÀNH VIÊN (`since` = giờ vào bảng, ms; `off` = đã bị người dùng bỏ khỏi bảng). Chặng 1-4 do máy khách tự tính từ dữ liệu kiện (đã nhận 4; có giờ hàng về 3; "đang về"/có mã vận đơn hoàn 2; còn lại 1). Đơn "Đã đồng ý" (TikTok: chờ khách gửi/đang về) chưa nhận, ở bảng chính tự vào bảng một lần khi máy chủ ghi/nhập kiện; vào rồi thì ở lại, chỉ `rwRemove`/`rwRestore` mới đổi.
 - `since=0` lấy toàn bộ. `more=true` thì gọi tiếp với `since` = `rev` lớn nhất vừa nhận.
 - Kiện bị xóa/lưu trữ KHÔNG biến mất khỏi luồng: có `isDeleted`/`isArchived` (máy khách tự ẩn). Không bao giờ xóa cứng (quy tắc 8).
 - Máy khách lưu `rev` đã xử lý xong; mất kết nối thì lúc nối lại gọi `/sync` từ `rev` đó.
@@ -67,7 +68,10 @@ Vai trò: `owner` (chủ) | `staff` (nhân viên). Điện thoại là ứng d�
 | `setWatch` | `id`, `on`, `reason?` | theo dõi / bỏ theo dõi |
 | `archive` / `unarchive` | `id` | |
 | `delete` / `restore` | `id` | xóa mềm |
-| `editCell` | `id`, `field`, `value` | sửa ô (ghi `cell_edit_history`) |
+| `editCell` | `id`, `field`, `value` | sửa ô (`platformStatus`, `carrier`, `shipDate`, `returnDate`, `recvDate`, `returnedAt`, `deadline`, `orderType`, `price`, `note`, `userNote`, `watchlistReason`) |
+| `rwRemove` / `rwRestore` | `id` | bỏ khỏi / khôi phục vào Bảng Hàng Hoàn Về (không xóa đơn); đơn ngoài bảng thì `not_found` |
+
+`GET /parcels/{id}/history` → nhật ký trước/sau của kiện `[{at, action, deviceName, before, after}]`, mới nhất trước, tối đa 200 dòng.
 
 Mọi thao tác ghi vào `audit_log` (ai, lúc nào, giá trị cũ → mới); không bao giờ ghi đè mất dấu.
 
@@ -91,6 +95,7 @@ Quyết định theo `cloud/core` (`decide`), chuẩn đối chiếu `cloud/gold
 `POST /import` `{ "source": "sheet"|"file"|"folder"|"salework", "signature": "<chữ ký nguồn>", "parcels": [ { ...Parcel không có rev/updatedAt, "hash": "..." } ] }` (tối đa 500 kiện/lần) → `{ "added": 3, "updated": 2, "unchanged": 495, "rejected": [ { "id": "...", "reason": "..." } ] }`.
 - Upsert theo `id` (khóa kiện); nhập lại cùng kiện thì **cập nhật**, không cộng lặp sản phẩm (quy tắc 5). Kiện `hash` trùng hash hiện có thì bỏ qua, không ghi.
 - Không ghi đè trường do người dùng sửa tay trên cloud (`userNote`, `isWatchlist`, `watchlistReason`, trạng thái nhận đã `Hàng đã trả`) trừ khi nguồn nói rõ; quy tắc gộp chi tiết nằm ở bộ gộp phía nguồn (`SheetPipeline`/`ParcelMerge`), không đoán ở máy chủ.
+- Tuỳ chọn `returnWatch: [{id, since, off}]` (≤ 2.000): dấu Bảng Hàng Hoàn Về của dữ liệu cũ; chỉ THÊM khi chưa có, không đổi dòng đã có; kiện không tồn tại bị bỏ qua; kết quả có `returnWatchAdded`.
 - `GET /import/state?source=sheet` → `{ "signature": "...", "lastRunAt": 1764000000000, "parcelCount": 4962 }` để nguồn bỏ qua vòng không đổi.
 - Quyền: khóa nhập riêng cho Apps Script (`X-Import-Key`, Worker secret `IMPORT_KEY`, chỉ gọi được `/import*`); thiết bị `owner`/`staff` cũng gọi được.
 

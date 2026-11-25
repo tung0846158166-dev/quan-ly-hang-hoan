@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
 import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parcel";
+import { returnWatchEligible } from "./returnwatch";
 import type { Env } from "./index";
 
 const DAY_MS = 86_400_000;
@@ -267,7 +268,15 @@ export class ShopDO extends DurableObject<Env> {
         p.id, rev, now, data, p.status, p.isArchived ? 1 : 0, p.isDeleted ? 1 : 0, srcHash);
     }
     this.refreshCodes(p);
+    this.touchReturnWatch(p);
     return rev;
+  }
+
+  /** Đơn đủ điều kiện mà chưa có dấu thì TỰ vào Bảng Hàng Hoàn Về (một lần; không bao giờ đổi dòng đã có, kể cả đã bị bỏ). */
+  private touchReturnWatch(p: Parcel): void {
+    if (!returnWatchEligible(p)) return;
+    if (this.db.first<Row>("SELECT 1 AS x FROM return_watch WHERE parcel_id = ?", p.id)) return;
+    this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev) VALUES (?,?,0,?)", p.id, Date.now(), this.nextRev());
   }
 
   private refreshCodes(p: Parcel): void {
@@ -289,12 +298,16 @@ export class ShopDO extends DurableObject<Env> {
   private sync(url: URL): Response {
     const since = Math.max(0, Number(url.searchParams.get("since") ?? 0) || 0);
     const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") ?? 500) || 500));
-    const rows = this.db.all<Row>("SELECT data, rev, updated_at FROM parcels WHERE rev > ? ORDER BY rev LIMIT ?", since, limit + 1);
-    const more = rows.length > limit;
-    const page = more ? rows.slice(0, limit) : rows;
-    const changes = page.map((r) => ({ type: "parcel", rev: Number(r.rev), parcel: this.toWire(JSON.parse(r.data as string) as Parcel, Number(r.rev), Number(r.updated_at)) }));
-    const rev = more ? Number((page[page.length - 1] as Row).rev) : this.currentRev();
-    return json({ rev, more, changes });
+    // hai nguồn thay đổi (kiện + bảng hoàn về) trộn theo rev; mỗi nguồn lấy tối đa limit+1 dòng nhỏ nhất nên n dòng nhỏ nhất chung luôn nằm trong đó
+    const parcels = this.db.all<Row>("SELECT data, rev, updated_at FROM parcels WHERE rev > ? ORDER BY rev LIMIT ?", since, limit + 1)
+      .map((r) => ({ rev: Number(r.rev), change: { type: "parcel", rev: Number(r.rev), parcel: this.toWire(JSON.parse(r.data as string) as Parcel, Number(r.rev), Number(r.updated_at)) } as Record<string, unknown> }));
+    const watch = this.db.all<Row>("SELECT parcel_id, since, off, rev FROM return_watch WHERE rev > ? ORDER BY rev LIMIT ?", since, limit + 1)
+      .map((r) => ({ rev: Number(r.rev), change: { type: "returnWatch", rev: Number(r.rev), key: r.parcel_id, since: Number(r.since), off: !!r.off } as Record<string, unknown> }));
+    const merged = [...parcels, ...watch].sort((a, b) => a.rev - b.rev);
+    const more = merged.length > limit;
+    const page = more ? merged.slice(0, limit) : merged;
+    const rev = more ? (page[page.length - 1] as { rev: number }).rev : this.currentRev();
+    return json({ rev, more, changes: page.map((x) => x.change) });
   }
 
   // ===================================================== thao tác ghi
@@ -342,6 +355,8 @@ export class ShopDO extends DurableObject<Env> {
       case "delete": return this.opMutate(op, dev, "delete", (p) => { p.deletedFrom = p.isArchived ? "Kho lưu trữ" : "Bảng chính"; p.isDeleted = true; p.deletedAt = vnTime(Date.now()); });
       case "restore": return this.opMutate(op, dev, "restore", (p) => { p.isDeleted = false; p.deletedAt = ""; p.deletedFrom = ""; });
       case "editCell": return this.opEditCell(op, dev);
+      case "rwRemove": return this.opReturnWatch(op, dev, true);
+      case "rwRestore": return this.opReturnWatch(op, dev, false);
       default: return fail(422, "invalid", `Loại thao tác không hỗ trợ: ${String(op.type)}`);
     }
   }
@@ -421,6 +436,18 @@ export class ShopDO extends DurableObject<Env> {
     });
   }
 
+  /** Bỏ khỏi / khôi phục vào Bảng Hàng Hoàn Về (không xóa đơn). */
+  private opReturnWatch(op: Record<string, unknown>, dev: Device, off: boolean): Record<string, unknown> {
+    const p = this.need(op.id);
+    const row = this.db.first<Row>("SELECT off FROM return_watch WHERE parcel_id = ?", p.id);
+    if (!row) return fail(404, "not_found", "Đơn không nằm trong Bảng Hàng Hoàn Về.");
+    if (!!row.off !== off) {
+      this.db.run("UPDATE return_watch SET off = ?, rev = ? WHERE parcel_id = ?", off ? 1 : 0, this.nextRev(), p.id);
+      this.audit(dev.deviceId, off ? "rwRemove" : "rwRestore", p.id, { off: !off }, { off });
+    }
+    return { off };
+  }
+
   /** Đọc kiện → áp thay đổi → ghi + nhật ký (trước/sau). */
   private opMutate(op: Record<string, unknown>, dev: Device, action: string, apply: (p: Parcel) => void): Record<string, unknown> {
     const p = this.need(op.id);
@@ -449,7 +476,7 @@ export class ShopDO extends DurableObject<Env> {
       prepared.push({ p: v.parcel, hash: given || (await sha256Hex(canonical(v.parcel))) });
     }
 
-    let added = 0, updated = 0, unchanged = 0;
+    let added = 0, updated = 0, unchanged = 0, watchAdded = 0;
     this.ctx.storage.transactionSync(() => {
       for (const { p, hash } of prepared) {
         const ex = this.db.first<Row>("SELECT data, src_hash FROM parcels WHERE id = ?", p.id);
@@ -459,12 +486,20 @@ export class ShopDO extends DurableObject<Env> {
         this.writeParcel(merged, hash);
         updated++;
       }
+      // dấu Bảng Hàng Hoàn Về của dữ liệu cũ: chỉ THÊM khi chưa có, không bao giờ đổi dòng đã có (kể cả đã bị bỏ)
+      for (const w of Array.isArray(b.returnWatch) ? (b.returnWatch as unknown[]).slice(0, 2000) : []) {
+        const e = w as { id?: unknown; since?: unknown; off?: unknown };
+        if (typeof e.id !== "string" || !this.db.first<Row>("SELECT 1 AS x FROM parcels WHERE id = ?", e.id)) continue;
+        if (this.db.first<Row>("SELECT 1 AS x FROM return_watch WHERE parcel_id = ?", e.id)) continue;
+        this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev) VALUES (?,?,?,?)", e.id, Number(e.since) > 0 ? Number(e.since) : Date.now(), e.off === true ? 1 : 0, this.nextRev());
+        watchAdded++;
+      }
       const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
       this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at",
         source, sig, Date.now());
     });
-    if (added + updated > 0) this.broadcast();
-    return json({ added, updated, unchanged, rejected });
+    if (added + updated + watchAdded > 0) this.broadcast();
+    return json({ added, updated, unchanged, rejected, returnWatchAdded: watchAdded });
   }
 
   private importState(source: string): Response {

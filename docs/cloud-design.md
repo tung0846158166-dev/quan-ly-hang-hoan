@@ -9,7 +9,8 @@ Trạng thái: **ĐỀ XUẤT, chưa làm gì.** Bản Electron cũ vẫn là ch
 4. Gói: **R2 10 GB, D1 500 MB** (xem 3.7: D1 là giới hạn chật nhất).
 5. **Điện thoại là một ứng dụng độc lập đầy đủ** (xem danh sách, chi tiết, thống kê, AI, quét...), không chỉ để quét.
 6. **Google Sheet nạp thẳng lên cloud** (Cron của Worker). Các cách nạp khác (file Excel, thư mục, Salework) vẫn chạy ở máy tính.
-Chưa trả lời: một hay nhiều cửa hàng (mặc định: MỘT cửa hàng, lược đồ có sẵn `shop_id`); số ngày giữ ảnh (mặc định 90, xem 3.7).
+7. **MỘT cửa hàng duy nhất, phần mềm nội bộ cho nhân viên dùng** (không bán/cho thuê, không có đăng ký cửa hàng). `shop_id` chỉ là một hằng số, không làm phần quản lý nhiều cửa hàng.
+Chưa trả lời: số ngày giữ ảnh (mặc định 90, xem 3.7).
 
 ## 1. Tổng quan
 

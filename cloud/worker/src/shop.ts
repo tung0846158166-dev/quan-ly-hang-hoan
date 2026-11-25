@@ -9,6 +9,13 @@ import type { Env } from "./index";
 
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
+/** Đổi khi SCHEMA/nâng cấp lược đồ đổi: lần khởi động sau sẽ chạy lại migrate(). */
+const SCHEMA_VERSION = "2026-11-26.1";
+
+/** Lỗi Cloudflare khi hết lượt ghi Durable Object (gói miễn phí). */
+export function isWriteQuotaError(e: unknown): boolean {
+  return /Exceeded allowed rows written/i.test(String((e as { message?: unknown })?.message ?? e));
+}
 const VALID_STATUS = new Set<string>(Object.values(ReceiveStatus));
 const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote", "watchlistReason"]);
 const PHOTO_ID = /^[A-Za-z0-9_-]{6,80}$/;
@@ -49,6 +56,8 @@ function timingSafeEqual(a: string, b: string): boolean {
 export class ShopDO extends DurableObject<Env> {
   private db: Db;
   private pendingReq = 0;
+  /** Ngày (UTC) Cloudflare đã chặn ghi vì hết lượt gói miễn phí: cả ngày đó coi như "stop". */
+  private hardStopDay = "";
   private lastFlush = Date.now();
   private flushedWritten = 0;
   private flushedRead = 0;
@@ -57,6 +66,25 @@ export class ShopDO extends DurableObject<Env> {
     super(ctx, env);
     this.db = new Db(ctx.storage.sql);
     ctx.blockConcurrencyWhile(async () => {
+      // Chỉ chạy lệnh tạo bảng khi phiên bản lược đồ đổi: CREATE ... IF NOT EXISTS vẫn bị Cloudflare tính là GHI, nên khi hết lượt ghi
+      // trong ngày mà chạy mỗi lần khởi động thì MỌI yêu cầu (kể cả đọc) đều lỗi. Lỗi ở đây không được làm sập cả Durable Object.
+      try {
+        if (this.schemaVersion() === SCHEMA_VERSION) return;
+        this.migrate();
+      } catch (e) {
+        if (isWriteQuotaError(e)) this.hardStopDay = this.dayKey();
+        else console.error("khởi tạo lược đồ lỗi", e);
+      }
+    });
+    // Ping/pong tự động, không đánh thức Durable Object (tiết kiệm yêu cầu).
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
+  }
+
+  private schemaVersion(): string {
+    try { return String(this.db.first<Row>("SELECT v FROM meta WHERE k = 'schema'")?.v ?? ""); } catch { return ""; }
+  }
+
+  private migrate(): void {
       this.db.exec(SCHEMA);
       this.db.run("INSERT OR IGNORE INTO meta(k, v) VALUES ('rev', '0')");
       // cột "auto": 1 = dấu cloud TỰ thêm lúc nhập (dữ liệu cũ được phép thay giờ gốc vào), 0 = dấu gốc/đã có người đụng
@@ -66,9 +94,7 @@ export class ShopDO extends DurableObject<Env> {
         // một lần lúc nâng cấp: dấu chưa ai bỏ/khôi phục coi như tự thêm (gửi lại dữ liệu cũ cùng giá trị thì không đổi gì)
         this.db.exec("UPDATE return_watch SET auto = 1 WHERE parcel_id NOT IN (SELECT parcel_id FROM audit_log WHERE action IN ('rwRemove','rwRestore'))");
       }
-    });
-    // Ping/pong tự động, không đánh thức Durable Object (tiết kiệm yêu cầu).
-    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
+      this.db.run("INSERT OR REPLACE INTO meta(k, v) VALUES ('schema', ?)", SCHEMA_VERSION);
   }
 
   // ===================================================== điểm vào
@@ -83,6 +109,12 @@ export class ShopDO extends DurableObject<Env> {
     } catch (e) {
       this.countRequest();
       if (e instanceof ApiError) return errorResponse(e);
+      if (isWriteQuotaError(e)) {
+        // Cloudflare hết lượt ghi gói miễn phí trong ngày: chặn MỌI truy vấn (kể cả SELECT) tới 00:00 UTC. Báo 429 để máy khách dừng và thử lại sau.
+        this.hardStopDay = this.dayKey();
+        console.warn("chặn ghi", path, (e as Error)?.stack);
+        return errorResponse(new ApiError(429, "quota_exceeded", "Cloud tạm khóa tới 07:00 sáng (giờ Việt Nam): đã hết lượt ghi trong ngày của gói miễn phí. Dữ liệu không mất."));
+      }
       console.error("lỗi không mong đợi", e);
       return json({ error: { code: "internal", message: "Lỗi máy chủ, thử lại sau." } }, 500);
     }
@@ -153,7 +185,11 @@ export class ShopDO extends DurableObject<Env> {
     const r = this.db.first<Row>("SELECT device_id, name, kind, role, revoked, last_seen_at FROM devices WHERE token_hash = ?", hash);
     if (!r || r.revoked) { this.tokenCache.delete(token); return fail(401, "unauthorized", "Thiết bị chưa được ghép hoặc đã bị thu hồi."); }
     const now = Date.now();
-    if (now - Number(r.last_seen_at) > 5 * 60_000) this.db.run("UPDATE devices SET last_seen_at = ? WHERE device_id = ?", now, r.device_id as string);
+    // "lần cuối thấy máy" chỉ là thông tin phụ: không ghi khi đang bị chặn ghi, và lỗi ghi không được làm hỏng yêu cầu (đọc vẫn phải chạy)
+    if (now - Number(r.last_seen_at) > 5 * 60_000 && this.hardStopDay !== this.dayKey()) {
+      try { this.db.run("UPDATE devices SET last_seen_at = ? WHERE device_id = ?", now, r.device_id as string); }
+      catch (e) { if (isWriteQuotaError(e)) this.hardStopDay = this.dayKey(); else throw e; }
+    }
     return { deviceId: r.device_id as string, name: r.name as string, kind: r.kind as string, role: r.role as string };
   }
 
@@ -335,8 +371,11 @@ export class ShopDO extends DurableObject<Env> {
       if (done) { results.push(JSON.parse(done.result as string)); continue; }
       let res: Record<string, unknown>;
       try {
-        if (op.type !== "scan" && this.quotaSnapshot(false).level === "stop")
+        const quota = this.quotaSnapshot(false);
+        if (op.type !== "scan" && quota.level === "stop")
           fail(429, "quota_exceeded", "Hết hạn mức hôm nay: thao tác ghi tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
+        if (op.type === "scan" && quota.scanStop)
+          fail(429, "quota_exceeded", "Cloud sắp hết lượt ghi hôm nay: tạm dừng quét tới 07:00 sáng (giờ Việt Nam) để tránh khóa cả cloud.");
         const before = this.currentRev();
         const result = this.ctx.storage.transactionSync(() => this.runOp(op, dev));
         const rev = this.currentRev();
@@ -765,7 +804,10 @@ export class ShopDO extends DurableObject<Env> {
   private countRequest(): void {
     this.pendingReq++;
     const now = Date.now();
-    if (this.pendingReq >= 10 || now - this.lastFlush > 60_000) this.flushQuota();
+    if (this.hardStopDay === this.dayKey()) return;   // đang bị chặn ghi: đừng ghi bảng hạn mức
+    if (this.pendingReq >= 10 || now - this.lastFlush > 60_000) {
+      try { this.flushQuota(); } catch (e) { if (isWriteQuotaError(e)) this.hardStopDay = this.dayKey(); else throw e; }
+    }
   }
 
   private flushQuota(): void {
@@ -779,18 +821,22 @@ export class ShopDO extends DurableObject<Env> {
     this.pendingReq = 0; this.lastFlush = Date.now();
   }
 
-  private quotaSnapshot(flush: boolean): Record<string, unknown> & { level: string } {
-    if (flush) this.flushQuota();
+  private quotaSnapshot(flush: boolean): Record<string, unknown> & { level: string; scanStop: boolean } {
     const day = this.dayKey();
+    if (flush && this.hardStopDay !== day) {
+      try { this.flushQuota(); } catch (e) { if (isWriteQuotaError(e)) this.hardStopDay = day; else throw e; }
+    }
     const row = this.db.first<Row>("SELECT requests, rows_written, rows_read FROM quota WHERE day = ?", day);
     const requests = Number(row?.requests ?? 0) + this.pendingReq;
     const written = Number(row?.rows_written ?? 0) + (this.db.rowsWritten - this.flushedWritten);
     const read = Number(row?.rows_read ?? 0) + (this.db.rowsRead - this.flushedRead);
     const frac = Math.max(requests / LIMITS.requests, written / LIMITS.rowsWritten, read / LIMITS.rowsRead);
-    const level = frac >= 0.98 ? "stop" : frac >= 0.7 ? "warn" : "ok";
+    // Bộ đếm của ta THẤP hơn số Cloudflare tính (đo 26/11/2026: ta đếm 88.900 khi Cloudflare đã chặn ở 100.000 — Cloudflare tính cả ghi chỉ mục).
+    // Chạm trần thật thì Cloudflare chặn cả ĐỌC tới 07:00 VN => dừng nhập/sửa từ 75%, cảnh báo từ 50%; quét nhận hàng vẫn chạy tới đó.
+    const level = this.hardStopDay === day || frac >= 0.75 ? "stop" : frac >= 0.5 ? "warn" : "ok";
     return {
       day, requests: { used: requests, limit: LIMITS.requests }, rowsWritten: { used: written, limit: LIMITS.rowsWritten },
-      rowsRead: { used: read, limit: LIMITS.rowsRead }, level,
+      rowsRead: { used: read, limit: LIMITS.rowsRead }, level, scanStop: this.hardStopDay === day || frac >= 0.9,
     };
   }
 

@@ -430,6 +430,16 @@ describe("nhập từ Google Sheet (cloud tự đối chiếu, cùng bộ gộp 
     expect((await sendSheet(Array.from({ length: 101 }, () => sheetParcel()))).status).toBe(422);
   });
 
+  it("Shopee: kiện cũ chưa có mã vận đơn cùng mã đơn được điền mã từ Sheet (đúng một kiện)", async () => {
+    await importParcels([parcel("p1", { orderId: "SPT1", track: "", platform: "Shopee", platformStatus: "Đang xử lý" })]);
+    const r = await sendSheet([sheetParcel({ orderId: "SPT1", returnOrderId: "", track: "SPXVN000000777" })]);
+    expect(r.status).toBe(200);
+    expect(r.data).toMatchObject({ added: 0, updated: 1 });
+    const ps = await all();
+    expect(ps).toHaveLength(1);
+    expect(ps[0]).toMatchObject({ id: "p1", track: "SPXVN000000777" });
+  });
+
   it("chủ shop xóa hẳn kiện Sheet CHƯA ai đụng; kiện đã quét/sửa/dữ liệu cũ giữ nguyên; nhân viên không làm được", async () => {
     await importParcels([parcel("p1")]);                               // dữ liệu cũ (không phải s_)
     await sendSheet([
@@ -616,6 +626,35 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
   });
 });
 
+describe("hết lượt ghi của Cloudflare (gói miễn phí)", () => {
+  it("lỗi chặn ghi thành 429 'hết hạn mức', đọc vẫn được, hạn mức báo stop; ngày sau hết chặn", async () => {
+    await importParcels([parcel("p1")]);
+    const s: any = await stub();   // any: tránh lỗi "Type instantiation is excessively deep" của kiểu stub
+    await (runInDurableObject as any)(s, (inst: any) => {
+      const db = inst.db;
+      inst.__origRun = db.run.bind(db);
+      db.run = (q: string, ...b: unknown[]) => {
+        if (/^\s*(INSERT|UPDATE|DELETE)/i.test(q)) throw new Error("Exceeded allowed rows written in Durable Objects free tier.");
+        return inst.__origRun(q, ...b);
+      };
+    });
+    const w = await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editNote", id: "p1", userNote: "x" }] }, phoneA);
+    expect(w.status).toBe(429);
+    expect(w.data.error.code).toBe("quota_exceeded");
+    // máy lâu không thấy (sẽ cần ghi "lần cuối thấy máy") vẫn đọc được
+    await (runInDurableObject as any)(s, (inst: any) => { inst.__origRun("UPDATE devices SET last_seen_at = 0"); });
+    const r = await call("GET", "/sync?since=0", undefined, phoneA);
+    expect(r.status).toBe(200);
+    expect((await call("GET", "/me", undefined, phoneB)).status).toBe(200);
+    expect(r.data.changes.some((c: any) => c.type === "parcel" && c.parcel.id === "p1")).toBe(true);
+    const q = await call("GET", "/quota", undefined, owner);
+    expect(q.status).toBe(200);
+    expect(q.data.level).toBe("stop");
+    await (runInDurableObject as any)(s, (inst: any) => { inst.db.run = inst.__origRun; inst.hardStopDay = "2000-01-01"; });
+    expect((await call("GET", "/quota", undefined, owner)).data.level).not.toBe("stop");
+  });
+});
+
 describe("hạn mức và thời gian thực", () => {
   it("đếm yêu cầu và hàng ghi trong ngày, mức 'ok' khi dùng ít", async () => {
     await importParcels([parcel("p1"), parcel("p2")]);
@@ -631,7 +670,7 @@ describe("hạn mức và thời gian thực", () => {
     const s = await stub();
     await runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => {
       const day = new Date().toISOString().slice(0, 10);
-      state.storage.sql.exec("INSERT OR REPLACE INTO quota(day, requests, rows_written, rows_read) VALUES (?, 99500, 0, 0)", day);
+      state.storage.sql.exec("INSERT OR REPLACE INTO quota(day, requests, rows_written, rows_read) VALUES (?, 0, 80000, 0)", day);
     });
     const edit = await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editNote", id: "p1", userNote: "x" }] }, owner);
     expect(edit.data.results[0]).toMatchObject({ ok: false, error: { code: "quota_exceeded" } });
@@ -639,6 +678,26 @@ describe("hạn mức và thời gian thực", () => {
     expect(sc.res.result.outcome).toBe("received");
     const imp = await importParcels([parcel("p3")]);
     expect(imp.status).toBe(429);
+    // 91%: dừng cả quét để không bao giờ chạm trần thật (Cloudflare khóa cả đọc tới 07:00)
+    await runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => {
+      const day = new Date().toISOString().slice(0, 10);
+      state.storage.sql.exec("UPDATE quota SET rows_written = 91000 WHERE day = ?", day);
+    });
+    const sc2 = await scan(phoneA, "TRK-p2");
+    expect(sc2.res).toMatchObject({ ok: false, error: { code: "quota_exceeded" } });
+  });
+
+  it("ngưỡng: dưới 50% ok, từ 50% cảnh báo", async () => {
+    const s = await stub();
+    const set = (n: number) => runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => {
+      state.storage.sql.exec("INSERT OR REPLACE INTO quota(day, requests, rows_written, rows_read) VALUES (?, 0, ?, 0)", new Date().toISOString().slice(0, 10), n);
+    });
+    await set(49000);
+    expect((await call("GET", "/quota", undefined, owner)).data.level).toBe("ok");
+    await set(51000);
+    expect((await call("GET", "/quota", undefined, owner)).data.level).toBe("warn");
+    await set(76000);
+    expect((await call("GET", "/quota", undefined, owner)).data).toMatchObject({ level: "stop", scanStop: false });
   });
 
   it("WebSocket: nhận rev khi kết nối và khi có thay đổi", async () => {

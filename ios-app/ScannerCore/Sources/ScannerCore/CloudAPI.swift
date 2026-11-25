@@ -37,6 +37,17 @@ public struct CloudWatchChange: Codable, Equatable {
     public init(key: String, since: Int, off: Bool) { self.key = key; self.since = since; self.off = off }
 }
 
+/// Một ảnh của kiện trên cloud.
+public struct CloudPhotoInfo: Equatable {
+    public let photoId: String
+    public let takenAt: Int
+    public let deviceName: String
+    public let expired: Bool
+    public init(photoId: String, takenAt: Int, deviceName: String, expired: Bool) {
+        self.photoId = photoId; self.takenAt = takenAt; self.deviceName = deviceName; self.expired = expired
+    }
+}
+
 public struct CloudSyncPage {
     public let rev: Int
     public let more: Bool
@@ -249,6 +260,18 @@ public final class CloudAPI {
     public func photo(photoId: String, thumb: Bool) async throws -> Data {
         let id = photoId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? photoId
         return try await perform("GET", "/photos/\(id)" + (thumb ? "?size=thumb" : ""))
+    }
+
+    /// Danh sách ảnh của một kiện trên cloud (mới nhất trước), kể cả ảnh do máy khác chụp.
+    public func parcelPhotos(parcelId: String) async throws -> [CloudPhotoInfo] {
+        let id = parcelId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? parcelId
+        let data = try await perform("GET", "/parcels/\(id)/photos")
+        let arr = ((try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]]) ?? []
+        return arr.compactMap { x in
+            guard let pid = x["photoId"] as? String, !pid.isEmpty else { return nil }
+            return CloudPhotoInfo(photoId: pid, takenAt: Self.int(x["takenAt"]), deviceName: x["deviceName"] as? String ?? "",
+                                  expired: x["expired"] as? Bool ?? false)
+        }
     }
 
     public func history(parcelId: String) async throws -> [[String: Any]] {

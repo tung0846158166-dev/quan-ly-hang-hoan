@@ -95,6 +95,34 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(CloudStatusText.quotaNote(q("stop", 80_000))?.contains("07:00") ?? false)
     }
 
+    // MARK: ảnh trên cloud (xem ảnh máy khác chụp)
+
+    func testParcelPhotosListParsesAndSkipsBadEntries() async throws {
+        let t = Transport { r in
+            XCTAssertTrue(r.url!.path.hasSuffix("/parcels/p1/photos"))
+            return (200, #"[{"photoId":"photo_a","takenAt":1764000000000,"deviceName":"Điện thoại A","expired":false},{"photoId":""},{"takenAt":5}]"#)
+        }
+        let api = try CloudAPI(baseURL: "https://a.workers.dev", token: "tok", transport: t)
+        let list = try await api.parcelPhotos(parcelId: "p1")
+        XCTAssertEqual(list, [CloudPhotoInfo(photoId: "photo_a", takenAt: 1_764_000_000_000, deviceName: "Điện thoại A", expired: false)])
+    }
+
+    func testPhotoFilesDownloadOnceThenReadFromDisk() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qlhh-cloudphoto-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let t = Transport { _ in (200, "JPEGDATA") }
+        let api = try CloudAPI(baseURL: "https://a.workers.dev", token: "tok", transport: t)
+        let u1 = try await CloudPhotoFiles.fetch(api: api, dir: dir, photoId: "photo_a", thumb: true)
+        let u2 = try await CloudPhotoFiles.fetch(api: api, dir: dir, photoId: "photo_a", thumb: true)
+        XCTAssertEqual(u1, u2)
+        XCTAssertEqual(t.requests.count, 1)
+        XCTAssertEqual(try Data(contentsOf: u1), Data("JPEGDATA".utf8))
+        XCTAssertNotEqual(CloudPhotoFiles.url(dir: dir, photoId: "photo_a", thumb: false), u1)
+        XCTAssertFalse(CloudPhotoFiles.url(dir: dir, photoId: "../x", thumb: false).lastPathComponent.contains("/"))
+        XCTAssertEqual(CloudPhotoFiles.prune(dir: dir, olderThanDays: 90), 0)
+        XCTAssertEqual(CloudPhotoFiles.prune(dir: dir, olderThanDays: 90, now: Date().addingTimeInterval(100 * 86_400)), 1)
+    }
+
     // MARK: mã QR ghép
 
     func testPairLinkParsesAndRoundTrips() {

@@ -103,6 +103,9 @@ struct DetailView: View {
                     quickActionsBar
                     productsCard
                     photosCard
+                    if engine.cloudActive {
+                        CloudPhotosCard(parcelId: live.id)   // T042: ảnh trên cloud (cả ảnh máy khác chụp)
+                    }
 
                     if live.inReturnWatch {
                         returnJourneyCard

@@ -120,6 +120,37 @@ public enum CloudStatusText {
     }
 }
 
+/// Ảnh cloud lưu tạm trong thư mục cache của điện thoại (để xem ảnh máy khác chụp). Tải một lần, lần sau đọc tệp.
+public enum CloudPhotoFiles {
+    public static func url(dir: URL, photoId: String, thumb: Bool) -> URL {
+        let safe = String(photoId.map { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" ? $0 : "_" })
+        return dir.appendingPathComponent((thumb ? "t_" : "p_") + safe + ".img")
+    }
+
+    /// Có sẵn tệp thì trả luôn (không gọi mạng); chưa có thì tải và ghi nguyên tử.
+    public static func fetch(api: CloudAPI, dir: URL, photoId: String, thumb: Bool) async throws -> URL {
+        let u = url(dir: dir, photoId: photoId, thumb: thumb)
+        if FileManager.default.fileExists(atPath: u.path) { return u }
+        let data = try await api.photo(photoId: photoId, thumb: thumb)
+        guard !data.isEmpty else { throw CloudAPIError(code: "not_found", message: "Ảnh trống.", status: 404) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try data.write(to: u, options: .atomic)
+        return u
+    }
+
+    /// Xóa ảnh tạm cũ hơn `days` ngày (cloud cũng tự xóa ảnh sau 90 ngày).
+    @discardableResult
+    public static func prune(dir: URL, olderThanDays days: Int, now: Date = Date()) -> Int {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return 0 }
+        var n = 0
+        for f in files {
+            let d = (try? f.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? now
+            if now.timeIntervalSince(d) > Double(days) * 86_400, (try? FileManager.default.removeItem(at: f)) != nil { n += 1 }
+        }
+        return n
+    }
+}
+
 /// Mã QR ghép thiết bị: `qlhh://pair?u=<địa chỉ Worker>&c=<mã 6 số>`.
 public enum CloudPairLink {
     public static func parse(_ raw: String) -> (url: String, code: String)? {

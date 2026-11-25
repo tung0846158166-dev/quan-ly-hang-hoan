@@ -239,3 +239,95 @@ struct CloudSettingsView: View {
         if let err { error = err } else { code = ""; pairLink = "" }
     }
 }
+
+/// Chi tiết đơn (chế độ cloud): ảnh của kiện trên cloud, kể cả ảnh máy khác chụp. Chạm để xem to.
+struct CloudPhotosCard: View {
+    @EnvironmentObject var engine: SyncEngine
+    let parcelId: String
+    @State private var photos: [CloudPhotoInfo] = []
+    @State private var thumbs: [String: URL] = [:]
+    @State private var loading = false
+    @State private var error: String?
+    @State private var viewer: PhotoViewerSession?
+
+    private static var cacheDir: URL {
+        (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory)
+            .appendingPathComponent("cloud-photos", isDirectory: true)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitleRow(title: "Ảnh trên cloud", icon: "icloud.and.arrow.down", subtitle: photos.isEmpty ? nil : "\(photos.count) ảnh")
+            if loading && photos.isEmpty {
+                ProgressView().frame(maxWidth: .infinity)
+            } else if let error {
+                Text(error).font(.footnote).foregroundColor(.secondary)
+            } else if photos.isEmpty {
+                Text("Chưa có ảnh trên cloud cho kiện này.").font(.footnote).foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(photos.enumerated()), id: \.element.photoId) { idx, p in
+                            Button { Task { await open(at: idx) } } label: {
+                                ZStack(alignment: .bottomLeading) {
+                                    if let u = thumbs[p.photoId], let img = UIImage(contentsOfFile: u.path) {
+                                        Image(uiImage: img).resizable().scaledToFill()
+                                    } else {
+                                        Color.gray.opacity(0.15)
+                                        Image(systemName: p.expired ? "clock.badge.xmark" : "photo").foregroundColor(.secondary)
+                                    }
+                                    if !p.deviceName.isEmpty {
+                                        Text(p.deviceName).font(.caption2).foregroundColor(.white)
+                                            .padding(.horizontal, 4).background(Color.black.opacity(0.5))
+                                    }
+                                }
+                                .frame(width: 84, height: 84)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(p.expired)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+        .task(id: parcelId) { await load() }
+        .fullScreenCover(item: $viewer) { s in
+            ZoomablePhotoViewer(items: s.items, initialIndex: s.initialIndex)
+        }
+    }
+
+    private func load() async {
+        guard let api = engine.cloud.currentAPI else { error = "Chưa kết nối cloud: chưa tải được ảnh."; return }
+        loading = true
+        defer { loading = false }
+        do {
+            photos = try await api.parcelPhotos(parcelId: parcelId)
+            error = nil
+            CloudPhotoFiles.prune(dir: Self.cacheDir, olderThanDays: 90)
+            for p in photos where !p.expired {
+                if let u = try? await CloudPhotoFiles.fetch(api: api, dir: Self.cacheDir, photoId: p.photoId, thumb: true) { thumbs[p.photoId] = u }
+            }
+        } catch let e as CloudAPIError {
+            error = e.isNetwork ? "Mất kết nối cloud: chưa tải được ảnh." : e.message
+        } catch {
+            self.error = "Không tải được ảnh."
+        }
+    }
+
+    private func open(at index: Int) async {
+        guard let api = engine.cloud.currentAPI else { return }
+        var items: [PhotoViewerItem] = []
+        for p in photos where !p.expired {
+            if let u = try? await CloudPhotoFiles.fetch(api: api, dir: Self.cacheDir, photoId: p.photoId, thumb: false) {
+                let size = (try? FileManager.default.attributesOfItem(atPath: u.path)[.size] as? Int64) ?? 0
+                items.append(PhotoViewerItem(id: p.photoId, url: u, createdAtMs: p.takenAt, byteSize: size, canDelete: false))
+            }
+        }
+        guard !items.isEmpty else { error = "Không tải được ảnh."; return }
+        let wanted = photos.indices.contains(index) ? photos[index].photoId : ""
+        viewer = PhotoViewerSession(items: items, initialIndex: items.firstIndex(where: { $0.id == wanted }) ?? 0)
+    }
+}

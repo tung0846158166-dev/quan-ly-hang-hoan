@@ -140,6 +140,7 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
   - máy tính ở chế độ cloud không nạp Sheet.
   CHƯA chạy thật trên Google (chờ chủ shop).
 - [ ] (user) Dán Apps Script theo `cloud/sheet-script/README.md`, đặt `QLHH_IMPORT_KEY`, chạy `qlhhTestNow` rồi `qlhhInstallTriggers`
-- [ ] T042 (claude) giao diện + gắn cloud trên iPhone
-- [ ] (claude) Bản `ICloudLink` thật cho máy tính (ghép, WebSocket, đồng bộ vào SQLite cục bộ), chuyển các dịch vụ quét/sửa sang cloud, chạy song song bản cũ (GĐ2)
-- [ ] (claude) Máy khách cloud cho iPhone + ảnh lên R2 (GĐ3); chuyển nạp Google Sheet (Apps Script) và tắt MQTT/ntfy cũ (GĐ4)
+- [~] T042 (claude) iPhone chạy theo luồng cloud khi đã ghép (commit 95c2f53): danh sách từ cloud, quét/sửa/xóa/theo dõi/đơn hủy qua cloud, ảnh lên R2 sau khi cloud xác nhận đúng một kiện, tắt MQTT/ntfy; dải trạng thái, khóa quét khi mất mạng, Cài đặt > Cloud (mã 6 số / QR). CHƯA thử trên iPhone thật. Còn: xem ảnh của máy khác trên iPhone; tạo đơn mới bằng điện thoại khi dùng cloud
+- [x] (claude) Máy tính chế độ cloud (ghép, WebSocket, bản sao SQLite, quét/sửa qua cloud) + xem ảnh từ cloud (bộ nhớ đệm riêng). CHƯA thử ghép thật với Worker
+- [x] (claude) Dữ liệu cũ đã lên cloud (26/11): 4.962 đơn, 638 dấu Bảng Hàng Hoàn Về giờ gốc, 2.530 ảnh (4 ảnh dùng chung chờ chạy lại sau 07:00). Sheet nạp bằng Apps Script (cloud/sheet-script)
+- [ ] (user) Sau 07:00: chạy `qlhhNightlyFull`, gửi dòng nhật ký; rồi ghép máy tính + 1 iPhone với cloud để thử thật (quét, sửa, rút mạng)

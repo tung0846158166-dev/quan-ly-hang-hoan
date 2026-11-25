@@ -215,7 +215,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         _onOpenPhoto?.Invoke(row.PhotoId, row.OrderId, row.DisplayTracking);
     }
 
-    public void LoadOrders(IReadOnlyList<Order> orders)
+    /// <summary>Dựng các dòng (phần nặng, không đụng giao diện: gọi được từ luồng nền); áp bằng <see cref="LoadRows"/>.</summary>
+    public (List<ArchivedOrderRowViewModel> Rows, int Shopee, int TikTok) BuildRows(IReadOnlyList<Order> orders)
     {
         var rows = new List<ArchivedOrderRowViewModel>(orders.Count);
         int shopee = 0, tiktok = 0;
@@ -227,7 +228,14 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
             if (row.Platform.Equals(PlatformNames.Shopee, StringComparison.OrdinalIgnoreCase)) shopee++;
             else if (row.Platform.Equals(PlatformNames.TikTok, StringComparison.OrdinalIgnoreCase)) tiktok++;
         }
+        return (rows, shopee, tiktok);
+    }
 
+    public void LoadOrders(IReadOnlyList<Order> orders) => LoadRows(BuildRows(orders));
+
+    public void LoadRows((List<ArchivedOrderRowViewModel> Rows, int Shopee, int TikTok) built)
+    {
+        var (rows, shopee, tiktok) = built;
         var previousId = SelectedRow?.Source.Id;
         _allRows = rows;
         TotalCount = rows.Count;

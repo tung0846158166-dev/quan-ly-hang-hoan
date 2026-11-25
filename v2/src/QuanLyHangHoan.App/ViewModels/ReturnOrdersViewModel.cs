@@ -479,21 +479,33 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         if (!_suppressFilterRefresh) ApplyFiltersAndSort();
     }
 
-    public void LoadOrders(IReadOnlyList<Order> orders, DateTime? nowOverride = null, AlertPolicy? policyOverride = null)
+    /// <summary>Dựng các dòng hiển thị (phần nặng: tính ngày, chuỗi tìm kiếm...). KHÔNG đụng giao diện nên gọi được từ luồng nền; áp kết quả bằng <see cref="LoadRows"/>.</summary>
+    public List<ReturnOrderRowViewModel> BuildRows(IReadOnlyList<Order> orders, DateTime now, AlertPolicy? policyOverride = null)
     {
-        var sw = Stopwatch.StartNew();
-        var now = nowOverride ?? _provider.GetCurrentTime();
         var policy = policyOverride ?? _alertPolicy;
-
+        var scope = Scope;
         var rows = new List<ReturnOrderRowViewModel>(orders.Count);
         var stt = 0;
         for (var i = 0; i < orders.Count; i++)
         {
-            if (!MatchesScope(orders[i], Scope)) continue;
+            if (!MatchesScope(orders[i], scope)) continue;
             stt++;
             rows.Add(new ReturnOrderRowViewModel(orders[i], stt, now, policy));
         }
+        return rows;
+    }
 
+    public void LoadOrders(IReadOnlyList<Order> orders, DateTime? nowOverride = null, AlertPolicy? policyOverride = null)
+    {
+        var sw = Stopwatch.StartNew();
+        var now = nowOverride ?? _provider.GetCurrentTime();
+        LoadRows(BuildRows(orders, now, policyOverride), sw);
+    }
+
+    /// <summary>Áp danh sách dòng đã dựng lên bảng (nhanh: đếm, lọc, sắp xếp, dựng trang đầu). Chạy ở luồng giao diện.</summary>
+    public void LoadRows(List<ReturnOrderRowViewModel> rows, Stopwatch? sw = null)
+    {
+        sw ??= Stopwatch.StartNew();
         var previousId = SelectedRow?.Source.Id;
         _allRows = rows;
         RebuildCarrierOptions();

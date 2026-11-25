@@ -1302,15 +1302,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _searchArchivedOrders = archivedOrders;
         _searchDeletedOrders = deletedOrders;
 
+        // Phần NẶNG (dựng dòng bảng, tính số liệu trang chủ) chạy song song ở luồng nền: nhiều nghìn/chục nghìn đơn cũng không làm đứng giao diện.
+        // Luồng giao diện chỉ áp kết quả đã tính (nhanh).
+        var homeTask = Task.Run(() => HomeVm.Compute(returnOrders, now));
+        var shopeeRowsTask = Task.Run(() => ShopeeReturnVm.BuildRows(returnOrders, now));
+        var cancelledRowsTask = Task.Run(() => ShopeeCancelledVm.BuildRows(returnOrders, now));
+        var tiktokRowsTask = Task.Run(() => TikTokReturnVm.BuildRows(returnOrders, now));
+        var archivedRowsTask = Task.Run(() => ArchivedOrdersVm.BuildRows(archivedOrders));
+        await Task.WhenAll(homeTask, shopeeRowsTask, cancelledRowsTask, tiktokRowsTask, archivedRowsTask);
+
         ReturnWatchVm.LoadEntries(returnWatchEntries, now);
-        HomeVm.LoadData(returnOrders, now);
+        HomeVm.ApplyComputed(homeTask.Result, returnOrders, now);
         HomeVm.ReturnWatchOnTheWayCount = ReturnWatchVm.Stage2Count;
         HomeVm.MissingPhotoCount = missingCount;
-        ShopeeReturnVm.LoadOrders(returnOrders, now);
-        ShopeeCancelledVm.LoadOrders(returnOrders, now);
-        TikTokReturnVm.LoadOrders(returnOrders, now);
+        ShopeeReturnVm.LoadRows(shopeeRowsTask.Result);
+        ShopeeCancelledVm.LoadRows(cancelledRowsTask.Result);
+        TikTokReturnVm.LoadRows(tiktokRowsTask.Result);
         WatchlistVm.LoadOrders(returnOrders, archivedOrders, now);
-        ArchivedOrdersVm.LoadOrders(archivedOrders);
+        ArchivedOrdersVm.LoadRows(archivedRowsTask.Result);
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);
         NewCreatedVm.LoadOrders(returnOrders, now);

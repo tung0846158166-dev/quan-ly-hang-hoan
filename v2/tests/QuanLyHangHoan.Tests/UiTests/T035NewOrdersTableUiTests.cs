@@ -311,6 +311,8 @@ public sealed class T035NewOrdersTableUiTests
                 Assert.Equal(System.Windows.Input.ModifierKeys.None, System.Windows.Input.Keyboard.Modifiers);
                 grid.RaiseEvent(args);          // Source = ô được bấm; sự kiện đi qua bộ xử lý của bảng
                 Assert.True(reached, "sự kiện chuột không tới bảng");
+                // Sao chép chạy ở luồng nền (để giao diện không đứng) nên thông báo đến sau một chút: chờ tối đa 5 giây.
+                for (var w = 0; w < 100 && Volatile.Read(ref shown) is null; w++) { WpfTestHost.PumpDispatcher(); System.Threading.Thread.Sleep(50); }
                 Assert.NotNull(shown);
                 // Bộ nhớ tạm là tài nguyên dùng chung của cả hệ thống: app khác (trình quản lý clipboard...) có thể đang giữ, nên thử lại vài lần.
                 string? clip = null;

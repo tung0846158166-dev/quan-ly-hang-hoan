@@ -190,16 +190,58 @@ public sealed partial class HomeViewModel : ObservableObject
 
     private void BuildTopProducts(IReadOnlyList<Order> allOrders)
     {
-        var orders = FilterByPeriod(allOrders, ProductPeriod, _snapshotTime == default ? DateTime.Now : _snapshotTime);
+        var (items, text) = ComputeTopProducts(allOrders, _snapshotTime == default ? DateTime.Now : _snapshotTime);
+        TopProducts = items;
+        ProductSummaryText = text;
+    }
+
+    /// <summary>Phần tính toán thuần (không đụng giao diện) của "sản phẩm hoàn nhiều nhất": chạy được ở luồng nền.</summary>
+    private (IReadOnlyList<HomeProductItem> Items, string Text) ComputeTopProducts(IReadOnlyList<Order> allOrders, DateTime now)
+    {
+        var orders = FilterByPeriod(allOrders, ProductPeriod, now);
         var r = QuanLyHangHoan.Core.Stats.ProductStatistics.Compute(orders);
-        if (r.Products.Count == 0) { TopProducts = Array.Empty<HomeProductItem>(); ProductSummaryText = $"Chưa có sản phẩm hoàn nào ({ProductPeriodLabel.ToLowerInvariant()})."; return; }
+        if (r.Products.Count == 0) return (Array.Empty<HomeProductItem>(), $"Chưa có sản phẩm hoàn nào ({ProductPeriodLabel.ToLowerInvariant()}).");
         var top = r.Products.Take(6).ToList();
         var max = Math.Max(1, top[0].Units);
-        TopProducts = top.Select((p, i) => new HomeProductItem(
+        var items = top.Select((p, i) => new HomeProductItem(
             i + 1, p.Name, p.Units, p.Orders, p.Share.ToString("P1", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")),
             Math.Max(8, p.Units * 150.0 / max),
             p.PremiumUnits > 0 ? $"Premium {p.PremiumUnits:N0} • Thường {p.StandardUnits:N0}" : "")).ToList();
-        ProductSummaryText = $"{ProductPeriodLabel}: {r.Products.Count:N0} sản phẩm • {r.TotalUnits:N0} cái bị hoàn trong {r.OrdersWithItems:N0} đơn";
+        return (items, $"{ProductPeriodLabel}: {r.Products.Count:N0} sản phẩm • {r.TotalUnits:N0} cái bị hoàn trong {r.OrdersWithItems:N0} đơn");
+    }
+
+    /// <summary>Kết quả tính sẵn của trang chủ (tính ở luồng nền, áp lên giao diện bằng <see cref="ApplyComputed"/>).</summary>
+    public sealed record HomeComputed(
+        IReadOnlyList<Order> Orders, DateTime Now,
+        PlatformKpiSummary Overall, PlatformKpiSummary Shopee, PlatformKpiSummary TikTok,
+        IReadOnlyList<DailyTrendPoint> Trend, IReadOnlyList<OrderTypeBarItem> Bars, IReadOnlyList<ReasonBarItem> Reasons,
+        IReadOnlyList<UrgentOrderItem> Urgent, IReadOnlyList<HomeProductItem> Products, string ProductText);
+
+    /// <summary>Tính mọi số liệu trang chủ KHÔNG đụng giao diện (gọi được từ luồng nền). Danh sách rỗng trả null (dùng <see cref="LoadData"/>).</summary>
+    public HomeComputed? Compute(IReadOnlyList<Order> orders, DateTime now)
+    {
+        if (orders.Count == 0) return null;
+        var (items, text) = ComputeTopProducts(orders, now);
+        return new HomeComputed(orders, now,
+            ComputeKpi("Tổng toàn shop", orders, now),
+            ComputeKpi(PlatformNames.Shopee, orders.Where(o => o.Platform.Equals(PlatformNames.Shopee, StringComparison.OrdinalIgnoreCase)).ToList(), now),
+            ComputeKpi(PlatformNames.TikTok, orders.Where(o => o.Platform.Equals(PlatformNames.TikTok, StringComparison.OrdinalIgnoreCase)).ToList(), now),
+            BuildDailyTrend(orders, now, days: 7), BuildOrderTypeBars(orders), BuildTopReasons(orders, topN: 5), BuildUrgentItems(orders, now),
+            items, text);
+    }
+
+    /// <summary>Áp kết quả <see cref="Compute"/> lên giao diện (nhanh, chạy ở luồng giao diện). null = danh sách rỗng.</summary>
+    public void ApplyComputed(HomeComputed? c, IReadOnlyList<Order> orders, DateTime now)
+    {
+        if (c is null) { LoadData(orders, now); return; }
+        _orders = c.Orders;
+        _snapshotTime = c.Now;
+        TotalOrders = c.Orders.Count;
+        IsEmpty = false;
+        LastUpdatedText = $"Cập nhật lúc {c.Now:dd/MM/yyyy HH:mm} • Ngưỡng cảnh báo: Vàng > {AlertThresholds.YellowHours:0}h / Đỏ > {AlertThresholds.RedHours:0}h";
+        OverallKpi = c.Overall; ShopeeKpi = c.Shopee; TikTokKpi = c.TikTok;
+        DailyTrendPoints = c.Trend; OrderTypeBars = c.Bars; TopReasons = c.Reasons; UrgentItems = c.Urgent;
+        TopProducts = c.Products; ProductSummaryText = c.ProductText;
     }
 
     [ObservableProperty]

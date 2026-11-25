@@ -133,7 +133,7 @@
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Standard"
                           VirtualizingPanel.CacheLengthUnit="Page"
-                          VirtualizingPanel.CacheLength="1,1"
+                          VirtualizingPanel.CacheLength="0,0"
                           ScrollViewer.CanContentScroll="True"
                           SelectionMode="Single"
                           SelectionUnit="FullRow"

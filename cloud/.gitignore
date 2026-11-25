@@ -2,3 +2,5 @@
 .wrangler/
 .dev.vars
 dist/
+.secrets.local
+worker/.secrets.local

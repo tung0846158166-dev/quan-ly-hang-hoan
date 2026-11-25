@@ -14,6 +14,26 @@ public struct CloudParcelItem: Codable, Equatable {
         self.product = product; self.color = color; self.size = size; self.qty = qty; self.returnedQty = returnedQty
         self.sku = sku; self.skuId = skuId
     }
+
+    private enum Keys: String, CodingKey { case product, color, size, qty, returnedQty, sku, skuId }
+
+    /// Giải mã dễ tính: thiếu trường thì lấy giá trị rỗng/0; số đến dạng chuỗi hoặc số lẻ vẫn đọc được.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        func str(_ k: Keys) -> String {
+            if let s = try? c.decode(String.self, forKey: k) { return s }
+            if let i = try? c.decode(Int.self, forKey: k) { return String(i) }
+            return ""
+        }
+        func int(_ k: Keys) -> Int {
+            if let i = try? c.decode(Int.self, forKey: k) { return i }
+            if let d = try? c.decode(Double.self, forKey: k), d.isFinite { return Int(d) }
+            if let s = try? c.decode(String.self, forKey: k), let i = Int(s.trimmingCharacters(in: .whitespaces)) { return i }
+            return 0
+        }
+        self.init(product: str(.product), color: str(.color), size: str(.size), qty: int(.qty), returnedQty: int(.returnedQty),
+                  sku: try? c.decode(String.self, forKey: .sku), skuId: try? c.decode(String.self, forKey: .skuId))
+    }
 }
 
 /// Một KIỆN trên cloud ("slim": không có dữ liệu người mua/dữ liệu thô). Giải mã dễ tính: thiếu trường thì lấy giá trị rỗng, số/chuỗi đổi lẫn được.

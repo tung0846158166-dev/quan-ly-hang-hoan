@@ -25,7 +25,7 @@ public sealed class SqliteOrderProvider :
     public DateTime GetCurrentTime() => _clock();
 
     public IReadOnlyList<Order> GetReturnOrders(int count = 40)
-        => OrderRepository.LoadActive(_dbPath);
+        => LoadAllShortLived().Where(s => !s.IsArchived && !s.IsDeleted).Select(s => s.Order).ToList();
 
     public Task<IReadOnlyList<Order>> GetReturnOrdersAsync(int count = 40, CancellationToken cancellationToken = default)
         => Task.Run(() => GetReturnOrders(count), cancellationToken);

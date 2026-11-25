@@ -39,6 +39,9 @@ public sealed class SheetBuildResult
     public List<SheetParcel> Parcels { get; } = new();
     public int OldRequestsDropped { get; set; }
     public int SkippedCancelTypes { get; set; }
+    /// <summary>Số tab tra mã vận đơn đã đọc (không tính vào số tab đơn hàng) và số kiện được điền mã từ đó.</summary>
+    public int TrackLookupTabs { get; set; }
+    public int TracksFilled { get; set; }
     public int TooOld { get; set; }
     public List<string> SkippedTabs { get; } = new();
     /// <summary>Dòng của tab không nhận diện được kiểu (nạp như file Excel thường).</summary>
@@ -126,14 +129,45 @@ public static class SheetPipeline
         return (outRows, rows.Count - outRows.Count);
     }
 
-    /// <summary>sheetTabKind: "hanghoan" | "trahang" | "huy" | "".</summary>
+    /// <summary>Tên tab ẩn chứa mã vận đơn của đơn huỷ/bom (2 cột: Mã đơn, Mã vận đơn). Tùy chọn: thiếu thì bỏ qua.</summary>
+    public const string TrackTabName = "Vận đơn huỷ";
+
+    /// <summary>sheetTabKind: "hanghoan" | "trahang" | "huy" | "vandon" (tab tra mã vận đơn, không phải đơn hàng) | "".</summary>
     public static string TabKind(List<Dictionary<string, string>> rows)
     {
         var ks = new HashSet<string>((rows.Count > 0 ? rows[0].Keys : Enumerable.Empty<string>()).Select(K));
         if (ks.Contains("hang") && ks.Contains("madon") && ks.Contains("trangthaive")) return "hanghoan";
         if (ks.Contains("matrahang") && ks.Contains("madon")) return "trahang";
         if (ks.Contains("madon") && ks.Contains("loai") && (ks.Contains("aihuy") || ks.Contains("hanhtrinh"))) return "huy";
+        if (ks.Contains("madon") && ks.Contains("mavandon")) return "vandon";   // đã loại các tab có cột Hàng / Loại / Trạng thái về / Mã trả hàng ở trên
         return "";
+    }
+
+    /// <summary>Bảng tra Mã đơn (HOA, cắt khoảng trắng) -> Mã vận đơn từ tab "vandon". Bỏ dòng thiếu mã đơn hoặc mã vận đơn; trùng mã đơn thì giữ dòng sau.</summary>
+    public static Dictionary<string, string> TrackMap(IEnumerable<Dictionary<string, string>> rows)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var r in rows)
+        {
+            string o = "", t = "";
+            foreach (var kv in r)
+            {
+                var k = K(kv.Key); var v = (kv.Value ?? "").Trim();
+                if (k == "madon") o = v; else if (k == "mavandon") t = v;
+            }
+            if (o.Length > 0 && t.Length > 0) map[o.ToUpperInvariant()] = t;
+        }
+        return map;
+    }
+
+    /// <summary>Điền mã vận đơn cho kiện CHƯA có mã. Kiện đã có mã thì KHÔNG ghi đè. Trả về số kiện được điền.</summary>
+    public static int ApplyTrackMap(IEnumerable<SheetParcel> parcels, IReadOnlyDictionary<string, string> map)
+    {
+        var n = 0;
+        if (map.Count == 0) return 0;
+        foreach (var p in parcels)
+            if (p.Track.Length == 0 && p.OrderId.Length > 0 && map.TryGetValue(p.OrderId.Trim().ToUpperInvariant(), out var t)) { p.Track = t; n++; }
+        return n;
     }
 
     public static List<string> SkipTypes(string? configured) =>
@@ -159,7 +193,7 @@ public static class SheetPipeline
                 var ud = ParseFullDate(G(r, "capnhat"));
                 p = new SheetParcel
                 {
-                    OrderId = orderId, Src = kind, ClaimId = G(r, "ma", "matrahang"), Track = kind == "hanghoan" ? G(r, "mavandon") : "",
+                    OrderId = orderId, Src = kind, ClaimId = G(r, "ma", "matrahang"), Track = kind is "hanghoan" or "huy" ? G(r, "mavandon") : "",
                     Reason = G(r, "lydo"), BuyerNote = G(r, "khachghi"), WhoCancelled = G(r, "aihuy"), Journey = G(r, "hanhtrinh"),
                     ReturnDate = G(r, "ngay", "ngayyeucau"), DeliveredAt = G(r, "veshopluc"), Deadline = G(r, "hankhieunai"), Refund = G(r, "tien", "hoantien"),
                     UpdatedAt = ud is null ? 0 : Ms(ud.Value),
@@ -270,9 +304,11 @@ public static class SheetPipeline
         var res = new SheetBuildResult();
         var lists = new List<List<SheetParcel>>();
         var other = new List<Dictionary<string, string>>();
+        var trackMap = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var tab in tabs)
         {
             if (tab.Count == 0) { res.SkippedTabs.Add("tab"); continue; }
+            if (TabKind(tab) == "vandon") { foreach (var kv in TrackMap(tab)) trackMap[kv.Key] = kv.Value; res.TrackLookupTabs++; continue; }   // chỉ để tra mã, không nạp thành đơn
             var (kept, removed) = KeepLatestRequestPerOrder(tab);
             res.OldRequestsDropped += removed;
             var kind = TabKind(kept);
@@ -281,7 +317,9 @@ public static class SheetPipeline
         }
         if (lists.Count > 0)
         {
-            var (parcels, dropped) = FilterByDays(Merge(lists), maxDays, now);
+            var merged = Merge(lists);
+            res.TracksFilled = ApplyTrackMap(merged, trackMap);
+            var (parcels, dropped) = FilterByDays(merged, maxDays, now);
             res.TooOld = dropped;
             res.Parcels.AddRange(parcels);
             res.Rows.AddRange(ToRows(parcels));

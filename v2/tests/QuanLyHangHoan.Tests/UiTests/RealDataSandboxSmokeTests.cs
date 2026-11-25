@@ -43,6 +43,7 @@ public sealed class RealDataSandboxSmokeTests
                 WpfTestHost.RunTask(() => vm.InitializeAsync());
 
                 report.AppendLine($"Shopee hoan: {vm.ShopeeReturnVm.TotalCount} | Shopee huy: {vm.ShopeeCancelledVm.TotalCount} | TikTok: {vm.TikTokReturnVm.TotalCount} | Don moi: {vm.NewCreatedVm.TotalCount} | Luu tru: {vm.ArchivedOrdersVm.TotalCount} | Da xoa: {vm.DeletedOrdersVm.TotalCount}");
+                vm.NavigateByKey("stats");
                 report.AppendLine($"Thong ke: {vm.StatisticsVm.TotalOrders} don | {vm.StatisticsVm.ProductRows.Count} san pham | {vm.StatisticsVm.ProductSummaryText}");
                 foreach (var p in vm.StatisticsVm.ProductRows.Take(5)) report.AppendLine($"   #{p.Rank} {p.Units} cai {p.ShareText} | {p.PremiumText} | {p.Name}");
 

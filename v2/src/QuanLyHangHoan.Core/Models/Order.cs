@@ -94,7 +94,24 @@ public sealed class Order
 
     public string PhotoId { get; set; } = "";          // trỏ tới file ảnh
     public List<OrderItem> Items { get; set; } = new();
-    public ImportMeta Import { get; set; } = new();
+    private ImportMeta? _import;
+    private Func<ImportMeta>? _importFactory;
+
+    /// <summary>Thông tin lần nhập. Với đơn đọc từ CSDL thì chỉ phân tích JSON khi cần dùng lần đầu (nạp hàng nghìn đơn nhanh hơn nhiều).</summary>
+    public ImportMeta Import
+    {
+        get
+        {
+            var m = System.Threading.Volatile.Read(ref _import);
+            if (m is not null) return m;
+            var made = _importFactory?.Invoke() ?? new ImportMeta();
+            return System.Threading.Interlocked.CompareExchange(ref _import, made, null) ?? made;
+        }
+        set => _import = value;
+    }
+
+    /// <summary>Đăng ký cách tạo <see cref="Import"/> khi cần (chỉ dùng lúc đọc từ CSDL).</summary>
+    public void SetLazyImport(Func<ImportMeta> factory) { _importFactory = factory; _import = null; }
 
     /// <summary>Dữ liệu phụ chưa có cột riêng (rawDetails, priceModes...) giữ nguyên dạng JSON để không mất.</summary>
     public string ExtraJson { get; set; } = "";

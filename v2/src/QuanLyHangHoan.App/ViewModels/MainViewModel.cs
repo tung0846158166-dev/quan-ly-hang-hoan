@@ -859,6 +859,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         CurrentPage = vm;
+        if (ReferenceEquals(vm, StatisticsVm)) FlushPendingStats();
         UpdateNavigationVisibilityAndGroupBadges();
 
         if (persistLastPage)
@@ -1265,6 +1266,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         return d;
     }
 
+    private (IReadOnlyList<Core.Models.Order> Main, IReadOnlyList<Core.Models.Order> Archived, DateTime Now)? _pendingStats;
+
+    private void FlushPendingStats()
+    {
+        if (_pendingStats is not { } p) return;
+        _pendingStats = null;
+        StatisticsVm.LoadData(p.Main, p.Archived, p.Now);
+    }
+
     public async Task ReloadAllDataAsync()
     {
         _syncController.NotifyDataChanged();   // nạp Sheet/Excel/thư mục xong: điện thoại nhận phần thay đổi ngay
@@ -1304,7 +1314,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);
         NewCreatedVm.LoadOrders(returnOrders, now);
-        StatisticsVm.LoadData(returnOrders, archivedOrders, now);
+        // Thống kê tính nặng nhất: chỉ tính ngay khi đang mở màn đó, còn lại hoãn tới lúc mở (luôn dùng dữ liệu mới nhất).
+        _pendingStats = (returnOrders, archivedOrders, now);
+        if (ReferenceEquals(CurrentPage, StatisticsVm)) FlushPendingStats();
         StatisticsVm.MissingPhotoCount = missingCount;
         SyncSidebarKpis();
     }

@@ -236,6 +236,13 @@ public sealed class SheetSyncService : IDisposable
             texts.Add((tab, text));
         }
 
+        // Tab ẩn "Vận đơn huỷ" (mã đơn -> mã vận đơn của đơn huỷ/bom): TÙY CHỌN, thiếu / chưa được phép / lỗi thì bỏ qua lặng lẽ.
+        if (!tabNames.Any(t => string.Equals(t, SheetPipeline.TrackTabName, StringComparison.OrdinalIgnoreCase)))
+        {
+            var extra = await TryFetchOptionalTabAsync(url, token, now, SheetPipeline.TrackTabName, ct).ConfigureAwait(false);
+            if (extra is not null) texts.Add((SheetPipeline.TrackTabName, extra));
+        }
+
         var hash = Hash(string.Join("\u0002", texts.Select(t => t.Tab + "\u0001" + t.Text)));
         if (!manual && hash == Config.LastHash) return new SheetRunResult { Ran = true, Ok = true, Unchanged = true, Note = "Sheet không thay đổi" };
 
@@ -257,7 +264,7 @@ public sealed class SheetSyncService : IDisposable
         if (rows.Count == 0)
         {
             Config.LastHash = hash;
-            return new SheetRunResult { Ran = true, Ok = true, Unchanged = true, Note = $"{build.Parcels.Count} đơn ghép từ {tabs.Count} tab, không đơn nào đổi dữ liệu" };
+            return new SheetRunResult { Ran = true, Ok = true, Unchanged = true, Note = $"{build.Parcels.Count} đơn ghép từ {tabs.Count - build.TrackLookupTabs} tab, không đơn nào đổi dữ liệu" };
         }
 
         var import = TikTokImportService.ApplyGroups(_dbPath, new[] { (IReadOnlyList<Dictionary<string, string>>)rows },
@@ -266,12 +273,26 @@ public sealed class SheetSyncService : IDisposable
 
         Config.LastHash = hash;
         Config.Sigs = newSigs;
-        var note = $"{build.Parcels.Count} đơn ghép từ {tabs.Count} tab" + (unchangedOrders > 0 ? $" ({parcels.Count} đơn mới/đổi được nạp, {unchangedOrders} đơn không đổi)" : "")
+        var note = $"{build.Parcels.Count} đơn ghép từ {tabs.Count - build.TrackLookupTabs} tab" + (unchangedOrders > 0 ? $" ({parcels.Count} đơn mới/đổi được nạp, {unchangedOrders} đơn không đổi)" : "")
             + (build.SkippedCancelTypes > 0 ? $", bỏ {build.SkippedCancelTypes} đơn huỷ thuộc loại bỏ qua" : "")
             + (build.TooOld > 0 ? $", bỏ {build.TooOld} đơn quá cũ" : "")
             + (build.OldRequestsDropped > 0 ? $", bỏ {build.OldRequestsDropped} dòng yêu cầu cũ / đã hủy của cùng đơn" : "")
             + $". Thêm {import.Added}, cập nhật {import.Updated}" + (import.Ambiguous.Count > 0 ? $", {import.Ambiguous.Count} dòng nhập nhằng chưa nạp" : "");
         return new SheetRunResult { Ran = true, Ok = true, Note = note, Import = import };
+    }
+
+    /// <summary>Đọc một tab tùy chọn: mọi lỗi (mạng, Google, {"error"...}, trang HTML) đều trả null để không làm hỏng việc đồng bộ.</summary>
+    private async Task<string?> TryFetchOptionalTabAsync(string url, string token, DateTime now, string tab, CancellationToken ct)
+    {
+        try
+        {
+            var text = await _fetch(BuildUrl(url, token, now, tab), ct).ConfigureAwait(false);
+            var head = text.TrimStart();
+            if (head.Length == 0 || head.StartsWith("{\"error", StringComparison.Ordinal)
+                || head.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) || head.StartsWith("<html", StringComparison.OrdinalIgnoreCase)) return null;
+            return text;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
 
     private static string ExtractError(string head)

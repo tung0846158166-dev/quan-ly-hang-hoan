@@ -95,7 +95,9 @@ public sealed class SheetSyncServiceTests : IDisposable
         using var s = Make((_, _) => Task.FromResult(Csv()), urls);
         s.Config.Tabs = "Hàng hoàn";
         s.RunOnce(true);
-        Assert.Single(urls);
+        // 1 yêu cầu cho tab đã cấu hình + 1 yêu cầu cho tab ẩn "Vận đơn huỷ" (tùy chọn)
+        Assert.Equal(2, urls.Count);
+        Assert.Contains("tab=" + Uri.EscapeDataString("Vận đơn huỷ"), urls[1]);
         Assert.Contains("token=" + s.Token, urls[0]);
         Assert.Contains("&tab=H", urls[0]);
         Assert.StartsWith(Url + "?token=", urls[0]);

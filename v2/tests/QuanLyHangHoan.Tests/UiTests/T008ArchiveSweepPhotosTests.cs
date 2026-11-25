@@ -116,6 +116,7 @@ public sealed class T008ArchiveSweepPhotosTests : IDisposable
         Assert.Equal(1, mainVm.TikTokReturnVm.TotalCount); // TT-NO-4
         Assert.Equal(1, mainVm.ArchivedOrdersVm.TotalCount); // SHP-SWEEP-1
         Assert.Equal(3, mainVm.HomeVm.TotalOrders);
+        mainVm.NavigateByKey("stats"); // Thống kê chỉ được tính khi mở màn (hoãn để nạp lại dữ liệu nhanh)
         Assert.Equal(4, mainVm.StatisticsVm.TotalOrders); // 3 chính + 1 lưu trữ
 
         // Badge sidebar đồng bộ

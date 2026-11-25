@@ -73,7 +73,8 @@ public static class OrderRepository
                 WatchlistReason = rd.GetString(28), IsPartialReturn = rd.GetInt32(29) != 0, PhotoId = rd.GetString(30),
                 ExtraJson = rd.GetString(31), Items = items.GetValueOrDefault(key) ?? new(),
             };
-            o.Import = OrderExtra.Read(o.ExtraJson);
+            var extraText = o.ExtraJson;
+            o.SetLazyImport(() => OrderExtra.Read(extraText));
             result.Add(new StoredOrder(o, rd.GetInt32(32) != 0, rd.GetString(33), rd.GetInt32(34) != 0, rd.GetString(35), rd.GetString(36)));
         }
         return result;

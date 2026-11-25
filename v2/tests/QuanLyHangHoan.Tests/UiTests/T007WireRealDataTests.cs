@@ -172,6 +172,7 @@ public sealed class T007WireRealDataTests : IDisposable
         Assert.Equal(2, mainVm.TikTokReturnVm.TotalCount);
         Assert.Equal(2, mainVm.ArchivedOrdersVm.TotalCount);
         Assert.Equal(1, mainVm.DeletedOrdersVm.TotalCount);
+        mainVm.NavigateByKey("stats"); // Thống kê chỉ tính khi mở màn
         Assert.Equal(8, mainVm.StatisticsVm.TotalOrders);     // 6 chính + 2 lưu trữ (include_archive)
     }
 

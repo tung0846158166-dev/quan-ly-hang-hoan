@@ -195,6 +195,13 @@ Khối lượng lớn (nhiều tuần). Mỗi giai đoạn nộp riêng để b�
 2. **App iPhone (T042) gắn sâu vào "chờ máy tính xác nhận":** hàng đợi quét, ảnh tạm, lớp phủ sửa cục bộ, lệnh ghi chú/sửa/xóa/theo dõi/nhận đơn hủy, và **tạo đơn mới từ điện thoại** (cloud chưa có thao tác `createOrder`). Chuyển sang cloud là đổi vòng đời quét (ACK từ cloud thay cho ACK từ máy tính, bỏ hàng đợi ngoại tuyến) chứ không chỉ thay đường truyền. Nên làm theo 3 bước có kiểm tra CI: (1) trạng thái + ghép thiết bị + danh sách từ cloud (chỉ xem); (2) quét/ảnh qua cloud; (3) các lệnh sửa/xóa/theo dõi/đơn hủy/tạo đơn mới.
 3. Kết quả chạy thử trên dữ liệu thật (4.962 đơn): chỉ **6,2 MB** lên cloud; 3 dòng trùng id; 2.230 ảnh trong bảng `photos` (49 MB) + **621 ảnh nhúng DUY NHẤT** trong lịch sử ảnh (14,3 MB) cần chuyển riêng để không mất.
 
+## 9c. Chủ dự án chọn B (26/11/2026): CLOUD TỰ NẠP GOOGLE SHEET, kể cả khi mọi máy tắt
+Chia việc theo chỗ chạy (vì Worker gói miễn phí chỉ 10 ms CPU mỗi yêu cầu):
+- **Apps Script (phía Google, không giới hạn CPU đáng kể):** đọc các tab ngay trong Sheet (không gọi mạng), chạy `SheetPipeline` (gộp tab, tab ẩn "Vận đơn huỷ") + `ShopeeMapper.Map` (dòng -> kiện nhập, KHÔNG cần dữ liệu cũ), băm từng kiện, chỉ gửi kiện đổi, lô nhỏ (~20) lên `POST /v1/import/sheet`. Trigger theo thời gian.
+- **Worker:** với mỗi kiện nhập: lấy ứng viên qua chỉ mục (mã đơn, mã vận đơn), chạy so khớp + gộp như `TikTokMerger.Apply` (kiện đang dùng / lưu trữ / đã xóa, nhập nhằng thì KHÔNG đoán và báo lại), kiện mới thì sinh id mới. Quy tắc bất biến 1-5 giữ nguyên.
+- **Kiểm chứng:** mỗi phần TypeScript/JS phải đạt CÙNG bộ ca thử với C#: `match.golden.json` (1.500 tình huống của mã JS cũ), `sheet.*.json`, `shopee*.json`, và bộ ca mới sinh từ C# cho bước gộp.
+Tiến độ: [x] so khớp kiện (`cloud/core/src/matching.ts`, đạt 1.500/1.500 tình huống); [ ] gộp vào dữ liệu có sẵn (TikTokMerger/ItemMerge); [ ] SheetPipeline + ShopeeMapper bằng JS cho Apps Script; [ ] `/v1/import/sheet` trên Worker; [ ] Code.gs + hướng dẫn dán; [ ] máy tính tắt nạp Sheet khi bật cloud.
+
 ## 10. Việc còn cần chủ dự án
 1. **Duyệt** bản 2 này (hoặc nêu chỗ cần sửa).
 2. Trả lời: một hay nhiều cửa hàng; giữ ảnh bao nhiêu ngày (mặc định 90).

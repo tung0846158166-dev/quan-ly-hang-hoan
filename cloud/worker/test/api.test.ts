@@ -255,6 +255,21 @@ describe("thao tác khác", () => {
   });
 });
 
+describe("lịch sử sửa", () => {
+  it("trả nhật ký trước/sau của kiện, kèm tên máy; sửa lý do theo dõi qua editCell", async () => {
+    await importParcels([parcel("p1")]);
+    await call("POST", "/ops", { ops: [
+      { opId: crypto.randomUUID(), type: "editNote", id: "p1", userNote: "một" },
+      { opId: crypto.randomUUID(), type: "editCell", id: "p1", field: "watchlistReason", value: "khách khiếu nại" },
+    ] }, phoneA);
+    const h = await call("GET", "/parcels/p1/history", undefined, phoneB);
+    expect(h.status).toBe(200);
+    expect(h.data).toHaveLength(2);
+    expect(h.data[0]).toMatchObject({ action: "editCell", deviceName: "Điện thoại A", after: { watchlistReason: "khách khiếu nại" } });
+    expect(h.data[1].before).toEqual({ userNote: "" });
+  });
+});
+
 describe("ảnh", () => {
   const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5]);
   const put = (token: string, id: string, qs: string, bytes: Uint8Array = jpeg) =>

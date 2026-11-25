@@ -1,0 +1,83 @@
+import Foundation
+
+/// Bản sao cục bộ các kiện lấy từ cloud + mốc đồng bộ (`rev`). Dùng để XEM khi mất mạng (chỉ đọc) và dựng danh sách dòng cho giao diện.
+/// Có thể lưu ra tệp JSON (ghi nguyên tử). Không bao giờ xóa kiện (cloud cũng không xóa cứng).
+public final class CloudParcelStore {
+    private struct Disk: Codable {
+        var rev: Int
+        var parcels: [CloudParcel]
+    }
+
+    private let lock = NSLock()
+    private var map: [String: CloudParcel] = [:]
+    private var order: [String] = []        // thứ tự ổn định theo lần xuất hiện đầu tiên
+    private var revValue = 0
+    private let fileURL: URL?
+
+    public init(fileURL: URL? = nil) {
+        self.fileURL = fileURL
+        load()
+    }
+
+    public var rev: Int { lock.lock(); defer { lock.unlock() }; return revValue }
+    public var count: Int { lock.lock(); defer { lock.unlock() }; return map.count }
+    public func parcel(id: String) -> CloudParcel? { lock.lock(); defer { lock.unlock() }; return map[id] }
+    public var all: [CloudParcel] { lock.lock(); defer { lock.unlock() }; return order.compactMap { map[$0] } }
+
+    /// Áp một lô thay đổi từ cloud và nhớ mốc mới. Gọi `save()` sau khi bắt kịp.
+    public func apply(_ parcels: [CloudParcel], rev newRev: Int) {
+        lock.lock(); defer { lock.unlock() }
+        for p in parcels { put(p) }
+        revValue = max(revValue, newRev)
+    }
+
+    /// Áp ngay kiện trả về từ thao tác ghi (không đổi mốc đồng bộ; lần `/sync` kế tiếp áp lại cũng không sao).
+    public func upsertLocal(_ p: CloudParcel) {
+        lock.lock(); defer { lock.unlock() }
+        put(p)
+    }
+
+    private func put(_ p: CloudParcel) {
+        if map[p.id] == nil { order.append(p.id) }
+        map[p.id] = p
+    }
+
+    /// Quên toàn bộ (khi ghép sang cloud khác hoặc bỏ ghép).
+    public func reset() {
+        lock.lock(); defer { lock.unlock() }
+        map = [:]; order = []; revValue = 0
+        if let u = fileURL { try? FileManager.default.removeItem(at: u) }
+    }
+
+    /// Dòng cho giao diện (bỏ kiện đã xóa), đã sắp: đang chờ lên trước, hạn gần trước.
+    public func rows(now: Date, calendar: Calendar = CloudRowMapper.vietnamCalendar) -> [OrderRow] {
+        CloudRowMapper.rows(all, now: now, calendar: calendar)
+    }
+
+    // ---- lưu/đọc
+    public func save() {
+        guard let url = fileURL else { return }
+        lock.lock()
+        let disk = Disk(rev: revValue, parcels: order.compactMap { map[$0] })
+        lock.unlock()
+        guard let data = try? JSONEncoder().encode(disk) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let tmp = url.appendingPathExtension("tmp")
+        do {
+            try data.write(to: tmp, options: .atomic)
+            if FileManager.default.fileExists(atPath: url.path) {
+                _ = try FileManager.default.replaceItemAt(url, withItemAt: tmp)
+            } else {
+                try FileManager.default.moveItem(at: tmp, to: url)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: tmp)
+        }
+    }
+
+    private func load() {
+        guard let url = fileURL, let data = try? Data(contentsOf: url), let disk = try? JSONDecoder().decode(Disk.self, from: data) else { return }
+        for p in disk.parcels { put(p) }
+        revValue = disk.rev
+    }
+}

@@ -7,7 +7,7 @@ import type { Env } from "./index";
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
 const VALID_STATUS = new Set<string>(Object.values(ReceiveStatus));
-const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote"]);
+const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote", "watchlistReason"]);
 const PHOTO_ID = /^[A-Za-z0-9_-]{6,80}$/;
 const MAX_PHOTO_BYTES = 1_000_000;
 const SCAN_PHOTO_WINDOW_MS = 15 * 60_000;
@@ -106,6 +106,8 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path.startsWith("/photos/")) return this.getPhoto(url, decodeURIComponent(path.slice("/photos/".length)));
     const pp = /^\/parcels\/([^/]+)\/photos$/.exec(path);
     if (m === "GET" && pp) return this.parcelPhotos(decodeURIComponent(pp[1] as string));
+    const ph = /^\/parcels\/([^/]+)\/history$/.exec(path);
+    if (m === "GET" && ph) return this.parcelHistory(decodeURIComponent(ph[1] as string));
     return fail(404, "not_found", "Không có đường dẫn này.");
   }
 
@@ -526,6 +528,14 @@ export class ShopDO extends DurableObject<Env> {
       `SELECT p.photo_id, p.taken_at, p.deleted_at, d.name FROM photos p LEFT JOIN devices d ON d.device_id = p.device_id
        WHERE p.parcel_id = ? ORDER BY p.taken_at DESC`, parcelId);
     return json(rows.map((r) => ({ photoId: r.photo_id, takenAt: r.taken_at, deviceName: r.name ?? "", expired: Number(r.deleted_at) > 0 })));
+  }
+
+  /** Lịch sử sửa của một kiện (nhật ký trước/sau), mới nhất trước, tối đa 200 dòng. */
+  private parcelHistory(parcelId: string): Response {
+    const rows = this.db.all<Row>(
+      `SELECT a.at, a.action, a.before, a.after, COALESCE(d.name, a.device_id) AS who FROM audit_log a
+       LEFT JOIN devices d ON d.device_id = a.device_id WHERE a.parcel_id = ? ORDER BY a.id DESC LIMIT 200`, parcelId);
+    return json(rows.map((r) => ({ at: r.at, action: r.action, deviceName: r.who, before: JSON.parse(r.before as string), after: JSON.parse(r.after as string) })));
   }
 
   // ===================================================== cổng AI (khóa Groq/Gemini chỉ nằm trên cloud)

@@ -1,0 +1,218 @@
+import XCTest
+@testable import ScannerCore
+
+/// Máy khách cloud trên iPhone: ánh xạ kiện -> dòng, bản sao cục bộ, API (máy chủ GIẢ), quét khi mất mạng. Dữ liệu GIẢ.
+final class CloudTests: XCTestCase {
+    private var cal: Calendar { CloudRowMapper.vietnamCalendar }
+    private var now: Date { cal.date(from: DateComponents(year: 2026, month: 11, day: 25, hour: 14))! }
+
+    private func parcel(_ json: String) -> CloudParcel {
+        try! JSONDecoder().decode(CloudParcel.self, from: Data(json.utf8))
+    }
+
+    // MARK: giải mã kiện
+
+    func testParcelDecodesTolerantlyAndKeepsWhitelistedExtraAsStrings() {
+        let p = parcel(#"""
+        {"id":"a","orderId":123456,"track":"TRK1","price":"150000","isWatchlist":1,"rev":7,
+         "items":[{"product":"Áo","color":"Đen","size":"M","qty":2,"returnedQty":1}],
+         "extra":{"returnSuccessTime":"24/11/2026 10:00","priceNeedsReview":true}}
+        """#)
+        XCTAssertEqual(p.orderId, "123456")       // số đổi sang chuỗi
+        XCTAssertEqual(p.price, 150000)
+        XCTAssertTrue(p.isWatchlist)
+        XCTAssertEqual(p.rev, 7)
+        XCTAssertEqual(p.items.first?.returnedQty, 1)
+        XCTAssertEqual(p.extra["returnSuccessTime"], "24/11/2026 10:00")
+        XCTAssertEqual(p.extra["priceNeedsReview"], "true")
+        XCTAssertEqual(parcel(#"{"id":"b"}"#).status, "")     // thiếu trường: rỗng, không lỗi
+    }
+
+    // MARK: ánh xạ dòng điện thoại
+
+    func testRowMapsPendingParcelWithAlertAndOtherCodes() {
+        let p = parcel(#"""
+        {"id":"a","orderId":"O1","returnOrderId":"RR1","track":"TRK1","returnTrack":"RT1","trackingCodes":["old-1"],"scanAliases":["al 1"],
+         "forwardTrack":"SHARED","platform":"TikTok","orderType":"Trả hàng","status":"Chưa trả","carrier":"SPX","price":99000.4,
+         "returnedAt":"25/11/2026 01:00:00","note":"Sai mô tả","userNote":"gọi lại","platformStatus":"Đã hoàn",
+         "items":[{"product":"Áo","color":"Đen","size":"M","qty":2},{"product":"Quần","color":"","size":"L","qty":0}],"isWatchlist":true,"watchlistReason":"khiếu nại"}
+        """#)
+        let r = CloudRowMapper.row(p, now: now)!
+        XCTAssertEqual(r.k, "m"); XCTAssertEqual(r.c, "TRK1"); XCTAssertEqual(r.o, "O1")
+        XCTAssertEqual(r.p, "TikTok Shop")
+        XCTAssertEqual(r.n, "Áo | Quần")
+        XCTAssertEqual(r.co, "Đen | ")                 // giống C#: ghép cả ô trống
+        XCTAssertEqual(r.q, 3)                         // 2 + (qty<=0 tính 1)
+        XCTAssertEqual(r.lv, 1)                        // chờ 13 giờ: vàng
+        XCTAssertTrue(r.pd); XCTAssertFalse(r.rv)
+        XCTAssertGreaterThan(r.due, 0)
+        XCTAssertEqual(r.pr, 99000)
+        XCTAssertEqual(r.cr, "SPX")
+        XCTAssertEqual(r.ps, "Đã hoàn")
+        XCTAssertEqual(r.nt, "Sai mô tả | gọi lại")
+        XCTAssertTrue(r.wl); XCTAssertEqual(r.wr, "khiếu nại")
+        let codes = Set(r.x.split(separator: " ").map(String.init))
+        XCTAssertEqual(codes, ["RT1", "RR1", "OLD-1", "AL1"])   // KHÔNG có mã giao đi dùng chung
+        XCTAssertFalse(r.x.contains("SHARED"))
+    }
+
+    func testAlertLevelsAndReceivedParcels() {
+        func lv(_ hoursAgo: Double, status: String = "Chưa trả") -> Int {
+            let arrived = now.addingTimeInterval(-hoursAgo * 3600)
+            let f = DateFormatter(); f.calendar = cal; f.timeZone = cal.timeZone; f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+            return CloudRowMapper.row(parcel("{\"id\":\"a\",\"track\":\"T\",\"status\":\"\(status)\",\"returnedAt\":\"\(f.string(from: arrived))\"}"), now: now)!.lv
+        }
+        XCTAssertEqual(lv(6), 0)
+        XCTAssertEqual(lv(12), 1)
+        XCTAssertEqual(lv(23), 1)
+        XCTAssertEqual(lv(24), 2)
+        XCTAssertEqual(lv(48, status: "Hàng đã trả"), 0)          // đã nhận: không cảnh báo
+        let done = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","status":"Hàng đã trả","recvDate":"25/11/2026 09:00:00"}"#), now: now)!
+        XCTAssertTrue(done.rv); XCTAssertFalse(done.pd); XCTAssertEqual(done.rcd, "25/11/2026 09:00:00"); XCTAssertEqual(done.due, 0)
+        let lost = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","status":"Bị mất"}"#), now: now)!
+        XCTAssertFalse(lost.pd); XCTAssertFalse(lost.rv)
+    }
+
+    func testSalewareTimeBeforeDateIsReversedAndExtraReturnSuccessTimeIsUsed() {
+        let a = CloudRowMapper.arrivedAt(parcel(#"{"id":"a","returnedAt":"10:15:22 21/11/2026"}"#))!
+        let comps = cal.dateComponents([.day, .month, .year, .hour, .minute], from: a)
+        XCTAssertEqual([comps.day, comps.month, comps.year, comps.hour, comps.minute], [21, 11, 2026, 10, 15])
+        XCTAssertNotNil(CloudRowMapper.arrivedAt(parcel(#"{"id":"a","extra":{"returnSuccessTime":"24/11/2026 10:00"}}"#)))
+        XCTAssertNil(CloudRowMapper.arrivedAt(parcel(#"{"id":"a"}"#)))
+    }
+
+    func testKindsCancelledArchivedDeletedAndPartialReturn() {
+        let c = CloudRowMapper.row(parcel(#"{"id":"c1","orderId":"O9","orderType":"Đơn hủy","status":"Chưa trả"}"#), now: now)!
+        XCTAssertEqual(c.k, "c"); XCTAssertEqual(c.st, "Đơn hủy"); XCTAssertEqual(c.ci, "c1"); XCTAssertEqual(c.c, "O9")   // không có mã vận đơn: lấy mã đơn
+        XCTAssertEqual(CloudRowMapper.row(parcel(#"{"id":"a","track":"T","isArchived":true}"#), now: now)!.k, "a")
+        XCTAssertNil(CloudRowMapper.row(parcel(#"{"id":"a","track":"T","isDeleted":true}"#), now: now))
+        XCTAssertNil(CloudRowMapper.row(parcel(#"{"id":"a"}"#), now: now))                 // không có mã nào
+        let part = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","items":[{"product":"Áo","qty":1,"returnedQty":1},{"product":"Quần","qty":1}]}"#), now: now)!
+        XCTAssertEqual(part.rn, "Áo")
+        let all = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","items":[{"product":"Áo","qty":1,"returnedQty":1}]}"#), now: now)!
+        XCTAssertEqual(all.rn, "")                                                        // hoàn hết: không phân biệt
+    }
+
+    func testRowsSortPendingFirstThenSoonestDeadlineAndSkipDeleted() {
+        func p(_ id: String, _ status: String, _ at: String) -> CloudParcel {
+            parcel("{\"id\":\"\(id)\",\"track\":\"\(id)\",\"status\":\"\(status)\",\"returnedAt\":\"\(at)\"}")
+        }
+        let rows = CloudRowMapper.rows([
+            p("done", "Hàng đã trả", "25/11/2026 01:00:00"),
+            p("late", "Chưa trả", "25/11/2026 12:00:00"),
+            p("old", "Chưa trả", "24/11/2026 12:00:00"),
+            parcel(#"{"id":"del","track":"del","isDeleted":true}"#),
+            p("none", "Chưa trả", ""),
+        ], now: now)
+        XCTAssertEqual(rows.map { $0.c }, ["old", "late", "none", "done"])
+    }
+
+    // MARK: bản sao cục bộ
+
+    func testStoreAppliesUpsertsKeepsRevAndPersistsAtomically() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qlhh-cloud-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("parcels.json")
+        let s = CloudParcelStore(fileURL: url)
+        s.apply([parcel(#"{"id":"a","track":"A","status":"Chưa trả"}"#), parcel(#"{"id":"b","track":"B"}"#)], rev: 5)
+        XCTAssertEqual(s.rev, 5); XCTAssertEqual(s.count, 2)
+        s.apply([parcel(#"{"id":"a","track":"A","status":"Hàng đã trả"}"#)], rev: 9)
+        XCTAssertEqual(s.count, 2)                       // cập nhật, không nhân đôi
+        XCTAssertEqual(s.parcel(id: "a")?.status, "Hàng đã trả")
+        s.upsertLocal(parcel(#"{"id":"b","track":"B","status":"Bị mất"}"#))
+        XCTAssertEqual(s.rev, 9)                         // áp kiện lẻ không đổi mốc
+        s.save()
+
+        let again = CloudParcelStore(fileURL: url)
+        XCTAssertEqual(again.rev, 9)
+        XCTAssertEqual(again.all.map { $0.id }, ["a", "b"])
+        XCTAssertEqual(again.parcel(id: "b")?.status, "Bị mất")
+        again.reset()
+        XCTAssertEqual(again.count, 0); XCTAssertEqual(again.rev, 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
+    // MARK: API
+
+    private final class FakeTransport: CloudHTTPTransport {
+        var requests: [URLRequest] = []
+        let reply: (URLRequest) throws -> (Int, String)
+        init(_ reply: @escaping (URLRequest) throws -> (Int, String)) { self.reply = reply }
+        func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            requests.append(request)
+            let (code, body) = try reply(request)
+            let resp = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!
+            return (Data(body.utf8), resp)
+        }
+    }
+
+    func testBaseURLNormalisationAndInsecureRejected() throws {
+        XCTAssertEqual(try CloudAPI.normalize("https://a.workers.dev"), "https://a.workers.dev/v1")
+        XCTAssertEqual(try CloudAPI.normalize(" https://a.workers.dev/ "), "https://a.workers.dev/v1")
+        XCTAssertEqual(try CloudAPI.normalize("https://a.workers.dev/v1"), "https://a.workers.dev/v1")
+        XCTAssertEqual(try CloudAPI.normalize("http://127.0.0.1:8799"), "http://127.0.0.1:8799/v1")
+        for bad in ["", "http://example.com", "ftp://a.b", "khong-phai-url"] {
+            XCTAssertThrowsError(try CloudAPI.normalize(bad), bad)
+        }
+    }
+
+    func testSyncParsesParcelsAndSendsBearerTokenWithoutLeakingItInErrors() async throws {
+        let t = FakeTransport { r in
+            if r.url!.path == "/v1/sync" {
+                return (200, #"{"rev":7,"more":true,"changes":[{"type":"parcel","rev":7,"parcel":{"id":"a","track":"T"}},{"type":"returnWatch","rev":6}]}"#)
+            }
+            return (401, #"{"error":{"code":"unauthorized","message":"Thiết bị đã bị thu hồi."}}"#)
+        }
+        let api = try CloudAPI(baseURL: "https://x.workers.dev", token: "SECRET-TOKEN", transport: t)
+        let page = try await api.sync(since: 3)
+        XCTAssertEqual(page.rev, 7); XCTAssertTrue(page.more); XCTAssertEqual(page.parcels.map { $0.id }, ["a"])
+        XCTAssertTrue(t.requests[0].url!.absoluteString.contains("since=3"))
+        XCTAssertEqual(t.requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer SECRET-TOKEN")
+        do { _ = try await api.me(); XCTFail("phải lỗi") }
+        catch let e as CloudAPIError {
+            XCTAssertTrue(e.isUnauthorized); XCTAssertEqual(e.message, "Thiết bị đã bị thu hồi.")
+            XCTAssertFalse(e.message.contains("SECRET-TOKEN"))
+        }
+        let net = try CloudAPI(baseURL: "https://x.workers.dev", token: "t", transport: FakeTransport { _ in throw URLError(.notConnectedToInternet) })
+        do { _ = try await net.sync(since: 0); XCTFail("phải lỗi") }
+        catch let e as CloudAPIError { XCTAssertTrue(e.isNetwork); XCTAssertTrue(e.message.contains("kết nối")) }
+    }
+
+    func testScanMapsOutcomesAndAutoGeneratesOpId() async throws {
+        let t = FakeTransport { _ in
+            (200, #"{"results":[{"opId":"x","ok":true,"rev":9,"result":{"outcome":"alreadyReceived","ack":true,"message":"Kiện đã nhận trước đó.","receivedBy":"Máy A","receivedAt":"25/11/2026 09:00:00","parcel":{"id":"a","track":"T","status":"Hàng đã trả"}}}]}"#)
+        }
+        let api = try CloudAPI(baseURL: "https://x.workers.dev", token: "t", transport: t)
+        let r = try await api.scan(code: "trk")
+        XCTAssertEqual(r.outcome, .alreadyReceived); XCTAssertTrue(r.ack)
+        XCTAssertEqual(r.receivedBy, "Máy A"); XCTAssertEqual(r.parcel?.status, "Hàng đã trả")
+        let body = String(data: t.requests[0].httpBody ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(body.contains("\"opId\""))
+        XCTAssertTrue(body.contains("\"scan\""))
+    }
+
+    // MARK: quét khi mất mạng
+
+    func testScanIsRefusedWithoutConnectionAndNeverAcked() async {
+        let client = CloudSyncClient(store: CloudParcelStore(), sessions: InMemoryCloudSessionStore(),
+                                     transport: FakeTransport { _ in XCTFail("không được gọi mạng"); return (200, "{}") })
+        XCTAssertEqual(client.state, .unpaired)
+        XCTAssertFalse(client.canWrite)
+        let r = await client.scan(code: "TRK")
+        XCTAssertEqual(r.outcome, .error); XCTAssertFalse(r.ack)
+        XCTAssertTrue(r.message.contains("Mất kết nối"))
+    }
+
+    func testPairingValidatesInputBeforeAnyNetworkCall() async {
+        let t = FakeTransport { _ in (200, "{}") }
+        let client = CloudSyncClient(store: CloudParcelStore(), sessions: InMemoryCloudSessionStore(), transport: t)
+        let a = await client.pair(baseURL: "https://a.workers.dev", code: "12ab", deviceName: "Máy")
+        XCTAssertEqual(a, "Mã ghép gồm 6 chữ số.")
+        let b = await client.pair(baseURL: "https://a.workers.dev", code: "123456", deviceName: "  ")
+        XCTAssertEqual(b, "Hãy đặt tên cho thiết bị này.")
+        let c = await client.pair(baseURL: "http://khong-an-toan.com", code: "123456", deviceName: "Máy")
+        XCTAssertNotNil(c)
+        XCTAssertTrue(t.requests.isEmpty)
+        XCTAssertEqual(client.state, .unpaired)
+    }
+}

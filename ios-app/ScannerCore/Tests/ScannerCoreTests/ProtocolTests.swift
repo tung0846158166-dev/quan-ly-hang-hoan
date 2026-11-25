@@ -27,6 +27,11 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(n["note"] as? String, "Khách gửi hoàn")
     }
 
+    func testParsePong() {
+        XCTAssertEqual(SyncProtocol.parseMessage("{\"type\":\"pc_pong\",\"room\":\"R\",\"id\":\"abc\"}", room: "R"), .pong(id: "abc"))
+        XCTAssertNil(SyncProtocol.parseMessage("{\"type\":\"pc_pong\",\"room\":\"X\",\"id\":\"abc\"}", room: "R"))
+    }
+
     func testParseAckAndRejectEmptyRoom() {
         let inner = "{\"type\":\"pc_ack\",\"room\":\"ROOM-TEST-2026\",\"requestId\":\"s-1\",\"code\":\"spxvn067887279218\",\"outcome\":\"success\",\"orderNum\":12,\"captureId\":\"s-1\",\"photoSaved\":true,\"ackStage\":\"scan\"}"
         let outer = SyncProtocol.json(["event": "message", "message": inner])

@@ -153,6 +153,19 @@ public sealed class SyncService : IDisposable
             return;
         }
 
+        if (type == "latency_ping" && sameRoom)
+        {
+            // Đo độ trễ: trả lại đúng mã điện thoại gửi (không đụng dữ liệu).
+            try
+            {
+                using var d = JsonDocument.Parse(message);
+                var id = d.RootElement.TryGetProperty("id", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+                _ = _transport.PublishAsync(_room, JsonSerializer.Serialize(new { type = "pc_pong", room = _room, id }));
+            }
+            catch (Exception) { /* bản tin lỗi: bỏ qua */ }
+            return;
+        }
+
         if (type == "snapshot_request" && sameRoom)
         {
             _ = Task.Run(() => SendSnapshotAsync(force: true));

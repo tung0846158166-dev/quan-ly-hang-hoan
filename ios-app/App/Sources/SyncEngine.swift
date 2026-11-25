@@ -453,8 +453,33 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Đo thời gian khứ hồi điện thoại -> PC -> điện thoại.
+    @Published var pingResult: String = ""
+    private var pingId = ""
+    private var pingSentAt: Date?
+
+    func pingPC() {
+        guard !room.isEmpty else { pingResult = "Chưa có mã phòng"; return }
+        let id = UUID().uuidString
+        pingId = id; pingSentAt = Date(); pingResult = "Đang đo..."
+        broadcast(SyncProtocol.json(["type": "latency_ping", "room": room, "id": id]), title: "Shopee Connect", room: room)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            if self.pingId == id {
+                self.pingResult = "PC không trả lời sau 8 giây (PC tắt hoặc mất mạng)"
+                self.pingId = ""; self.pingSentAt = nil
+            }
+        }
+    }
+
     private func dispatch(_ msg: PcMessage) {
         switch msg {
+        case .pong(let id):
+            markPcSeen()
+            if id == pingId, let t = pingSentAt {
+                pingResult = "PC trả lời sau \(Int(Date().timeIntervalSince(t) * 1000)) ms"
+                pingId = ""; pingSentAt = nil
+            }
         case .hello, .heartbeat:
             markPcSeen()
         case .snapshotChunk(let ch):

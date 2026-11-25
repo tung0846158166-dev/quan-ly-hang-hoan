@@ -111,3 +111,14 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
 
 
 
+
+## Giai đoạn 5 - Hoàn thiện trước khi chạy dữ liệu thật (25/11/2026)
+- [x] T039 (antigravity): bỏ truyền ảnh sang PC, ảnh lưu trên điện thoại - claude đã kiểm tra: ĐẠT có điều kiện (`tasks/reports/T039-review.md`)
+- [x] T040 (antigravity): chỉ giữ ảnh khi quét đúng - claude đã kiểm tra: ĐẠT có điều kiện (`tasks/reports/T040-review.md`)
+- [x] (claude) Broker MQTT riêng (PC + iPhone nhập `wss://tên:mật-khẩu@...`), hướng dẫn `docs/private-broker/`
+- [x] (claude) Trợ lý AI (Groq 3 mô hình rồi Google Gemini): nút ✨ + popup trên PC và iPhone, ~19 công cụ chỉ đọc chọn theo câu hỏi, yêu cầu vừa gói miễn phí 7-8k token, khóa/mô hình trong Cài đặt
+- [x] (claude) PC đẩy phần thay đổi sang điện thoại ngay sau khi nạp; chu kỳ lấy Google Sheet 3 phút
+- [x] (claude) Thông báo kết quả quét trên iPhone theo màu (Hoàn kho: Thành công xanh / Quét trùng đỏ / Đơn hủy chữ xanh-đỏ / Không có vàng; Đơn mới: Tạo thành công xanh / Đã tạo rồi đỏ); PC báo cờ đơn hủy trong ACK
+- [x] (claude) Nút "Đo ngay" tốc độ phản hồi trong Cài đặt iPhone (latency_ping -> pc_pong); test PC xanh, iPhone chờ CI
+- [ ] (user) Thử Google Sheet thật; nhập khóa Google Gemini; xác nhận dòng MQTT 1/1 với EMQX; thử iPhone build 28 trên máy thật
+- [ ] (claude) Đóng gói bộ cài exe mới (`v2/installer/build-installer.ps1`) và chuyển sang chạy thật (user quyết định lúc nào)

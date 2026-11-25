@@ -39,6 +39,7 @@ public enum PcMessage: Equatable {
     case snapshotChunk(SnapshotChunk)
     case snapshotDelta(SnapshotChunk)
     case watchSync(time: Int, items: [WatchItem])
+    case pong(id: String)
     case other
 }
 
@@ -136,6 +137,7 @@ public enum SyncProtocol {
         switch type {
         case "pc_hello": return .hello
         case "pc_heartbeat": return .heartbeat
+        case "pc_pong": return .pong(id: (d["id"] as? String) ?? "")
         case "manifest_sync":
             let codes = (d["knownCodes"] as? [Any])?.compactMap { $0 as? String } ?? []
             return .manifest(codes.map { TrackingCode.clean($0) })

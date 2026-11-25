@@ -154,6 +154,19 @@ struct SettingsView: View {
                             .font(.footnote.bold())
                     }
 
+                    settingsRow(icon: "speedometer", color: Theme.info, title: "Tốc độ phản hồi") {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Button("Đo ngay") { engine.pingPC() }
+                                .font(.subheadline.bold())
+                            if !engine.pingResult.isEmpty {
+                                Text(engine.pingResult)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+
                     settingsRow(icon: "tray.and.arrow.up.fill", color: Theme.warning, title: "Hàng chờ gửi PC") {
                         Text("\(engine.pendingCount)")
                             .font(.subheadline.bold())

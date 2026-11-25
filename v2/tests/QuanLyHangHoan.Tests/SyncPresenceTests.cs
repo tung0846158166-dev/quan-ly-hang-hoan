@@ -72,6 +72,22 @@ public sealed class SyncPresenceTests : IDisposable
     }
 
     [Fact]
+    public async Task Latency_ping_is_echoed_as_pc_pong_with_same_id_only_for_same_room()
+    {
+        var t = new InMemoryTransport();
+        var inbox = Listen(t);
+        using var svc = new SyncService(Db, Room, t, () => Now, heartbeatInterval: TimeSpan.Zero);
+        svc.Start();
+
+        await t.PublishAsync(Room, JsonSerializer.Serialize(new { type = "latency_ping", room = Room, id = "abc" }));
+        var pong = Of(inbox, "pc_pong").Single();
+        Assert.Equal("abc", pong.GetProperty("id").GetString());
+
+        await t.PublishAsync(Room, JsonSerializer.Serialize(new { type = "latency_ping", room = "PHONG-KHAC", id = "x" }));
+        Assert.Single(Of(inbox, "pc_pong"));
+    }
+
+    [Fact]
     public async Task Heartbeat_is_sent_periodically_and_stops_after_dispose()
     {
         var t = new InMemoryTransport();

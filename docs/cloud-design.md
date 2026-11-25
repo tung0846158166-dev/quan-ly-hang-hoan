@@ -1,129 +1,149 @@
-# Thiết kế chuyển sang CLOUD (Cloudflare) — BẢN ĐỀ XUẤT CHỜ CHỦ DỰ ÁN DUYỆT
+# Thiết kế chuyển sang CLOUD (Cloudflare) — BẢN 2, CHỜ CHỦ DỰ ÁN DUYỆT
 
-Trạng thái: **ĐỀ XUẤT, chưa làm gì.** Bản Electron cũ vẫn là chuẩn đối chiếu; bản v2 hiện tại (SQLite + MQTT/ntfy) vẫn chạy bình thường cho tới khi chủ dự án duyệt và kiểm tra bản cloud.
+Trạng thái: **ĐỀ XUẤT, chưa làm gì.** Bản Electron cũ vẫn là chuẩn đối chiếu; bản v2 hiện tại (SQLite + MQTT/ntfy) chạy bình thường cho tới khi chủ dự án duyệt và kiểm tra bản cloud.
 
-## 1. Vì sao đổi
-- Chủ dự án có **2 máy tính + 10 điện thoại** dùng chung; không thể bắt máy tính luôn bật để làm trung tâm.
-- Vì vậy **cloud là nguồn dữ liệu gốc**. Máy tính và điện thoại là máy khách, có bản lưu tạm để chạy nhanh và dùng khi mất mạng.
+## 0. Những điều chủ dự án đã chốt (bản 2)
+1. **Mất mạng = KHÔNG làm việc.** Máy hiện trạng thái "Mất kết nối" và chặn quét/sửa; không có hàng đợi ngoại tuyến. (Tránh nhiều máy quét cùng một đơn lúc mất mạng rồi dồn lên lệch.)
+2. Không đưa dữ liệu cá nhân người nhận lên cloud; phần dữ liệu thô chỉ giữ các trường cần thiết (xem 3.1).
+3. **Cả điện thoại và máy tính đều xem được ảnh của đơn; chỉ điện thoại mới chụp/quét ảnh.** Ảnh lưu ở R2.
+4. Gói: **R2 10 GB, D1 500 MB** (xem 3.7: D1 là giới hạn chật nhất).
+5. **Điện thoại là một ứng dụng độc lập đầy đủ** (xem danh sách, chi tiết, thống kê, AI, quét...), không chỉ để quét.
+6. **Google Sheet nạp thẳng lên cloud** (Cron của Worker). Các cách nạp khác (file Excel, thư mục, Salework) vẫn chạy ở máy tính.
+Chưa trả lời: một hay nhiều cửa hàng (mặc định: MỘT cửa hàng, lược đồ có sẵn `shop_id`); số ngày giữ ảnh (mặc định 90, xem 3.7).
 
-## 2. Tổng quan
+## 1. Tổng quan
 
 ```
-   iPhone x10 (SwiftUI)                 Máy tính x2 (WPF)
-   ┌──────────────────┐                ┌──────────────────────┐
-   │ giao diện (giữ)  │                │ giao diện (giữ)      │
-   │ bản lưu tạm      │                │ bản lưu tạm (SQLite) │
-   │ hàng đợi gửi lên │                │ hàng đợi gửi lên     │
-   └───────┬──────────┘                │ bộ nạp file/thư mục/ │
-           │ HTTPS + WebSocket         │ Salework (giữ)       │
-           │                           └──────────┬───────────┘
-           └─────────────────┬────────────────────┘
-                             ▼
-                ┌────────────────────────────┐
-                │  Cloudflare Worker (API)   │  xác thực thiết bị, quy tắc nghiệp vụ
-                ├────────────────────────────┤
-                │ D1  : đơn, kiện, nhật ký   │  nguồn dữ liệu gốc
-                │ DO  : 1 đối tượng/cửa hàng │  báo thay đổi thời gian thực (WebSocket)
-                │ R2  : ảnh quét, sao lưu    │  tệp lớn
-                │ Cron: nạp Google Sheet     │  chạy khi không máy nào bật (giai đoạn sau)
-                └────────────────────────────┘
+   iPhone x10 (SwiftUI, ứng dụng đầy đủ)     Máy tính x2 (WPF)
+   ┌────────────────────────────┐          ┌───────────────────────────┐
+   │ giao diện (giữ)            │          │ giao diện (giữ)           │
+   │ bản lưu tạm CHỈ ĐỌC khi    │          │ bản lưu tạm CHỈ ĐỌC khi   │
+   │ mất mạng; mọi GHI cần mạng │          │ mất mạng; mọi GHI cần mạng│
+   │ chụp + gửi ảnh             │          │ xem ảnh; bộ nạp file/     │
+   └────────────┬───────────────┘          │ thư mục/Salework (giữ)    │
+                │ HTTPS + WebSocket        └─────────────┬─────────────┘
+                └───────────────┬────────────────────────┘
+                                ▼
+                 ┌─────────────────────────────┐
+                 │ Cloudflare Worker (API)     │ xác thực thiết bị + quy tắc nghiệp vụ
+                 ├─────────────────────────────┤
+                 │ D1  (500 MB): đơn, kiện,    │ nguồn dữ liệu gốc, dòng GỌN
+                 │      nhật ký, chỉ mục       │
+                 │ DO  : 1 đối tượng/cửa hàng  │ báo thay đổi (WebSocket)
+                 │ R2  (10 GB): ảnh, kho lưu   │ tệp lớn, bản lưu trữ cũ
+                 │ Cron: nạp Google Sheet      │ chạy khi mọi máy tắt
+                 └─────────────────────────────┘
 ```
 
-## 3. Cloud (Worker + D1 + R2 + Durable Object)
+## 2. Quy tắc "mất mạng = dừng"
+- Máy khách có chấm trạng thái: **Đã kết nối / Đang đồng bộ / MẤT KẾT NỐI**.
+- Khi MẤT KẾT NỐI: quét, sửa, đổi trạng thái, nạp, chụp ảnh đều bị **chặn** kèm thông báo rõ. Chỉ **xem** được dữ liệu đã tải lần cuối (nhãn "Dữ liệu cũ lúc HH:mm, chỉ xem").
+- Mọi thao tác ghi chỉ coi là thành công khi **server trả về thành công** (quy tắc bất biến số 6: chỉ ACK sau khi đã lưu bền).
+- Mạng đứt đúng lúc đang gửi (không biết server đã nhận chưa): máy khách gửi lại với **cùng mã thao tác** (`client_op_id`), server nhận trùng thì trả lại kết quả cũ, không làm đôi. Nếu không xác nhận được thì báo "chưa chắc đã nhận, hãy kiểm tra lại đơn trước khi quét lại".
+- Thay đổi so với hiện tại: iPhone hiện có hàng đợi quét khi mất mạng; bản cloud **bỏ hàng đợi này** (đúng yêu cầu).
 
-### 3.1 Dữ liệu (D1)
-- Bảng chính: `orders` (một dòng = một KIỆN), `order_items`, `scan_events`, `audit_log` (lịch sử sửa, không ghi đè), `watchlist`, `return_watch`, `notes`, `devices`, `photos`.
-- Mỗi dòng có `shop_id` (sẵn sàng nhiều cửa hàng), `rev` (số thứ tự tăng dần theo cửa hàng, dùng để đồng bộ phần thay đổi), `updated_at`, `deleted`, `archived`.
-- **KHÔNG lưu dữ liệu cá nhân người nhận** (tên, SĐT, địa chỉ) và **bỏ phần dữ liệu thô nặng** (`extra_json` ~41 MB ở bản hiện tại). Cloud chỉ giữ: mã đơn, mã vận đơn, sàn, hãng vận chuyển, sản phẩm/màu/size/số lượng, giá, ngày giờ, trạng thái, lý do, ghi chú, theo dõi. Ước tính ~1–3 KB mỗi kiện, 100.000 kiện ≈ 100–300 MB (cần đo lại bằng dữ liệu thật).
+## 3. Cloud
 
-### 3.2 API chính
+### 3.1 Dữ liệu và "dữ liệu thô" (đo trên dữ liệu thật hiện tại: 4.962 đơn, DB 180 MB)
+Số liệu đo (chỉ tên trường và dung lượng, không đọc nội dung cá nhân):
+| Phần | Dung lượng | Là gì | Lên cloud? |
+|---|---|---|---|
+| `orders.raw_json` | ~76 MB | bản sao nguyên văn của từng đơn từ app cũ | **Không** (giữ ở máy cũ/bản sao lưu) |
+| `extra_json` → `photoHistory` | ~37 MB (chỉ 328 đơn) | ảnh cũ nhúng thẳng vào đơn | **Không nhúng**; chuyển ảnh sang R2 rồi bỏ khỏi dòng đơn |
+| `extra_json` → `rawDetails` | ~2,2 MB | dòng gốc của file nhập (địa chỉ giao, tên đăng nhập người mua, lý do hoàn, mã khiếu nại...) | **Chỉ giữ vài trường cần cho nghiệp vụ** (bên dưới) |
+| `extra_json` → giá/chế độ nhập (`priceModes`...) | ~0,7 MB | cách tính giá khi nhập | Chỉ giữ giá cuối cùng và cờ cần xem lại |
+| `photos.data` | ~52 MB (2.230 ảnh) | ảnh trong CSDL | **Chuyển sang R2** |
+- Trường trong `rawDetails` **được giữ** vì giao diện/cảnh báo dùng: `returnSuccessTime` (giờ hàng về), `returnStatus`, `returnShippingStatus`, `cancelType`, `returnReason`, mã/hãng vận chuyển giao đi và hoàn.
+- **Không đưa lên:** `deliveryAddress`, `buyerUsername`, `buyerReturnNote`, `buyerOrderNote`, tên/SĐT/địa chỉ nếu có, `paymentMethod`, `claimId`... (dữ liệu người mua).
+- Bảng: `orders` (một dòng = một KIỆN), `order_items`, `scan_events`, `audit_log` (lịch sử sửa, không ghi đè), `cell_edit_history`, `return_watch`, `watchlist`, `photos` (chỉ tham chiếu R2), `devices`, `order_index` (chỉ mục kho lưu trữ).
+- Mỗi dòng có `shop_id`, `rev` (số thứ tự tăng dần để đồng bộ phần thay đổi), `updated_at`, `deleted`, `archived`.
+- Dòng gọn ước ~1–2 KB: 4.962 đơn ≈ 5–10 MB. (Ước tính, cần đo lại bằng công cụ nhập thử.)
+
+### 3.2 API
 | Việc | Cách |
 |---|---|
 | Lấy thay đổi | `GET /sync?since=<rev>` trả mọi dòng đổi từ `rev` đó, có phân trang |
-| Gửi thay đổi | `POST /ops` gửi lô thao tác, mỗi thao tác có `client_op_id` (gửi lại không bị làm đôi) |
-| Quét nhận kiện | `POST /scan` — kiểm tra và cập nhật trong **một thao tác nguyên tử** |
+| Gửi thao tác | `POST /ops` (mỗi thao tác có `client_op_id`) |
+| Quét nhận kiện | `POST /scan` — kiểm tra và cập nhật **một thao tác nguyên tử** |
 | Nạp đơn | `POST /import` — upsert theo khóa kiện (nhập lại cùng kiện thì cập nhật, không cộng lặp) |
-| Ảnh | `PUT /photos/<id>` lên R2; ảnh thu nhỏ khi tải |
+| Ảnh | điện thoại `PUT /photos/<id>` lên R2; máy tính và điện thoại tải bản thu nhỏ để xem |
 | Thiết bị | ghép bằng mã QR, thu hồi từng máy |
 
 ### 3.3 Quy tắc nghiệp vụ chạy ở server (BẤT BIẾN, không đổi)
 1. Một mã đơn có nhiều kiện A/B/C, mỗi kiện một mã vận đơn, một dòng, trạng thái/ảnh/ngày nhận riêng.
 2. Nhận kiện A **không** nhận B/C. Cùng mã đơn hoặc mã yêu cầu hoàn **không đủ** để gộp.
-3. Mã giao đi dùng chung hoặc mã đơn gốc có nhiều ứng viên → trả **ambiguous**, yêu cầu kiểm tra.
+3. Mã giao đi dùng chung hoặc mã đơn gốc có nhiều ứng viên → **ambiguous**, yêu cầu kiểm tra.
 4. Chỉ gộp mã thay thế khi có liên kết tường minh; giữ mã lịch sử.
 5. Nhập lại cùng kiện → cập nhật, không cộng lặp sản phẩm.
-6. **Chỉ xác nhận thành công SAU khi cloud đã ghi bền** (ACK từ server). Máy khách ghi vào hàng đợi bền trước và hiện "chờ đồng bộ"; chỉ khi server xác nhận mới coi là xong. Ảnh chưa xác nhận không coi là đã lưu.
-7. Cảnh báo vàng sau 12 giờ, đỏ sau 24 giờ kể từ lúc hàng về: máy khách tự tính từ giờ hàng về (không cần server).
-8. Không xóa/ghi đè dữ liệu cũ; mọi sửa đổi ghi vào `audit_log`; không đoán để tách/gộp dữ liệu lịch sử.
+6. Chỉ ACK sau khi server đã ghi bền; ảnh chưa ACK không coi là đã lưu.
+7. Cảnh báo vàng sau 12 giờ, đỏ sau 24 giờ kể từ lúc hàng về (máy khách tự tính).
+8. Không xóa/ghi đè dữ liệu cũ; mọi sửa đổi ghi vào `audit_log`.
 
-### 3.4 Hai người quét cùng lúc
-Quét nhận là câu lệnh có điều kiện (`UPDATE ... WHERE trạng thái = 'Đang chờ'`). Người đến sau nhận kết quả "đã nhận trước đó lúc … bởi …". Sửa ghi chú/trạng thái khác: người ghi sau thắng nhưng bản cũ luôn còn trong `audit_log`.
+### 3.4 Nhiều máy cùng lúc (khi đều có mạng)
+Quét nhận là câu lệnh có điều kiện (`UPDATE ... WHERE trạng thái = 'Đang chờ'`). Người đến sau nhận "đã nhận trước đó lúc … bởi máy …". Sửa ghi chú/trạng thái khác: người ghi sau thắng nhưng bản cũ luôn còn trong `audit_log`.
 
 ### 3.5 Thời gian thực
-Mỗi cửa hàng có một Durable Object giữ WebSocket. Có thay đổi thì phát `{rev}`; máy khách nhận được thì gọi `/sync` lấy phần mới. Mất kết nối thì lúc nối lại tự lấy phần còn thiếu theo `rev`.
+Mỗi cửa hàng có một Durable Object giữ WebSocket; có thay đổi thì phát `{rev}`, máy khách gọi `/sync` lấy phần mới. Mất kết nối thì chuyển trạng thái MẤT KẾT NỐI; nối lại thì tự lấy phần còn thiếu rồi mở khóa.
 
-### 3.6 Bảo mật
-- Chỉ HTTPS. Mỗi thiết bị một token riêng (lưu băm trong D1), vai trò **chủ cửa hàng / nhân viên / chỉ quét**; thu hồi từng máy được.
-- Mã ghép nối QR sống 10 phút, dùng một lần.
-- Khóa bí mật (token Apps Script, khóa AI nếu sau này đưa lên) đặt ở **Worker secrets**, không nằm trong mã hay máy khách.
-- Không có mã hóa đầu cuối (server cần đọc mã để khớp và tìm kiếm); bù lại không lưu dữ liệu cá nhân của người nhận.
+### 3.6 Nạp Google Sheet ngay trên cloud
+Cron của Worker gọi Apps Script mỗi vài phút (token là **Worker secret**), chạy bộ gộp rồi upsert vào D1. Đây là việc phải **viết lại bằng TypeScript**: nhận dạng tab (`hanghoan/trahang/huy/vandon`), gộp kiện, điền mã vận đơn từ tab ẩn "Vận đơn huỷ" (không ghi đè mã sẵn có), bỏ qua tab thiếu. Dùng bộ ca thử chung với C# (mục 6).
 
-### 3.7 Dung lượng (gói có 10 GB)
-- Dữ liệu đơn: vài trăm MB ở 100.000 kiện → thoải mái.
-- **Ảnh là phần tốn nhất.** Đề xuất: thu nhỏ còn cạnh dài ~1000 px, JPEG chất lượng ~60% (≈ 80–120 KB/ảnh). Với 500 lượt quét/ngày ≈ 40–60 MB/ngày ≈ 10 GB sau khoảng 6 tháng. Đề xuất mặc định **tự xóa ảnh sau 90 ngày** (chỉnh được) và tối đa 5 ảnh/kiện như hiện tại. Cần xác nhận lại 10 GB của bạn là của dịch vụ nào (R2 hay D1) và các giới hạn lượt đọc/ghi theo bảng giá hiện hành của Cloudflare.
+### 3.7 Dung lượng
+- **R2 10 GB (ảnh):** ảnh mới thu nhỏ cạnh dài ~1000 px, JPEG ~60% ≈ 80–120 KB. 500 lượt quét/ngày ≈ 40–60 MB/ngày → khoảng 6 tháng đầy. Mặc định **tự xóa ảnh sau 90 ngày** (chỉnh được) và tối đa 5 ảnh/kiện. 2.230 ảnh cũ ≈ 52 MB chuyển sang R2 không đáng kể.
+- **D1 500 MB (dữ liệu):** chật hơn R2. Dòng gọn 1–2 KB cộng chỉ mục thì chạm 500 MB khi khoảng **150.000–250.000 kiện** (ước tính thô). Cách xử lý: đơn ở Kho lưu trữ lâu (mặc định > 12 tháng) được **nén thành tệp theo tháng trên R2**, trong D1 chỉ giữ `order_index` (mã đơn, mã vận đơn, sàn, tháng, vài chục byte/dòng) để vẫn tìm được và mở lại. Chưa cần làm ngay, thiết kế sẵn để không phải đổi lược đồ sau.
+- Cần xác nhận lại giới hạn lượt đọc/ghi mỗi ngày của gói D1 hiện hành (tôi chưa kiểm tra bảng giá).
+
+### 3.8 Bảo mật
+HTTPS; mỗi thiết bị một token riêng (lưu băm), vai trò chủ cửa hàng / nhân viên (điện thoại vẫn là ứng dụng đầy đủ), thu hồi từng máy; mã ghép QR sống 10 phút dùng một lần; khóa bí mật ở Worker secrets. Không mã hóa đầu cuối (server cần đọc mã để khớp/tìm), bù lại không lưu dữ liệu cá nhân người nhận.
 
 ## 4. Máy tính (WPF)
 **Giữ nguyên:** toàn bộ màn hình, bảng, bộ lọc, thông báo, tìm kiếm, thống kê, xuất file, trợ lý AI.
 **Đổi:**
-1. Lớp dữ liệu: các giao diện trừu tượng hiện có (`IReturnOrderProvider`, `IArchivedOrderProvider`, `IScanService`…) có thêm cài đặt mới "cloud + bản lưu tạm". Giao diện không biết thay đổi.
-2. Bản lưu tạm = SQLite cục bộ (như hiện nay) đóng vai bản sao + bảng `outbox` (hàng đợi gửi lên). Giao diện luôn đọc bản sao nên mở nhanh, dùng được khi mất mạng.
-3. Thanh trạng thái hiển thị: "Đã đồng bộ" / "Đang đồng bộ" / "N thao tác chờ gửi" / "Mất mạng".
-4. Bộ nạp (thư mục, Excel, Salework): giữ cách đọc, đầu ra gửi lên `/import`. Hai máy cùng nạp một file không gây trùng.
-5. MQTT/ntfy bị thay bằng đồng bộ qua cloud (ntfy giữ lại tạm cho thông báo đẩy).
-6. Google Sheet: giai đoạn đầu vẫn chạy ở máy tính và gửi lên `/import`; sau đó chuyển sang Cron của Worker (cần viết lại bộ gộp Sheet bằng TypeScript).
+1. Lớp dữ liệu: cài đặt mới "cloud + bản lưu tạm chỉ đọc" cho các giao diện trừu tượng (`IReturnOrderProvider`, `IArchivedOrderProvider`, `IScanService`...).
+2. Chấm trạng thái kết nối (mục 2); mất mạng thì khóa mọi nút ghi.
+3. **Máy tính chỉ xem ảnh**, không chụp/đưa ảnh lên.
+4. Bộ nạp thư mục/Excel/Salework giữ cách đọc, đầu ra gửi `/import` (cần mạng). Hai máy cùng nạp một file không gây trùng.
+5. Tắt đồng bộ MQTT/ntfy (ntfy giữ tạm cho thông báo đẩy điện thoại).
 
-## 5. Điện thoại (SwiftUI)
-**Giữ nguyên:** các tab, quét camera, chi tiết đơn, trợ lý AI.
+## 5. Điện thoại (SwiftUI) — ứng dụng đầy đủ
+**Giữ nguyên:** các tab (Tổng quan, Quét, Đơn, Lịch sử, Cài đặt), chi tiết đơn, trợ lý AI.
 **Đổi:**
-1. `SyncEngine` + lớp chuyển tin MQTT/ntfy → máy khách cloud (HTTP + WebSocket), có bản lưu tạm và hàng đợi bền (đã có ý tưởng hàng đợi quét ngoại tuyến, mở rộng thành mọi thao tác).
-2. Ảnh quét: gửi lên R2 ngầm sau khi quét được **server xác nhận đúng một kiện**; chưa xác nhận hoặc quét sai thì bỏ ảnh (giữ quy tắc "chỉ giữ ảnh khi xác nhận đúng một kiện"). Máy khác xem ảnh qua bản thu nhỏ tải từ R2.
-3. Thông báo khi app đóng: tạm dùng ntfy; thay bằng Apple Push khi có tài khoản Apple Developer.
-4. Màn "Đồng bộ" đổi từ mã phòng sang "ghép thiết bị bằng QR".
+1. `SyncEngine` + MQTT/ntfy → máy khách cloud (HTTP + WebSocket); bỏ hàng đợi quét ngoại tuyến.
+2. Quét → `POST /scan`; chụp ảnh gắn với kết quả **server xác nhận đúng một kiện** rồi mới tải lên R2; quét sai/không tìm thấy/mơ hồ thì bỏ ảnh.
+3. Tab Đơn/chi tiết hiển thị ảnh của mọi máy (bản thu nhỏ từ R2), có lưu tạm trên máy để cuộn mượt.
+4. Màn Đồng bộ đổi từ mã phòng sang "ghép thiết bị bằng QR" + trạng thái kết nối.
+5. Thông báo khi app đóng: tạm dùng ntfy; về sau Apple Push khi có tài khoản Apple Developer.
 
 ## 6. Kiểm chứng (giữ AGENTS.md: không tuyên bố PASS cho thứ chưa chạy thật)
-- Bộ ca thử **dùng chung** (JSON xuất từ test C# hiện có: khớp mã, ambiguous, kiện A/B/C, nhập lại cùng kiện, cảnh báo): C# và TypeScript cùng chạy và phải ra cùng kết quả. Đây là cách chặn lệch quy tắc nghiệp vụ giữa hai bản cài.
-- Worker kiểm thử cục bộ bằng giả lập (không cần tài khoản Cloudflare); thử thật cần tài khoản của bạn.
-- Test ngoại tuyến, hai người quét cùng lúc, gửi lặp thao tác, mất mạng giữa chừng.
-- Điện thoại: chỉ kiểm tra biên dịch/`swift test` trên GitHub Actions; chạy thật trên máy do bạn xác nhận.
+- Bộ ca thử **dùng chung** xuất từ test C# hiện có (khớp mã, ambiguous, kiện A/B/C, nhập lại cùng kiện, gộp Sheet, tab Vận đơn huỷ): C# và TypeScript cùng chạy phải ra cùng kết quả.
+- Worker kiểm thử cục bộ bằng giả lập (không cần tài khoản); thử thật cần tài khoản của bạn.
+- Test: hai máy quét cùng kiện, gửi lặp thao tác, mất mạng giữa chừng, khóa ghi khi mất kết nối.
+- Điện thoại: chỉ kiểm tra biên dịch + `swift test` trên GitHub Actions; chạy thật trên máy do bạn xác nhận.
 
 ## 7. Chuyển đổi dữ liệu
-1. Công cụ nhập dữ liệu cũ lên cloud có **chế độ chạy thử** (đếm, báo lỗi, không ghi) và báo cáo so khớp số lượng.
-2. Bản sao SQLite cục bộ được giữ nguyên để quay lại.
-3. Chạy song song bản cũ và bản cloud một thời gian, so kết quả, rồi mới chuyển hẳn.
+1. Công cụ nhập dữ liệu cũ lên cloud có **chế độ chạy thử** (đếm, báo lỗi, không ghi) và báo cáo so khớp: số kiện, số ảnh, trường bị bỏ.
+2. Trước khi bỏ `photoHistory` khỏi dòng đơn, công cụ kiểm tra ảnh đó **đã có trong bảng `photos`** hay là ảnh duy nhất; ảnh duy nhất được đưa lên R2 chứ không bỏ (quy tắc 8: không xóa dữ liệu cũ).
+3. Bản SQLite cục bộ giữ nguyên làm bản lưu để quay lại.
+4. Chạy song song bản cũ và bản cloud một thời gian rồi mới chuyển hẳn.
 
 ## 8. Các giai đoạn và cổng nghiệm thu
 | GĐ | Nội dung | Xong khi |
 |---|---|---|
-| 1 | Lược đồ D1, API, đăng nhập thiết bị, bộ ca thử dùng chung, công cụ nhập dữ liệu cũ (chạy thử) | Bộ ca thử đạt ở cả C# và TypeScript; nhập thử khớp số liệu |
-| 2 | Máy tính dùng cloud (bản lưu tạm + hàng đợi), chạy song song bản cũ | Hai máy tính cùng dùng, quét trùng được xử lý đúng, mất mạng rồi có mạng lại không mất dữ liệu |
+| 1 | Lược đồ D1, API, đăng nhập thiết bị, quy tắc quét, **bộ gộp Google Sheet bằng TypeScript + Cron**, bộ ca thử chung, công cụ nhập dữ liệu cũ (chạy thử) | Bộ ca thử đạt ở C# và TypeScript; nhập thử khớp số liệu; Sheet nạp được trên môi trường thử |
+| 2 | Máy tính dùng cloud (bản lưu tạm chỉ đọc, khóa khi mất mạng), chạy song song bản cũ | Hai máy tính cùng dùng, quét trùng xử lý đúng, mất mạng thì khóa ghi, có mạng thì mở khóa |
 | 3 | iPhone dùng cloud, ảnh lên R2 | `swift test` + build đạt; bạn thử trên điện thoại thật |
-| 4 | Chuyển nạp Google Sheet sang Cron của Worker | Sheet tự nạp khi mọi máy tắt |
-| 5 | Tắt MQTT/ntfy cũ, đóng gói bản chạy thật | Bạn xác nhận |
+| 4 | Tắt MQTT/ntfy cũ, đóng gói bản chạy thật | Bạn xác nhận |
 
-Đây là khối lượng lớn (nhiều tuần); mỗi giai đoạn nộp riêng để bạn kiểm tra trước khi sang giai đoạn tiếp.
+Khối lượng lớn (nhiều tuần). Mỗi giai đoạn nộp riêng để bạn kiểm tra trước khi sang giai đoạn tiếp.
 
 ## 9. Rủi ro đã biết
-- Logic nghiệp vụ có **hai bản cài** (C# và TypeScript): rủi ro lệch quy tắc → giảm bằng bộ ca thử dùng chung.
+- Logic nghiệp vụ có **hai bản cài** (C# và TypeScript), nay gồm cả bộ gộp Sheet: rủi ro lệch → bộ ca thử chung.
+- Mất mạng thì cả cửa hàng không quét được (đã chấp nhận theo yêu cầu); Cloudflare lỗi cũng vậy.
+- D1 500 MB sẽ đầy khi dữ liệu rất lớn → chuyển đơn cũ sang R2 (3.7).
 - Ảnh có thể đầy 10 GB nếu không giới hạn → thu nhỏ + tự xóa sau N ngày.
-- Mọi người cùng dùng nên cần xác nhận lại quyền hạn từng vai trò.
-- Cloud là một điểm hỏng chung: mất mạng/Cloudflare lỗi thì máy khách vẫn quét được nhờ hàng đợi, nhưng không có xác nhận tức thì.
-- Không có mã hóa đầu cuối; chỉ bảo vệ bằng việc không lưu dữ liệu cá nhân của người nhận.
+- Không có mã hóa đầu cuối.
 
-## 10. Điều cần chủ dự án duyệt / trả lời
-1. Cloud là nguồn gốc + máy khách có bản lưu tạm và hàng đợi ngoại tuyến: **duyệt?**
-2. **Không** đưa tên/SĐT/địa chỉ người nhận lên cloud: **duyệt?** (Nếu cần xem lại thông tin này thì xem ở nguồn gốc như Salework/Sheet.)
-3. Ảnh lên R2 (thay quyết định cũ "chỉ trên điện thoại"), thu nhỏ + tự xóa sau **N ngày** (đề xuất 90): **duyệt, N = ?**
-4. 10 GB của bạn là dịch vụ nào của Cloudflare (R2 hay D1)? Một cửa hàng hay nhiều cửa hàng?
-5. Vai trò thiết bị: chủ / nhân viên / chỉ quét — đủ chưa?
-6. Google Sheet: giai đoạn đầu để máy tính nạp, đến GĐ4 mới chuyển lên Worker — **đồng ý?**
-7. Việc bạn cần làm: tạo tài khoản Cloudflare và chạy `! npx wrangler login` khi tới lúc triển khai (tôi không tự đăng nhập hộ).
+## 10. Việc còn cần chủ dự án
+1. **Duyệt** bản 2 này (hoặc nêu chỗ cần sửa).
+2. Trả lời: một hay nhiều cửa hàng; giữ ảnh bao nhiêu ngày (mặc định 90).
+3. Khi tới lúc triển khai: tạo tài khoản Cloudflare và chạy `! npx wrangler login` (tôi không tự đăng nhập hộ).

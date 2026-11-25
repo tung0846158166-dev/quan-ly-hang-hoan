@@ -145,3 +145,42 @@ public sealed class CloudOrderEditService : IOrderEditService
         return list;
     }
 }
+
+/// <summary>
+/// Bảng Hàng Hoàn Về qua cloud: đọc từ bản sao SQLite (KHÔNG tự thêm đơn ở máy: việc tự vào bảng do cloud làm, mọi máy thấy như nhau);
+/// bỏ/đưa lại vào bảng đi qua cloud, cần mạng.
+/// </summary>
+public sealed class CloudReturnWatchService : IReturnWatchService
+{
+    private readonly CloudLinkService _link;
+    private readonly string _dbPath;
+
+    public CloudReturnWatchService(CloudLinkService link, string dbPath) { _link = link; _dbPath = dbPath; }
+
+    public Task<IReadOnlyList<ReturnWatchEntry>> LoadAsync(DateTime now, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<ReturnWatchEntry>>(() =>
+        {
+            var all = OrderRepository.Load(_dbPath);
+            var marks = ReturnWatchService.ActiveMarks(_dbPath, all);
+            return all.Where(s => marks.ContainsKey(s.Order.Id))
+                .Select(s => new ReturnWatchEntry(s, marks[s.Order.Id].Since, marks[s.Order.Id].Stage))
+                .OrderBy(e => e.Stage).ThenBy(e => e.Since).ToList();
+        }, cancellationToken);
+
+    public Task<EditResult> RemoveAsync(string orderId, DateTime now, CancellationToken cancellationToken = default) => SetAsync(orderId, true, cancellationToken);
+    public Task<EditResult> RestoreAsync(string orderId, DateTime now, CancellationToken cancellationToken = default) => SetAsync(orderId, false, cancellationToken);
+
+    private async Task<EditResult> SetAsync(string orderId, bool off, CancellationToken ct)
+    {
+        if (!_link.CanWrite || _link.Api is not { } api) return new(EditKind.Error, "Mất kết nối cloud: tạm khóa thao tác này. Kiểm tra mạng rồi thử lại.");
+        try
+        {
+            var res = await api.OpAsync(new JsonObject { ["type"] = off ? "rwRemove" : "rwRestore", ["id"] = orderId }, ct).ConfigureAwait(false);
+            if (!res.Ok)
+                return new(res.ErrorCode == "not_found" ? EditKind.NotFound : EditKind.Error, res.ErrorMessage ?? "Cloud từ chối thao tác.");
+            try { _link.Engine?.ApplyWatchLocal(orderId, CloudReplica.WatchSince(_dbPath, orderId), off); } catch (Exception) { /* sẽ đồng bộ lại */ }
+            return new(EditKind.Saved, off ? "Đã bỏ khỏi bảng." : "Đã đưa lại vào bảng.");
+        }
+        catch (CloudApiException ex) { return new(EditKind.Error, ex.IsNetwork ? "Mất kết nối cloud giữa chừng: chưa chắc đã lưu. Hãy tải lại rồi kiểm tra." : ex.Message); }
+    }
+}

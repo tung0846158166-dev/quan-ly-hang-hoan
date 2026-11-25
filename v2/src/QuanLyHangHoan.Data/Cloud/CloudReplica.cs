@@ -39,6 +39,17 @@ public static class CloudReplica
         return long.TryParse(cmd.ExecuteScalar()?.ToString(), out var r) ? r : 0;
     }
 
+    /// <summary>Giờ vào Bảng Hàng Hoàn Về (ms) của một đơn trong bản sao; 0 nếu chưa có dấu.</summary>
+    public static long WatchSince(string dbPath, string orderId)
+    {
+        if (!File.Exists(dbPath)) return 0;
+        using var c = Open(dbPath);
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = ReturnWatchService.TableSql + "SELECT since FROM return_watch WHERE order_id = $i";
+        cmd.Parameters.AddWithValue("$i", orderId);
+        return long.TryParse(cmd.ExecuteScalar()?.ToString(), out var s) ? s : 0;
+    }
+
     /// <summary>Quên mốc đồng bộ (ví dụ khi ghép sang cloud khác): lần sau lấy lại toàn bộ.</summary>
     public static void ResetRev(string dbPath)
     {
@@ -49,13 +60,25 @@ public static class CloudReplica
     }
 
     /// <summary>Áp một lô kiện từ cloud trong MỘT giao dịch; nếu <paramref name="newRev"/> có giá trị thì lưu mốc đồng bộ cùng giao dịch.</summary>
-    public static int Apply(string dbPath, IEnumerable<JsonObject> parcels, long? newRev)
+    public static int Apply(string dbPath, IEnumerable<JsonObject> parcels, long? newRev, IEnumerable<CloudWatchChange>? watch = null)
     {
         using var c = Open(dbPath);
         using var tx = c.BeginTransaction();
-        using (var m = c.CreateCommand()) { m.Transaction = tx; m.CommandText = MetaSql; m.ExecuteNonQuery(); }
+        using (var m = c.CreateCommand()) { m.Transaction = tx; m.CommandText = MetaSql + ";" + ReturnWatchService.TableSql; m.ExecuteNonQuery(); }
         var n = 0;
         foreach (var p in parcels) { ApplyOne(c, tx, p); n++; }
+        // Bảng Hàng Hoàn Về: cùng bảng `return_watch` mà màn hình đang đọc; cloud là nguồn gốc nên ghi đè giờ vào + cờ bỏ
+        foreach (var w in watch ?? Array.Empty<CloudWatchChange>())
+        {
+            using var wc = c.CreateCommand();
+            wc.Transaction = tx;
+            wc.CommandText = "INSERT INTO return_watch(order_id, since, off) VALUES($i,$s,$o) ON CONFLICT(order_id) DO UPDATE SET since = excluded.since, off = excluded.off";
+            wc.Parameters.AddWithValue("$i", w.Key);
+            wc.Parameters.AddWithValue("$s", w.Since);
+            wc.Parameters.AddWithValue("$o", w.Off ? 1 : 0);
+            wc.ExecuteNonQuery();
+            n++;
+        }
         if (newRev is { } rev)
         {
             using var m = c.CreateCommand();

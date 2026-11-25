@@ -61,8 +61,8 @@ public sealed class CloudSyncEngine : IDisposable
             {
                 var since = CloudReplica.GetRev(_dbPath);
                 var page = await _api.SyncAsync(since, 500, ct).ConfigureAwait(false);
-                if (page.Parcels.Count > 0 || page.Rev != since)
-                    total += CloudReplica.Apply(_dbPath, page.Parcels, page.Rev);
+                if (page.Parcels.Count > 0 || (page.Watch?.Count ?? 0) > 0 || page.Rev != since)
+                    total += CloudReplica.Apply(_dbPath, page.Parcels, page.Rev, page.Watch);
                 if (!page.More) break;
             }
             LastSyncAt = DateTime.Now;
@@ -77,6 +77,13 @@ public sealed class CloudSyncEngine : IDisposable
     public void ApplyLocal(JsonObject parcel)
     {
         CloudReplica.Apply(_dbPath, new[] { parcel }, null);
+        DataChanged?.Invoke();
+    }
+
+    /// <summary>Áp ngay thay đổi Bảng Hàng Hoàn Về vừa gửi lên cloud thành công.</summary>
+    public void ApplyWatchLocal(string orderId, long since, bool off)
+    {
+        CloudReplica.Apply(_dbPath, Array.Empty<JsonObject>(), null, new[] { new CloudWatchChange(orderId, since, off) });
         DataChanged?.Invoke();
     }
 

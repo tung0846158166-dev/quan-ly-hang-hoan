@@ -180,6 +180,52 @@ public sealed class CloudTests : IDisposable
         Assert.Equal("warn", q.Level); Assert.Equal(100000, q.RequestsLimit);
     }
 
+    // ------------------------------------------------------------ Bảng Hàng Hoàn Về
+    [Fact]
+    public async Task Sync_page_carries_return_watch_membership_and_the_replica_stores_it_where_the_screens_read()
+    {
+        var h = new Handler(_ => (HttpStatusCode.OK, """{"rev":4,"more":false,"changes":[{"type":"parcel","rev":3,"parcel":{"id":"a","track":"TRK-a","status":"Chưa trả","platformStatus":"Đã đồng ý"}},{"type":"returnWatch","rev":4,"key":"a","since":1764000000123,"off":false}]}"""));
+        var api = new CloudApi(new HttpClient(h), "https://x.workers.dev", "t");
+        var page = await api.SyncAsync(0);
+        Assert.Single(page.Parcels);
+        Assert.Equal(new CloudWatchChange("a", 1764000000123, false), Assert.Single(page.Watch!));
+
+        CloudReplica.Apply(Db, page.Parcels, page.Rev, page.Watch);
+        var all = OrderRepository.Load(Db);
+        var marks = ReturnWatchService.ActiveMarks(Db, all);
+        Assert.Equal(1764000000123, marks["a"].Since);
+        Assert.Equal(1, marks["a"].Stage);   // chưa có giờ hàng về/mã hoàn: chặng 1
+
+        // bị bỏ khỏi bảng trên cloud -> không còn trong danh sách đang hiệu lực, nhưng dấu vẫn giữ
+        CloudReplica.Apply(Db, Array.Empty<JsonObject>(), null, new[] { new CloudWatchChange("a", 1764000000123, true) });
+        Assert.Empty(ReturnWatchService.ActiveMarks(Db, OrderRepository.Load(Db)));
+        Assert.Equal(1764000000123, CloudReplica.WatchSince(Db, "a"));
+    }
+
+    [Fact]
+    public async Task Return_watch_screen_service_reads_the_replica_without_adding_local_entries_and_is_locked_offline()
+    {
+        // đơn "Đã đồng ý" nằm trong bản sao nhưng cloud chưa đưa vào bảng: máy KHÔNG được tự thêm
+        CloudReplica.Apply(Db, new[] { Parcel("a") }, 1);
+        using (var c = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            c.Open();
+            using var u = c.CreateCommand();
+            u.CommandText = "UPDATE orders SET platform_status='Đã đồng ý' WHERE id='a'";
+            u.ExecuteNonQuery();
+        }
+        var link = new CloudLinkService(new HttpClient(new Handler(_ => throw new InvalidOperationException("không được gọi mạng"))), Db,
+            new CloudSessionStore(Path.Combine(_dir, "c.json"), new FakeProtector()));
+        var svc = new CloudReturnWatchService(link, Db);
+        Assert.Empty(await svc.LoadAsync(DateTime.Now));
+
+        CloudReplica.Apply(Db, Array.Empty<JsonObject>(), null, new[] { new CloudWatchChange("a", 1764000000000, false) });
+        var entries = await svc.LoadAsync(DateTime.Now);
+        Assert.Equal("a", Assert.Single(entries).Stored.Order.Id);
+
+        Assert.Equal(EditKind.Error, (await svc.RemoveAsync("a", DateTime.Now)).Kind);
+        Assert.Single(await svc.LoadAsync(DateTime.Now));   // không đổi gì khi mất kết nối
+    }
     // ------------------------------------------------------------ phiên ghép
     [Fact]
     public void Session_is_saved_atomically_with_the_token_protected_and_survives_corruption()
@@ -317,6 +363,16 @@ public sealed class CloudLiveTests(ITestOutputHelper output) : IDisposable
         Assert.True(await WaitAsync(() => link.Quota is not null));
         Assert.True(link.Quota!.RequestsUsed > 0);
 
+        // Bảng Hàng Hoàn Về: đơn "Đã đồng ý" do cloud tự đưa vào bảng; máy thấy qua WebSocket; bỏ/đưa lại qua cloud
+        var wp = Parcel("live-w-" + suffix); wp["platformStatus"] = "Đã đồng ý";
+        Assert.Equal(1, (await ownerApi.ImportAsync("file", "sig2", new[] { wp })).Added);
+        var rw = new CloudReturnWatchService(link, db);
+        Assert.True(await WaitAsync(() => rw.LoadAsync(DateTime.Now).GetAwaiter().GetResult().Any(e => e.Stored.Order.Id == "live-w-" + suffix)), "đơn không tự vào Bảng Hàng Hoàn Về");
+        Assert.True((await rw.RemoveAsync("live-w-" + suffix, DateTime.Now)).Ok);
+        Assert.DoesNotContain(await rw.LoadAsync(DateTime.Now), e => e.Stored.Order.Id == "live-w-" + suffix);
+        Assert.True((await rw.RestoreAsync("live-w-" + suffix, DateTime.Now)).Ok);
+        Assert.Contains(await rw.LoadAsync(DateTime.Now), e => e.Stored.Order.Id == "live-w-" + suffix);
+        Assert.Equal(EditKind.NotFound, (await rw.RemoveAsync("live-b-" + suffix, DateTime.Now)).Kind);   // đơn ngoài bảng
         // thu hồi thiết bị -> máy bị đẩy ra, trạng thái "đã thu hồi", khóa ghi
         var devices = await new CloudApi(http, url, ownerToken).MeAsync();
         var list = JsonNode.Parse(await http.SendAsync(new HttpRequestMessage(HttpMethod.Get, CloudApi.NormalizeBaseUrl(url) + "/devices") { Headers = { { "Authorization", "Bearer " + ownerToken } } }).ContinueWith(t => t.Result.Content.ReadAsStringAsync()).Unwrap())!.AsArray();

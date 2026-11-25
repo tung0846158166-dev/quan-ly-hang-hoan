@@ -17,7 +17,9 @@ public sealed class CloudApiException(string code, string message, int status) :
 }
 
 public sealed record CloudPaired(string DeviceId, string Token, string Role);
-public sealed record CloudSyncPage(long Rev, bool More, IReadOnlyList<JsonObject> Parcels);
+/// <summary>Tư cách thành viên Bảng Hàng Hoàn Về: giờ vào bảng (ms) và cờ đã bị bỏ khỏi bảng.</summary>
+public sealed record CloudWatchChange(string Key, long Since, bool Off);
+public sealed record CloudSyncPage(long Rev, bool More, IReadOnlyList<JsonObject> Parcels, IReadOnlyList<CloudWatchChange>? Watch = null);
 public sealed record CloudQuotaInfo(string Day, long RequestsUsed, long RequestsLimit, long RowsWrittenUsed, long RowsWrittenLimit,
     long RowsReadUsed, long RowsReadLimit, string Level);
 public sealed record CloudOpResult(string OpId, bool Ok, long Rev, JsonObject? Result, string? ErrorCode, string? ErrorMessage);
@@ -132,10 +134,16 @@ public sealed class CloudApi
     {
         var r = await JsonAsync(HttpMethod.Get, $"/sync?since={since}&limit={limit}", null, ct);
         var list = new List<JsonObject>();
+        var watch = new List<CloudWatchChange>();
         if (r["changes"] is JsonArray arr)
             foreach (var c in arr)
-                if (c?["type"]?.GetValue<string>() == "parcel" && c["parcel"] is JsonObject p) list.Add((JsonObject)p.DeepClone());
-        return new(r["rev"]?.GetValue<long>() ?? since, r["more"]?.GetValue<bool>() ?? false, list);
+            {
+                var type = c?["type"]?.GetValue<string>();
+                if (type == "parcel" && c!["parcel"] is JsonObject p) list.Add((JsonObject)p.DeepClone());
+                else if (type == "returnWatch" && c!["key"]?.GetValue<string>() is { Length: > 0 } key)
+                    watch.Add(new(key, (long)ParcelMapper.Num(c["since"]), c["off"] is JsonValue o && o.TryGetValue<bool>(out var off) && off));
+            }
+        return new(r["rev"]?.GetValue<long>() ?? since, r["more"]?.GetValue<bool>() ?? false, list, watch);
     }
 
     // ---- thao tác ghi

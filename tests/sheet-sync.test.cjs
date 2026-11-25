@@ -21,8 +21,8 @@ function ctx(fetchText) {
   };
   vm.createContext(c);
   vm.runInContext("const SHEET_SYNC_KEY = 'qlhh_sheet_sync_v1';", c);
-  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText', 'loadSheetSyncSigs', 'saveSheetSyncSigs', 'saveSheetLatestClaims', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'shopeeClaimDeadline', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
-  vm.runInContext("const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi']; const SHEET_CLAIMS_KEY = 'claims'; let sheetLatestClaims = null;", c);
+  for (const n of ['parseFullDate', 'keepLatestRequestPerOrder', 'removeVietnameseTones', 'parseSheetItemsCell', 'normalizeSheetRows', 'sheetSyncTabs', 'sheetTrackMap', 'applySheetTrackMap', 'sheetIdFromLink', 'loadSheetSyncCfg', 'saveSheetSyncCfg', 'sheetSyncHash', 'buildSheetSyncUrl', 'fetchSheetSyncText', 'runSheetSync', 'renderSheetSyncStatus', 'sheetSyncScriptText', 'loadSheetSyncSigs', 'saveSheetSyncSigs', 'saveSheetLatestClaims', 'sheetSkipTypes', 'filterSheetParcelsByDays', 'sheetTabKind', 'sheetRowsToParcels', 'mergeSheetParcels', 'shopeeClaimDeadline', 'sheetParcelsToRows']) vm.runInContext(extract(n), c);
+  vm.runInContext("const SHEET_SKIP_CANCEL_TYPES = ['huy truoc chuan bi']; const SHEET_TRACK_TAB = 'Vận đơn huỷ'; const SHEET_CLAIMS_KEY = 'claims'; let sheetLatestClaims = null;", c);
   vm.runInContext('let sheetSyncRunning = false;', c);
   return c;
 }
@@ -117,13 +117,14 @@ test('Google Sheet: app chỉ GỬI yêu cầu đọc (GET), không có đườn
 test('Google Sheet: chỉ đọc các tab đã chọn; tab không có cột đơn hàng thì bỏ qua, các tab còn lại vẫn nạp', async () => {
   const fetched = [];
   const c = ctx(async url => { const tab = decodeURIComponent((url.match(/[&?]tab=([^&]*)/) || [])[1] || ''); fetched.push(tab);
+    if (tab === 'Vận đơn huỷ') return { ok: true, text: '{"error":"Tab không nằm trong danh sách được phép"}' };   // tab ẩn chưa được cấp quyền: bỏ qua lặng lẽ
     return { ok: true, text: tab === 'Hiệu quả mẫu' ? 'Tên SP\n' : 'Mã đơn hàng\n' + tab + '-1\n' + tab + '-2' }; });
   c.readWorkbookRowsFromBuffer = buf => { const t = new TextDecoder().decode(buf); return t.startsWith('Mã đơn hàng') ? t.split('\n').slice(1).filter(Boolean).map(l => ({ 'Mã đơn hàng': l })) : []; };
   const cfg = vm.runInContext('loadSheetSyncCfg()', c);
   cfg.url = 'https://script.google.com/macros/s/abc/exec'; cfg.sheetId = 'SID'; cfg.sheetTab = 'Hàng hoàn; Trả hàng;Hiệu quả mẫu';
   vm.runInContext('saveSheetSyncCfg', c)(cfg);
   assert.strictEqual((await vm.runInContext('runSheetSync(true)', c)).success, true);
-  assert.deepStrictEqual(fetched.join('|'), 'Hàng hoàn|Trả hàng|Hiệu quả mẫu');
+  assert.deepStrictEqual(fetched.join('|'), 'Hàng hoàn|Trả hàng|Hiệu quả mẫu|Vận đơn huỷ');
   assert.strictEqual(c.imports[0].files.length, 2);
   assert.strictEqual(c.imports[0].files.map(f => f.name).join('|'), 'Google Sheet · Hàng hoàn|Google Sheet · Trả hàng');
   assert.ok(/bỏ qua tab không có cột đơn hàng: Hiệu quả mẫu/.test(vm.runInContext('loadSheetSyncCfg().lastNote', c)));
@@ -225,4 +226,24 @@ test('Google Sheet 3 tab: lần sau chỉ nạp đơn mới / đổi dữ liệu
   assert.strictEqual(r3.unchanged, true); assert.strictEqual(c.imports.length, 2);
   await vm.runInContext('runSheetSync(true)', c);
   assert.strictEqual(c.imports[2].files[0].rows.length, 3, 'bấm tay -> nạp lại toàn bộ');
+});
+
+// v1.9.78: lỗi mạng thoáng qua (ECONNRESET) được thử lại, lỗi thật thì báo ngay
+test('Google Sheet: tải lại tối đa 3 lần khi ECONNRESET; lỗi khác (mã 403) không thử lại', async () => {
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8').replace(/\r\n/g, '\n');
+  const code = main.slice(main.indexOf('const SHEET_RETRY_RE'), main.indexOf("ipcMain.handle('fetch-sheet-text'"));
+  const run = async (errs) => {
+    let calls = 0;
+    const g = { fetchSheetText: async () => { const e = errs[calls++]; if (e) { const x = new Error(e.m); x.code = e.c; throw x; } return 'OK'; }, setTimeout: (f) => f(), String, Promise, Error };
+    vm.createContext(g); vm.runInContext(code, g);
+    let out, err;
+    try { out = await vm.runInContext('fetchSheetTextRetry("u", 0)', g); } catch (e) { err = e.message; }
+    return { calls, out, err };
+  };
+  const reset = { c: 'ECONNRESET', m: 'read ECONNRESET' };
+  assert.deepStrictEqual(await run([reset, reset, null]), { calls: 3, out: 'OK', err: undefined }, 'lỗi 2 lần rồi được');
+  assert.strictEqual((await run([reset, reset, reset, null])).calls, 3, 'tối đa 3 lần');
+  assert.strictEqual((await run([reset, reset, reset, null])).err, 'read ECONNRESET');
+  const r403 = await run([{ c: '', m: 'Máy chủ Google trả mã 403' }, null]);
+  assert.strictEqual(r403.calls, 1); assert.strictEqual(r403.err, 'Máy chủ Google trả mã 403');
 });

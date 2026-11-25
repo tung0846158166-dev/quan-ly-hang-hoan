@@ -76,7 +76,7 @@ jobs:
       - name: Upload Artifacts (.exe Installer)
         uses: actions/upload-artifact@v4
         with:
-          name: QuanLyHangHoan-Windows-Installer-v1.9.77
+          name: QuanLyHangHoan-Windows-Installer-v1.9.78
           path: |
             dist/*.exe
             dist/*.blockmap
@@ -88,9 +88,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
-          tag_name: v1.9.77
-          name: "Quản Lý Hàng Hoàn v1.9.77 — Tab tuần gộp thành danh sách chọn"
+          tag_name: v1.9.78
+          name: "Quản Lý Hàng Hoàn v1.9.78 — Mã vận đơn đơn huỷ lấy ngầm + tải sheet tự thử lại"
           body: |
+            ### Bản 1.9.78
+
+            - 📦 **Mã vận đơn của đơn huỷ / bom được lấy ngầm từ một tab ẩn** ("Vận đơn huỷ") thay vì hiện thêm cột trên sheet. App tự đọc tab này nếu có, chưa có thì bỏ qua; quét mã đơn huỷ có vận đơn sẽ khớp được. Cần dán thêm đoạn mã vào Apps Script Lavi và thêm tên tab vào danh sách được phép đọc ở script đọc sheet.
+            - 🔄 Khi tải Google Sheet gặp lỗi mạng thoáng qua (ví dụ **read ECONNRESET**, hết giờ chờ), app tự thử lại tối đa 3 lần cách nhau vài giây trước khi báo lỗi. Lỗi thật (mã 403, địa chỉ sai...) vẫn báo ngay.
+
             ### Bản 1.9.77
 
             - 📅 **Các tab tuần gộp thành một danh sách chọn** (Tất Cả Các Tuần, Tuần 48, Tuần 47...), mỗi dòng ghi số đơn và số SP. Thanh đầu trang gọn lại, không còn bị tràn làm mất các nút bên phải. Nút "➕ Tuần" giữ nguyên; tuần trống tự tạo có nút ✕ để xóa.

@@ -159,7 +159,10 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         var changed = false
         while true {
             let page = try await a.sync(since: store.rev, limit: 500)
-            if !page.parcels.isEmpty || page.rev != store.rev { store.apply(page.parcels, rev: page.rev); changed = changed || !page.parcels.isEmpty }
+            if !page.parcels.isEmpty || !page.watch.isEmpty || page.rev != store.rev {
+                store.apply(page.parcels, rev: page.rev, watch: page.watch)
+                changed = changed || !page.parcels.isEmpty || !page.watch.isEmpty
+            }
             if !page.more { break }
         }
         store.save()

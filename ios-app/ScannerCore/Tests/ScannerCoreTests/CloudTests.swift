@@ -191,6 +191,117 @@ final class CloudTests: XCTestCase {
         XCTAssertTrue(body.contains("\"scan\""))
     }
 
+    // MARK: Bảng Hàng Hoàn Về
+
+    func testReturnWatchFieldsOnlyForMainRowsStillInTheBoardWithStages() {
+        let w = CloudWatchChange(key: "a", since: 1_764_000_000_123, off: false)
+        func row(_ json: String, watch: CloudWatchChange? = w) -> OrderRow {
+            CloudRowMapper.row(parcel(json), now: now, watch: watch)!
+        }
+        let s1 = row(#"{"id":"a","track":"T","status":"Chưa trả","platformStatus":"Đã đồng ý"}"#)
+        XCTAssertEqual(s1.rw, 1_764_000_000_123); XCTAssertEqual(s1.rws, 1); XCTAssertEqual(s1.ar, 0)
+        XCTAssertTrue(s1.inReturnWatch)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","platformStatus":"Đang vận chuyển về"}"#).rws, 2)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","platformStatus":"Đã đồng ý","returnTrack":"RT9"}"#).rws, 2)
+        let s3 = row(#"{"id":"a","track":"T","platformStatus":"Đã đồng ý","returnedAt":"25/11/2026 01:00:00"}"#)
+        XCTAssertEqual(s3.rws, 3); XCTAssertGreaterThan(s3.ar, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","status":"Hàng đã trả"}"#).rws, 4)
+
+        // không vào bảng: bị bỏ (off), không có dấu, đơn hủy, kho lưu trữ, "Không cần nhận"/"Bị mất"
+        XCTAssertEqual(row(#"{"id":"a","track":"T"}"#, watch: CloudWatchChange(key: "a", since: 5, off: true)).rw, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T"}"#, watch: nil).rw, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","orderType":"Đơn hủy"}"#).rw, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","isArchived":true}"#).rw, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","status":"Bị mất"}"#).rw, 0)
+        XCTAssertEqual(row(#"{"id":"a","track":"T","status":"Không cần nhận"}"#).rw, 0)
+    }
+
+    func testStoreKeepsReturnWatchMarksAcrossSaveLoadAndFeedsRows() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qlhh-cloud-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("parcels.json")
+        let s = CloudParcelStore(fileURL: url)
+        s.apply([parcel(#"{"id":"a","track":"A","platformStatus":"Đã đồng ý"}"#)], rev: 3,
+                watch: [CloudWatchChange(key: "a", since: 111, off: false)])
+        XCTAssertEqual(s.watch(id: "a")?.since, 111)
+        XCTAssertEqual(s.rows(now: now).first?.rw, 111)
+        s.apply([], rev: 4, watch: [CloudWatchChange(key: "a", since: 111, off: true)])     // bị bỏ khỏi bảng
+        XCTAssertEqual(s.rows(now: now).first?.rw, 0)
+        s.save()
+
+        let again = CloudParcelStore(fileURL: url)
+        XCTAssertEqual(again.watch(id: "a")?.off, true)
+        again.reset()
+        XCTAssertNil(again.watch(id: "a"))
+    }
+
+    func testSyncPageParsesReturnWatchChanges() async throws {
+        let t = FakeTransport { _ in
+            (200, #"{"rev":4,"more":false,"changes":[{"type":"parcel","rev":3,"parcel":{"id":"a","track":"T"}},{"type":"returnWatch","rev":4,"key":"a","since":1764000000123,"off":true}]}"#)
+        }
+        let api = try CloudAPI(baseURL: "https://x.workers.dev", token: "t", transport: t)
+        let page = try await api.sync(since: 0)
+        XCTAssertEqual(page.parcels.map { $0.id }, ["a"])
+        XCTAssertEqual(page.watch, [CloudWatchChange(key: "a", since: 1_764_000_000_123, off: true)])
+    }
+
+    // MARK: ảnh quét
+
+    private func scanResult(_ outcome: CloudScanResult.Outcome, ack: Bool, withParcel: Bool = true) -> CloudScanResult {
+        CloudScanResult(outcome: outcome, ack: ack, message: "", parcel: withParcel ? parcel(#"{"id":"a1","track":"trk-9"}"#) : nil, receivedBy: nil, receivedAt: nil)
+    }
+
+    func testPhotoIsKeptOnlyWhenCloudConfirmedExactlyOneParcel() {
+        XCTAssertTrue(CloudPhotoRules.shouldUpload(scanResult(.received, ack: true)))
+        XCTAssertTrue(CloudPhotoRules.shouldUpload(scanResult(.alreadyReceived, ack: true)))
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.received, ack: false)))             // chưa chắc đã ghi bền
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.ambiguous, ack: false)))
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.notFound, ack: false, withParcel: false)))
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.needsManualCheck, ack: false)))
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.error, ack: false, withParcel: false)))
+        XCTAssertFalse(CloudPhotoRules.shouldUpload(scanResult(.received, ack: true, withParcel: false)))
+    }
+
+    func testPhotoIdIsSafeUniqueAndWithinLimits() {
+        let p = parcel(#"{"id":"a1","track":"spx vn/0123 456"}"#)
+        let a = CloudPhotoRules.makePhotoId(parcel: p, now: now, random: 255)
+        XCTAssertTrue(a.hasPrefix("p_SPXVN0123456_"))
+        XCTAssertTrue(a.hasSuffix("_ff"))
+        XCTAssertNotNil(a.range(of: #"^[A-Za-z0-9_-]{6,80}$"#, options: .regularExpression))
+        XCTAssertNotEqual(a, CloudPhotoRules.makePhotoId(parcel: p, now: now, random: 256))      // cùng giây vẫn khác nhau
+        let long = parcel("{\"id\":\"a\",\"track\":\"" + String(repeating: "A", count: 200) + "\"}")
+        XCTAssertLessThanOrEqual(CloudPhotoRules.makePhotoId(parcel: long, now: now).count, 80)
+    }
+
+    func testUploaderSendsFullThenThumbOnlyAfterConfirmedScan() async throws {
+        let t = FakeTransport { _ in (200, #"{"ok":true}"#) }
+        let up = CloudPhotoUploader(api: try CloudAPI(baseURL: "https://x.workers.dev", token: "t", transport: t))
+
+        let skipped = try await up.upload(after: scanResult(.ambiguous, ack: false), full: Data([1, 2, 3]), thumb: Data([9]))
+        XCTAssertNil(skipped)
+        XCTAssertTrue(t.requests.isEmpty)                       // không đủ điều kiện: không gọi mạng
+
+        let id = try await up.upload(after: scanResult(.received, ack: true), full: Data([1, 2, 3]), thumb: Data([9]), now: now)
+        XCTAssertNotNil(id)
+        XCTAssertEqual(t.requests.count, 2)
+        XCTAssertEqual(t.requests[0].httpMethod, "PUT")
+        let u0 = t.requests[0].url!.absoluteString, u1 = t.requests[1].url!.absoluteString
+        XCTAssertTrue(u0.contains("parcelId=a1")); XCTAssertFalse(u0.contains("kind=thumb"))
+        XCTAssertTrue(u1.contains("kind=thumb"))
+        XCTAssertEqual(t.requests[0].httpBody, Data([1, 2, 3]))
+        XCTAssertTrue(u0.contains(id!))
+    }
+
+    func testUploaderRejectsOversizedOrEmptyPhotoWithoutCallingTheNetwork() async throws {
+        let t = FakeTransport { _ in XCTFail("không được gọi mạng"); return (200, "{}") }
+        let up = CloudPhotoUploader(api: try CloudAPI(baseURL: "https://x.workers.dev", token: "t", transport: t))
+        do { _ = try await up.upload(after: scanResult(.received, ack: true), full: Data(count: CloudPhotoRules.hardMaxBytes + 1), thumb: nil); XCTFail("phải lỗi") }
+        catch let e as CloudAPIError { XCTAssertEqual(e.code, "invalid") }
+        do { _ = try await up.upload(after: scanResult(.received, ack: true), full: Data(), thumb: nil); XCTFail("phải lỗi") }
+        catch let e as CloudAPIError { XCTAssertEqual(e.code, "invalid") }
+        XCTAssertTrue(t.requests.isEmpty)
+    }
+
     // MARK: quét khi mất mạng
 
     func testScanIsRefusedWithoutConnectionAndNeverAcked() async {

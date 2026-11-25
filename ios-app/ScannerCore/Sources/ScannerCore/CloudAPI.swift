@@ -29,10 +29,19 @@ public struct CloudPaired: Equatable {
     public let deviceId: String, token: String, role: String
 }
 
+/// Tư cách thành viên Bảng Hàng Hoàn Về của một kiện: giờ vào bảng (ms) và cờ đã bị bỏ khỏi bảng.
+public struct CloudWatchChange: Codable, Equatable {
+    public let key: String
+    public let since: Int
+    public let off: Bool
+    public init(key: String, since: Int, off: Bool) { self.key = key; self.since = since; self.off = off }
+}
+
 public struct CloudSyncPage {
     public let rev: Int
     public let more: Bool
     public let parcels: [CloudParcel]
+    public let watch: [CloudWatchChange]
 }
 
 /// Kết quả của một thao tác ghi (`/ops`).
@@ -166,13 +175,19 @@ public final class CloudAPI {
     public func sync(since: Int, limit: Int = 500) async throws -> CloudSyncPage {
         let r = try await json("GET", "/sync?since=\(since)&limit=\(limit)")
         var parcels: [CloudParcel] = []
+        var watch: [CloudWatchChange] = []
         if let changes = r["changes"] as? [[String: Any]] {
-            for c in changes where (c["type"] as? String) == "parcel" {
-                if let p = c["parcel"], let d = try? JSONSerialization.data(withJSONObject: p),
-                   let parcel = try? JSONDecoder().decode(CloudParcel.self, from: d) { parcels.append(parcel) }
+            for c in changes {
+                let type = c["type"] as? String
+                if type == "parcel" {
+                    if let p = c["parcel"], let d = try? JSONSerialization.data(withJSONObject: p),
+                       let parcel = try? JSONDecoder().decode(CloudParcel.self, from: d) { parcels.append(parcel) }
+                } else if type == "returnWatch", let key = c["key"] as? String, !key.isEmpty {
+                    watch.append(CloudWatchChange(key: key, since: Self.int(c["since"]), off: c["off"] as? Bool ?? false))
+                }
             }
         }
-        return CloudSyncPage(rev: Self.int(r["rev"], default: since), more: r["more"] as? Bool ?? false, parcels: parcels)
+        return CloudSyncPage(rev: Self.int(r["rev"], default: since), more: r["more"] as? Bool ?? false, parcels: parcels, watch: watch)
     }
 
     static func int(_ v: Any?, default def: Int = 0) -> Int {

@@ -51,7 +51,7 @@ public enum CloudRowMapper {
     private static func ms(_ d: Date) -> Int { Int((d.timeIntervalSince1970 * 1000).rounded()) }
 
     /// Dòng điện thoại của một kiện; nil nếu kiện không có mã nào (không tra/quét được) hoặc đã xóa.
-    public static func row(_ p: CloudParcel, now: Date, calendar: Calendar = vietnamCalendar) -> OrderRow? {
+    public static func row(_ p: CloudParcel, now: Date, calendar: Calendar = vietnamCalendar, watch: CloudWatchChange? = nil) -> OrderRow? {
         if p.isDeleted { return nil }
         let k = kind(p)
         let pending = isPending(p)
@@ -96,6 +96,13 @@ public enum CloudRowMapper {
         }
         if !extra.isEmpty { row.x = extra.prefix(6).joined(separator: " ") }
 
+        // Bảng Hàng Hoàn Về: chỉ đơn bảng chính còn trong bảng (chưa bị bỏ), không phải "Không cần nhận"/"Bị mất"
+        if k == "m", let w = watch, !w.off, w.since > 0, p.status != "Không cần nhận", p.status != "Bị mất" {
+            row.rw = w.since
+            row.rws = stage(p, calendar: calendar)
+            if let a = arrived { row.ar = ms(a) }
+        }
+
         if p.preOrder == "Hàng đặt trước" { row.pre = true }
         if !pending { row.pd = false }
         if isReceived(p) { row.rv = true }
@@ -109,10 +116,25 @@ public enum CloudRowMapper {
         return row
     }
 
+    /// Chặng trong Bảng Hàng Hoàn Về (port ReturnWatchService.StageOf): đã nhận 4; có giờ hàng về 3; "đang về"/có mã vận đơn hoàn 2; còn lại 1.
+    public static func stage(_ p: CloudParcel, calendar: Calendar = vietnamCalendar) -> Int {
+        if isReceived(p) { return 4 }
+        if arrivedAt(p, calendar: calendar) != nil { return 3 }
+        if fold(p.platformStatus).range(of: #"dang ve|dang van chuyen|van chuyen ve|dang giao"#, options: .regularExpression) != nil
+            || !normalize(p.returnTrack).isEmpty { return 2 }
+        return 1
+    }
+
+    /// Bỏ dấu tiếng Việt, đ -> d, chữ thường.
+    static func fold(_ s: String) -> String {
+        s.replacingOccurrences(of: "đ", with: "d").replacingOccurrences(of: "Đ", with: "D")
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased()
+    }
+
     /// Mọi dòng của điện thoại: đơn đang chờ lên trước, hạn gần trước; ổn định theo thứ tự đầu vào.
-    public static func rows(_ parcels: [CloudParcel], now: Date, calendar: Calendar = vietnamCalendar) -> [OrderRow] {
+    public static func rows(_ parcels: [CloudParcel], now: Date, calendar: Calendar = vietnamCalendar, watch: [String: CloudWatchChange] = [:]) -> [OrderRow] {
         let built: [(row: OrderRow, index: Int)] = parcels.enumerated().compactMap { (i, p) in
-            guard let r = row(p, now: now, calendar: calendar) else { return nil }
+            guard let r = row(p, now: now, calendar: calendar, watch: watch[p.id]) else { return nil }
             return (r, i)
         }
         let sorted = built.sorted { a, b in

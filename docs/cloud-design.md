@@ -91,7 +91,28 @@ Cron của Worker gọi Apps Script mỗi vài phút (token là **Worker secret*
 ### 3.7 Dung lượng
 - **R2 10 GB (ảnh):** ảnh mới thu nhỏ cạnh dài ~1000 px, JPEG ~60% ≈ 80–120 KB. 500 lượt quét/ngày ≈ 40–60 MB/ngày → khoảng 6 tháng đầy. Mặc định **tự xóa ảnh sau 90 ngày** (chỉnh được) và tối đa 5 ảnh/kiện. 2.230 ảnh cũ ≈ 52 MB chuyển sang R2 không đáng kể.
 - **D1 500 MB (dữ liệu):** chật hơn R2. Dòng gọn 1–2 KB cộng chỉ mục thì chạm 500 MB khi khoảng **150.000–250.000 kiện** (ước tính thô). Cách xử lý: đơn ở Kho lưu trữ lâu (mặc định > 12 tháng) được **nén thành tệp theo tháng trên R2**, trong D1 chỉ giữ `order_index` (mã đơn, mã vận đơn, sàn, tháng, vài chục byte/dòng) để vẫn tìm được và mở lại. Chưa cần làm ngay, thiết kế sẵn để không phải đổi lược đồ sau.
-- Cần xác nhận lại giới hạn lượt đọc/ghi mỗi ngày của gói D1 hiện hành (tôi chưa kiểm tra bảng giá).
+
+### 3.7b Ngân sách hạn mức (theo số liệu chủ dự án cung cấp)
+Hạn mức: **D1** 500 MB, 5 triệu hàng đọc/ngày, 100.000 hàng ghi/ngày. **R2** 10 GB, 1 triệu lượt ghi/tháng, 10 triệu lượt đọc/tháng, tải ra miễn phí.
+Giả định để ước tính: ~5.000 kiện đang dùng, 500 lượt quét/ngày, 12 thiết bị. (Ước tính, sẽ đo lại khi chạy thử.)
+
+| Việc | Ước tính | So với hạn mức |
+|---|---|---|
+| Quét 500 kiện/ngày (mỗi lượt ghi kiện + sự kiện quét + nhật ký + chỉ mục ≈ 10 hàng) | ~5.000 hàng ghi/ngày | ~5% của 100.000 |
+| Sửa tay, đổi trạng thái, ghi chú | vài nghìn hàng ghi/ngày | thoải mái |
+| Máy khởi động lấy toàn bộ danh sách (12 máy × 5.000 kiện) | ~60.000 hàng đọc/lần mở hết | ~1% của 5 triệu |
+| Lấy phần thay đổi (theo `rev`, có chỉ mục) | rất nhỏ | không đáng kể |
+| Ảnh: 500 lượt quét/ngày × (ảnh gốc + thu nhỏ) | ~30.000 lượt ghi R2/tháng | ~3% của 1 triệu |
+| Xem ảnh (có lưu tạm trên máy + tiêu đề lưu tạm) | vài trăm nghìn lượt đọc/tháng | ~vài % của 10 triệu |
+
+**Hai chỗ DỄ VƯỢT hạn mức nếu làm ẩu — thiết kế phải chặn:**
+1. **Nạp Google Sheet bằng Cron.** Nếu mỗi vòng ghi lại toàn bộ 5.000 kiện, cứ 3 phút một lần = 5.000 × 480 = 2,4 triệu hàng ghi/ngày (vượt 24 lần). Bắt buộc: (a) so **chữ ký** nội dung Sheet, không đổi thì không làm gì; (b) khi đổi, chỉ upsert **dòng thật sự khác** (so băm từng kiện); (c) chu kỳ mặc định 5–10 phút, chỉnh được.
+2. **Truy vấn không có chỉ mục** đọc quét cả bảng: mỗi lần tính cả 5.000 hàng. Mọi truy vấn của API phải dùng chỉ mục (theo `rev`, mã đơn, mã vận đơn, trạng thái), có test kiểm tra kế hoạch truy vấn (`EXPLAIN`) và đếm hàng đọc.
+Quy tắc khác: máy khách **không hỏi vòng** (polling), chỉ nhận đẩy qua WebSocket rồi mới lấy phần mới; ảnh gửi kèm tiêu đề lưu tạm lâu; định kỳ dọn ảnh quá hạn.
+
+**Khi chạm hạn mức ghi/ngày của D1** thì mọi thao tác ghi (cả quét) sẽ lỗi cho tới khi hạn mức làm mới (hằng ngày, theo giờ UTC). Cần: đo hạn mức đã dùng ngay trong app (hiện thanh "Hạn mức hôm nay: xx%"), cảnh báo khi quá 70%, và thông báo lỗi rõ ràng. Nếu thực tế gần chạm thì nâng gói trả phí là lối thoát.
+
+**Chưa có trong số liệu bạn gửi:** Cloudflare còn giới hạn **số yêu cầu Worker/ngày** và **Durable Object** của gói miễn phí (theo hiểu biết của tôi: khoảng 100.000 yêu cầu/ngày; tôi chưa kiểm tra bảng giá hiện hành). Cần bạn xác nhận con số này trong tài khoản trước khi chốt, vì nó ảnh hưởng số máy và tần suất đồng bộ.
 
 ### 3.8 Bảo mật
 HTTPS; mỗi thiết bị một token riêng (lưu băm), vai trò chủ cửa hàng / nhân viên (điện thoại vẫn là ứng dụng đầy đủ), thu hồi từng máy; mã ghép QR sống 10 phút dùng một lần; khóa bí mật ở Worker secrets. Không mã hóa đầu cuối (server cần đọc mã để khớp/tìm), bù lại không lưu dữ liệu cá nhân người nhận.

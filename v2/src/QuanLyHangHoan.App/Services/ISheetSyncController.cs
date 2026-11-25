@@ -24,6 +24,7 @@ public interface ISheetSyncController : IDisposable
     event Action? ConfigChanged;
 
     bool SetUrl(string url, out string error);
+    bool SetToken(string token, out string error);
     void UpdateConfig(bool enabled, string tabs, string maxDays, string? skipTypes, bool onlyReturns);
     void Start(TimeSpan? firstDelay = null, TimeSpan? interval = null);
     Task<SheetRunResult> RunOnceAsync(bool manual = false, CancellationToken ct = default);
@@ -71,6 +72,13 @@ public sealed class RealSheetSyncController : ISheetSyncController
 
     public event Action<SheetRunResult>? Completed;
     public event Action? ConfigChanged;
+
+    public bool SetToken(string token, out string error)
+    {
+        var ok = _service.SetToken(token, out error);
+        if (ok) ConfigChanged?.Invoke();
+        return ok;
+    }
 
     public bool SetUrl(string url, out string error)
     {
@@ -138,6 +146,15 @@ public sealed class FakeSheetSyncController : ISheetSyncController
 
     public event Action<SheetRunResult>? Completed;
     public event Action? ConfigChanged;
+
+    public bool SetToken(string token, out string error)
+    {
+        token = (token ?? "").Trim();
+        if (token.Length < 8) { error = "Token quá ngắn."; return false; }
+        if (!HasUrl) { error = "Hãy lưu địa chỉ Apps Script trước."; return false; }
+        Token = token; error = ""; ConfigChanged?.Invoke();
+        return true;
+    }
 
     public bool SetUrl(string url, out string error)
     {

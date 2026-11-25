@@ -191,6 +191,26 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
         IsEditingUrl = false;
     }
 
+    [ObservableProperty]
+    private string _tokenInput = string.Empty;
+
+    [ObservableProperty]
+    private string _tokenError = string.Empty;
+
+    /// <summary>Dán token của app cũ để hai app dùng chung một Apps Script.</summary>
+    [RelayCommand]
+    public void SaveToken()
+    {
+        if (_controller.SetToken(TokenInput, out var err))
+        {
+            TokenError = string.Empty;
+            TokenInput = string.Empty;
+            Token = _controller.Token ?? string.Empty;
+            CopiedNotice = "Đã dùng token mới";
+        }
+        else TokenError = err;
+    }
+
     [RelayCommand]
     public void CopyToken()
     {

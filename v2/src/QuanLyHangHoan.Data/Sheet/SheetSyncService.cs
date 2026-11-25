@@ -120,6 +120,21 @@ public sealed class SheetSyncService : IDisposable
         return true;
     }
 
+    /// <summary>Dùng token có sẵn (vd token của app cũ) để chạy chung một Apps Script. Cần đã lưu địa chỉ.</summary>
+    public bool SetToken(string token, out string error)
+    {
+        token = (token ?? "").Trim();
+        if (token.Length < 8 || token.Length > 64 || !token.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        { error = "Token gồm 8-64 ký tự chữ, số, gạch ngang hoặc gạch dưới (không có dấu cách)."; return false; }
+        var (url, _) = ReadSecret();
+        if (url is null) { error = "Hãy lưu địa chỉ Apps Script trước."; return false; }
+        Config.Secret = _protector.Protect(JsonSerializer.Serialize(new Dictionary<string, string> { ["url"] = url, ["token"] = token }));
+        Config.LastHash = ""; Config.Sigs = new();
+        SaveConfig();
+        error = "";
+        return true;
+    }
+
     public bool HasUrl => ReadSecret().Url is not null;
 
     /// <summary>Token để dán vào Apps Script của chủ shop (không phải địa chỉ).</summary>
@@ -141,10 +156,19 @@ public sealed class SheetSyncService : IDisposable
     // ------------------------------------------------------------ tải
     private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 5 }) { Timeout = TimeSpan.FromSeconds(60) };
 
+    /// <summary>Lời báo lỗi dễ hiểu kèm cách sửa (mã 401/403 gần như luôn do Apps Script chưa mở quyền "Bất kỳ ai").</summary>
+    public static string DescribeHttpError(int code) => code switch
+    {
+        401 or 403 => $"Google từ chối truy cập (mã {code}). Trong Apps Script chọn Triển khai > Quản lý bản triển khai > sửa: \"Người thực thi\" = Tôi, \"Ai có quyền truy cập\" = Bất kỳ ai; lưu phiên bản mới rồi dán lại địa chỉ Web App (đuôi /exec).",
+        404 => "Không tìm thấy Web App (mã 404). Kiểm tra lại địa chỉ có đuôi /exec và bản triển khai chưa bị xóa.",
+        >= 500 => $"Máy chủ Google đang lỗi (mã {code}), sẽ tự thử lại ở lượt sau.",
+        _ => "Máy chủ Google trả mã " + code,
+    };
+
     private static async Task<string> DefaultFetch(string url, CancellationToken ct)
     {
         using var res = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        if (!res.IsSuccessStatusCode) throw new InvalidOperationException("Máy chủ Google trả mã " + (int)res.StatusCode);
+        if (!res.IsSuccessStatusCode) throw new InvalidOperationException(DescribeHttpError((int)res.StatusCode));
         if (res.Content.Headers.ContentLength is > 25_000_000) throw new InvalidOperationException("Dữ liệu quá lớn.");
         return await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
     }

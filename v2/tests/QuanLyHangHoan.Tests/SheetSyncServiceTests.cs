@@ -100,4 +100,34 @@ public sealed class SheetSyncServiceTests : IDisposable
         Assert.Contains("&tab=H", urls[0]);
         Assert.StartsWith(Url + "?token=", urls[0]);
     }
+
+    [Theory]
+    [InlineData(401, "Bất kỳ ai")]
+    [InlineData(403, "Bất kỳ ai")]
+    [InlineData(404, "/exec")]
+    [InlineData(503, "503")]
+    public void Http_errors_explain_how_to_fix(int code, string hint) =>
+        Assert.Contains(hint, SheetSyncService.DescribeHttpError(code));
+
+    [Fact]
+    public void Set_token_reuses_old_app_token_in_the_request_and_rejects_bad_values()
+    {
+        var urls = new List<string>();
+        using var s = Make((_, _) => Task.FromResult(Csv()), urls);
+        Assert.False(s.SetToken("ngan", out var e1)); Assert.NotEmpty(e1);
+        Assert.False(s.SetToken("co dau cach 12345", out _));
+        Assert.True(s.SetToken("  abc123DEF456  ", out _));
+        Assert.Equal("abc123DEF456", s.Token);
+        s.RunOnce(manual: true);
+        Assert.Contains(urls, u => u.Contains("token=abc123DEF456"));
+    }
+
+    [Fact]
+    public void Set_token_needs_url_first()
+    {
+        AppDatabase.Initialize(Db);
+        using var s = new SheetSyncService(Db, State, new FakeProtector(), () => Now, (_, _) => Task.FromResult(""));
+        Assert.False(s.SetToken("abc123DEF456", out var err));
+        Assert.Contains("địa chỉ", err);
+    }
 }

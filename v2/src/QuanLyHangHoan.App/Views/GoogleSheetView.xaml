@@ -160,6 +160,15 @@
                                 </Border>
                             </DockPanel>
 
+                            <TextBlock Text="Đang dùng chung Apps Script với app cũ? Dán token cũ vào đây:" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,6" />
+                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                                <Button DockPanel.Dock="Right" Content="Dùng token này" Command="{Binding SaveTokenCommand}"
+                                        IsEnabled="{Binding HasUrl}" Style="{StaticResource FilterPillButtonStyle}" Height="34" Padding="12,0" />
+                                <TextBox Text="{Binding TokenInput, UpdateSourceTrigger=PropertyChanged}" FontFamily="Consolas" FontSize="13"
+                                         Height="34" Padding="8,0" VerticalContentAlignment="Center" Margin="0,0,8,0" AutomationProperties.AutomationId="SheetTokenInput" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding TokenError}" Foreground="{DynamicResource AlertRedTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8" />
+
                             <TextBlock Text="{Binding CopiedNotice}"
                                        Visibility="{Binding HasCopiedNotice, Converter={StaticResource BoolToVis}}"
                                        Foreground="{DynamicResource AlertGreenTextBrush}"

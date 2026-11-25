@@ -18263,7 +18263,26 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       if (ks.has('hang') && ks.has('madon') && ks.has('trangthaive')) return 'hanghoan';
       if (ks.has('matrahang') && ks.has('madon')) return 'trahang';
       if (ks.has('madon') && ks.has('loai') && (ks.has('aihuy') || ks.has('hanhtrinh'))) return 'huy';
+      // Tab ẩn chỉ chứa "Mã đơn" + "Mã vận đơn" (mã vận đơn của đơn huỷ/bom, Lavi ghi ngầm, không hiện trên các tab chính)
+      if (ks.has('madon') && ks.has('mavandon') && !ks.has('hang') && !ks.has('loai') && !ks.has('trangthaive') && !ks.has('matrahang')) return 'vandon';
       return '';
+    }
+    // Tab ẩn lấy mã vận đơn cho đơn huỷ/bom. App tự thêm vào danh sách tab; chưa có/chưa được phép đọc thì bỏ qua lặng lẽ.
+    const SHEET_TRACK_TAB = 'Vận đơn huỷ';
+    function sheetTrackMap(rows) {
+      const norm = k => removeVietnameseTones(String(k || '')).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const map = {};
+      (rows || []).forEach(r => {
+        let o = '', t = '';
+        Object.keys(r).forEach(k => { const n = norm(k); const v = String(r[k] == null ? '' : r[k]).trim(); if (n === 'madon') o = v; else if (n === 'mavandon') t = v; });
+        if (o && t) map[o.toUpperCase()] = t;
+      });
+      return map;
+    }
+    function applySheetTrackMap(parcels, map) {
+      let n = 0;
+      (parcels || []).forEach(m => { if (m && !m.track && m.orderId) { const t = map[String(m.orderId).trim().toUpperCase()]; if (t) { m.track = t; n++; } } });
+      return n;
     }
     function sheetRowsToParcels(rows, kind, skipTypes) {
       const skipList = Array.isArray(skipTypes) ? skipTypes : SHEET_SKIP_CANCEL_TYPES;
@@ -18277,7 +18296,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (kind === 'huy' && skipList.some(t => loaiN.includes(t))) { skipped++; return; }
         let p = out.get(orderId);
         if (!p) {
-          p = { orderId, src: kind, items: [], claimId: g(r, 'ma', 'matrahang'), track: kind === 'hanghoan' ? g(r, 'mavandon') : '',
+          p = { orderId, src: kind, items: [], claimId: g(r, 'ma', 'matrahang'), track: (kind === 'hanghoan' || kind === 'huy') ? g(r, 'mavandon') : '',
             type: '', parcelStatus: '', requestStatus: '', reason: g(r, 'lydo'), buyerNote: g(r, 'khachghi'), whoCancelled: g(r, 'aihuy'), journey: g(r, 'hanhtrinh'),
             returnDate: g(r, 'ngay', 'ngayyeucau'), deliveredAt: g(r, 'veshopluc'), deadline: g(r, 'hankhieunai'), refund: g(r, 'tien', 'hoantien'),
             updatedAt: tms(g(r, 'capnhat')) };
@@ -18404,17 +18423,23 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
       };
       try {
         const tabs = sheetSyncTabs(c);
+        const wantTrackTab = tabs.length > 0 && !tabs.includes(SHEET_TRACK_TAB);
+        if (wantTrackTab) tabs.push(SHEET_TRACK_TAB);
         const texts = [];
         for (const tab of (tabs.length ? tabs : [''])) {
-          const text = await fetchSheetSyncText(buildSheetSyncUrl(c) + (tab ? '&tab=' + encodeURIComponent(tab) : ''));
+          const optional = wantTrackTab && tab === SHEET_TRACK_TAB;
+          let text;
+          try { text = await fetchSheetSyncText(buildSheetSyncUrl(c) + (tab ? '&tab=' + encodeURIComponent(tab) : '')); }
+          catch (e) { if (optional) continue; throw e; }
           const head = String(text || '').trim().slice(0, 200);
+          if (optional && (/^\{\s*"error"/.test(head) || /^<!doctype html|^<html/i.test(head))) continue;
           if (/^\{\s*"error"/.test(head)) { let m = head; try { m = JSON.parse(text).error; } catch (e) {} throw new Error((tab ? 'Tab "' + tab + '": ' : '') + m); }
           if (/^<!doctype html|^<html/i.test(head)) throw new Error('Google trả về trang web thay vì dữ liệu — kiểm tra lại bước "Triển khai" (Ai có quyền truy cập: Bất kỳ ai).');
           texts.push({ tab, text });
         }
         const hash = sheetSyncHash(texts.map(t => t.tab + '\u0001' + t.text).join('\u0002'));
         if (!manual && hash === c.lastHash) { finish(true, 'Sheet không thay đổi'); return { success: true, unchanged: true }; }
-        const files = [], skipped = [], parcelLists = [];
+        const files = [], skipped = [], parcelLists = []; let trackMap = {};
         let oldRequests = 0, skippedCancel = 0;
         const breathe = () => new Promise(r => setTimeout(r, 0));   // nhả màn hình giữa các bước để app không đơ
         for (const t of texts) {
@@ -18425,6 +18450,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
           const kept = keepLatestRequestPerOrder(r);
           if (kept.removed) oldRequests += kept.removed;
           const kind = sheetTabKind(kept.rows);
+          if (kind === 'vandon') { Object.assign(trackMap, sheetTrackMap(r)); continue; }
           if (kind) { const pr = sheetRowsToParcels(kept.rows, kind, sheetSkipTypes(c)); skippedCancel += pr.skipped; parcelLists.push(pr.parcels); }
           else files.push({ name: 'Google Sheet' + (t.tab ? ' · ' + t.tab : ''), rows: kept.rows });
         }
@@ -18432,6 +18458,7 @@ var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],
         if (parcelLists.length) {
           await breathe();
           const mergedAll = mergeSheetParcels(parcelLists);
+          applySheetTrackMap(mergedAll, trackMap);
           deadlineParcels = mergedAll;
           {
             // mã đơn -> { c: mã yêu cầu, s: trạng thái sàn đúng như sẽ ghi vào cột Trạng thái sàn }

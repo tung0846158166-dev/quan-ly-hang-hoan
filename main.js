@@ -428,8 +428,19 @@ function fetchSheetText(url, redirectsLeft = 5) {
     req.on('error', reject);
   });
 }
+// v1.9.78: lỗi mạng thoáng qua (ECONNRESET, hết giờ chờ...) thì thử lại tối đa 3 lần thay vì báo lỗi ngay.
+const SHEET_RETRY_RE = /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|ENOTFOUND|EPIPE|socket hang up|Quá thời gian chờ|aborted/i;
+async function fetchSheetTextRetry(url, delayMs = 1500) {
+  for (let i = 0; ; i++) {
+    try { return await fetchSheetText(url); }
+    catch (e) {
+      if (i >= 2 || !SHEET_RETRY_RE.test(String((e && e.code) || '') + ' ' + String((e && e.message) || e))) throw e;
+      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+}
 ipcMain.handle('fetch-sheet-text', async (event, url) => {
-  try { return { ok: true, text: await fetchSheetText(String(url || '')) }; }
+  try { return { ok: true, text: await fetchSheetTextRetry(String(url || '')) }; }
   catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 

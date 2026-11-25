@@ -124,7 +124,15 @@ Quy tắc khác: máy khách **không hỏi vòng** (polling), chỉ nhận đ�
 
 **Khi chạm hạn mức ghi/ngày của D1** thì mọi thao tác ghi (cả quét) sẽ lỗi cho tới khi hạn mức làm mới (hằng ngày, theo giờ UTC). Cần: đo hạn mức đã dùng ngay trong app (hiện thanh "Hạn mức hôm nay: xx%"), cảnh báo khi quá 70%, và thông báo lỗi rõ ràng. Nếu thực tế gần chạm thì nâng gói trả phí là lối thoát.
 
-**Chưa có trong số liệu bạn gửi:** Cloudflare còn giới hạn **số yêu cầu Worker/ngày** và **Durable Object** của gói miễn phí (theo hiểu biết của tôi: khoảng 100.000 yêu cầu/ngày; tôi chưa kiểm tra bảng giá hiện hành). Cần bạn xác nhận con số này trong tài khoản trước khi chốt, vì nó ảnh hưởng số máy và tần suất đồng bộ.
+### 3.7c Gói thực tế của chủ dự án (đã xác nhận)
+Tất cả đều gói **Miễn phí, hóa đơn $0**: Workers 100.000 yêu cầu/ngày (tối đa 1.000 yêu cầu/phút, **10 ms CPU mỗi yêu cầu**); D1 500 MB, 5 triệu hàng đọc + 100.000 hàng ghi/ngày; Durable Object 100.000 yêu cầu/ngày, **5 GB SQLite**; R2 10 GB (đã gắn thẻ, vượt 10 GB tính $0,015/GB/tháng). Chạm trần Workers/D1 thì hệ thống **tạm dừng tới hôm sau, không tự trừ tiền**.
+
+Hệ quả thiết kế:
+1. **Trần 100.000 yêu cầu/ngày dùng chung cho mọi máy** và khi chạm là cả cửa hàng ngừng quét tới hôm sau. Mục tiêu: dùng thường xuyên **dưới 30%** (≤ 30.000/ngày). Ước tính: 500 lượt quét × (1 lệnh quét + 12 máy lấy phần mới) ≈ 6.500; mở app/tải danh sách vài nghìn; ảnh là phần dễ tốn nhất. Ảnh **tải lên và xem qua đường dẫn ký sẵn (presigned URL) thẳng với R2** để không tính vào yêu cầu Worker; thông báo qua WebSocket của Durable Object (tính 1/20 yêu cầu mỗi tin).
+2. **10 ms CPU mỗi yêu cầu rất chật.** Không thể gộp/phân tích cả Sheet 5.000 dòng trong Worker. Vì vậy phần nặng (nhận dạng tab, gộp, so băm, lọc phần đổi) chạy ở **Apps Script phía Google** (miễn phí, thời gian chạy dài); Worker chỉ nhận lô nhỏ đã gộp sẵn và ghi (chờ I/O không tính CPU). Mô hình **Apps Script chủ động đẩy** (mục 3.6b) trở thành lựa chọn chính, không còn là phương án thay thế. Logic gộp Sheet chuyển sang JavaScript chạy trong Apps Script (kiểm chứng bằng bộ ca thử chung).
+3. **Có thể dùng SQLite của Durable Object (5 GB) làm kho chính thay D1 (500 MB):** một Durable Object cho cả cửa hàng xử lý ghi tuần tự nên quét nhận "một thao tác nguyên tử" tự nhiên và hết lo trần 500 MB. Đánh đổi: khó xem/sửa trực tiếp hơn D1 và cần chức năng xuất sao lưu. **Quyết định chốt ở đầu giai đoạn 1 sau một lần thử nhanh cả hai** (D1 hay Durable Object SQLite); lược đồ và API viết sao cho đổi được kho phía sau.
+4. Hiển thị thanh "Hạn mức hôm nay" cho yêu cầu Worker và hàng ghi D1; cảnh báo ở 50% và 70%.
+5. Workers AI (10.000 neurons/ngày) không dùng; trợ lý AI vẫn dùng khóa Groq/Gemini của bạn trên từng máy.
 
 ### 3.8 Bảo mật
 HTTPS; mỗi thiết bị một token riêng (lưu băm), vai trò chủ cửa hàng / nhân viên (điện thoại vẫn là ứng dụng đầy đủ), thu hồi từng máy; mã ghép QR sống 10 phút dùng một lần; khóa bí mật ở Worker secrets. Không mã hóa đầu cuối (server cần đọc mã để khớp/tìm), bù lại không lưu dữ liệu cá nhân người nhận.

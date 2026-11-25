@@ -99,6 +99,9 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path === "/sync") return this.sync(url);
     if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
+    if (m === "GET" && path === "/ai/status") return this.aiStatus();
+    const ai = /^\/ai\/(groq|gemini)\/chat\/completions$/.exec(path);
+    if (m === "POST" && ai) return this.aiProxy(req, ai[1] as "groq" | "gemini");
     if (m === "PUT" && path.startsWith("/photos/")) return this.putPhoto(req, url, decodeURIComponent(path.slice("/photos/".length)), dev);
     if (m === "GET" && path.startsWith("/photos/")) return this.getPhoto(url, decodeURIComponent(path.slice("/photos/".length)));
     const pp = /^\/parcels\/([^/]+)\/photos$/.exec(path);
@@ -523,6 +526,47 @@ export class ShopDO extends DurableObject<Env> {
       `SELECT p.photo_id, p.taken_at, p.deleted_at, d.name FROM photos p LEFT JOIN devices d ON d.device_id = p.device_id
        WHERE p.parcel_id = ? ORDER BY p.taken_at DESC`, parcelId);
     return json(rows.map((r) => ({ photoId: r.photo_id, takenAt: r.taken_at, deviceName: r.name ?? "", expired: Number(r.deleted_at) > 0 })));
+  }
+
+  // ===================================================== cổng AI (khóa Groq/Gemini chỉ nằm trên cloud)
+  private aiLimit(): number { return Math.max(1, Number(this.env.AI_DAILY_LIMIT) || 3000); }
+
+  private aiUsedToday(): number {
+    return this.meta("ai_day") === this.dayKey() ? Number(this.meta("ai_n") ?? 0) : 0;
+  }
+
+  private aiStatus(): Response {
+    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
+  }
+
+  /**
+   * Chuyển tiếp yêu cầu kiểu OpenAI tới Groq/Gemini bằng khóa của cloud. Máy khách dùng NGUYÊN logic gọi AI hiện có, chỉ đổi địa chỉ gốc
+   * sang `/v1/ai/<nhà-cung-cấp>` và dùng token thiết bị thay cho khóa API. Không ghi lại nội dung hỏi/đáp (chỉ đếm số lần gọi trong ngày).
+   */
+  private async aiProxy(req: Request, provider: "groq" | "gemini"): Promise<Response> {
+    const key = provider === "groq" ? this.env.GROQ_API_KEY : this.env.GEMINI_API_KEY;
+    if (!key) return fail(503, "ai_not_configured", "Chưa cấu hình khóa AI trên cloud (chủ cửa hàng đặt khóa bằng wrangler secret put).");
+    if (this.aiUsedToday() >= this.aiLimit())
+      return fail(429, "ai_quota", "Hôm nay đã dùng hết số lượt hỏi AI cho cả cửa hàng. Thử lại sau 07:00 sáng mai (giờ Việt Nam).");
+    if (this.quotaSnapshot(false).level === "stop") return fail(429, "quota_exceeded", "Hết hạn mức cloud hôm nay, tạm dừng hỏi AI.");
+    const body = await req.arrayBuffer();
+    if (body.byteLength === 0 || body.byteLength > 1_000_000) return fail(422, "invalid", "Nội dung gửi AI rỗng hoặc quá lớn.");
+    this.setMeta("ai_day", this.dayKey());
+    this.setMeta("ai_n", String(this.aiUsedToday() + 1));
+    const base = provider === "groq" ? "https://api.groq.com/openai/v1" : "https://generativelanguage.googleapis.com/v1beta/openai";
+    let up: Response;
+    try {
+      up = await fetch(`${base}/chat/completions`, {
+        method: "POST", body, signal: AbortSignal.timeout(90_000),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      });
+    } catch {
+      return fail(503, "unavailable", "Không kết nối được tới nhà cung cấp AI. Thử lại sau.");
+    }
+    const headers = new Headers({ "Content-Type": up.headers.get("Content-Type") ?? "application/json" });
+    const ra = up.headers.get("Retry-After");
+    if (ra) headers.set("Retry-After", ra);
+    return new Response(up.body, { status: up.status, headers });
   }
 
   // ===================================================== thời gian thực

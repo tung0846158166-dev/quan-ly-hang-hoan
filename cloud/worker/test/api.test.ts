@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/vitest-pool-workers/types" />
 import { env, runInDurableObject, SELF } from "cloudflare:test";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/index";
 import type { ShopDO } from "../src/shop";
 
@@ -303,6 +303,73 @@ describe("ảnh", () => {
     expect(await E.IMAGES.get("p/photo_old1")).toBeNull();
     const out2 = await runInDurableObject(s, (inst: ShopDO) => inst.cleanup());
     expect(out2.photosExpired).toBe(0);
+  });
+});
+
+describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
+  const realFetch = globalThis.fetch;
+  let seen: { url: string; auth: string | null; body: string }[] = [];
+  const stubUpstream = (status = 200, body: unknown = { choices: [{ message: { role: "assistant", content: "xin chào" } }] }, headers: Record<string, string> = {}) => {
+    seen = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (!url.startsWith("https://api.groq.com") && !url.startsWith("https://generativelanguage.googleapis.com")) return realFetch(input, init);
+      seen.push({ url, auth: new Headers(init?.headers).get("Authorization"), body: new TextDecoder().decode(init?.body as ArrayBuffer) });
+      return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
+    });
+  };
+  afterEach(() => vi.unstubAllGlobals());
+
+  const ask = (token: string | undefined, provider = "groq", body: unknown = { model: "m", messages: [{ role: "user", content: "hi" }] }) =>
+    SELF.fetch(`${BASE}/ai/${provider}/chat/completions`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
+    });
+
+  it("chuyển tiếp tới Groq bằng khóa của cloud; khóa không bao giờ lộ cho máy khách", async () => {
+    stubUpstream();
+    const res = await ask(phoneA);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("xin chào");
+    expect(text).not.toContain("test-groq-key");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.url).toBe("https://api.groq.com/openai/v1/chat/completions");
+    expect(seen[0]!.auth).toBe("Bearer test-groq-key");     // khóa của cloud, KHÔNG phải token thiết bị
+    expect(seen[0]!.auth).not.toContain(phoneA);
+    expect(JSON.parse(seen[0]!.body).messages[0].content).toBe("hi");
+  });
+
+  it("cần token thiết bị; chưa cấu hình khóa nhà cung cấp thì báo rõ", async () => {
+    stubUpstream();
+    expect((await ask(undefined)).status).toBe(401);
+    const noKey = await ask(phoneA, "gemini");
+    expect(noKey.status).toBe(503);
+    expect((await noKey.json() as any).error.code).toBe("ai_not_configured");
+    expect(seen).toHaveLength(0);
+  });
+
+  it("giữ nguyên mã lỗi và Retry-After của nhà cung cấp để máy khách tự chuyển mô hình/chờ", async () => {
+    stubUpstream(429, { error: { message: "Rate limit. Please try again in 659ms." } }, { "Retry-After": "1" });
+    const res = await ask(phoneA);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("1");
+    expect(JSON.stringify(await res.json())).toContain("659ms");
+  });
+
+  it("giới hạn số lượt hỏi AI mỗi ngày cho cả cửa hàng (5 trong thử nghiệm), rồi trả 429", async () => {
+    stubUpstream();
+    for (let i = 0; i < 5; i++) expect((await ask(phoneA)).status).toBe(200);
+    const over = await ask(phoneB);
+    expect(over.status).toBe(429);
+    expect((await over.json() as any).error.code).toBe("ai_quota");
+    const st = (await call("GET", "/ai/status", undefined, owner)).data;
+    expect(st).toMatchObject({ groq: true, gemini: false, usedToday: 5, dailyLimit: 5 });
+  });
+
+  it("từ chối nội dung rỗng", async () => {
+    stubUpstream();
+    const res = await SELF.fetch(`${BASE}/ai/groq/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${phoneA}` }, body: "" });
+    expect(res.status).toBe(422);
   });
 });
 

@@ -100,5 +100,12 @@ Quyết định theo `cloud/core` (`decide`), chuẩn đối chiếu `cloud/gold
 ## 9. Hạn mức
 `GET /quota` → `{ "day": "2026-11-25", "requests": { "used": 8200, "limit": 100000 }, "rowsWritten": { "used": 5100, "limit": 100000 }, "rowsRead": {"used": 90000, "limit": 5000000}, "level": "ok"|"warn"|"stop" }`. `warn` ≥ 70%, `stop` ≥ 98% (từ chối ghi không khẩn cấp, vẫn cho quét). Số liệu là **đếm của chính ứng dụng** (ước lượng), không phải số của Cloudflare.
 
+## 9b. Cổng AI (khóa Groq/Gemini chỉ nằm trên cloud)
+- `POST /ai/groq/chat/completions` và `POST /ai/gemini/chat/completions`: nhận NGUYÊN thân yêu cầu kiểu OpenAI (`model`, `messages`, `tools`, `tool_choice`, `temperature`...) rồi chuyển tiếp tới nhà cung cấp bằng khóa của cloud; trả lại đúng mã trạng thái, thân và `Retry-After` của nhà cung cấp.
+- Máy khách dùng lại NGUYÊN logic gọi AI hiện có (chuỗi mô hình dự phòng, chờ khi 429 ngắn, lọc công cụ cho Gemini...), chỉ đổi địa chỉ gốc sang `<worker>/v1/ai/<groq|gemini>` và dùng **token thiết bị** thay cho khóa API. Công cụ AI vẫn chạy trên máy khách với dữ liệu đã đồng bộ (không gửi tên/SĐT/địa chỉ).
+- `GET /ai/status` → `{ groq: bool, gemini: bool, usedToday, dailyLimit }` (khóa nào đã cấu hình; số lượt hỏi hôm nay cho cả cửa hàng).
+- Lỗi: `503 ai_not_configured` (chưa đặt khóa), `429 ai_quota` (hết lượt AI trong ngày, mặc định 3.000, biến `AI_DAILY_LIMIT`), `429 quota_exceeded` (hết hạn mức cloud), `422 invalid` (rỗng hoặc > 1 MB), `503 unavailable` (không tới được nhà cung cấp).
+- Cloud KHÔNG ghi lại nội dung hỏi/đáp; chỉ đếm số lượt trong ngày.
+
 ## 10. Trạng thái kết nối phía máy khách
 `connected` (WebSocket sống, /sync đã bắt kịp) · `syncing` (đang lấy thay đổi) · `connecting` · `disconnected` (MẤT KẾT NỐI, khóa ghi, chỉ xem dữ liệu đã tải kèm nhãn "chỉ xem") · `unpaired` (chưa ghép) · `revoked` (token bị thu hồi).

@@ -10,6 +10,11 @@ export interface Env {
   /** Khóa riêng cho Apps Script đẩy đơn (`wrangler secret put IMPORT_KEY`). */
   IMPORT_KEY: string;
   PHOTO_RETENTION_DAYS: string;
+  /** Khóa AI (đặt bằng `wrangler secret put GROQ_API_KEY` / `GEMINI_API_KEY`); không có thì cổng AI báo chưa cấu hình. */
+  GROQ_API_KEY?: string;
+  GEMINI_API_KEY?: string;
+  /** Số lượt hỏi AI tối đa mỗi ngày cho cả cửa hàng (bảo vệ hạn mức yêu cầu của gói miễn phí). */
+  AI_DAILY_LIMIT?: string;
 }
 
 const shop = (env: Env) => env.SHOP.get(env.SHOP.idFromName("main"));

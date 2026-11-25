@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import AudioToolbox
+import Security
 import ScannerCore
 
 struct Banner: Equatable {
@@ -56,6 +57,14 @@ final class SyncEngine: ObservableObject {
     let snapshot = SnapshotStore()
     let photoManager = OrderPhotoManager()
 
+    /// T042: liên kết cloud. Đã ghép (phiên lưu trong Keychain) thì chạy theo LUỒNG CLOUD thay cho MQTT/ntfy:
+    /// danh sách đơn lấy từ cloud, quét/sửa gửi thẳng lên cloud, mất mạng = khóa ghi (không hàng đợi ngoại tuyến).
+    let cloud: CloudSyncClient
+    @Published private(set) var cloudState: CloudState = .unpaired
+    fileprivate var cloudReloadScheduled = false
+    /// true khi máy đã ghép cloud (kể cả đang mất kết nối hoặc bị thu hồi: vẫn khóa theo luồng cloud).
+    var cloudActive: Bool { cloudState != .unpaired }
+
     private let client = NtfyClient()
     private var mqttClients: [MQTTClient] = []
     private var mqttTasks: [Task<Void, Never>] = []
@@ -87,6 +96,9 @@ final class SyncEngine: ObservableObject {
     var pendingNoteCount: Int { pendingCommands.count }
 
     init() {
+        let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        cloud = CloudSyncClient(store: CloudParcelStore(fileURL: docsDir.appendingPathComponent("cloud_parcels.json")),
+                                sessions: KeychainCloudSessionStore())
         room = SyncProtocol.normalizeRoom(UserDefaults.standard.string(forKey: "room") ?? "")   // v2: không có mã phòng mặc định
         try? FileManager.default.createDirectory(at: photosDir, withIntermediateDirectories: true)
         if FileManager.default.fileExists(atPath: storeURL.path) {
@@ -295,8 +307,11 @@ final class SyncEngine: ObservableObject {
             items: items,
             scanItemsLoadedCleanly: scanItemsLoadedCleanly
         )
-        startSSE()
-        startMQTT()
+        startCloud()
+        if !cloudActive {
+            startSSE()
+            startMQTT()
+        }
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
@@ -308,6 +323,7 @@ final class SyncEngine: ObservableObject {
     /// Gọi khi app trở lại foreground: kiểm tra lại quyền thông báo và đánh thức đồng bộ nếu cần.
     func handleForeground() {
         snapshot.refreshAuthorization()
+        if cloudActive { Task { await cloud.syncNow() }; return }
         guard !isDemoMode, !room.isEmpty else { return }
         if !channelUp {
             sseTask?.cancel(); sseTask = nil
@@ -346,7 +362,7 @@ final class SyncEngine: ObservableObject {
     }
 
     private func startSSE() {
-        if room.isEmpty { return }   // v2: chưa cài mã phòng thì không nối
+        if room.isEmpty || cloudActive { return }   // cloud: không dùng kênh cũ   // v2: chưa cài mã phòng thì không nối
         let watching = room
         sseTask = Task { [weak self] in
             var backoff = 1.0
@@ -375,7 +391,7 @@ final class SyncEngine: ObservableObject {
         brokerUp = []
         mqttGeneration += 1
         let gen = mqttGeneration
-        if room.isEmpty { return }
+        if room.isEmpty || cloudActive { return }   // cloud: chỉ hủy kết nối cũ, không nối lại
         let topic = SyncProtocol.mqttTopic(room: room)
         for b in SyncProtocol.mqttBrokers {
             let c = MQTTClient(name: b.name, url: b.url)
@@ -668,6 +684,8 @@ final class SyncEngine: ObservableObject {
             return true
         }
 
+        if cloudActive { return submitCloud(code: code, kind: kind, photo: photo, useSnapshot: useSnapshot) }
+
         if let existing = items.first(where: { $0.code == code && $0.kind == kind && !$0.scanConfirmed }) {
             banner = Banner(code: code, text: "Đang gửi lại, chờ PC xác nhận", color: Theme.warning)
             transmit(existing.requestId)
@@ -782,6 +800,10 @@ final class SyncEngine: ObservableObject {
             setOrderFeedback(for: row, requestId: "demo-note-\(nowMs())", state: .confirmed, message: msg)
             return
         }
+        if cloudActive {
+            cloudWrite(rows: [row], ops: [CloudOps.setWatch(id: row.id, on: watch, reason: t)], done: watch ? "Đã lưu theo dõi" : "Đã bỏ theo dõi")
+            return
+        }
         let rid = nextRequestId(prefix: "note")
         let body = SyncProtocol.orderNote(code: row.c, orderId: row.o, note: t, watch: watch, room: room, requestId: rid)
         let ov = LocalEditOverlay(requestId: rid, action: .note, rowId: row.id, note: t, watch: watch, timeMs: nowMs())
@@ -799,6 +821,11 @@ final class SyncEngine: ObservableObject {
             let msg = "Đã cập nhật trạng thái (dữ liệu mẫu)"
             banner = Banner(code: row.c, text: msg, color: Theme.accent)
             setOrderFeedback(for: row, requestId: "demo-edit-\(nowMs())", state: .confirmed, message: msg)
+            return
+        }
+        if cloudActive {
+            guard let st = fields["st"] as? String else { return }
+            cloudWrite(rows: [row], ops: [CloudOps.setStatus(id: row.id, status: st)], done: "Đã cập nhật trạng thái")
             return
         }
         let rid = nextRequestId(prefix: "edit")
@@ -819,6 +846,11 @@ final class SyncEngine: ObservableObject {
         if isDemoMode {
             for row in rows { snapshot.applyLocalEdit(rowId: row.id, fields: fields) }
             banner = Banner(code: "\(rows.count) đơn", text: "Đã cập nhật cục bộ (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
+        if cloudActive {
+            guard let st = fields["st"] as? String else { return }
+            cloudWrite(rows: rows, ops: rows.map { CloudOps.setStatus(id: $0.id, status: st) }, done: "Đã cập nhật \(rows.count) đơn")
             return
         }
         let st = fields["st"] as? String
@@ -845,6 +877,10 @@ final class SyncEngine: ObservableObject {
         if isDemoMode {
             snapshot.removeLocal(rowId: row.id)
             banner = Banner(code: row.c, text: "Đã xóa cục bộ (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
+        if cloudActive {
+            cloudWrite(rows: [row], ops: [CloudOps.delete(id: row.id)], done: "Đã xóa đơn (khôi phục được trên máy tính)")
             return
         }
         let rid = nextRequestId(prefix: "del")
@@ -888,6 +924,13 @@ final class SyncEngine: ObservableObject {
         if isDemoMode {
             snapshot.applyCancelledReceivedLocal(ids: Set(ids), received: received)
             banner = Banner(code: "\(ids.count) đơn hủy", text: received ? "Đã đánh dấu đã nhận (dữ liệu mẫu)" : "Đã đánh dấu chưa nhận (dữ liệu mẫu)", color: Theme.accent)
+            return
+        }
+        if cloudActive {
+            let rows = ids.compactMap { snapshot.row(byId: $0) }
+            cloudWrite(rows: rows, ops: ids.map { CloudOps.cancelReceive(id: $0, received: received) },
+                       done: received ? "Đã đánh dấu đã nhận \(ids.count) đơn hủy" : "Đã đánh dấu chưa nhận \(ids.count) đơn hủy",
+                       code: "\(ids.count) đơn hủy")
             return
         }
         let rid = nextRequestId(prefix: "cxl")
@@ -945,7 +988,7 @@ final class SyncEngine: ObservableObject {
 
     // MARK: gửi lệnh quét (T039: KHÔNG còn gửi ảnh sang PC; ảnh lưu cục bộ trên điện thoại)
     private func transmit(_ id: String) {
-        guard !isDemoMode, !room.isEmpty else { return }
+        guard !isDemoMode, !room.isEmpty, !cloudActive else { return }
         guard let i = items.firstIndex(where: { $0.requestId == id }) else { return }
         items[i].lastSendAt = nowMs()
         items[i].attempts += 1
@@ -966,6 +1009,7 @@ final class SyncEngine: ObservableObject {
     private func tick() async {
         tickCount += 1
         if tickCount % 20 == 0 { snapshot.recount() }   // quá hạn/sắp đến hạn đổi theo thời gian (~1 phút)
+        if cloudActive { return }                        // cloud tự đồng bộ qua WebSocket; không gửi lại kiểu MQTT
         if isDemoMode || room.isEmpty { return }
         if snapshotChunksSeen != chunkCounter { snapshotChunksSeen = chunkCounter }
         // Danh sách đơn ghép dở và đã 10 giây không có mảnh mới: xin PC gửi lại (tối đa 4 lần mỗi đợt).
@@ -1104,4 +1148,203 @@ final class SyncEngine: ObservableObject {
     }
 
     private func nowMs() -> Int { Int(Date().timeIntervalSince1970 * 1000) }
+}
+
+// MARK: - T042: luồng cloud (đã ghép thiết bị)
+// Cùng tệp với SyncEngine để dùng các hàm private (persist, photosDir, nextRequestId...).
+extension SyncEngine {
+    /// Gọi trong `start()`: nối callback, khôi phục phiên đã ghép (nếu có) và hiện ngay bản sao đã tải lần trước.
+    fileprivate func startCloud() {
+        cloud.onChange = { [weak self] in
+            Task { @MainActor [weak self] in self?.cloudStatusChanged() }
+        }
+        cloud.onDataChanged = { [weak self] in
+            Task { @MainActor [weak self] in self?.scheduleCloudReload() }
+        }
+        cloud.start()
+        cloudState = cloud.state
+        if cloudActive { applyCloudRows() }
+    }
+
+    private func cloudStatusChanged() {
+        let was = cloudActive
+        cloudState = cloud.state
+        if !was && cloudActive {
+            // vừa ghép: tắt kênh MQTT/ntfy cũ, chuyển hẳn sang cloud
+            sseTask?.cancel(); sseTask = nil
+            sseConnected = false
+            startMQTT()                 // đang cloud: chỉ hủy kết nối cũ, không nối lại
+            applyCloudRows()
+        } else if was && !cloudActive {
+            // quên ghép: quay lại kiểu cũ nếu đã có mã phòng
+            snapshot.applyCloud(rows: [], at: Date())
+            startSSE()
+            startMQTT()
+        }
+    }
+
+    /// Gom nhiều lô /sync liên tiếp thành một lần dựng lại danh sách.
+    private func scheduleCloudReload() {
+        guard !cloudReloadScheduled else { return }
+        cloudReloadScheduled = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self else { return }
+            self.cloudReloadScheduled = false
+            self.applyCloudRows()
+        }
+    }
+
+    /// Dựng danh sách dòng từ bản sao cloud (chạy nền) rồi đưa vào `snapshot` mà mọi màn hình đang đọc.
+    func applyCloudRows() {
+        let store = cloud.store
+        let now = Date()
+        let at = cloud.lastSyncAt ?? now
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let rows = store.rows(now: now)
+            await MainActor.run { self?.snapshot.applyCloud(rows: rows, at: at) }
+        }
+    }
+
+    // MARK: ghép / bỏ ghép
+
+    /// Ghép bằng mã 6 số (hoặc mã QR `qlhh://pair?...`). nil = thành công.
+    func pairCloud(baseURL: String, code: String, deviceName: String) async -> String? {
+        let err = await cloud.pair(baseURL: baseURL, code: code, deviceName: deviceName)
+        cloudStatusChanged()
+        return err
+    }
+
+    func unpairCloud() {
+        cloud.unpair()
+        cloudStatusChanged()
+    }
+
+    // MARK: quét qua cloud
+
+    fileprivate func submitCloud(code: String, kind: ScanKind, photo: Data?, useSnapshot: Bool) -> Bool {
+        guard kind == .returnScan else {
+            banner = Banner(code: code, text: "Tạo đơn mới bằng điện thoại chưa hỗ trợ khi dùng cloud", color: Theme.warning,
+                            sub: "Tạo đơn trên máy tính")
+            return false
+        }
+        guard cloud.canWrite else {
+            banner = Banner(code: code, text: "MẤT KẾT NỐI CLOUD: chưa quét được", color: Theme.danger,
+                            sub: CloudStatusText.lockReason(cloud.state) ?? "Kiểm tra mạng rồi thử lại")
+            if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.error) }
+            if Self.pref("soundOn") { AudioServicesPlaySystemSound(1053) }
+            return false
+        }
+        let rid = nextRequestId(prefix: "sc")
+        var photoData = photo
+        if photoData == nil && useSnapshot && Self.pref("sendPhoto") { photoData = snapshotProvider?() }
+        var savedFile: String? = nil
+        if let d = photoData, !d.isEmpty {
+            let fileName = rid + ".jpg"
+            if (try? d.write(to: photosDir.appendingPathComponent(fileName), options: .atomic)) != nil { savedFile = fileName }
+        }
+        var item = ScanItem(requestId: rid, code: code, kind: kind, time: nowMs(), photoFile: savedFile)
+        item.detail = "Đang gửi lên cloud..."
+        items.insert(item, at: 0)
+        trimHistory()
+        flushPersist()
+        banner = Banner(code: code, text: "Đang gửi lên cloud...", color: Theme.info)
+        if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+
+        let fullPhoto = photoData
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let r = await self.cloud.scan(code: code)
+            let v = CloudScanPresentation.map(r)
+            if let i = self.items.firstIndex(where: { $0.requestId == rid }) {
+                self.items[i].status = v.status
+                self.items[i].scanConfirmed = true          // cloud đã trả lời (lỗi: status .error + cần kiểm tra, KHÔNG phải đã nhận)
+                self.items[i].reviewRequired = v.reviewRequired
+                self.items[i].detail = v.text
+                if let p = r.parcel { self.items[i].orderNum = p.orderId }
+            }
+            self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: r.parcel?.orderId ?? "")
+            if Self.pref("hapticOn") {
+                UINotificationFeedbackGenerator().notificationOccurred(v.tone == .success ? .success : (v.tone == .danger ? .error : .warning))
+            }
+            // ảnh chỉ lên cloud khi cloud xác nhận đúng MỘT kiện (quy tắc 6)
+            if CloudPhotoRules.shouldUpload(r), let data = fullPhoto, !data.isEmpty, let api = self.cloud.currentAPI {
+                do {
+                    _ = try await CloudPhotoUploader(api: api).upload(after: r, full: data, thumb: nil)
+                } catch {
+                    self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: "Chưa tải được ảnh lên cloud")
+                }
+            }
+            self.persist()
+            self.reconcileScanPhotos()
+        }
+        return true
+    }
+
+    // MARK: sửa đơn qua cloud
+
+    /// Gửi các thao tác ghi lên cloud. Mất kết nối thì từ chối ngay, không đổi gì trên máy (không hàng đợi ngoại tuyến).
+    fileprivate func cloudWrite(rows: [OrderRow], ops: [[String: Any]], done: String, code: String? = nil) {
+        let label = code ?? (rows.count == 1 ? rows[0].c : "\(rows.count) đơn")
+        guard cloud.canWrite else {
+            banner = Banner(code: label, text: "MẤT KẾT NỐI CLOUD: chưa lưu được", color: Theme.danger,
+                            sub: CloudStatusText.lockReason(cloud.state) ?? "")
+            for row in rows { setOrderFeedback(for: row, requestId: "cloud-\(nowMs())", state: .failed, message: "Mất kết nối cloud: chưa lưu.") }
+            return
+        }
+        let rid = nextRequestId(prefix: "cloud")
+        for row in rows { setOrderFeedback(for: row, requestId: rid, state: .pending, message: "Đang lưu lên cloud...") }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            var failed: String?
+            for op in ops {
+                if let err = await self.cloud.mutate(op) { failed = err; break }
+            }
+            for row in rows {
+                self.setOrderFeedback(for: row, requestId: rid, state: failed == nil ? .confirmed : .failed, message: failed ?? done)
+            }
+            self.banner = Banner(code: label, text: failed == nil ? done : "Chưa lưu được", color: failed == nil ? Theme.success : Theme.danger,
+                                 sub: failed ?? "")
+        }
+    }
+
+    fileprivate static func color(_ t: CloudTone) -> Color {
+        switch t {
+        case .success: return Theme.success
+        case .info: return Theme.info
+        case .warning: return Theme.warning
+        case .danger: return Theme.danger
+        case .neutral: return .gray
+        }
+    }
+}
+
+/// Lưu phiên ghép cloud trong Keychain (token KHÔNG nằm trong UserDefaults hay tệp thường; chỉ máy này, sau lần mở khóa đầu).
+final class KeychainCloudSessionStore: CloudSessionStoring {
+    private let service = "com.quanlyhanghoan.cloud"
+    private let account = "session"
+
+    private var query: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account]
+    }
+
+    func load() -> CloudSavedSession? {
+        var q = query
+        q[kSecReturnData as String] = true
+        q[kSecMatchLimit as String] = kSecMatchLimitOne
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
+        return try? JSONDecoder().decode(CloudSavedSession.self, from: data)
+    }
+
+    func save(_ s: CloudSavedSession) {
+        guard let data = try? JSONEncoder().encode(s) else { return }
+        SecItemDelete(query as CFDictionary)
+        var q = query
+        q[kSecValueData as String] = data
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        SecItemAdd(q as CFDictionary, nil)
+    }
+
+    func clear() { SecItemDelete(query as CFDictionary) }
 }

@@ -18,6 +18,9 @@ struct ScanView: View {
         if engine.isDemoMode {
             return ("Dữ liệu mẫu", Theme.accent)
         }
+        if engine.cloudActive {
+            return (CloudStatusText.label(engine.cloudState), CloudStatusText.tone(engine.cloudState).color)
+        }
         if engine.pcOnline {
             return ("Đã nối PC", Theme.success)
         }
@@ -149,6 +152,10 @@ struct ScanView: View {
         ZStack(alignment: .bottom) {
             ZStack {
                 CameraPreview(controller: camera)
+
+                if engine.cloudLocked {
+                    CloudScanLockOverlay()   // T042: mất kết nối cloud = không quét
+                }
 
                 if camera.denied {
                     VStack(spacing: 8) {

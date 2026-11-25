@@ -116,6 +116,24 @@ struct SettingsView: View {
                     Text("Mã phòng đồng bộ")
                 }
 
+                // MARK: - Cloud (T042)
+                Section {
+                    NavigationLink {
+                        CloudSettingsView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "cloud.fill").foregroundColor(engine.cloudActive ? CloudStatusText.tone(engine.cloudState).color : .gray)
+                            Text("Cloud")
+                            Spacer()
+                            Text(engine.cloudActive ? CloudStatusText.label(engine.cloudState) : "Chưa ghép").font(.footnote).foregroundColor(.secondary)
+                        }
+                    }
+                } footer: {
+                    if engine.cloudActive {
+                        Text("Đang dùng cloud: mã phòng và kết nối máy tính bên dưới không còn dùng cho điện thoại này.")
+                    }
+                }
+
                 // MARK: - Kết nối
                 Section("Kết nối") {
                     let conn = overallConnection

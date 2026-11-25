@@ -38,6 +38,10 @@ struct ContentView: View {
             if store.isDemoMode {
                 DemoModeBanner { engine.setDemoMode(false) }
             }
+            if engine.cloudActive {
+                CloudStatusBar()
+                CloudReadOnlyBanner()
+            }
 
             TabView(selection: $router.tab) {
                 HomeView()

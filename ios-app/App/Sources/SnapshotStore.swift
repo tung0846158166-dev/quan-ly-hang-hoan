@@ -239,6 +239,23 @@ final class SnapshotStore: ObservableObject {
         onRowsUpdated?()
     }
 
+    /// Chế độ cloud: danh sách lấy thẳng từ bản sao cloud trên máy (`CloudParcelStore.rows`). Cloud đã là nguồn gốc nên
+    /// không phủ thao tác "chờ PC xác nhận"; mọi màn hình đọc `rows` như cũ.
+    func applyCloud(rows newRows: [OrderRow], at: Date) {
+        if isDemoMode {
+            savedRealRows = newRows
+            savedRealUpdatedAt = at
+            return
+        }
+        rows = newRows
+        updatedAt = at
+        index = SnapshotIndex(rows: newRows)
+        recount()
+        revision += 1
+        scheduleNotifications()
+        onRowsUpdated?()
+    }
+
     /// Tính lại số quá hạn / sắp đến hạn / thông báo; gọi khi danh sách, danh sách ẩn đổi hoặc theo thời gian (mỗi phút).
     func recount() {
         let now = nowMs()

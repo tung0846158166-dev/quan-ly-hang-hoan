@@ -9,6 +9,7 @@ namespace QuanLyHangHoan.App;
 public partial class App : Application
 {
     private MainViewModel? _mainViewModel;
+    private CloudMode? _cloud;
     private ISingleInstanceGuard? _singleInstanceGuard;
     private ITrayService? _trayService;
 
@@ -159,9 +160,11 @@ public partial class App : Application
             IArchiveSweeper archiveSweeper = new SqliteArchiveSweeper(AppPaths.DatabasePath);
             IPhotoProvider photoProvider = new SqlitePhotoProvider(AppPaths.DatabasePath);
             IPhotoViewerService photoViewerService = new WindowsPhotoViewerService(photoProvider);
-            IScanService sqliteScan = new SqliteScanService(AppPaths.DatabasePath);
+            // Công tắc cloud: --cloud hoặc đã ghép thiết bị. Tắt thì mọi thứ như cũ (SQLite cục bộ + MQTT).
+            _cloud = CloudMode.IsEnabled(e.Args) ? new CloudMode(AppPaths.DatabasePath, new DpapiProtector()) : null;
+            IScanService sqliteScan = _cloud?.Scan ?? new SqliteScanService(AppPaths.DatabasePath);
             realSyncController = new RealSyncController(AppPaths.DatabasePath, AppPaths.SettingsPath);
-            IOrderEditService sqliteEdit = new SqliteOrderEditService(AppPaths.DatabasePath);
+            IOrderEditService sqliteEdit = _cloud?.Edit ?? new SqliteOrderEditService(AppPaths.DatabasePath);
             realFolderWatchController = new RealFolderWatchController(
                 AppPaths.DatabasePath,
                 AppPaths.FolderWatchStatePath,
@@ -177,7 +180,7 @@ public partial class App : Application
                 AppPaths.SaleworkWebViewFolder,
                 () => DateTime.Now);
             IFileImportController realFileImport = new RealFileImportController(AppPaths.DatabasePath, () => DateTime.Now);
-            IReturnWatchService sqliteReturnWatch = new SqliteReturnWatchService(AppPaths.DatabasePath);
+            IReturnWatchService sqliteReturnWatch = _cloud?.ReturnWatch ?? new SqliteReturnWatchService(AppPaths.DatabasePath);
             mainViewModel = new MainViewModel(
                 sqliteProvider,
                 sqliteProvider,
@@ -219,8 +222,18 @@ public partial class App : Application
                 newOrderCreator: isDemoMode ? null : new SqliteNewOrderCreator(AppPaths.DatabasePath),
                 newOrderDialogService: new WindowsNewOrderDialogService(),
                 diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)),
-                // Chế độ cục bộ hiện tại (chưa bật cloud): truyền null để giữ nguyên hành vi hiện tại; Claude thay bằng bản ICloudLink thật khi bật cloud.
-                cloudLink: null);
+                // Chưa bật cloud: null giữ nguyên giao diện/hành vi cũ.
+                cloudLink: _cloud?.Link);
+            if (_cloud is { } cloud)
+            {
+                var vmForCloud = mainViewModel;
+                cloud.Start(() => vmForCloud.ReloadAllDataAsync(), a => Dispatcher.BeginInvoke(a));
+                // nạp xong ở máy này thì đẩy các đơn đã đổi lên cloud cho mọi máy
+                realSheetSyncController.Completed += r => { _ = cloud.PublishAsync("sheet"); };
+                realFolderWatchController.Completed += r => { _ = cloud.PublishAsync("folder"); };
+                realSaleworkController.Completed += r => { _ = cloud.PublishAsync("salework"); };
+                realFileImport.Completed += r => { _ = cloud.PublishAsync("file"); };
+            }
         }
 
         _mainViewModel = mainViewModel;
@@ -262,6 +275,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _mainViewModel?.Dispose();
+        _cloud?.Dispose();
         _trayService?.Dispose();
         _singleInstanceGuard?.Dispose();
         base.OnExit(e);

@@ -218,6 +218,10 @@ public static class CloudMigration
 
     public static string LegacyPhotoId(string sha) => "legacy_" + sha[..Math.Min(32, sha.Length)].ToLowerInvariant();
 
+    /// <summary>Cùng một ảnh gắn cho nhiều kiện (vd. kiện A và B chung ảnh): mỗi kiện thêm một mã riêng, cố định theo mã kiện (chạy lại không sinh bản trùng).</summary>
+    public static string SharedPhotoId(string photoId, string parcelId) =>
+        photoId + "_" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(parcelId)))[..10].ToLowerInvariant();
+
     /// <summary>
     /// Chuyển ảnh cũ lên cloud (cần token CHỦ). Ảnh quá hạn lưu (mặc định 90 ngày theo ngày nhận/nạp của đơn) bị bỏ qua vì cloud sẽ tự xóa ngay,
     /// trừ khi <see cref="PhotoMigrationOptions.KeepAsNew"/> (coi như mới chụp, giữ 90 ngày kể từ hôm nay). Dừng ngay khi 401/403/429.
@@ -230,7 +234,7 @@ public static class CloudMigration
         var failReasons = new List<string>();
         using var c = OpenRead(dbPath);
 
-        async Task SendAsync(string photoId, string parcelId, string mime, byte[] bytes, long? takenAt)
+        async Task SendAsync(string photoId, string parcelId, string mime, byte[] bytes, long? takenAt, bool perParcel = false)
         {
             if (bytes.Length == 0 || bytes.Length > 1_000_000) { big++; return; }
             if (!options.KeepAsNew && takenAt is { } t && t < cutoff) { expired++; return; }
@@ -243,6 +247,7 @@ public static class CloudMigration
             catch (CloudApiException ex) when (ex.Status is 401 or 403 or 429) { throw; }
             catch (CloudApiException ex) when (ex.Code == "not_found") { noParcel++; }
             catch (CloudApiException ex) when (ex.Code == "expired") { expired++; }
+            catch (CloudApiException ex) when (ex.Code == "conflict" && !perParcel) { await SendAsync(SharedPhotoId(photoId, parcelId), parcelId, mime, bytes, takenAt, perParcel: true).ConfigureAwait(false); }
             catch (CloudApiException ex) { failed++; failReasons.Add($"{photoId}: {ex.Status} {ex.Code} {ex.Message}"); }
         }
 

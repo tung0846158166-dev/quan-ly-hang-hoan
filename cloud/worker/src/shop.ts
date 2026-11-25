@@ -597,7 +597,7 @@ export class ShopDO extends DurableObject<Env> {
         const old = base.get(o.id) ?? null;
         const p = orderToParcel(o, old);
         if (!old) { p.importedAt = p.importedAt || vnTime(now); this.writeParcel(p, ""); }
-        else if (JSON.stringify(old) !== JSON.stringify(p)) this.writeParcel(p);
+        else if (JSON.stringify(old) !== JSON.stringify(p)) this.writeParcel(p, "");   // xóa dấu bản máy tính: bản gửi lại từ máy tính phải được áp dụng lại
         else continue;
         written++;
       }

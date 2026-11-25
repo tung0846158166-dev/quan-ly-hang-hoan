@@ -156,6 +156,27 @@ public sealed class CloudMigrationTests : IDisposable
     }
 
     [Fact]
+    public async Task Same_photo_on_two_parcels_gets_a_per_parcel_id_when_the_cloud_says_it_belongs_to_another_parcel()
+    {
+        Seed();
+        var baseId = CloudMigration.LegacyPhotoId(Sha(PhotoA));
+        // cloud: mã gốc đã thuộc kiện khác (409 conflict); mã riêng thì nhận
+        var h = new Handler(r => r.RequestUri!.AbsolutePath.EndsWith("/photos/" + baseId)
+            ? (HttpStatusCode.Conflict, "{\"error\":{\"code\":\"conflict\",\"message\":\"Mã ảnh đã thuộc kiện khác.\"}}")
+            : (HttpStatusCode.OK, "{\"ok\":true}"));
+        var api = new CloudApi(new HttpClient(h), "https://x.workers.dev", "owner-token");
+        var r = await CloudMigration.UploadPhotosAsync(api, Db);
+        Assert.Equal(1, r.Uploaded);
+        Assert.Equal(0, r.Failed);
+        Assert.Equal(2, h.Calls.Count);
+        var alt = CloudMigration.SharedPhotoId(baseId, "a");
+        Assert.Contains("/photos/" + alt + "?", h.Calls[1].Url);
+        Assert.Equal(alt, CloudMigration.SharedPhotoId(baseId, "a"));                 // chạy lại ra cùng mã: không tạo bản trùng
+        Assert.NotEqual(alt, CloudMigration.SharedPhotoId(baseId, "b"));
+        Assert.Matches("^[A-Za-z0-9_-]{6,80}$", alt);                                 // đúng định dạng mã ảnh của cloud
+    }
+
+    [Fact]
     public async Task Photos_older_than_the_retention_are_skipped_unless_kept_as_new_and_auth_errors_stop_the_run()
     {
         Seed();

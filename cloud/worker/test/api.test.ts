@@ -130,6 +130,18 @@ describe("nhập đơn", () => {
     expect((await importParcels([parcel("p1", { hash: "h2", price: 5 })])).data).toMatchObject({ updated: 1 });
   });
 
+  it("Sheet ghi vào kiện thì máy tính gửi lại CÙNG bản cũ vẫn được áp dụng (không bị coi là 'không đổi')", async () => {
+    await importParcels([parcel("p1", { hash: "h1", platformStatus: "Đã huỷ", orderType: "Đơn hủy" })]);
+    const r = await call("POST", "/import/sheet", { signature: "s", parcels: [{ platform: "Shopee", orderId: "O-p1", track: "TRK-p1",
+      orderType: "Trả hàng/Hoàn tiền", platformStatus: "Chờ xác nhận", items: [{ product: "Áo thun", color: "Đen", size: "M", qty: 1, returnedQty: 1 }] }] },
+      undefined, { "X-Import-Key": "test-import-key" });
+    expect(r.data.updated).toBe(1);
+    const again = await importParcels([parcel("p1", { hash: "h1", platformStatus: "Đã huỷ", orderType: "Đơn hủy" })]);
+    expect(again.data).toMatchObject({ updated: 1, unchanged: 0 });
+    const p = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.find((c: any) => c.type === "parcel").parcel;
+    expect(p).toMatchObject({ platformStatus: "Đã huỷ", orderType: "Đơn hủy" });
+  });
+
   it("khóa nhập sai thì 401; token thiết bị cũng nhập được", async () => {
     expect((await importParcels([parcel("p1")], "sai")).status).toBe(401);
     const r = await call("POST", "/import", { source: "file", parcels: [parcel("p9")] }, phoneA);

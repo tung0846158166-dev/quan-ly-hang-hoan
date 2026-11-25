@@ -702,7 +702,9 @@ export class ShopDO extends DurableObject<Env> {
       if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at) VALUES (?,?,?,?,?,?,?)",
         photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt);
       else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ? WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ? WHERE photo_id = ?", bytes.byteLength, mime, photoId);
-      if (kind === "full" && parcel.photoId !== photoId && (!legacy || parcel.photoId === "")) {
+      // ảnh cũ: chỉ gắn khi kiện chưa có ảnh HOẶC đang trỏ mã ảnh của máy tính (không có trên cloud, vd. "ph-..."); không đè ảnh cloud đang gắn
+      const attachLegacy = parcel.photoId === "" || !this.db.first<Row>("SELECT 1 AS x FROM photos WHERE photo_id = ? AND deleted_at = 0", parcel.photoId);
+      if (kind === "full" && parcel.photoId !== photoId && (!legacy || attachLegacy)) {
         const before = parcel.photoId;
         parcel.photoId = photoId;
         this.writeParcel(parcel);

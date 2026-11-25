@@ -543,6 +543,20 @@ describe("ảnh", () => {
     expect((await put(owner, "legacy_004", "parcelId=p2&legacy=1")).status).toBe(200);
   });
 
+  it("chuyển ảnh cũ: kiện còn trỏ mã ảnh của MÁY TÍNH (không có trên cloud) thì gắn ảnh vừa chuyển; mã đã có trên cloud thì giữ", async () => {
+    await importParcels([parcel("p1", { photoId: "ph-maytinh" }), parcel("p2", { photoId: "ph-maytinh2" })]);
+    const recent = Date.now() - 86_400_000;
+    expect((await put(owner, "legacy_101", `parcelId=p1&legacy=1&takenAt=${recent}`)).status).toBe(200);
+    expect((await put(owner, "legacy_102", `parcelId=p1&legacy=1&takenAt=${recent}`)).status).toBe(200);
+    const ps = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.filter((c: any) => c.type === "parcel").map((c: any) => c.parcel);
+    expect(ps.find((p: any) => p.id === "p1").photoId).toBe("legacy_101");        // ảnh đầu tiên (ảnh chính trên máy tính) được gắn
+    expect(ps.find((p: any) => p.id === "p2").photoId).toBe("ph-maytinh2");       // chưa chuyển ảnh: giữ nguyên
+    // máy tính đẩy lại đơn (vẫn mang mã ảnh cũ) không làm mất ảnh đã gắn
+    await importParcels([parcel("p1", { photoId: "ph-maytinh", hash: "lai" })]);
+    const p1 = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.filter((c: any) => c.type === "parcel").map((c: any) => c.parcel).find((p: any) => p.id === "p1");
+    expect(p1.photoId).toBe("legacy_101");
+  });
+
   it("Cron xóa ảnh quá 90 ngày và ghi nhật ký; ảnh mới giữ nguyên", async () => {
     await importParcels([parcel("p1")]);
     await scan(phoneA, "TRK-p1");

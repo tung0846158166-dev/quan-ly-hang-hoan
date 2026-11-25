@@ -158,10 +158,16 @@ public partial class App : Application
             var sqliteProvider = new SqliteOrderProvider(AppPaths.DatabasePath);
             ILegacyImporter sqliteImporter = new SqliteLegacyImporter(AppPaths.LegacyCopiesFolder, AppPaths.DatabasePath);
             IArchiveSweeper archiveSweeper = new SqliteArchiveSweeper(AppPaths.DatabasePath);
-            IPhotoProvider photoProvider = new SqlitePhotoProvider(AppPaths.DatabasePath);
-            IPhotoViewerService photoViewerService = new WindowsPhotoViewerService(photoProvider);
             // Công tắc cloud: --cloud hoặc đã ghép thiết bị. Tắt thì mọi thứ như cũ (SQLite cục bộ + MQTT).
             _cloud = CloudMode.IsEnabled(e.Args) ? new CloudMode(AppPaths.DatabasePath, new DpapiProtector()) : null;
+            var cloudForPhotos = _cloud;
+            // Cloud: ảnh trong máy trước, không có thì tải từ cloud (ảnh điện thoại chụp, ảnh đã chuyển lên) và lưu đệm
+            IPhotoProvider photoProvider = cloudForPhotos is not null
+                ? new CloudPhotoProvider(AppPaths.DatabasePath, () => cloudForPhotos.Link.Api)
+                : new SqlitePhotoProvider(AppPaths.DatabasePath);
+            if (cloudForPhotos is not null)
+                _ = Task.Run(() => { try { QuanLyHangHoan.Data.Cloud.CloudPhotoCache.Prune(AppPaths.DatabasePath, TimeSpan.FromDays(90)); } catch (Exception) { } });
+            IPhotoViewerService photoViewerService = new WindowsPhotoViewerService(photoProvider);
             IScanService sqliteScan = _cloud?.Scan ?? new SqliteScanService(AppPaths.DatabasePath);
             realSyncController = new RealSyncController(AppPaths.DatabasePath, AppPaths.SettingsPath);
             IOrderEditService sqliteEdit = _cloud?.Edit ?? new SqliteOrderEditService(AppPaths.DatabasePath);

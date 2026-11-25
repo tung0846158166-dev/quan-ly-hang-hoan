@@ -42,7 +42,11 @@ public sealed record MigrationReport(
 }
 
 public sealed record PhotoMigrationOptions(bool IncludeHistory = false, bool KeepAsNew = false, int RetentionDays = 90, IProgress<string>? Progress = null);
-public sealed record PhotoMigrationResult(int Uploaded, int SkippedExpired, int SkippedTooBig, int SkippedNoParcel, int Failed);
+public sealed record PhotoMigrationResult(int Uploaded, int SkippedExpired, int SkippedTooBig, int SkippedNoParcel, int Failed)
+{
+    /// <summary>Lý do lỗi (mã ảnh + mã lỗi + thông báo của cloud), không có nội dung ảnh/đơn.</summary>
+    public IReadOnlyList<string> FailReasons { get; init; } = Array.Empty<string>();
+}
 
 /// <summary>
 /// Chuyển dữ liệu cũ lên cloud. CHẠY THỬ (<see cref="DryRun"/>) chỉ đọc CSDL ở chế độ chỉ-đọc, không bao giờ mở mạng và không in nội dung đơn
@@ -223,6 +227,7 @@ public static class CloudMigration
         options ??= new();
         var cutoff = DateTimeOffset.UtcNow.AddDays(-options.RetentionDays).ToUnixTimeMilliseconds();
         int up = 0, expired = 0, big = 0, noParcel = 0, failed = 0;
+        var failReasons = new List<string>();
         using var c = OpenRead(dbPath);
 
         async Task SendAsync(string photoId, string parcelId, string mime, byte[] bytes, long? takenAt)
@@ -238,7 +243,7 @@ public static class CloudMigration
             catch (CloudApiException ex) when (ex.Status is 401 or 403 or 429) { throw; }
             catch (CloudApiException ex) when (ex.Code == "not_found") { noParcel++; }
             catch (CloudApiException ex) when (ex.Code == "expired") { expired++; }
-            catch (CloudApiException) { failed++; }
+            catch (CloudApiException ex) { failed++; failReasons.Add($"{photoId}: {ex.Status} {ex.Code} {ex.Message}"); }
         }
 
         var tableShas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -285,6 +290,6 @@ public static class CloudMigration
                 }
             }
         }
-        return new(up, expired, big, noParcel, failed);
+        return new(up, expired, big, noParcel, failed) { FailReasons = failReasons };
     }
 }

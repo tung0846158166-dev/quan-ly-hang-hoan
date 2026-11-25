@@ -59,6 +59,13 @@ export class ShopDO extends DurableObject<Env> {
     ctx.blockConcurrencyWhile(async () => {
       this.db.exec(SCHEMA);
       this.db.run("INSERT OR IGNORE INTO meta(k, v) VALUES ('rev', '0')");
+      // cột "auto": 1 = dấu cloud TỰ thêm lúc nhập (dữ liệu cũ được phép thay giờ gốc vào), 0 = dấu gốc/đã có người đụng
+      if (!this.db.all<Row>("PRAGMA table_info(return_watch)").some((c) => c.name === "auto"))
+      {
+        this.db.exec("ALTER TABLE return_watch ADD COLUMN auto INTEGER NOT NULL DEFAULT 0");
+        // một lần lúc nâng cấp: dấu chưa ai bỏ/khôi phục coi như tự thêm (gửi lại dữ liệu cũ cùng giá trị thì không đổi gì)
+        this.db.exec("UPDATE return_watch SET auto = 1 WHERE parcel_id NOT IN (SELECT parcel_id FROM audit_log WHERE action IN ('rwRemove','rwRestore'))");
+      }
     });
     // Ping/pong tự động, không đánh thức Durable Object (tiết kiệm yêu cầu).
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
@@ -104,6 +111,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path === "/sync") return this.sync(url);
     if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
+    if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     const ai = /^\/ai\/(groq|gemini)\/chat\/completions$/.exec(path);
     if (m === "POST" && ai) return this.aiProxy(req, ai[1] as "groq" | "gemini");
@@ -280,7 +288,7 @@ export class ShopDO extends DurableObject<Env> {
   private touchReturnWatch(p: Parcel): void {
     if (!returnWatchEligible(p)) return;
     if (this.db.first<Row>("SELECT 1 AS x FROM return_watch WHERE parcel_id = ?", p.id)) return;
-    this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev) VALUES (?,?,0,?)", p.id, Date.now(), this.nextRev());
+    this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev, auto) VALUES (?,?,0,?,1)", p.id, Date.now(), this.nextRev());
   }
 
   private refreshCodes(p: Parcel): void {
@@ -446,7 +454,7 @@ export class ShopDO extends DurableObject<Env> {
     const row = this.db.first<Row>("SELECT off FROM return_watch WHERE parcel_id = ?", p.id);
     if (!row) return fail(404, "not_found", "Đơn không nằm trong Bảng Hàng Hoàn Về.");
     if (!!row.off !== off) {
-      this.db.run("UPDATE return_watch SET off = ?, rev = ? WHERE parcel_id = ?", off ? 1 : 0, this.nextRev(), p.id);
+      this.db.run("UPDATE return_watch SET off = ?, auto = 0, rev = ? WHERE parcel_id = ?", off ? 1 : 0, this.nextRev(), p.id);
       this.audit(dev.deviceId, off ? "rwRemove" : "rwRestore", p.id, { off: !off }, { off });
     }
     return { off };
@@ -480,7 +488,7 @@ export class ShopDO extends DurableObject<Env> {
       prepared.push({ p: v.parcel, hash: given || (await sha256Hex(canonical(v.parcel))) });
     }
 
-    let added = 0, updated = 0, unchanged = 0, watchAdded = 0;
+    let added = 0, updated = 0, unchanged = 0, watchAdded = 0, watchFixed = 0;
     this.ctx.storage.transactionSync(() => {
       for (const { p, hash } of prepared) {
         const ex = this.db.first<Row>("SELECT data, src_hash FROM parcels WHERE id = ?", p.id);
@@ -490,20 +498,29 @@ export class ShopDO extends DurableObject<Env> {
         this.writeParcel(merged, hash);
         updated++;
       }
-      // dấu Bảng Hàng Hoàn Về của dữ liệu cũ: chỉ THÊM khi chưa có, không bao giờ đổi dòng đã có (kể cả đã bị bỏ)
+      // dấu Bảng Hàng Hoàn Về của dữ liệu cũ: THÊM khi chưa có. Dòng đã có chỉ được thay khi đó là dấu cloud TỰ tạo lúc nhập
+      // (chưa ai bỏ/khôi phục: không có nhật ký rwRemove/rwRestore) — để giữ đúng giờ hàng về gốc cho cảnh báo 12h/24h.
       for (const w of Array.isArray(b.returnWatch) ? (b.returnWatch as unknown[]).slice(0, 2000) : []) {
         const e = w as { id?: unknown; since?: unknown; off?: unknown };
         if (typeof e.id !== "string" || !this.db.first<Row>("SELECT 1 AS x FROM parcels WHERE id = ?", e.id)) continue;
-        if (this.db.first<Row>("SELECT 1 AS x FROM return_watch WHERE parcel_id = ?", e.id)) continue;
-        this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev) VALUES (?,?,?,?)", e.id, Number(e.since) > 0 ? Number(e.since) : Date.now(), e.off === true ? 1 : 0, this.nextRev());
-        watchAdded++;
+        const since = Number(e.since) > 0 ? Number(e.since) : Date.now(), off = e.off === true ? 1 : 0;
+        const ex = this.db.first<Row>("SELECT since, off, auto FROM return_watch WHERE parcel_id = ?", e.id);
+        if (!ex) {
+          this.db.run("INSERT INTO return_watch(parcel_id, since, off, rev) VALUES (?,?,?,?)", e.id, since, off, this.nextRev());
+          watchAdded++;
+          continue;
+        }
+        if (!Number(ex.auto)) continue;
+        if (this.db.first<Row>("SELECT 1 AS x FROM audit_log WHERE parcel_id = ? AND action IN ('rwRemove','rwRestore')", e.id)) continue;
+        this.db.run("UPDATE return_watch SET since = ?, off = ?, auto = 0, rev = ? WHERE parcel_id = ?", since, off, this.nextRev(), e.id);
+        watchFixed++;
       }
       const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
       this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at",
         source, sig, Date.now());
     });
-    if (added + updated + watchAdded > 0) this.broadcast();
-    return json({ added, updated, unchanged, rejected, returnWatchAdded: watchAdded });
+    if (added + updated + watchAdded + watchFixed > 0) this.broadcast();
+    return json({ added, updated, unchanged, rejected, returnWatchAdded: watchAdded, returnWatchFixed: watchFixed });
   }
 
   /**
@@ -511,6 +528,39 @@ export class ShopDO extends DurableObject<Env> {
    * CÙNG bộ gộp của app máy tính (cloud/core/src/merge.ts, đạt bộ ca thử C#): khớp đúng một kiện -> cập nhật; dòng cùng mã đơn chưa có mã
    * -> điền mã; đã lưu trữ -> chỉ bổ sung; đã xóa -> bỏ qua; nhập nhằng/khớp kiện của đơn khác -> KHÔNG đổi, ghi vào danh sách cần kiểm tra.
    */
+  /**
+   * Chỉ chủ cửa hàng. Xóa HẲN các kiện do Sheet tạo trên cloud (id "s_...") mà CHƯA từng có người đụng vào:
+   * không quét, không ảnh, không sửa (nhật ký: gồm cả bỏ/khôi phục ở Bảng Hàng Hoàn Về), không lưu trữ/xóa. Dấu Bảng Hàng Hoàn Về TỰ thêm lúc nhập thì xóa theo.
+   * Dùng khi Sheet lỡ nạp lên cloud TRƯỚC khi chuyển dữ liệu cũ (tránh tạo bản trùng). Kiện đã bị đụng vào thì giữ nguyên và báo lại.
+   * Bắt buộc confirm = "XOA_KIEN_SHEET_CHUA_DUNG"; dryRun = true chỉ đếm.
+   */
+  private async purgeFreshSheet(b: Record<string, unknown>, dev: Device): Promise<Response> {
+    this.requireOwner(dev);
+    if (b.confirm !== "XOA_KIEN_SHEET_CHUA_DUNG") return fail(422, "invalid", "Thiếu xác nhận.");
+    const dryRun = b.dryRun === true;
+    const rows = this.db.all<Row>(
+      `SELECT p.id AS id,
+         (SELECT COUNT(*) FROM scans s WHERE s.parcel_id = p.id) AS sc,
+         (SELECT COUNT(*) FROM photos f WHERE f.parcel_id = p.id) AS ph,
+         (SELECT COUNT(*) FROM audit_log a WHERE a.parcel_id = p.id) AS au,
+         p.is_archived AS ar, p.is_deleted AS de
+       FROM parcels p WHERE p.id LIKE 's\\_%' ESCAPE '\\'`);
+    const fresh = rows.filter((r) => !Number(r.sc) && !Number(r.ph) && !Number(r.au) && !Number(r.ar) && !Number(r.de)).map((r) => r.id as string);
+    const kept = rows.length - fresh.length;
+    if (!dryRun && fresh.length) {
+      this.ctx.storage.transactionSync(() => {
+        for (let i = 0; i < fresh.length; i += 90) {
+          const chunk = fresh.slice(i, i + 90), q = chunk.map(() => "?").join(",");
+          this.db.run(`DELETE FROM parcel_codes WHERE parcel_id IN (${q})`, ...chunk);
+          this.db.run(`DELETE FROM return_watch WHERE parcel_id IN (${q})`, ...chunk);
+          this.db.run(`DELETE FROM parcels WHERE id IN (${q})`, ...chunk);
+        }
+        this.db.run("DELETE FROM import_state WHERE source = 'sheet'");
+      });
+    }
+    return json({ dryRun, purged: dryRun ? 0 : fresh.length, wouldPurge: fresh.length, kept });
+  }
+
   private async importSheet(b: Record<string, unknown>): Promise<Response> {
     const list = Array.isArray(b.parcels) ? b.parcels : fail(422, "invalid", "Thiếu danh sách kiện.");
     if (list.length > 100) fail(422, "invalid", "Tối đa 100 kiện mỗi lần.");

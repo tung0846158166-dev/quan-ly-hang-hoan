@@ -174,6 +174,8 @@ public partial class App : Application
                 AppPaths.SheetSyncStatePath,
                 new DpapiProtector(),
                 () => DateTime.Now);
+            // Cloud: Sheet do Apps Script gửi thẳng lên cloud, máy tính không nạp Sheet (tránh hai nơi cùng ghi).
+            if (_cloud is not null) realSheetSyncController = new CloudSheetSyncController(realSheetSyncController);
             realSaleworkController = new RealSaleworkController(
                 AppPaths.DatabasePath,
                 AppPaths.SaleworkAutoStatePath,
@@ -229,7 +231,6 @@ public partial class App : Application
                 var vmForCloud = mainViewModel;
                 cloud.Start(() => vmForCloud.ReloadAllDataAsync(), a => Dispatcher.BeginInvoke(a));
                 // nạp xong ở máy này thì đẩy các đơn đã đổi lên cloud cho mọi máy
-                realSheetSyncController.Completed += r => { _ = cloud.PublishAsync("sheet"); };
                 realFolderWatchController.Completed += r => { _ = cloud.PublishAsync("folder"); };
                 realSaleworkController.Completed += r => { _ = cloud.PublishAsync("salework"); };
                 realFileImport.Completed += r => { _ = cloud.PublishAsync("file"); };

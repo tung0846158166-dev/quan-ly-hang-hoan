@@ -131,6 +131,15 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
 - [x] T041 (antigravity) giao diện cloud trên máy tính: Claude kiểm tra ĐẠT (`tasks/reports/T041-review.md`). Chủ dự án DỪNG agy (26/11/2026): T042, T043, T044 do Claude làm tiếp
 - [x] T044 (claude, thay agy) công cụ nhập dữ liệu cũ `v2/tools/QuanLyHangHoan.CloudMigrate` (dry-run/upload/photos) + `CloudMigration`/`CloudPublisher`; chạy thử trên dữ liệu thật: 4.962 đơn -> 6,2 MB lên cloud, 3 dòng trùng id (xử lý: hệt nhau bỏ bản sao, khác nhau giữ với id ~2), 621 ảnh nhúng DUY NHẤT (14,3 MB) cần chuyển riêng
 - [x] (claude) App máy tính: công tắc chế độ cloud (`--cloud` hoặc đã ghép; `Services/CloudMode.cs`): quét/sửa/Bảng Hàng Hoàn Về qua cloud, nạp lại màn hình khi cloud đổi, đẩy đơn đã đổi sau mỗi lần nạp. Đã chạy thử khởi động ở chế độ cloud (thư mục dữ liệu trống) không lỗi; CHƯA thử ghép + dùng thật với Worker thật. Còn hở: điện thoại quét qua MQTT trong chế độ cloud vẫn ghi vào SQLite máy tính (chưa lên cloud) cho tới khi xong T042
-- [ ] T042 (claude) giao diện + gắn cloud trên iPhone; T043 (claude) CLOUD TỰ NẠP SHEET (chủ dự án chọn B, xem docs/cloud-design.md 9c): đã xong so khớp kiện TS (1.500/1.500 tình huống mã cũ); còn gộp, ShopeeMapper JS, /import/sheet, Code.gs
+- [x] T043 (claude) CLOUD TỰ NẠP SHEET (chủ dự án chọn B, xem docs/cloud-design.md 9c). Đã xong:
+  - so khớp kiện 1.500/1.500;
+  - gộp 800/800;
+  - Sheet → kiện bằng JS 450/450;
+  - Worker `/v1/import/sheet` đã triển khai;
+  - Apps Script `cloud/sheet-script` (README hướng dẫn dán);
+  - máy tính ở chế độ cloud không nạp Sheet.
+  CHƯA chạy thật trên Google (chờ chủ shop).
+- [ ] (user) Dán Apps Script theo `cloud/sheet-script/README.md`, đặt `QLHH_IMPORT_KEY`, chạy `qlhhTestNow` rồi `qlhhInstallTriggers`
+- [ ] T042 (claude) giao diện + gắn cloud trên iPhone
 - [ ] (claude) Bản `ICloudLink` thật cho máy tính (ghép, WebSocket, đồng bộ vào SQLite cục bộ), chuyển các dịch vụ quét/sửa sang cloud, chạy song song bản cũ (GĐ2)
 - [ ] (claude) Máy khách cloud cho iPhone + ảnh lên R2 (GĐ3); chuyển nạp Google Sheet (Apps Script) và tắt MQTT/ntfy cũ (GĐ4)

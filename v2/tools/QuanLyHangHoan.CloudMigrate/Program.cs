@@ -56,6 +56,7 @@ try
         var progress = new Progress<string>(Console.WriteLine);
         var pr = await CloudMigration.UploadPhotosAsync(api, db, new PhotoMigrationOptions(Flag(args, "--include-history"), Flag(args, "--keep-as-new"), 90, progress));
         Console.WriteLine($"Ảnh: đã chuyển {pr.Uploaded:N0}; bỏ vì quá hạn lưu {pr.SkippedExpired:N0}; quá lớn/rỗng {pr.SkippedTooBig:N0}; kiện chưa có trên cloud {pr.SkippedNoParcel:N0}; lỗi {pr.Failed:N0}.");
+        foreach (var f in pr.FailReasons) Console.WriteLine("  lỗi: " + f);
         return pr.Failed > 0 || pr.SkippedNoParcel > 0 ? 3 : 0;
     }
 

@@ -308,6 +308,24 @@ describe("Bảng Hàng Hoàn Về", () => {
     expect(w.find((c) => c.key === "b")).toMatchObject({ since: 1_700_000_000_456, off: false });
   });
 
+  it("dấu cloud TỰ thêm lúc nhập được thay bằng giờ gốc của dữ liệu cũ; dấu người dùng đã bỏ/khôi phục thì không", async () => {
+    await importParcels([parcel("a", { platformStatus: "Đã đồng ý" }), parcel("b", { platformStatus: "Đã đồng ý" })]);
+    const auto = await watchChanges();
+    expect(auto.map((c) => c.key).sort()).toEqual(["a", "b"]);               // tự thêm, giờ = lúc nhập
+    expect((await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "rwRemove", id: "b" }] }, phoneA)).data.results[0].ok).toBe(true);
+    const r = await call("POST", "/import", { source: "file", signature: "s", parcels: [], returnWatch: [
+      { id: "a", since: 1_700_000_000_123, off: false }, { id: "b", since: 1_700_000_000_456, off: false },
+    ] }, owner);
+    expect(r.data).toMatchObject({ returnWatchAdded: 0, returnWatchFixed: 1 });
+    const w = await watchChanges();
+    expect(w.find((c) => c.key === "a")).toMatchObject({ since: 1_700_000_000_123, off: false });
+    expect(w.find((c) => c.key === "b")).toMatchObject({ off: true });                  // người dùng đã bỏ: giữ nguyên
+    expect(w.find((c) => c.key === "b").since).not.toBe(1_700_000_000_456);
+    // gửi lại lần nữa: "a" giờ là dấu gốc, không đổi nữa
+    const again = await call("POST", "/import", { source: "file", signature: "s", parcels: [], returnWatch: [{ id: "a", since: 5, off: true }] }, owner);
+    expect(again.data).toMatchObject({ returnWatchAdded: 0, returnWatchFixed: 0 });
+  });
+
   it("phân trang trộn kiện + bảng hoàn về theo rev: không sót, không lặp", async () => {
     await importParcels([parcel("a", { platformStatus: "Đã đồng ý" }), parcel("b", { platformStatus: "Đã đồng ý" }), parcel("c")]);
     const seen: string[] = [];
@@ -398,6 +416,33 @@ describe("nhập từ Google Sheet (cloud tự đối chiếu, cùng bộ gộp 
     const r = await sendSheet([{ platform: "Shopee" }, sheetParcel()]);
     expect(r.data).toMatchObject({ rejected: 1, added: 1 });
     expect((await sendSheet(Array.from({ length: 101 }, () => sheetParcel()))).status).toBe(422);
+  });
+
+  it("chủ shop xóa hẳn kiện Sheet CHƯA ai đụng; kiện đã quét/sửa/dữ liệu cũ giữ nguyên; nhân viên không làm được", async () => {
+    await importParcels([parcel("p1")]);                               // dữ liệu cũ (không phải s_)
+    await sendSheet([
+      sheetParcel({ orderId: "SPA", returnOrderId: "RA", track: "SPXVN000000901" }),
+      sheetParcel({ orderId: "SPB", returnOrderId: "RB", track: "SPXVN000000902" }),
+      sheetParcel({ orderId: "SPC", returnOrderId: "RC", track: "SPXVN000000903" }),
+    ]);
+    expect((await scan(phoneA, "SPXVN000000902")).res.ok).toBe(true);  // B đã quét
+    const c = (await all()).find((p) => p.orderId === "SPC");
+    await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editNote", id: c.id, userNote: "đã gọi khách" }] }, phoneA);  // C đã sửa
+
+    const body = { confirm: "XOA_KIEN_SHEET_CHUA_DUNG" };
+    expect((await call("POST", "/admin/purge-fresh-sheet", body, phoneA)).status).toBe(403);
+    expect((await call("POST", "/admin/purge-fresh-sheet", {}, owner)).status).toBe(422);
+    const dry = await call("POST", "/admin/purge-fresh-sheet", { ...body, dryRun: true }, owner);
+    expect(dry.data).toMatchObject({ dryRun: true, purged: 0, wouldPurge: 1, kept: 2 });
+    expect(await all()).toHaveLength(4);
+
+    const r = await call("POST", "/admin/purge-fresh-sheet", body, owner);
+    expect(r.data).toMatchObject({ purged: 1, kept: 2 });
+    const left = await all();
+    expect(left.map((p) => p.orderId).sort()).toEqual(["O-p1", "SPB", "SPC"]);
+    expect((await scan(phoneA, "SPXVN000000901")).res.result.outcome).toBe("notFound");   // mã của kiện đã xóa không còn khớp
+    // Sheet gửi lại A thì tạo lại bình thường
+    expect((await sendSheet([sheetParcel({ orderId: "SPA", returnOrderId: "RA", track: "SPXVN000000901" })])).data).toMatchObject({ added: 1 });
   });
 });
 

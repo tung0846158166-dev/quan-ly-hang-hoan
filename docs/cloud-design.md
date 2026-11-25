@@ -200,7 +200,17 @@ Chia việc theo chỗ chạy (vì Worker gói miễn phí chỉ 10 ms CPU mỗi
 - **Apps Script (phía Google, không giới hạn CPU đáng kể):** đọc các tab ngay trong Sheet (không gọi mạng), chạy `SheetPipeline` (gộp tab, tab ẩn "Vận đơn huỷ") + `ShopeeMapper.Map` (dòng -> kiện nhập, KHÔNG cần dữ liệu cũ), băm từng kiện, chỉ gửi kiện đổi, lô nhỏ (~20) lên `POST /v1/import/sheet`. Trigger theo thời gian.
 - **Worker:** với mỗi kiện nhập: lấy ứng viên qua chỉ mục (mã đơn, mã vận đơn), chạy so khớp + gộp như `TikTokMerger.Apply` (kiện đang dùng / lưu trữ / đã xóa, nhập nhằng thì KHÔNG đoán và báo lại), kiện mới thì sinh id mới. Quy tắc bất biến 1-5 giữ nguyên.
 - **Kiểm chứng:** mỗi phần TypeScript/JS phải đạt CÙNG bộ ca thử với C#: `match.golden.json` (1.500 tình huống của mã JS cũ), `sheet.*.json`, `shopee*.json`, và bộ ca mới sinh từ C# cho bước gộp.
-Tiến độ: [x] so khớp kiện (`cloud/core/src/matching.ts`, đạt 1.500/1.500 tình huống); [ ] gộp vào dữ liệu có sẵn (TikTokMerger/ItemMerge); [ ] SheetPipeline + ShopeeMapper bằng JS cho Apps Script; [ ] `/v1/import/sheet` trên Worker; [ ] Code.gs + hướng dẫn dán; [ ] máy tính tắt nạp Sheet khi bật cloud.
+Tiến độ:
+- [x] Tìm kiện trùng khớp: `cloud/core/src/matching.ts`, đạt 1.500/1.500 tình huống.
+- [x] Gộp vào dữ liệu có sẵn: `merge.ts`, đạt 800/800 ca.
+- [x] SheetPipeline + ShopeeMapper viết lại bằng JS cho Apps Script: `cloud/sheet-script/qlhh-core.js`, đạt 450/450 ca do C# sinh; 5.000 dòng chạy khoảng 1,7 giây.
+- [x] `/v1/import/sheet` trên Worker: đã triển khai.
+- [x] `qlhh-sync.js` + `build.js` → `dist/QLHH.gs` + `README.md` hướng dẫn dán:
+  - lô 50 kiện; lưu dấu vân tay ở tab ẩn `_qlhh_state`;
+  - lịch 5 phút/lần (30 phút/lần ban đêm), đối soát đầy đủ lúc 2 giờ sáng;
+  - 5 ca thử với Apps Script giả lập.
+- [x] Máy tính tắt nạp Sheet khi bật cloud (`CloudSheetSyncController`).
+- [ ] CHƯA chạy thật trên Google Apps Script (chờ chủ shop dán + đặt khóa).
 
 ## 10. Việc còn cần chủ dự án
 1. **Duyệt** bản 2 này (hoặc nêu chỗ cần sửa).

@@ -3,6 +3,8 @@ import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
 import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parcel";
 import { returnWatchEligible } from "./returnwatch";
+import { applyImport, type MOrder, type OtherEntry } from "../../core/src/merge";
+import { lookupKeys, orderToParcel, parcelToOrder, parseIncoming, vnToday } from "./sheetimport";
 import type { Env } from "./index";
 
 const DAY_MS = 86_400_000;
@@ -84,10 +86,12 @@ export class ShopDO extends DurableObject<Env> {
     // ---- không cần token
     if (m === "POST" && path === "/pair/bootstrap") return this.pairBootstrap(await this.body(req));
     if (m === "POST" && path === "/pair/complete") return this.pairComplete(await this.body(req));
-    if (path === "/import" || path === "/import/state") {
+    if (path === "/import" || path === "/import/state" || path === "/import/sheet" || path === "/import/issues") {
       const dev = this.authImport(req);
       if (m === "POST" && path === "/import") return this.importParcels(await this.body(req), dev);
       if (m === "GET" && path === "/import/state") return this.importState(url.searchParams.get("source") ?? "");
+      if (m === "POST" && path === "/import/sheet") return this.importSheet(await this.body(req));
+      if (m === "GET" && path === "/import/issues") return this.importIssues();
     }
     if (m === "GET" && path === "/ws") return this.upgradeWs(req, url);
 
@@ -500,6 +504,69 @@ export class ShopDO extends DurableObject<Env> {
     });
     if (added + updated + watchAdded > 0) this.broadcast();
     return json({ added, updated, unchanged, rejected, returnWatchAdded: watchAdded });
+  }
+
+  /**
+   * NHẬP TỪ GOOGLE SHEET (Apps Script đẩy lên): kiện đã chuyển dòng sẵn (ImportedParcel). Máy chủ đối chiếu với dữ liệu có sẵn bằng
+   * CÙNG bộ gộp của app máy tính (cloud/core/src/merge.ts, đạt bộ ca thử C#): khớp đúng một kiện -> cập nhật; dòng cùng mã đơn chưa có mã
+   * -> điền mã; đã lưu trữ -> chỉ bổ sung; đã xóa -> bỏ qua; nhập nhằng/khớp kiện của đơn khác -> KHÔNG đổi, ghi vào danh sách cần kiểm tra.
+   */
+  private async importSheet(b: Record<string, unknown>): Promise<Response> {
+    const list = Array.isArray(b.parcels) ? b.parcels : fail(422, "invalid", "Thiếu danh sách kiện.");
+    if (list.length > 100) fail(422, "invalid", "Tối đa 100 kiện mỗi lần.");
+    if (this.quotaSnapshot(false).level === "stop") fail(429, "quota_exceeded", "Hết hạn mức hôm nay: nhập Sheet tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
+    const incoming = list.map(parseIncoming);
+    const rejected = incoming.filter((x) => x === null).length;
+    const parcels = incoming.filter((x): x is NonNullable<typeof x> => x !== null);
+
+    // ứng viên: mọi kiện chung mã đơn / mã vận đơn / mã yêu cầu với lô này (theo thứ tự thêm vào kho)
+    const keys = [...new Set(parcels.flatMap(lookupKeys))];
+    const rows: Row[] = [];
+    for (let i = 0; i < keys.length; i += 90) {
+      const chunk = keys.slice(i, i + 90);
+      rows.push(...this.db.all<Row>(
+        `SELECT DISTINCT p.rowid AS rid, p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id WHERE c.code IN (${chunk.map(() => "?").join(",")})`, ...chunk));
+    }
+    const seen = new Set<number>();
+    const loaded = rows.filter((r) => !seen.has(Number(r.rid)) && seen.add(Number(r.rid))).sort((a, b) => Number(a.rid) - Number(b.rid))
+      .map((r) => JSON.parse(r.data as string) as Parcel);
+    const base = new Map(loaded.map((p) => [p.id, p]));
+    const main: MOrder[] = loaded.filter((p) => !p.isArchived && !p.isDeleted).map(parcelToOrder);
+    const others: OtherEntry[] = loaded.filter((p) => p.isArchived || p.isDeleted)
+      .map((p) => ({ order: parcelToOrder(p), where: p.isDeleted ? "deleted" as const : "archive" as const }));
+
+    const { today, year } = vnToday(Date.now());
+    const res = applyImport(main, others, parcels, "supplement", today, year, () => "s_" + crypto.randomUUID().replace(/-/g, ""));
+
+    const now = Date.now();
+    let written = 0;
+    this.ctx.storage.transactionSync(() => {
+      const touched = new Map<string, MOrder>();
+      for (const o of [...res.updated, ...res.enrichedArchived, ...res.added]) touched.set(o.id, o);
+      for (const o of touched.values()) {
+        const old = base.get(o.id) ?? null;
+        const p = orderToParcel(o, old);
+        if (!old) { p.importedAt = p.importedAt || vnTime(now); this.writeParcel(p, ""); }
+        else if (JSON.stringify(old) !== JSON.stringify(p)) this.writeParcel(p);
+        else continue;
+        written++;
+      }
+      for (const a of res.ambiguous)
+        this.db.run("INSERT INTO import_issues(at, source, data) VALUES (?,?,?)", now, "sheet", JSON.stringify(a));
+      this.db.run("DELETE FROM import_issues WHERE id NOT IN (SELECT id FROM import_issues ORDER BY id DESC LIMIT 500)");
+      const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
+      this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES ('sheet',?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at", sig, now);
+    });
+    if (written > 0) this.broadcast();
+    return json({
+      added: res.added.length, updated: res.updated.length, enrichedArchived: res.enrichedArchived.length, written,
+      skippedDeleted: res.skippedDeleted, skippedArchivedUnchanged: res.skippedArchivedUnchanged, ambiguous: res.ambiguous, rejected,
+    });
+  }
+
+  private importIssues(): Response {
+    const rows = this.db.all<Row>("SELECT at, source, data FROM import_issues ORDER BY id DESC LIMIT 200");
+    return json(rows.map((r) => ({ at: Number(r.at), source: r.source, ...JSON.parse(r.data as string) })));
   }
 
   private importState(source: string): Response {

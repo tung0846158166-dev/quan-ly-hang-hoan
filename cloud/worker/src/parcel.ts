@@ -1,4 +1,5 @@
 import { normalize } from "../../core/src/tracking";
+import { cleanTrackingCode } from "../../core/src/matching";
 
 /** Danh sách trắng (cloud/API.md mục 1): khóa nào ngoài danh sách đều bị TỪ CHỐI (mặc định cấm dữ liệu cá nhân/dữ liệu thô). */
 export const PARCEL_KEYS = new Set([
@@ -94,6 +95,9 @@ export function codesOf(p: Parcel): { code: string; kind: "own" | "weak" }[] {
   const out = new Map<string, "own" | "weak">();
   const own = [p.track, p.returnTrack, p.altTrack, ...p.trackingCodes, ...p.scanAliases].map(normalize).filter((c) => c.length > 0);
   for (const c of own) out.set(c, "own");
+  // bản "làm sạch" (tách mã từ link...) để nhập Sheet tìm được ứng viên như bộ so khớp nhập dùng
+  for (const c of [p.track, p.returnTrack, p.altTrack, p.forwardTrack, ...p.trackingCodes].map((x) => cleanTrackingCode(x)).filter((c) => c.length > 0))
+    if (!out.has(c)) out.set(`${c}\u0000clean`, "weak");
   for (const c of [p.forwardTrack, p.orderId, p.returnOrderId].map(normalize).filter((c) => c.length > 0)) {
     // cùng một mã vừa là mã riêng vừa là mã yếu của chính kiện: giữ cả hai dòng tra
     out.set(`${c}\u0000weak`, "weak");

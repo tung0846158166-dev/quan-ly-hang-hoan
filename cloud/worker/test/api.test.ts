@@ -45,7 +45,7 @@ async function stub() {
   return E.SHOP.get(E.SHOP.idFromName("main"));
 }
 
-const TABLES = ["return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
+const TABLES = ["import_issues", "return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
 
 // Trạng thái Durable Object được giữ giữa các test: xóa sạch bảng + ảnh trước mỗi test rồi tạo lại thiết bị.
 beforeEach(async () => {
@@ -319,6 +319,85 @@ describe("Bảng Hàng Hoàn Về", () => {
       if (!page.more) break;
     }
     expect(seen.sort()).toEqual(["p:a", "p:b", "p:c", "w:a", "w:b"]);
+  });
+});
+
+describe("nhập từ Google Sheet (cloud tự đối chiếu, cùng bộ gộp với máy tính)", () => {
+  const sheetParcel = (over: Record<string, unknown> = {}) => ({
+    platform: "Shopee", orderId: "261120ABCDEF", returnOrderId: "RR1", track: "SPXVN000000101", orderType: "Trả hàng/Hoàn tiền",
+    platformStatus: "Đã đồng ý", price: 150000, priceHasValue: true, returnDate: "20/11/2026", buyerNote: "Nguyễn Văn A 0912345678",
+    rawDetails: { returnReason: "Sai mô tả", deliveryAddress: "12 Đường Giả" },
+    items: [{ product: "Áo thun", color: "Đen", size: "M", qty: 1, returnedQty: 1 }], ...over,
+  });
+  const sendSheet = (parcels: unknown[]) =>
+    call("POST", "/import/sheet", { signature: "s1", parcels }, undefined, { "X-Import-Key": "test-import-key" });
+  const all = async () => ((await call("GET", "/sync?since=0", undefined, owner)).data.changes as any[]).filter((c) => c.type === "parcel").map((c) => c.parcel);
+
+  it("kiện mới được tạo với id mới, mặc định như nạp file; KHÔNG lưu ghi chú người mua/địa chỉ", async () => {
+    const r = await sendSheet([sheetParcel()]);
+    expect(r.status).toBe(200);
+    expect(r.data).toMatchObject({ added: 1, updated: 0, written: 1 });
+    const [p] = await all();
+    expect(p).toMatchObject({ orderId: "261120ABCDEF", track: "SPXVN000000101", status: "Chưa trả", carrier: "SPX Express", platformStatus: "Đã đồng ý", price: 150000 });
+    expect(p.id).toMatch(/^s_/);
+    expect(p.extra.returnReason).toBe("Sai mô tả");
+    const text = JSON.stringify(p);
+    expect(text).not.toContain("0912345678");
+    expect(text).not.toContain("12 Đường Giả");
+    expect(text).not.toContain("buyerNote");
+  });
+
+  it("nhập lại cùng kiện thì CẬP NHẬT (không tạo dòng mới, không cộng lặp sản phẩm) và giữ trường người dùng/kho", async () => {
+    await sendSheet([sheetParcel()]);
+    const [p0] = await all();
+    await call("POST", "/ops", { ops: [
+      { opId: crypto.randomUUID(), type: "editNote", id: p0.id, userNote: "của tôi" },
+      { opId: crypto.randomUUID(), type: "setWatch", id: p0.id, on: true, reason: "theo dõi" },
+    ] }, owner);
+    await scan(phoneA, "SPXVN000000101");
+    const r = await sendSheet([sheetParcel({ platformStatus: "Đã hoàn tiền", price: 160000 })]);
+    expect(r.data).toMatchObject({ added: 0, updated: 1 });
+    const ps = await all();
+    expect(ps).toHaveLength(1);
+    expect(ps[0]).toMatchObject({ platformStatus: "Đã hoàn tiền", price: 160000, userNote: "của tôi", isWatchlist: true, status: "Hàng đã trả" });
+    expect(ps[0].items).toHaveLength(1);
+    expect(ps[0].items[0].qty).toBe(1);
+  });
+
+  it("kiện A/B cùng mã đơn khác mã vận đơn là hai dòng; mã chung khớp nhiều kiện -> KHÔNG đổi, ghi vào danh sách cần kiểm tra", async () => {
+    await sendSheet([sheetParcel({ returnOrderId: "", track: "SPXVN000000201" }), sheetParcel({ returnOrderId: "", track: "SPXVN000000202" })]);
+    expect(await all()).toHaveLength(2);
+    // hai kiện cùng liên kết tường minh tới một mã -> mã đó khớp cả hai
+    const ps = await all();
+    for (const p of ps) await call("POST", "/import", { source: "file", parcels: [{ ...p, trackingCodes: ["SPXVN000000299"], rev: undefined, updatedAt: undefined }] }, owner);
+    const r = await sendSheet([sheetParcel({ returnOrderId: "", track: "SPXVN000000299" })]);
+    expect(r.data.ambiguous).toHaveLength(1);
+    expect(r.data.ambiguous[0].candidates).toBe(2);
+    expect(await all()).toHaveLength(2);
+    const issues = await call("GET", "/import/issues", undefined, undefined, { "X-Import-Key": "test-import-key" });
+    expect(issues.data[0]).toMatchObject({ source: "sheet", candidates: 2 });
+  });
+
+  it("kiện đã xóa thì bỏ qua (không nạp lại); kiện ở kho lưu trữ chỉ được bổ sung, không thành dòng mới", async () => {
+    await sendSheet([sheetParcel({ track: "SPXVN000000301", returnOrderId: "C301" }), sheetParcel({ orderId: "261121XYZ", track: "SPXVN000000302", returnOrderId: "C302" })]);
+    const [a, b] = await all();
+    await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "delete", id: a.id }, { opId: crypto.randomUUID(), type: "archive", id: b.id }] }, owner);
+    const r = await sendSheet([
+      sheetParcel({ track: "SPXVN000000301", returnOrderId: "C301", platformStatus: "Khác" }),
+      sheetParcel({ orderId: "261121XYZ", track: "SPXVN000000302", returnOrderId: "C302", platformStatus: "Đã hoàn tiền" }),
+    ]);
+    expect(r.data).toMatchObject({ added: 0, skippedDeleted: 1, enrichedArchived: 1 });
+    const ps = await all();
+    expect(ps).toHaveLength(2);
+    expect(ps.find((p) => p.id === b.id)).toMatchObject({ isArchived: true, platformStatus: "Đã hoàn tiền" });
+    expect(ps.find((p) => p.id === a.id)).toMatchObject({ isDeleted: true, platformStatus: "Đã đồng ý" });
+  });
+
+  it("khóa nhập sai thì 401; kiện thiếu mọi mã bị loại; quá 100 kiện bị từ chối", async () => {
+    expect((await call("POST", "/import/sheet", { parcels: [] }, undefined, { "X-Import-Key": "sai" })).status).toBe(401);
+    const r = await sendSheet([{ platform: "Shopee" }, sheetParcel()]);
+    expect(r.data).toMatchObject({ rejected: 1, added: 1 });
+    expect((await sendSheet(Array.from({ length: 101 }, () => sheetParcel()))).status).toBe(422);
   });
 });
 

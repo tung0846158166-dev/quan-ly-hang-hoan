@@ -104,6 +104,24 @@ export function findAllMatchIndexes(orders: readonly MatchParcel[], incoming: Ma
 }
 
 /** Dòng chưa có mã nào cùng mã đơn (do file hoàn tiền TikTok / Google Sheet tạo) được điền mã thay vì tạo kiện mới. */
+/**
+ * Shopee (quyết định 26/11/2026, = ParcelMatching.FindShopeeTracklessSameOrderIndexes): kiện mới CÓ mã vận đơn, KHÔNG có mã yêu cầu trả;
+ * các kiện Shopee cùng mã đơn chưa có mã vận đơn nào và không có mã yêu cầu trả. Đúng một -> điền; từ hai trở lên -> nhập nhằng.
+ */
+export function findShopeeTracklessSameOrderIndexes(orders: readonly MatchParcel[], incoming: MatchParcel): number[] {
+  if (incoming.platform !== "Shopee" || returnParcelId(incoming)) return [];
+  if (!clean(first(incoming.returnTrack, incoming.track, incoming.forwardTrack))) return [];
+  const oid = up(incoming.orderId);
+  if (!oid) return [];
+  const out: number[] = [];
+  for (let i = 0; i < orders.length; i++) {
+    const o = orders[i] as MatchParcel;
+    if (up(o.orderId) === oid && o.platform === "Shopee" && !returnParcelId(o) &&
+      !clean(o.track) && !clean(o.returnTrack) && !clean(o.forwardTrack) && !clean(o.altTrack)) out.push(i);
+  }
+  return out;
+}
+
 export function findTracklessSameOrderIndex(
   orders: readonly MatchParcel[], incoming: MatchParcel,
   platformOk: (p: string) => boolean = (p) => p === "TikTok Shop" || p === "TikTok",

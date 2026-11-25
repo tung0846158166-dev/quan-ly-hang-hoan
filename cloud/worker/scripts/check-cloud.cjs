@@ -38,7 +38,7 @@ const mask = (s) => String(s).replace(/[0-9A-Z]{8,}/g, "[mã]");
   console.log(`Kiện Sheet tạo mà cùng mã đơn với kiện cũ: ${sheet.filter((p) => oldOrders.has(N(p.orderId))).length} | chung mã vận đơn/mã yêu cầu với kiện cũ: ${sheet.filter((p) => codes(p).some((c) => oldCodes.has(c))).length}`);
 
   const iss = await (await fetch(`${base}/v1/import/issues`, { headers: { "X-Import-Key": env.IMPORT_KEY } })).json().catch(() => null);
-  console.log(`Ca nhập nhằng: ${iss && Array.isArray(iss.issues) ? iss.issues.length : "?"}`);
+  console.log(`Ca nhập nhằng: ${Array.isArray(iss) ? iss.length : iss && Array.isArray(iss.issues) ? iss.issues.length : "?"}`);
   const now = Date.now(), w = [...watch.values()];
   console.log(`Bảng Hàng Hoàn Về: ${w.length} dấu (đã bỏ ${w.filter((x) => x.off).length}, tạo trong 1 giờ qua ${w.filter((x) => now - x.since < 3600e3).length})`);
   const q = await (await fetch(`${base}/v1/quota`, { headers: H })).json();

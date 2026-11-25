@@ -123,11 +123,18 @@ public sealed class GoldenMergeVectorsTests
         var r = new Random(20261126);
         var today = new DateTime(2026, 11, 26);
         var cases = new JsonArray();
-        for (var n = 0; n < 800; n++)
+        var r2 = new Random(20261127);
+        for (var n = 0; n < 1000; n++)
         {
             var main = Enumerable.Range(0, r.Next(0, 4)).Select(i => MakeOrder(r, i)).ToList();
             var others = Enumerable.Range(0, r.Next(0, 3)).Select(i => new OtherEntry(MakeOrder(r, 100 + i), r.Next(2) == 0 ? OtherWhere.Archive : OtherWhere.Deleted)).ToList();
             var incoming = Enumerable.Range(0, r.Next(1, 4)).Select(_ => MakeIncoming(r)).ToList();
+            if (n >= 800)
+            {
+                // 200 ca dồn vào nhánh "Shopee chưa có mã vận đơn cùng mã đơn" (quyết định 26/11/2026); bộ sinh riêng để 800 ca đầu không đổi
+                foreach (var o in main) { o.Platform = Pick(r2, "Shopee", "Shopee", "TikTok"); if (r2.Next(3) != 0) { o.Track = o.ReturnTrack = o.ForwardTrack = o.AltTrack = ""; o.TrackingCodes = new(); } if (r2.Next(3) != 0) o.ReturnOrderId = ""; o.OrderId = Pick(r2, "O1", "O2"); }
+                foreach (var p in incoming) { p.Platform = "Shopee"; p.OrderId = Pick(r2, "O1", "O2"); if (r2.Next(3) != 0) p.ReturnOrderId = ""; if (p.Track.Length == 0 && p.ReturnTrack.Length == 0) p.Track = Pick(r2, "SPXVN000000011", "SPXVN000000012"); }
+            }
             var mode = r.Next(4) == 0 ? ImportProductMode.Replace : ImportProductMode.Supplement;
 
             var input = new JsonObject

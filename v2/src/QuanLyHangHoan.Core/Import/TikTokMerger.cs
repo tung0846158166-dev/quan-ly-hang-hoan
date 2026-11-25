@@ -170,6 +170,19 @@ public static class TikTokMerger
                     outcome.Enriched++;
                     continue;
                 }
+                var shopee = ParcelMatching.FindShopeeTracklessSameOrderIndexes(main, incoming);
+                if (shopee.Count > 1)
+                {
+                    outcome.Ambiguous.Add(new AmbiguousParcel(incoming.Platform, incoming.OrderId, incoming.Track, incoming.ReturnOrderId, shopee.Count));
+                    continue;
+                }
+                if (shopee.Count == 1)
+                {
+                    ParcelMerge.FillTrackless(main[shopee[0]], raw);
+                    outcome.Updated.Add(main[shopee[0]]);
+                    outcome.Enriched++;
+                    continue;
+                }
             }
 
             if (existingIdx != -1)

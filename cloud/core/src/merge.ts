@@ -5,7 +5,7 @@
  * không đụng trường kho nhập tay (trạng thái nhận, ngày nhận, giờ về do quét, ảnh, ghi chú của tôi, theo dõi).
  * Kiểm chứng: cloud/golden/merge-vectors.json do CHÍNH bản C# sinh ra.
  */
-import { cleanTrackingCode, findAllMatchIndexes, findTracklessSameOrderIndex, isSameReturnParcel } from "./matching";
+import { cleanTrackingCode, findAllMatchIndexes, findShopeeTracklessSameOrderIndexes, findTracklessSameOrderIndex, isSameReturnParcel } from "./matching";
 
 export interface MItem {
   product: string; color: string; size: string; qty: number; returnedQty: number;
@@ -469,6 +469,17 @@ export function applyImport(main: MOrder[], others: readonly OtherEntry[], parce
       if (fillIdx !== -1) {
         fillTrackless(main[fillIdx]!, raw);
         out.updated.push(main[fillIdx]!);
+        out.enriched++;
+        continue;
+      }
+      const shopee = findShopeeTracklessSameOrderIndexes(main, incoming);
+      if (shopee.length > 1) {
+        out.ambiguous.push({ platform: incoming.platform, orderId: incoming.orderId, track: incoming.track, returnOrderId: incoming.returnOrderId, candidates: shopee.length, orderConflict: false });
+        continue;
+      }
+      if (shopee.length === 1) {
+        fillTrackless(main[shopee[0]!]!, raw);
+        out.updated.push(main[shopee[0]!]!);
         out.enriched++;
         continue;
       }

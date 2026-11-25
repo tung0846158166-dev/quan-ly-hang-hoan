@@ -81,6 +81,24 @@ public static class ParcelMatching
     /// findTracklessSameOrderIndex: dòng Salework không có mã yêu cầu hoàn nên trước đây bị coi là kiện KHÁC; nay điền mã vào chính
     /// dòng cũ cùng mã đơn mà CHƯA có mã vận đơn nào (do file hoàn tiền TikTok / Google Sheet tạo).
     /// </summary>
+    /// <summary>
+    /// Shopee (quyết định 26/11/2026): kiện mới CÓ mã vận đơn, KHÔNG có mã yêu cầu trả; các kiện Shopee cùng mã đơn chưa có mã vận đơn nào và
+    /// cũng không có mã yêu cầu trả. Đúng một -> điền mã vào kiện đó; từ hai trở lên -> nhập nhằng (không đoán).
+    /// </summary>
+    public static IReadOnlyList<int> FindShopeeTracklessSameOrderIndexes(IReadOnlyList<Order> orders, Order incoming)
+    {
+        if (incoming.Platform != "Shopee" || ReturnParcelId(incoming).Length > 0) return Array.Empty<int>();
+        if (Clean(First(incoming.ReturnTrack, incoming.Track, incoming.ForwardTrack)).Length == 0) return Array.Empty<int>();
+        var oid = Up(incoming.OrderId);
+        if (oid.Length == 0) return Array.Empty<int>();
+        return Enumerable.Range(0, orders.Count).Where(i =>
+        {
+            var o = orders[i];
+            return Up(o.OrderId) == oid && o.Platform == "Shopee" && ReturnParcelId(o).Length == 0 &&
+                   Clean(o.Track).Length == 0 && Clean(o.ReturnTrack).Length == 0 && Clean(o.ForwardTrack).Length == 0 && Clean(o.AltTrack).Length == 0;
+        }).ToList();
+    }
+
     public static int FindTracklessSameOrderIndex(IReadOnlyList<Order> orders, Order incoming, Func<string, bool>? platformOk = null)
     {
         platformOk ??= p => p is "TikTok Shop" or "TikTok";

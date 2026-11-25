@@ -12,13 +12,6 @@ public sealed class WindowsClipboardService : IClipboardService
     public void SetText(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        try
-        {
-            Clipboard.SetText(text);
-        }
-        catch
-        {
-            // Bỏ qua nếu clipboard đang bị tiến trình khác khóa tạm thời
-        }
+        ClipboardHelper.SetTextInBackground(text);   // ngoài luồng giao diện; bỏ qua nếu clipboard đang bị tiến trình khác khóa
     }
 }

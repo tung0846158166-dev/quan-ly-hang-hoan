@@ -165,8 +165,8 @@ public sealed partial class AiChatViewModel : ObservableObject
     private void CopyMessage(AiChatMessage? m)
     {
         if (m is null) return;
-        try { System.Windows.Clipboard.SetText(ChatMarkdown.ToPlainText(m.Text)); StatusText = "Đã sao chép."; }
-        catch { StatusText = "Không sao chép được (clipboard đang bận)."; }
+        Services.ClipboardHelper.SetTextInBackground(ChatMarkdown.ToPlainText(m.Text),
+            ok => StatusText = ok ? "Đã sao chép." : "Không sao chép được (clipboard đang bận).");
     }
 
     [RelayCommand]

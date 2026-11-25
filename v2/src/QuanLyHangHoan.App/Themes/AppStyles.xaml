@@ -250,11 +250,7 @@
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="16,14" />
-        <Setter Property="Effect">
-            <Setter.Value>
-                <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.06" Color="#0F172A" />
-            </Setter.Value>
-        </Setter>
+        <!-- Không dùng DropShadowEffect: vẽ bằng CPU, làm trang chủ cuộn giật. -->
     </Style>
 
     <Style x:Key="SectionHeadingStyle" TargetType="TextBlock">

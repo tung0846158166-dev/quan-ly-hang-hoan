@@ -418,6 +418,7 @@
                           Background="{DynamicResource CardBgBrush}"
                           MinRowHeight="36"
                           EnableRowVirtualization="True"
+                          EnableColumnVirtualization="True"
                           Sorting="OrdersGrid_Sorting"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Standard"

@@ -44,18 +44,9 @@ public static class ClickToCopy
     public static void CopyText(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            try
-            {
-                Clipboard.SetText(text);
-                Notify?.Invoke($"📋 Đã sao chép: {text}");
-                return;
-            }
-            catch (System.Runtime.InteropServices.COMException) { System.Threading.Thread.Sleep(30); }   // bộ nhớ tạm đang bị app khác giữ
-            catch (System.Runtime.InteropServices.ExternalException) { System.Threading.Thread.Sleep(30); }
-        }
-        Notify?.Invoke("Không sao chép được (bộ nhớ tạm đang bận), thử lại.");
+        // Chạy ngoài luồng giao diện: bộ nhớ tạm bị app khác giữ thì chỉ luồng nền chờ, giao diện không bị đứng.
+        Services.ClipboardHelper.SetTextInBackground(text, ok =>
+            Notify?.Invoke(ok ? $"📋 Đã sao chép: {text}" : "Không sao chép được (bộ nhớ tạm đang bận), thử lại."));
     }
 
     private static string? FindText(DependencyObject root)

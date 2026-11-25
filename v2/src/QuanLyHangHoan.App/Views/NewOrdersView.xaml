@@ -129,6 +129,7 @@
                           Background="{DynamicResource CardBgBrush}"
                           RowHeight="36"
                           EnableRowVirtualization="True"
+                          EnableColumnVirtualization="True"
                           VirtualizingPanel.IsVirtualizing="True"
                           VirtualizingPanel.VirtualizationMode="Standard"
                           VirtualizingPanel.CacheLengthUnit="Page"

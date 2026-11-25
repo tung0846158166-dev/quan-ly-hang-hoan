@@ -1,6 +1,6 @@
 ﻿{
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "app-backend",
+  "name": "qlhh-cloud",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,4 +12,5 @@
   "triggers": { "crons": ["17 20 * * *"] },
   "vars": { "PHOTO_RETENTION_DAYS": "90" }
 }
+
 

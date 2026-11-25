@@ -1,4 +1,4 @@
-# TASKS (ai nhận: claude | antigravity | user)
+﻿# TASKS (ai nhận: claude | antigravity | user)
 
 Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận/xong. Chi tiết xem PLAN.md.
 
@@ -122,3 +122,11 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
 - [x] (claude) Nút "Đo ngay" tốc độ phản hồi trong Cài đặt iPhone (latency_ping -> pc_pong); test PC xanh, iPhone chờ CI
 - [ ] (user) Thử Google Sheet thật; nhập khóa Google Gemini; xác nhận dòng MQTT 1/1 với EMQX; thử iPhone build 28 trên máy thật
 - [ ] (claude) Đóng gói bộ cài exe mới (`v2/installer/build-installer.ps1`) và chuyển sang chạy thật (user quyết định lúc nào)
+
+## Giai đoạn 6 - Chuyển sang CLOUD (Cloudflare) - xem docs/cloud-design.md, cloud/API.md (25/11/2026)
+- [x] (claude) Thiết kế đã duyệt (một cửa hàng nội bộ, mất mạng = khóa ghi, ảnh R2 xem chung, tự xóa sau 90 ngày, Sheet nạp trên cloud)
+- [x] (claude) `cloud/core` (TypeScript) + `ScanDecider` (C#) cùng đạt bộ ca thử chung `cloud/golden/scan-vectors.json` (26 ca)
+- [x] (claude) `cloud/worker`: Worker + Durable Object SQLite: ghép thiết bị, /sync theo rev, /ops (quét nguyên tử, sửa, lưu trữ, xóa mềm...), /import, ảnh R2, hạn mức, WebSocket, Cron xóa ảnh 90 ngày. 26 test cục bộ đạt; `wrangler dev` chạy thật cục bộ (bootstrap, nhập, quét OK). CHƯA triển khai lên Cloudflare thật (cần chủ dự án làm `cloud/DEPLOY.md`)
+- [~] (antigravity) T041 giao diện trạng thái cloud + khóa ghi trên máy tính; T042 trên iPhone; T043 bộ gộp Google Sheet bằng JS (Apps Script) + ca thử chung; T044 công cụ nhập dữ liệu cũ (chạy thử)
+- [ ] (claude) Bản `ICloudLink` thật cho máy tính (ghép, WebSocket, đồng bộ vào SQLite cục bộ), chuyển các dịch vụ quét/sửa sang cloud, chạy song song bản cũ (GĐ2)
+- [ ] (claude) Máy khách cloud cho iPhone + ảnh lên R2 (GĐ3); chuyển nạp Google Sheet (Apps Script) và tắt MQTT/ntfy cũ (GĐ4)

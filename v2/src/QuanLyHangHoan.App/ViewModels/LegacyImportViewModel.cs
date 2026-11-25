@@ -8,12 +8,29 @@ public sealed partial class LegacyImportViewModel : ObservableObject
 {
     private readonly ILegacyImporter _importer;
     private readonly IFolderPickerService? _folderPicker;
+    private readonly WriteGate _writeGate;
 
-    public LegacyImportViewModel(ILegacyImporter importer, IFolderPickerService? folderPicker = null, bool isDemoMode = false)
+    public LegacyImportViewModel(ILegacyImporter importer, IFolderPickerService? folderPicker = null, bool isDemoMode = false, WriteGate? writeGate = null)
     {
         _importer = importer;
         _folderPicker = folderPicker;
         _isDemoMode = isDemoMode;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
+    }
+
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        OnPropertyChanged(nameof(CanExecuteImport));
+        ExecuteImportCommand.NotifyCanExecuteChanged();
     }
 
     public event Func<Task>? ImportSucceeded;
@@ -85,7 +102,8 @@ public sealed partial class LegacyImportViewModel : ObservableObject
     public bool CanRunDryRun => !IsBusy && !string.IsNullOrWhiteSpace(SourceFolderPath);
 
     public bool CanExecuteImport =>
-        !IsBusy
+        CanWrite
+        && !IsBusy
         && HasCompletedDryRun
         && IsConfirmed
         && !string.IsNullOrWhiteSpace(SourceFolderPath);

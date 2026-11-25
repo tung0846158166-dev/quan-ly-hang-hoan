@@ -30,6 +30,7 @@
                     <Button Command="{Binding ImportFilesCommand}"
                             Content="{Binding ImportButtonText}"
                             IsEnabled="{Binding CanImport}"
+                            ToolTip="{Binding WriteDisabledTooltip}"
                             Style="{StaticResource PrimaryActionButtonStyle}"
                             Background="#2563EB"
                             Height="34"

@@ -79,6 +79,7 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
     private readonly Services.IOrderExportService? _exportService;
+    private readonly WriteGate _writeGate;
     private List<ArchivedOrderRowViewModel> _allRows = [];
 
     // ---- Xuất Excel/CSV (chỉ đọc dữ liệu đơn) ----
@@ -115,7 +116,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
         Services.IOrderExportService? exportService = null,
-        bool loadInitialData = true)
+        bool loadInitialData = true,
+        WriteGate? writeGate = null)
     {
         _provider = provider;
         _exportService = exportService;
@@ -126,6 +128,11 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         _onOrdersDeleted = onOrdersDeleted;
         _onNotify = onNotify;
         _onOpenDetail = onOpenDetail;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
         SortOptions =
         [
             new SortOptionItem("default", "Mặc định (STT)"),
@@ -362,9 +369,22 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
     /// <summary>Yêu cầu giao diện cuộn tới và làm nổi bật dòng này.</summary>
     public event Action<ArchivedOrderRowViewModel>? RevealRequested;
 
-    [RelayCommand]
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        UnarchiveRowCommand.NotifyCanExecuteChanged();
+        DeleteRowCommand.NotifyCanExecuteChanged();
+        HandleDeleteKeyCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task UnarchiveRowAsync(ArchivedOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null) return;
 
@@ -372,9 +392,10 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task DeleteRowAsync(ArchivedOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -407,8 +428,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         _onOpenDetail?.Invoke(target.Source);
     }
 
-    [RelayCommand]
-    public Task HandleDeleteKeyAsync() => DeleteRowAsync(SelectedRow);
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public Task HandleDeleteKeyAsync() => CanWrite ? DeleteRowAsync(SelectedRow) : Task.CompletedTask;
 
     private static int CompareNullableDateDesc(DateTime? a, DateTime? b, int sttA, int sttB)
     {

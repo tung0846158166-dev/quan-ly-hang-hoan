@@ -52,6 +52,7 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
     private readonly Func<Task>? _onDataChangedAsync;
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
+    private readonly WriteGate _writeGate;
     private List<DeletedOrderRowViewModel> _allRows = [];
     private bool _suppressRefresh;
 
@@ -62,7 +63,8 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         Func<Task>? onDataChangedAsync = null,
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
-        bool loadInitialData = true)
+        bool loadInitialData = true,
+        WriteGate? writeGate = null)
     {
         _provider = provider;
         _editService = editService;
@@ -70,6 +72,11 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         _onDataChangedAsync = onDataChangedAsync;
         _onNotify = onNotify;
         _onOpenDetail = onOpenDetail;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
         SortOptions =
         [
             new SortOptionItem("default", "Mặc định (STT)"),
@@ -340,9 +347,20 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
         _onOpenDetail?.Invoke(order);
     }
 
-    [RelayCommand]
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        RestoreRowCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task RestoreRowAsync(DeletedOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null) return;
 

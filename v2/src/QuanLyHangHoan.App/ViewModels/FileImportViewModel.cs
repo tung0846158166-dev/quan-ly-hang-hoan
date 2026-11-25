@@ -29,17 +29,24 @@ public sealed partial class FileImportViewModel : ObservableObject
     private readonly IImportFilePickerService _filePickerService;
     private readonly IConfirmationService _confirmationService;
     private readonly Action<Action> _dispatchToUi;
+    private readonly WriteGate _writeGate;
 
     public FileImportViewModel(
         IFileImportController controller,
         IImportFilePickerService? filePickerService = null,
         IConfirmationService? confirmationService = null,
-        Action<Action>? dispatchToUi = null)
+        Action<Action>? dispatchToUi = null,
+        WriteGate? writeGate = null)
     {
         _controller = controller;
         _filePickerService = filePickerService ?? new WindowsImportFilePickerService();
         _confirmationService = confirmationService ?? new WindowsConfirmationService();
         _dispatchToUi = dispatchToUi ?? (a => a());
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
 
         PriceModeOptions =
         [
@@ -73,6 +80,7 @@ public sealed partial class FileImportViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanImport))]
     [NotifyPropertyChangedFor(nameof(CanSelectFiles))]
     [NotifyPropertyChangedFor(nameof(ImportButtonText))]
+    [NotifyCanExecuteChangedFor(nameof(ImportFilesCommand))]
     private bool _isImporting;
 
     [ObservableProperty]
@@ -102,8 +110,19 @@ public sealed partial class FileImportViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasResults))]
     private string _errorMessage = string.Empty;
 
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        OnPropertyChanged(nameof(CanImport));
+        ImportFilesCommand.NotifyCanExecuteChanged();
+    }
+
     public bool HasSelectedFiles => SelectedFiles.Count > 0;
-    public bool CanImport => SelectedFiles.Count > 0 && !IsImporting;
+    public bool CanImport => CanWrite && SelectedFiles.Count > 0 && !IsImporting;
     public bool CanSelectFiles => !IsImporting;
     public string ImportButtonText => IsImporting ? "Đang nạp..." : "Nạp";
     public bool HasSummary => !string.IsNullOrWhiteSpace(SummaryText);
@@ -163,7 +182,7 @@ public sealed partial class FileImportViewModel : ObservableObject
         NotifySelectedFilesChanged();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanImport))]
     public async Task ImportFilesAsync()
     {
         if (!CanImport) return;
@@ -259,6 +278,7 @@ public sealed partial class FileImportViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(HasSelectedFiles));
         OnPropertyChanged(nameof(CanImport));
+        ImportFilesCommand.NotifyCanExecuteChanged();
     }
 
     private static string FormatFileSize(string fullPath)

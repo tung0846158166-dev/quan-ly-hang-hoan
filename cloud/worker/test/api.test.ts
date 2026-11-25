@@ -372,6 +372,31 @@ describe("ảnh", () => {
     expect((await put(phoneA, "bad id!", "parcelId=p1")).status).toBe(422);
   });
 
+  it("chuyển ảnh CŨ (legacy): chỉ chủ; không cần vừa quét; giữ giờ chụp gốc; ảnh quá hạn bị từ chối; không đè ảnh mới nhất của kiện", async () => {
+    await importParcels([parcel("p1"), parcel("p2")]);
+    expect((await put(phoneA, "legacy_001", "parcelId=p1&legacy=1")).status).toBe(403);          // nhân viên không được
+    const recent = Date.now() - 5 * 86_400_000;
+    expect((await put(owner, "legacy_001", `parcelId=p1&legacy=1&takenAt=${recent}`)).status).toBe(200);
+    const sync = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === "p1");
+    expect(sync.parcel.photoId).toBe("legacy_001");                                                // kiện chưa có ảnh: gắn
+    const s = await stub();
+    const row = await runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => state.storage.sql.exec("SELECT taken_at FROM photos WHERE photo_id='legacy_001'").one());
+    expect(row.taken_at).toBe(recent);
+
+    const tooOld = Date.now() - 200 * 86_400_000;
+    const old = await put(owner, "legacy_002", `parcelId=p1&legacy=1&takenAt=${tooOld}`);
+    expect(old.status).toBe(422);
+    expect((await old.json() as any).error.code).toBe("expired");
+
+    // ảnh cũ thứ hai không đè ảnh đang gắn của kiện
+    expect((await put(owner, "legacy_003", `parcelId=p1&legacy=1&takenAt=${recent}`)).status).toBe(200);
+    const again = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === "p1");
+    expect(again.parcel.photoId).toBe("legacy_001");
+    expect((await call("GET", "/parcels/p1/photos", undefined, owner)).data).toHaveLength(2);
+    // không có takenAt: coi như mới chụp
+    expect((await put(owner, "legacy_004", "parcelId=p2&legacy=1")).status).toBe(200);
+  });
+
   it("Cron xóa ảnh quá 90 ngày và ghi nhật ký; ảnh mới giữ nguyên", async () => {
     await importParcels([parcel("p1")]);
     await scan(phoneA, "TRK-p1");

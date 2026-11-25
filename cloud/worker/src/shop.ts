@@ -515,12 +515,23 @@ export class ShopDO extends DurableObject<Env> {
     const kind = url.searchParams.get("kind") === "thumb" ? "thumb" : "full";
     const mime = (url.searchParams.get("mime") ?? "image/jpeg").toLowerCase();
     if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") return fail(422, "invalid", "Chỉ nhận ảnh JPEG, PNG hoặc WebP.");
-    if (dev.kind === "pc") return fail(403, "forbidden", "Chỉ điện thoại mới được tải ảnh lên.");
+    // Chuyển ảnh CŨ lên (công cụ nhập dữ liệu, chỉ chủ cửa hàng): không cần vừa quét, giữ giờ chụp gốc nếu còn trong hạn lưu.
+    const legacy = url.searchParams.get("legacy") === "1";
+    if (legacy && dev.role !== "owner") return fail(403, "forbidden", "Chỉ chủ cửa hàng mới chuyển được ảnh cũ.");
+    if (!legacy && dev.kind === "pc") return fail(403, "forbidden", "Chỉ điện thoại mới được tải ảnh lên.");
+    let takenAt = Date.now();
+    if (legacy && url.searchParams.has("takenAt")) {
+      const t = Number(url.searchParams.get("takenAt"));
+      const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
+      if (!Number.isFinite(t) || t <= 0) return fail(422, "invalid", "Giờ chụp không hợp lệ.");
+      if (t < Date.now() - days * DAY_MS) return fail(422, "expired", `Ảnh đã quá ${days} ngày, vượt hạn lưu.`);
+      takenAt = Math.min(t, Date.now());
+    }
     const parcel = this.loadParcel(parcelId);
     if (!parcel) return fail(404, "not_found", "Không tìm thấy kiện.");
     const existing = this.db.first<Row>("SELECT device_id, parcel_id FROM photos WHERE photo_id = ?", photoId);
     if (existing && existing.parcel_id !== parcelId) return fail(409, "conflict", "Mã ảnh đã thuộc kiện khác.");
-    if (!existing) {
+    if (!existing && !legacy) {
       const scan = this.db.first<Row>(
         "SELECT at FROM scans WHERE parcel_id = ? AND device_id = ? AND outcome IN ('received','alreadyReceived') ORDER BY at DESC LIMIT 1", parcelId, dev.deviceId);
       if (!scan || Date.now() - Number(scan.at) > SCAN_PHOTO_WINDOW_MS)
@@ -531,12 +542,11 @@ export class ShopDO extends DurableObject<Env> {
     if (bytes.byteLength > MAX_PHOTO_BYTES) return fail(413, "invalid", "Ảnh quá lớn (tối đa 1 MB sau khi thu nhỏ).");
     const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) => x.toString(16).padStart(2, "0")).join("");
     await this.env.IMAGES.put(`${kind === "thumb" ? "t" : "p"}/${photoId}`, bytes, { httpMetadata: { contentType: mime } });
-    const now = Date.now();
     this.ctx.storage.transactionSync(() => {
       if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at) VALUES (?,?,?,?,?,?,?)",
-        photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, now);
+        photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt);
       else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ? WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ? WHERE photo_id = ?", bytes.byteLength, mime, photoId);
-      if (kind === "full" && parcel.photoId !== photoId) {
+      if (kind === "full" && parcel.photoId !== photoId && (!legacy || parcel.photoId === "")) {
         const before = parcel.photoId;
         parcel.photoId = photoId;
         this.writeParcel(parcel);

@@ -45,7 +45,7 @@
                         Background="#16A34A"
                         VerticalAlignment="Center"
                         Margin="12,0,0,0"
-                        ToolTip="Nhập mã vận đơn và thông tin để tạo đơn mới"
+                        ToolTip="{Binding WriteDisabledTooltip, TargetNullValue='Nhập mã vận đơn và thông tin để tạo đơn mới'}"
                         AutomationProperties.Name="Tạo đơn mới"
                         Visibility="{Binding ShowCreateButton, Converter={StaticResource BoolToVis}}" />
 
@@ -369,11 +369,13 @@
                            Margin="0,0,14,0" />
                 <Button Content="✅ Đánh dấu đã nhận"
                         Command="{Binding BulkMarkReceivedCommand}"
+                        ToolTip="{Binding WriteDisabledTooltip}"
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#16A34A"
                         Margin="0,0,8,0" />
                 <Button Content="📦 Dời sang lưu trữ"
                         Command="{Binding BulkArchiveCommand}"
+                        ToolTip="{Binding WriteDisabledTooltip}"
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#2563EB"
                         Margin="0,0,8,0" />
@@ -382,9 +384,10 @@
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#D97706"
                         Margin="0,0,8,0"
-                        ToolTip="Thêm tất cả các dòng đang chọn vào mục Đang theo dõi" />
+                        ToolTip="{Binding WriteDisabledTooltip, TargetNullValue='Thêm tất cả các dòng đang chọn vào mục Đang theo dõi'}" />
                 <Button Content="🗑️ Xóa"
                         Command="{Binding BulkDeleteCommand}"
+                        ToolTip="{Binding WriteDisabledTooltip}"
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#DC2626"
                         Margin="0,0,8,0" />
@@ -438,19 +441,29 @@
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="🔄 Đổi trạng thái..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="📝 Ghi chú của tôi..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.EditUserNoteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="✏️ Sửa lý do..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.EditNoteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="⭐ Bật/tắt theo dõi..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.ToggleWatchlistCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="📦 Dời sang kho lưu trữ"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.ArchiveRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="📜 Xem lịch sử sửa"
@@ -458,6 +471,8 @@
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="🗑️ Xóa... (Del)"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.DeleteRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                         </ContextMenu>

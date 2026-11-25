@@ -102,6 +102,16 @@ public partial class App : Application
             ISaleworkController fakeSalework = new FakeSaleworkController();
             IFileImportController fakeFileImport = new FakeFileImportController();
             IReturnWatchService fakeReturnWatch = new FakeReturnWatchService();
+            var demoNow = fakeData.GetCurrentTime();
+            var fakeCloud = new FakeCloudLink();
+            fakeCloud.Set(
+                CloudState.Connected,
+                error: null,
+                quota: new CloudQuota(demoNow.ToString("yyyy-MM-dd"), 8200, 100000, 5100, 100000, 90000, 5000000, "ok"),
+                lastSync: demoNow,
+                role: "owner",
+                deviceName: "Máy tính kho (Demo)",
+                baseUrl: "https://qlhh-demo.workers.dev");
             mainViewModel = new MainViewModel(
                 fakeData,
                 fakeData,
@@ -130,7 +140,8 @@ public partial class App : Application
                 autoStartService: autoStartService,
                 trayService: trayService,
                 notificationService: notificationService,
-                alertNotifyStateStore: alertStateStore);
+                alertNotifyStateStore: alertStateStore,
+                cloudLink: fakeCloud);
         }
         else
         {
@@ -207,7 +218,9 @@ public partial class App : Application
                 notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),
                 newOrderCreator: isDemoMode ? null : new SqliteNewOrderCreator(AppPaths.DatabasePath),
                 newOrderDialogService: new WindowsNewOrderDialogService(),
-                diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)));
+                diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)),
+                // Chế độ cục bộ hiện tại (chưa bật cloud): truyền null để giữ nguyên hành vi hiện tại; Claude thay bằng bản ICloudLink thật khi bật cloud.
+                cloudLink: null);
         }
 
         _mainViewModel = mainViewModel;

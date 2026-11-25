@@ -185,11 +185,14 @@ public sealed class CloudApi
     }
 
     // ---- ảnh
-    public async Task PutPhotoAsync(string photoId, string parcelId, string mime, bool thumb, byte[] bytes, CancellationToken ct = default)
+    /// <param name="legacy">Chuyển ảnh CŨ (chỉ chủ cửa hàng): không cần vừa quét.</param>
+    /// <param name="takenAtMs">Giờ chụp gốc (ms); chỉ dùng với legacy, quá hạn lưu thì cloud từ chối.</param>
+    public async Task PutPhotoAsync(string photoId, string parcelId, string mime, bool thumb, byte[] bytes, CancellationToken ct = default, bool legacy = false, long? takenAtMs = null)
     {
         var content = new ByteArrayContent(bytes);
         content.Headers.ContentType = new MediaTypeHeaderValue(mime);
         var q = $"parcelId={Uri.EscapeDataString(parcelId)}&mime={Uri.EscapeDataString(mime)}" + (thumb ? "&kind=thumb" : "");
+        if (legacy) q += "&legacy=1" + (takenAtMs is { } t ? "&takenAt=" + t : "");
         await SendRawAsync(HttpMethod.Put, $"/photos/{Uri.EscapeDataString(photoId)}?{q}", content, null, ct).ConfigureAwait(false);
     }
 

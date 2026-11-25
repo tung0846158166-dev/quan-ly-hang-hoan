@@ -83,6 +83,9 @@
                                 <Grid>
                                     <TextBox x:Name="ScanCodeBox"
                                              Text="{Binding ScanInput, UpdateSourceTrigger=PropertyChanged}"
+                                             IsEnabled="{Binding CanWrite}"
+                                             ToolTipService.ShowOnDisabled="True"
+                                             ToolTip="{Binding WriteDisabledTooltip}"
                                              BorderThickness="0"
                                              Background="Transparent"
                                              VerticalContentAlignment="Center"
@@ -114,6 +117,7 @@
                             <Button Grid.Column="1"
                                     Content="Nhận kiện (Enter)"
                                     Command="{Binding SubmitScanCommand}"
+                                    ToolTip="{Binding WriteDisabledTooltip}"
                                     Style="{StaticResource PrimaryActionButtonStyle}"
                                     Background="#2563EB"
                                     Height="46"

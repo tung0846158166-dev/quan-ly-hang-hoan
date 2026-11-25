@@ -25,6 +25,7 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
     private readonly IConfirmationService _confirmationService;
     private readonly Action<Action> _dispatchToUi;
     private readonly Func<DateTime> _clock;
+    private readonly WriteGate _writeGate;
     private bool _suppressSave;
     private bool _disposed;
 
@@ -33,13 +34,19 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
         IFolderPickerService? folderPickerService = null,
         IConfirmationService? confirmationService = null,
         Action<Action>? dispatchToUi = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        WriteGate? writeGate = null)
     {
         _controller = controller;
         _folderPickerService = folderPickerService ?? new WindowsFolderPickerService();
         _confirmationService = confirmationService ?? new WindowsConfirmationService();
         _dispatchToUi = dispatchToUi ?? (a => a());
         _clock = clock ?? (() => DateTime.Now);
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
 
         PriceModeOptions =
         [
@@ -77,10 +84,14 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(HasFolder))]
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
     [NotifyPropertyChangedFor(nameof(DisplayDirText))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunExistingCommand))]
     private string _dir = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunExistingCommand))]
     private bool _isEnabled;
 
     [ObservableProperty]
@@ -98,6 +109,8 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
     [NotifyPropertyChangedFor(nameof(RunNowButtonText))]
     [NotifyPropertyChangedFor(nameof(RunExistingButtonText))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunExistingCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -112,8 +125,20 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _skipUnshippedCancel;
 
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        OnPropertyChanged(nameof(CanRunNow));
+        RunNowCommand.NotifyCanExecuteChanged();
+        RunExistingCommand.NotifyCanExecuteChanged();
+    }
+
     public bool HasFolder => !string.IsNullOrWhiteSpace(Dir);
-    public bool CanRunNow => HasFolder && IsEnabled && !IsRunning;
+    public bool CanRunNow => CanWrite && HasFolder && IsEnabled && !IsRunning;
     public string DisplayDirText => HasFolder ? Dir : "(Chưa chọn thư mục)";
     public string LastStatusText => string.IsNullOrWhiteSpace(LastNote) ? "Chưa nạp file nào." : LastNote;
     public bool IsStatusError => !LastOk && !string.IsNullOrWhiteSpace(LastNote);
@@ -155,7 +180,7 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
         SyncFromController();
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunNow))]
     public async Task RunNowAsync()
     {
         if (!CanRunNow) return;
@@ -170,7 +195,7 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunNow))]
     public async Task RunExistingAsync()
     {
         if (!CanRunNow) return;
@@ -305,6 +330,10 @@ public sealed partial class FolderWatchViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed -= OnWriteGateChanged;
+        }
         _controller.Completed -= OnControllerCompleted;
         _controller.ConfigChanged -= OnControllerConfigChanged;
     }

@@ -409,7 +409,8 @@ public sealed class T020SearchAndWatchlistUiTests : IDisposable
             {
                 vm.WatchlistVm.RemoveFromWatchlistCommand.Execute(row);
             }
-            WpfTestHost.PumpDispatcher(window);
+            // việc nạp lại dữ liệu chạy ở luồng nền nên đợi tối đa 10 giây (không đợi cố định, tránh chập chờn khi máy tải cao)
+            for (var w = 0; w < 200 && !vm.WatchlistVm.IsEmpty; w++) { WpfTestHost.PumpDispatcher(window); System.Threading.Thread.Sleep(50); }
             Assert.True(vm.WatchlistVm.IsEmpty);
             WpfTestHost.SaveWindowPng(window, Path.Combine(screensDir, "04-watchlist-empty.png"));
 

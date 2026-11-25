@@ -88,6 +88,10 @@
         <ContentControl Grid.Row="1" Content="{Binding ImportPage}"
                         Visibility="{Binding IsImportTab, Converter={StaticResource BoolToVis}}" />
 
+        <!-- Nội dung thẻ Cloud (chỉ hiện khi bật cloud) -->
+        <views:CloudSettingsView Grid.Row="1" DataContext="{Binding Cloud}"
+                                 Visibility="{Binding DataContext.IsCloudTab, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVis}}" />
+
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20,16"
                       Visibility="{Binding IsGeneralTab, Converter={StaticResource BoolToVis}}">
             <StackPanel MaxWidth="900" HorizontalAlignment="Left">

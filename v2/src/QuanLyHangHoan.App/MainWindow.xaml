@@ -268,14 +268,15 @@
             </DockPanel>
         </Border>
 
-        <!-- Main Content Area + Top Global Search Bar + Floating Toast -->
+        <!-- Main Content Area + Top Global Search Bar + Cloud Banner + Floating Toast -->
         <Grid Grid.Column="1">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- Top Global Search Bar (T020) -->
+            <!-- Top Global Search Bar (T020) + Cloud Status Pill (T041) + Notification Bell (T027) -->
             <Border Grid.Row="0"
                     Background="{DynamicResource CardBgBrush}"
                     BorderBrush="{DynamicResource BorderBrushLight}"
@@ -284,6 +285,7 @@
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
@@ -368,7 +370,110 @@
                                    Foreground="{DynamicResource NeutralBadgeFgBrush}" />
                     </Border>
 
-                    <Button x:Name="NotificationBellButton" Grid.Column="2" Margin="10,0,0,0" Padding="8,0" Height="34" Cursor="Hand"
+                    <!-- Chấm trạng thái Cloud (T041, chỉ hiện khi bật cloud) -->
+                    <Button x:Name="CloudStatusButton" Grid.Column="2" Margin="10,0,0,0" Height="34" Cursor="Hand"
+                            Command="{Binding CloudVm.TogglePopupCommand}"
+                            ToolTip="{Binding CloudVm.StatusTooltip}"
+                            AutomationProperties.Name="Trạng thái Cloud"
+                            Visibility="{Binding CloudVm.IsEnabled, Converter={StaticResource BoolToVis}}">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bd"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="10,0">
+                                    <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Opacity" Value="0.88" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="{DynamicResource NeutralBadgeBgBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource NeutralBadgeBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource NeutralBadgeFgBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Green">
+                                        <Setter Property="Background" Value="{DynamicResource AlertGreenBadgeBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertGreenCardBorderBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Blue">
+                                        <Setter Property="Background" Value="{DynamicResource InfoBlueBadgeBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueCardBorderBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource InfoBlueTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Yellow">
+                                        <Setter Property="Background" Value="{DynamicResource AlertYellowBadgeBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowCardBorderBrush}" />
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Red">
+                                        <Setter Property="Background" Value="#DC2626" />
+                                        <Setter Property="BorderBrush" Value="#991B1B" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="CloudStatusDot" Width="9" Height="9" CornerRadius="5" Margin="0,0,7,0" VerticalAlignment="Center">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#64748B" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Green">
+                                                <Setter Property="Background" Value="#16A34A" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Blue">
+                                                <Setter Property="Background" Value="#2563EB" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Yellow">
+                                                <Setter Property="Background" Value="#D97706" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Red">
+                                                <Setter Property="Background" Value="#FFFFFF" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                            <TextBlock x:Name="CloudStatusLabel" Text="{Binding CloudVm.StatusText}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                            <Border Margin="6,0,0,0" Padding="5,1" CornerRadius="6" VerticalAlignment="Center"
+                                    Visibility="{Binding CloudVm.ShowStatusQuotaBadge, Converter={StaticResource BoolToVis}}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#F59E0B" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.IsQuotaStop}" Value="True">
+                                                <Setter Property="Background" Value="#991B1B" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock FontSize="10" FontWeight="Bold" Foreground="#FFFFFF">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="⚠ Hạn mức" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CloudVm.IsQuotaStop}" Value="True">
+                                                    <Setter Property="Text" Value="⛔ Hết hạn mức" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="NotificationBellButton" Grid.Column="3" Margin="10,0,0,0" Padding="8,0" Height="34" Cursor="Hand"
                             Command="{Binding NotificationsVm.ToggleCommand}"
                             Background="{DynamicResource NeutralBadgeBgBrush}" BorderBrush="{DynamicResource NeutralBadgeBorderBrush}" BorderThickness="1"
                             ToolTip="Thông báo (Ctrl+Shift+N)" AutomationProperties.Name="Thông báo">
@@ -384,10 +489,48 @@
                 </Grid>
             </Border>
 
-            <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+            <!-- Banner "chỉ xem" khi mất kết nối / khóa ghi (T041 mục 3) -->
+            <Border x:Name="CloudReadOnlyBanner"
+                    Grid.Row="1"
+                    Background="{DynamicResource AlertRedCardBgBrush}"
+                    BorderBrush="{DynamicResource AlertRedBorderStrongBrush}"
+                    BorderThickness="0,0,0,1.5"
+                    Padding="16,9"
+                    Visibility="{Binding CloudVm.ShowReadOnlyBanner, Converter={StaticResource BoolToVis}}">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Button Content="🔄 Đồng bộ ngay"
+                                Command="{Binding CloudVm.SyncNowCommand}"
+                                Visibility="{Binding CloudVm.ShowBannerSyncButton, Converter={StaticResource BoolToVis}}"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                Background="#DC2626"
+                                Padding="11,4"
+                                FontSize="11.5"
+                                Margin="0,0,6,0" />
+                        <Button Content="⚙️ Cài đặt Cloud"
+                                Command="{Binding CloudVm.OpenCloudSettingsCommand}"
+                                Style="{StaticResource FilterPillButtonStyle}"
+                                Padding="10,4"
+                                FontSize="11.5"
+                                Margin="0" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="🔒" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <TextBlock x:Name="CloudReadOnlyBannerText"
+                                   Text="{Binding CloudVm.ReadOnlyBannerText}"
+                                   FontSize="12.5"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource AlertRedTextBrush}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <ContentControl Grid.Row="2" Content="{Binding CurrentPage}" />
 
             <!-- Trợ lý AI: cửa sổ chat dạng popup (mở bằng nút ✨ nổi ở góc phải dưới, có ở mọi màn hình) -->
-            <Border x:Name="AiChatPanel" Grid.Row="1" Panel.ZIndex="115" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            <Border x:Name="AiChatPanel" Grid.Row="2" Panel.ZIndex="115" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                     Margin="0,0,20,132" Width="440" Height="560"
                     Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushStrong}" BorderThickness="1.2" CornerRadius="12"
                     Visibility="{Binding AiChatVm.IsPanelOpen, Converter={StaticResource BoolToVis}}">
@@ -398,7 +541,7 @@
                     <views:AiChatView DataContext="{Binding AiChatVm}" />
                 </Border>
             </Border>
-            <Button x:Name="AiFloatingButton" Grid.Row="1" Panel.ZIndex="120" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            <Button x:Name="AiFloatingButton" Grid.Row="2" Panel.ZIndex="120" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                     Margin="0,0,44,66" Width="56" Height="56" Cursor="Hand" ToolTip="Hỏi AI về đơn hàng"
                     Command="{Binding AiChatVm.TogglePanelCommand}" AutomationProperties.Name="Hỏi AI">
                 <Button.Template>
@@ -430,8 +573,149 @@
                 </Button.Template>
             </Button>
 
+            <!-- Chi tiết trạng thái Cloud (popup khi bấm chấm trạng thái, T041 mục 1 & 5) -->
+            <Border x:Name="CloudStatusPopup" Grid.Row="2" Panel.ZIndex="112" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,4,72,0" Width="390"
+                    Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushStrong}" BorderThickness="1.2" CornerRadius="10"
+                    Padding="16,14"
+                    Visibility="{Binding CloudVm.IsPopupOpen, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.22" Color="#000000" />
+                </Border.Effect>
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <Button DockPanel.Dock="Right" Content="✕" Command="{Binding CloudVm.ClosePopupCommand}"
+                                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource InkMutedBrush}"
+                                FontWeight="Bold" Cursor="Hand" Padding="6,2" ToolTip="Đóng (Esc)" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="11" Height="11" CornerRadius="6" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#64748B" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Green">
+                                                <Setter Property="Background" Value="#16A34A" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Blue">
+                                                <Setter Property="Background" Value="#2563EB" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Yellow">
+                                                <Setter Property="Background" Value="#D97706" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.StatusColorKey}" Value="Red">
+                                                <Setter Property="Background" Value="#DC2626" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                            <TextBlock Text="{Binding CloudVm.StatusText}" FontSize="14.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <StackPanel Margin="0,0,0,8" Visibility="{Binding CloudVm.ShowPairedInfo, Converter={StaticResource BoolToVis}}">
+                        <TextBlock FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}">
+                            <Run Text="Thiết bị: " FontWeight="SemiBold" /><Run Text="{Binding CloudVm.DeviceNameDisplay, Mode=OneWay}" FontWeight="Bold" />
+                            <Run Text=" • " /><Run Text="{Binding CloudVm.RoleDisplayText, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <TextBlock FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,8">
+                        <Run Text="Lần đồng bộ cuối: " FontWeight="SemiBold" /><Run Text="{Binding CloudVm.LastSyncText, Mode=OneWay}" />
+                    </TextBlock>
+
+                    <Border Background="{DynamicResource AlertRedCardBgBrush}"
+                            BorderBrush="{DynamicResource AlertRedCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="7"
+                            Padding="10,8"
+                            Margin="0,0,0,10"
+                            Visibility="{Binding CloudVm.HasLastError, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="Lỗi gần nhất:" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AlertRedTextBrush}" />
+                            <TextBlock Text="{Binding CloudVm.LastError}" FontSize="12" Foreground="{DynamicResource AlertRedDarkTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hạn mức hôm nay thu gọn -->
+                    <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrushLight}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,8"
+                            Margin="0,0,0,12"
+                            Visibility="{Binding CloudVm.HasQuota, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding CloudVm.QuotaDayText}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,6" />
+                            <TextBlock Text="{Binding CloudVm.RequestsQuotaText}" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,0,0,3" />
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding CloudVm.RequestsPercent, Mode=OneWay}" Height="6" Margin="0,0,0,6"
+                                         Background="{DynamicResource SurfaceSubtleBgBrush}" BorderThickness="0">
+                                <ProgressBar.Style>
+                                    <Style TargetType="ProgressBar">
+                                        <Setter Property="Foreground" Value="#16A34A" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.QuotaColorKey}" Value="Yellow">
+                                                <Setter Property="Foreground" Value="#D97706" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.QuotaColorKey}" Value="Red">
+                                                <Setter Property="Foreground" Value="#DC2626" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ProgressBar.Style>
+                            </ProgressBar>
+                            <TextBlock Text="{Binding CloudVm.RowsWrittenQuotaText}" FontSize="11.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,0,0,3" />
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding CloudVm.RowsWrittenPercent, Mode=OneWay}" Height="6"
+                                         Background="{DynamicResource SurfaceSubtleBgBrush}" BorderThickness="0">
+                                <ProgressBar.Style>
+                                    <Style TargetType="ProgressBar">
+                                        <Setter Property="Foreground" Value="#16A34A" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.QuotaColorKey}" Value="Yellow">
+                                                <Setter Property="Foreground" Value="#D97706" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding CloudVm.QuotaColorKey}" Value="Red">
+                                                <Setter Property="Foreground" Value="#DC2626" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ProgressBar.Style>
+                            </ProgressBar>
+                            <TextBlock Text="{Binding CloudVm.QuotaWarningText}"
+                                       Visibility="{Binding CloudVm.HasQuotaWarning, Converter={StaticResource BoolToVis}}"
+                                       FontSize="11.5" FontWeight="Bold" TextWrapping="Wrap" Margin="0,6,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding CloudVm.IsQuotaStop}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="🔄 Đồng bộ ngay"
+                                Command="{Binding CloudVm.SyncNowCommand}"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                Background="#2563EB"
+                                Padding="12,6"
+                                Margin="0,0,8,0" />
+                        <Button Content="⚙️ Cài đặt Cloud"
+                                Command="{Binding CloudVm.OpenCloudSettingsCommand}"
+                                Style="{StaticResource FilterPillButtonStyle}"
+                                Padding="12,6"
+                                Margin="0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Chuông thông báo: khung thả xuống (T027) -->
-            <Border x:Name="NotificationDropdown" Grid.Row="1" Panel.ZIndex="110" HorizontalAlignment="Right" VerticalAlignment="Top"
+            <Border x:Name="NotificationDropdown" Grid.Row="2" Panel.ZIndex="110" HorizontalAlignment="Right" VerticalAlignment="Top"
                     Margin="0,4,16,0" Width="430" MaxHeight="520"
                     Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushStrong}" BorderThickness="1.2" CornerRadius="10"
                     Visibility="{Binding NotificationsVm.IsOpen, Converter={StaticResource BoolToVis}}">
@@ -539,7 +823,7 @@
 
             <!-- Global Search Results Dropdown Overlay (T020) -->
             <Border x:Name="GlobalSearchDropdown"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     Panel.ZIndex="100"
                     VerticalAlignment="Top"
                     Margin="16,4,16,0"
@@ -705,7 +989,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1"
+            <Border Grid.Row="2"
                     Panel.ZIndex="110"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Bottom"
@@ -742,6 +1026,8 @@
                     <Button Content="↩ Hoàn tác"
                             Command="{Binding UndoDeleteCommand}"
                             Visibility="{Binding CanUndoDelete, Converter={StaticResource BoolToVis}}"
+                            ToolTipService.ShowOnDisabled="True"
+                            ToolTip="{Binding WriteDisabledTooltip}"
                             Background="#F97316"
                             Foreground="#FFFFFF"
                             BorderThickness="0"

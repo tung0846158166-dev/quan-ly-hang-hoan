@@ -63,6 +63,30 @@ public static class ParcelMapper
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(c.ToJsonString()))).ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Đổi cả danh sách đơn thành kiện cloud, xử lý đơn TRÙNG khóa id (dữ liệu cũ có các dòng hệt nhau): dòng trùng có nội dung gửi lên cloud
+    /// GIỐNG HỆT dòng trước thì bỏ qua (không mất thông tin nào), khác thì giữ lại với id có hậu tố "~2", "~3"... để không ai ghi đè ai.
+    /// </summary>
+    public static List<JsonObject> ToParcels(IEnumerable<StoredOrder> orders, out int skippedIdentical, out int renamed)
+    {
+        var list = new List<JsonObject>();
+        var firstHash = new Dictionary<string, string>(StringComparer.Ordinal);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        skippedIdentical = 0; renamed = 0;
+        foreach (var s in orders)
+        {
+            var p = ToParcel(s);
+            var id = p["id"]!.GetValue<string>();
+            var h = Hash(p);
+            if (!firstHash.TryGetValue(id, out var h0)) { firstHash[id] = h; counts[id] = 1; list.Add(p); continue; }
+            if (h0 == h) { skippedIdentical++; continue; }
+            counts[id]++;
+            p["id"] = id + "~" + counts[id];
+            renamed++;
+            list.Add(p);
+        }
+        return list;
+    }
     private static readonly string[] RawKeys = { "returnReason", "returnStatus", "returnShippingStatus", "returnSuccessTime", "cancelType" };
     private static readonly string[] TopKeys = { "forwardCarrier", "returnCarrier" };
 

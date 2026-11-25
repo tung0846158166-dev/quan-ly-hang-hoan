@@ -216,6 +216,7 @@
 
                         <Button Content="📥 Nhập thật vào v2"
                                 Command="{Binding ExecuteImportCommand}"
+                                ToolTip="{Binding WriteDisabledTooltip}"
                                 Style="{StaticResource PrimaryActionButtonStyle}"
                                 Background="#DC2626"
                                 Padding="18,10"

@@ -139,6 +139,7 @@ public sealed partial class WatchlistViewModel : ObservableObject
     private readonly Action<string, bool>? _onNotify;
     private readonly Action<Order>? _onOpenDetail;
     private readonly AlertPolicy _alertPolicy;
+    private readonly WriteGate _writeGate;
     private IReadOnlyList<Order> _activeOrders = Array.Empty<Order>();
     private IReadOnlyList<Order> _archivedOrders = Array.Empty<Order>();
     private DateTime _lastNow = DateTime.Now;
@@ -151,7 +152,8 @@ public sealed partial class WatchlistViewModel : ObservableObject
         Func<Task>? onDataChangedAsync = null,
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
-        AlertPolicy? alertPolicy = null)
+        AlertPolicy? alertPolicy = null,
+        WriteGate? writeGate = null)
     {
         _editService = editService;
         _dialogService = dialogService;
@@ -159,7 +161,24 @@ public sealed partial class WatchlistViewModel : ObservableObject
         _onNotify = onNotify;
         _onOpenDetail = onOpenDetail;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
         Pager = new Pager<WatchlistRowViewModel>(p => VisibleOrders = p);
+    }
+
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        ChangeStatusCommand.NotifyCanExecuteChanged();
+        EditWatchlistReasonCommand.NotifyCanExecuteChanged();
+        RemoveFromWatchlistCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Chia trang 100 kiện/trang.</summary>
@@ -361,9 +380,10 @@ public sealed partial class WatchlistViewModel : ObservableObject
         _onOpenDetail?.Invoke(target.Source);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task ChangeStatusAsync(WatchlistRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -378,9 +398,10 @@ public sealed partial class WatchlistViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task EditWatchlistReasonAsync(WatchlistRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -399,9 +420,10 @@ public sealed partial class WatchlistViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task RemoveFromWatchlistAsync(WatchlistRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null) return;
 

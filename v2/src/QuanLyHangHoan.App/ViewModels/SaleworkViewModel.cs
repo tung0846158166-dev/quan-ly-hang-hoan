@@ -20,6 +20,7 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
     private readonly IConfirmationService _confirmationService;
     private readonly Action<Action> _dispatchToUi;
     private readonly Func<DateTime> _clock;
+    private readonly WriteGate _writeGate;
     private bool _suppressSave;
     private bool _disposed;
 
@@ -27,12 +28,18 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
         ISaleworkController controller,
         IConfirmationService? confirmationService = null,
         Action<Action>? dispatchToUi = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        WriteGate? writeGate = null)
     {
         _controller = controller;
         _confirmationService = confirmationService ?? new WindowsConfirmationService();
         _dispatchToUi = dispatchToUi ?? (a => a());
         _clock = clock ?? (() => DateTime.Now);
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
 
         _controller.Completed += OnControllerCompleted;
         _controller.StateChanged += OnControllerStateChanged;
@@ -53,6 +60,7 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
     [NotifyPropertyChangedFor(nameof(ConfigStatusText))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
     private bool _configured;
 
     [ObservableProperty]
@@ -62,6 +70,7 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
     [NotifyPropertyChangedFor(nameof(CanStop))]
     [NotifyPropertyChangedFor(nameof(RunNowButtonText))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -103,10 +112,21 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(AmbiguousWarningText))]
     private int _ambiguousCount;
 
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        OnPropertyChanged(nameof(CanRunNow));
+        RunNowCommand.NotifyCanExecuteChanged();
+    }
+
     public bool HasActionError => !string.IsNullOrWhiteSpace(ActionError);
     public bool HasActionNotice => !string.IsNullOrWhiteSpace(ActionNotice);
     public bool CanSaveCurrentPage => IsLoginOpen && !IsRunning;
-    public bool CanRunNow => Configured && !IsRunning;
+    public bool CanRunNow => CanWrite && Configured && !IsRunning;
     public bool CanStop => IsRunning;
     public string RunNowButtonText => IsRunning ? "Đang lấy..." : "Lấy ngay";
     public bool ShowReloginHint => NeedsRelogin;
@@ -175,7 +195,7 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
             IsWarning: false));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunNow))]
     public async Task RunNowAsync()
     {
         if (!CanRunNow) return;
@@ -312,6 +332,10 @@ public sealed partial class SaleworkViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed -= OnWriteGateChanged;
+        }
         _controller.Completed -= OnControllerCompleted;
         _controller.StateChanged -= OnControllerStateChanged;
     }

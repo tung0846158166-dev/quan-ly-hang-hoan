@@ -57,11 +57,10 @@ public static class CloudPublisher
     {
         var published = LoadPublished(dbPath);
         var list = new List<(JsonObject, string)>();
-        foreach (var s in OrderRepository.Load(dbPath))
+        foreach (var p in ParcelMapper.ToParcels(OrderRepository.Load(dbPath), out _, out _))
         {
-            var p = ParcelMapper.ToParcel(s);
             var h = ParcelMapper.Hash(p);
-            if (published.TryGetValue(s.Order.Id, out var old) && old == h) continue;
+            if (published.TryGetValue(p["id"]!.GetValue<string>(), out var old) && old == h) continue;
             list.Add((p, h));
         }
         return list;

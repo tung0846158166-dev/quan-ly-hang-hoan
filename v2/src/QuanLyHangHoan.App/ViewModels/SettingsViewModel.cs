@@ -43,7 +43,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         Func<DateTime> clock,
         Action<string, bool>? onBackgroundSettingChanged = null,
         Action<bool, int, int>? onBackupSettingChanged = null,
-        Action? openPhoneSync = null)
+        Action? openPhoneSync = null,
+        CloudStatusViewModel? cloud = null)
     {
         _backup = backup;
         _clipboard = clipboard;
@@ -52,6 +53,22 @@ public sealed partial class SettingsViewModel : ObservableObject
         _onBackgroundSettingChanged = onBackgroundSettingChanged;
         _onBackupSettingChanged = onBackupSettingChanged;
         _openPhoneSync = openPhoneSync;
+        Cloud = cloud;
+
+        var tabs = new List<SettingsTabItem>
+        {
+            new(GeneralTabKey, "⚙️", "Chung") { IsSelected = true },
+            new("file_import", "📄", "Nạp file Excel (TikTok)"),
+            new("folder_watch", "📁", "Theo dõi thư mục"),
+            new("google_sheet", "📊", "Google Sheet"),
+            new("salework", "🛒", "Salework"),
+        };
+        if (cloud is { IsEnabled: true })
+        {
+            tabs.Add(new SettingsTabItem(CloudTabKey, "☁️", "Cloud"));
+        }
+        Tabs = tabs;
+
         _backup.Changed += OnBackupChanged;
         RefreshBackups();
         RefreshRoom();
@@ -62,26 +79,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Trợ lý AI: Cài đặt hiện khối nhập khóa API và danh sách mô hình (MainViewModel gán sau khi tạo).</summary>
     public AiChatViewModel? AiChat { get; set; }
 
-    // ---------------- các thẻ (tab): Chung + 4 đường nạp đơn (trước đây nằm ở thanh bên) ----------------
+    /// <summary>Trạng thái và cài đặt Cloud (chỉ hiện thẻ Cloud khi IsEnabled == true).</summary>
+    public CloudStatusViewModel? Cloud { get; }
+
+    // ---------------- các thẻ (tab): Chung + 4 đường nạp đơn + Cloud (khi bật cloud) ----------------
     public const string GeneralTabKey = "general";
+    public const string CloudTabKey = "cloud";
     public static readonly string[] ImportTabKeys = { "file_import", "folder_watch", "google_sheet", "salework" };
 
     private Func<string, object?>? _importPageResolver;
 
-    public IReadOnlyList<SettingsTabItem> Tabs { get; } = new[]
-    {
-        new SettingsTabItem(GeneralTabKey, "⚙️", "Chung") { IsSelected = true },
-        new SettingsTabItem("file_import", "📄", "Nạp file Excel (TikTok)"),
-        new SettingsTabItem("folder_watch", "📁", "Theo dõi thư mục"),
-        new SettingsTabItem("google_sheet", "📊", "Google Sheet"),
-        new SettingsTabItem("salework", "🛒", "Salework"),
-    };
+    public IReadOnlyList<SettingsTabItem> Tabs { get; }
 
     [ObservableProperty] private string _selectedTabKey = GeneralTabKey;
     [ObservableProperty] private object? _importPage;
 
     public bool IsGeneralTab => SelectedTabKey == GeneralTabKey;
-    public bool IsImportTab => !IsGeneralTab;
+    public bool IsCloudTab => SelectedTabKey == CloudTabKey;
+    public bool IsImportTab => !IsGeneralTab && !IsCloudTab;
 
     /// <summary>MainViewModel cấp các màn nạp đơn có sẵn để hiện bên trong Cài đặt.</summary>
     public void AttachImportPages(Func<string, object?> resolver)
@@ -102,12 +117,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         foreach (var t in Tabs) t.IsSelected = t.Key == value;
         OnPropertyChanged(nameof(IsGeneralTab));
+        OnPropertyChanged(nameof(IsCloudTab));
         OnPropertyChanged(nameof(IsImportTab));
         UpdateTabContent();
     }
 
     private void UpdateTabContent() =>
-        ImportPage = IsGeneralTab ? null : _importPageResolver?.Invoke(SelectedTabKey);
+        ImportPage = IsImportTab ? _importPageResolver?.Invoke(SelectedTabKey) : null;
 
     // ---------------- chạy nền và thông báo ----------------
     [ObservableProperty] private bool _autoStart;

@@ -1,0 +1,420 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.CloudSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:CloudStatusViewModel}"
+             UseLayoutRounding="True"
+             SnapsToDevicePixels="True"
+             TextOptions.TextFormattingMode="Display">
+
+    <UserControl.Resources>
+        <Style x:Key="CloudCardTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource InkPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style x:Key="CloudHintStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource InkMutedBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="CloudFieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource InkSecondaryBrush}" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+        </Style>
+        <Style x:Key="CloudQuotaBarStyle" TargetType="ProgressBar">
+            <Setter Property="Height" Value="9" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushLight}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#16A34A" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding QuotaColorKey}" Value="Yellow">
+                    <Setter Property="Foreground" Value="#D97706" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding QuotaColorKey}" Value="Red">
+                    <Setter Property="Foreground" Value="#DC2626" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16" Background="{DynamicResource AppBgBrush}">
+        <StackPanel MaxWidth="900" HorizontalAlignment="Left">
+
+            <!-- Thẻ 1: Trạng thái kết nối & Thông tin thiết bị -->
+            <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <!-- Badge trạng thái -->
+                        <Border DockPanel.Dock="Right" CornerRadius="10" Padding="10,4" BorderThickness="1" VerticalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource NeutralBadgeBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource NeutralBadgeBorderBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusColorKey}" Value="Green">
+                                            <Setter Property="Background" Value="{DynamicResource AlertGreenBadgeBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AlertGreenCardBorderBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusColorKey}" Value="Blue">
+                                            <Setter Property="Background" Value="{DynamicResource InfoBlueBadgeBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueCardBorderBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusColorKey}" Value="Yellow">
+                                            <Setter Property="Background" Value="{DynamicResource AlertYellowBadgeBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowCardBorderBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusColorKey}" Value="Red">
+                                            <Setter Property="Background" Value="#DC2626" />
+                                            <Setter Property="BorderBrush" Value="#991B1B" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Width="9" Height="9" CornerRadius="5" Margin="0,0,7,0" VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#64748B" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Green">
+                                                    <Setter Property="Background" Value="#16A34A" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Blue">
+                                                    <Setter Property="Background" Value="#2563EB" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Yellow">
+                                                    <Setter Property="Background" Value="#D97706" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Red">
+                                                    <Setter Property="Background" Value="#FFFFFF" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                                <TextBlock Text="{Binding StatusText}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource NeutralBadgeFgBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Green">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Blue">
+                                                    <Setter Property="Foreground" Value="{DynamicResource InfoBlueTextBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Yellow">
+                                                    <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusColorKey}" Value="Red">
+                                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="☁️ Kết nối Cloud (Cloudflare)" Style="{StaticResource CloudCardTitleStyle}" Margin="0" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <TextBlock Text="Nguồn dữ liệu gốc nằm trên cloud. Khi mất mạng, mọi thao tác ghi tạm khóa để tránh ghi chồng giữa các máy — bạn vẫn xem được dữ liệu đã tải."
+                               Style="{StaticResource CloudHintStyle}" Margin="0,0,0,12" />
+
+                    <!-- Thông tin thiết bị khi đã ghép -->
+                    <Border Background="{DynamicResource SurfaceMutedBgBrush}"
+                            BorderBrush="{DynamicResource BorderBrushLight}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="14,10"
+                            Margin="0,0,0,12"
+                            Visibility="{Binding ShowPairedInfo, Converter={StaticResource BoolToVis}}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="140" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="6" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="6" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="6" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Địa chỉ Worker:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding BaseUrlDisplay}" FontFamily="Consolas" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" TextWrapping="Wrap" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tên thiết bị:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding DeviceNameDisplay}" FontSize="12.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Vai trò:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding RoleDisplayText}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Lần đồng bộ cuối:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding LastSyncText}" FontSize="12.5" Foreground="{DynamicResource InkPrimaryBrush}" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Cảnh báo thiết bị bị thu hồi -->
+                    <Border Background="{DynamicResource AlertRedCardBgBrush}"
+                            BorderBrush="{DynamicResource AlertRedBorderStrongBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12,10"
+                            Margin="0,0,0,10"
+                            Visibility="{Binding IsRevoked, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="⛔ Thiết bị này đã bị chủ cửa hàng thu hồi quyền truy cập. Hãy nhập mã ghép mới bên dưới hoặc quên ghép trên máy này."
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AlertRedTextBrush}" TextWrapping="Wrap" />
+                    </Border>
+
+                    <!-- Lỗi gần nhất -->
+                    <Border Background="{DynamicResource AlertRedCardBgBrush}"
+                            BorderBrush="{DynamicResource AlertRedCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12,9"
+                            Margin="0,0,0,10"
+                            Visibility="{Binding HasLastError, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="Lỗi gần nhất:" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource AlertRedTextBrush}" />
+                            <TextBlock Text="{Binding LastError}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AlertRedDarkTextBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Nút hành động -->
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="🔄 Đồng bộ ngay"
+                                Command="{Binding SyncNowCommand}"
+                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                Background="#2563EB"
+                                Padding="14,7"
+                                Margin="0,0,10,0" />
+                        <Button Content="🔌 Quên ghép trên máy này"
+                                Command="{Binding UnpairCommand}"
+                                Visibility="{Binding ShowPairedInfo, Converter={StaticResource BoolToVis}}"
+                                Style="{StaticResource FilterPillButtonStyle}"
+                                Foreground="{DynamicResource AlertRedTextBrush}"
+                                BorderBrush="{DynamicResource AlertRedCardBorderBrush}"
+                                Padding="14,7"
+                                Margin="0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Thẻ 2: Hạn mức hôm nay (mục 5) -->
+            <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding QuotaDayText}" Style="{StaticResource CloudHintStyle}" VerticalAlignment="Center" />
+                        <TextBlock Text="📊 Hạn mức hôm nay" Style="{StaticResource CloudCardTitleStyle}" Margin="0" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <TextBlock Text="Chưa có dữ liệu hạn mức hôm nay."
+                               Style="{StaticResource CloudHintStyle}"
+                               Visibility="{Binding HasQuota, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}" />
+
+                    <StackPanel Visibility="{Binding HasQuota, Converter={StaticResource BoolToVis}}">
+                        <!-- Yêu cầu -->
+                        <DockPanel Margin="0,0,0,4">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding RequestsQuotaText}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                            <TextBlock Text="Yêu cầu Worker" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" />
+                        </DockPanel>
+                        <ProgressBar Value="{Binding RequestsPercent, Mode=OneWay}" Style="{StaticResource CloudQuotaBarStyle}" Margin="0,0,0,12" />
+
+                        <!-- Hàng ghi -->
+                        <DockPanel Margin="0,0,0,4">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding RowsWrittenQuotaText}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                            <TextBlock Text="Hàng ghi dữ liệu" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" />
+                        </DockPanel>
+                        <ProgressBar Value="{Binding RowsWrittenPercent, Mode=OneWay}" Style="{StaticResource CloudQuotaBarStyle}" Margin="0,0,0,6" />
+
+                        <!-- Cảnh báo warn / stop -->
+                        <Border CornerRadius="8" BorderThickness="1.2" Padding="12,9" Margin="0,8,0,0"
+                                Visibility="{Binding HasQuotaWarning, Converter={StaticResource BoolToVis}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AlertYellowBorderStrongBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsQuotaStop}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource AlertRedBorderStrongBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding QuotaWarningText}" FontSize="12.5" FontWeight="Bold" TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsQuotaStop}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Thẻ 3: Ghép thiết bị (hiện khi chưa ghép hoặc đã bị thu hồi) -->
+            <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
+                    Visibility="{Binding ShowPairForm, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="🔗 Ghép thiết bị với Cloud" Style="{StaticResource CloudCardTitleStyle}" />
+                    <TextBlock Text="Nhập địa chỉ Worker, mã ghép 6 số do chủ cửa hàng tạo và tên nhận diện của máy tính này."
+                               Style="{StaticResource CloudHintStyle}" Margin="0,0,0,12" />
+
+                    <TextBlock Text="Địa chỉ Worker" Style="{StaticResource CloudFieldLabelStyle}" />
+                    <TextBox x:Name="WorkerUrlBox"
+                             Text="{Binding WorkerUrlInput, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="Consolas"
+                             FontSize="13"
+                             Padding="10,7"
+                             Margin="0,0,0,10"
+                             Background="{DynamicResource SurfaceMutedBgBrush}"
+                             Foreground="{DynamicResource InkPrimaryBrush}"
+                             BorderBrush="{DynamicResource InputBorderBrush}"
+                             AutomationProperties.AutomationId="CloudWorkerUrlInput" />
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Mã ghép 6 số" Style="{StaticResource CloudFieldLabelStyle}" />
+                            <TextBox x:Name="PairingCodeBox"
+                                     Text="{Binding PairingCodeInput, UpdateSourceTrigger=PropertyChanged}"
+                                     MaxLength="6"
+                                     FontFamily="Consolas"
+                                     FontSize="16"
+                                     FontWeight="Bold"
+                                     Padding="10,6"
+                                     Background="{DynamicResource SurfaceMutedBgBrush}"
+                                     Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource InputBorderBrush}"
+                                     AutomationProperties.AutomationId="CloudPairingCodeInput" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Tên thiết bị" Style="{StaticResource CloudFieldLabelStyle}" />
+                            <TextBox x:Name="DeviceNameBox"
+                                     Text="{Binding DeviceNameInput, UpdateSourceTrigger=PropertyChanged}"
+                                     FontSize="13"
+                                     Padding="10,7"
+                                     Background="{DynamicResource SurfaceMutedBgBrush}"
+                                     Foreground="{DynamicResource InkPrimaryBrush}"
+                                     BorderBrush="{DynamicResource InputBorderBrush}"
+                                     AutomationProperties.AutomationId="CloudDeviceNameInput" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Button Content="🔗 Ghép thiết bị"
+                            Command="{Binding PairCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#16A34A"
+                            Padding="18,8"
+                            FontSize="13"
+                            HorizontalAlignment="Left" />
+
+                    <TextBlock Text="{Binding PairError}"
+                               Visibility="{Binding HasPairError, Converter={StaticResource BoolToVis}}"
+                               Foreground="{DynamicResource AlertRedTextBrush}"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0" />
+
+                    <TextBlock Text="{Binding PairSuccess}"
+                               Visibility="{Binding HasPairSuccess, Converter={StaticResource BoolToVis}}"
+                               Foreground="{DynamicResource AlertGreenTextBrush}"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Thẻ 4: Tạo mã ghép cho máy khác (chỉ vai trò owner) -->
+            <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
+                    Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <TextBlock Text="🔑 Tạo mã ghép cho máy khác (Chủ cửa hàng)" Style="{StaticResource CloudCardTitleStyle}" />
+                    <TextBlock Text="Mã ghép 6 số dùng một lần và tự hết hạn sau 10 phút. Nhập mã này lên máy tính hoặc iPhone nhân viên để ghép vào cửa hàng."
+                               Style="{StaticResource CloudHintStyle}" Margin="0,0,0,12" />
+
+                    <Button Content="🔑 Tạo mã ghép cho máy khác"
+                            Command="{Binding StartPairingCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}"
+                            Background="#2563EB"
+                            Padding="16,8"
+                            FontSize="12.5"
+                            HorizontalAlignment="Left" />
+
+                    <Border Background="{DynamicResource InfoBlueCardBgBrush}"
+                            BorderBrush="{DynamicResource InfoBlueCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="16,12"
+                            Margin="0,12,0,0"
+                            Visibility="{Binding HasGeneratedPairCode, Converter={StaticResource BoolToVis}}">
+                        <DockPanel LastChildFill="True">
+                            <Button DockPanel.Dock="Right"
+                                    Content="📋 Sao chép mã"
+                                    Command="{Binding CopyGeneratedCodeCommand}"
+                                    Style="{StaticResource FilterPillButtonStyle}"
+                                    VerticalAlignment="Center"
+                                    Margin="12,0,0,0" />
+                            <StackPanel>
+                                <TextBlock Text="MÃ GHÉP 6 SỐ" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InfoBlueTextBrush}" />
+                                <TextBlock Text="{Binding GeneratedPairCode}"
+                                           FontFamily="Consolas"
+                                           FontSize="28"
+                                           FontWeight="Bold"
+                                           Foreground="{DynamicResource InfoBlueStrongTextBrush}"
+                                           Margin="0,2,0,2" />
+                                <TextBlock Text="{Binding GeneratedPairCountdownText}"
+                                           FontSize="12.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource InkSecondaryBrush}" />
+                                <TextBlock Text="{Binding CopyCodeNotice}"
+                                           Visibility="{Binding HasCopyCodeNotice, Converter={StaticResource BoolToVis}}"
+                                           FontSize="11.5"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AlertGreenTextBrush}"
+                                           Margin="0,4,0,0" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding GenerateCodeError}"
+                               Visibility="{Binding HasGenerateCodeError, Converter={StaticResource BoolToVis}}"
+                               Foreground="{DynamicResource AlertRedTextBrush}"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -122,11 +122,14 @@ Trạng thái: [ ] chưa làm, [~] đang làm, [x] xong. Cập nhật khi nhận
 - [x] (claude) Nút "Đo ngay" tốc độ phản hồi trong Cài đặt iPhone (latency_ping -> pc_pong); test PC xanh, iPhone chờ CI
 - [ ] (user) Thử Google Sheet thật; nhập khóa Google Gemini; xác nhận dòng MQTT 1/1 với EMQX; thử iPhone build 28 trên máy thật
 - [ ] (claude) Đóng gói bộ cài exe mới (`v2/installer/build-installer.ps1`) và chuyển sang chạy thật (user quyết định lúc nào)
+- [x] T041 (antigravity) - phiếu `tasks/T041-pc-cloud-status-ui.md`: giao diện trạng thái Cloud (chấm 6 trạng thái + popup chi tiết + cập nhật an toàn từ luồng nền), khóa ghi tập trung qua `WriteGate`/`MainViewModel.CanWrite` trên toàn bộ bảng/quét/nạp/hoàn tác (lệnh xem/lọc/tìm/chi tiết/xuất vẫn chạy), banner "chỉ xem" tự biến mất khi nối lại, thẻ **Cài đặt > Cloud** (ghép 6 số, quên ghép có xác nhận, tạo mã + đếm ngược 10 phút cho `owner`), hạn mức hôm nay `ok`/`warn`/`stop`; `cloudLink == null` giữ nguyên giao diện cũ. Build 0 lỗi, 7/7 test mới `T041CloudStatusUiTests` + 437/437 test không-UI xanh, ảnh ở `tasks/reports/T041-screens/`, báo cáo `tasks/reports/T041-report.md`, chờ claude kiểm tra & cắm bản `ICloudLink` thật (chưa chạy với Worker/mạng thật)
 
 ## Giai đoạn 6 - Chuyển sang CLOUD (Cloudflare) - xem docs/cloud-design.md, cloud/API.md (25/11/2026)
 - [x] (claude) Thiết kế đã duyệt (một cửa hàng nội bộ, mất mạng = khóa ghi, ảnh R2 xem chung, tự xóa sau 90 ngày, Sheet nạp trên cloud)
 - [x] (claude) `cloud/core` (TypeScript) + `ScanDecider` (C#) cùng đạt bộ ca thử chung `cloud/golden/scan-vectors.json` (26 ca)
 - [x] (claude) `cloud/worker`: Worker + Durable Object SQLite: ghép thiết bị, /sync theo rev, /ops (quét nguyên tử, sửa, lưu trữ, xóa mềm...), /import, ảnh R2, hạn mức, WebSocket, Cron xóa ảnh 90 ngày. 26 test cục bộ đạt; `wrangler dev` chạy thật cục bộ (bootstrap, nhập, quét OK). CHƯA triển khai lên Cloudflare thật (cần chủ dự án làm `cloud/DEPLOY.md`)
-- [~] (antigravity) T041 giao diện trạng thái cloud + khóa ghi trên máy tính; T042 trên iPhone; T043 bộ gộp Google Sheet bằng JS (Apps Script) + ca thử chung; T044 công cụ nhập dữ liệu cũ (chạy thử)
+- [x] T041 (antigravity) giao diện cloud trên máy tính: Claude kiểm tra ĐẠT (`tasks/reports/T041-review.md`). Chủ dự án DỪNG agy (26/11/2026): T042, T043, T044 do Claude làm tiếp
+- [x] T044 (claude, thay agy) công cụ nhập dữ liệu cũ `v2/tools/QuanLyHangHoan.CloudMigrate` (dry-run/upload/photos) + `CloudMigration`/`CloudPublisher`; chạy thử trên dữ liệu thật: 4.962 đơn -> 6,2 MB lên cloud, 3 dòng trùng id (xử lý: hệt nhau bỏ bản sao, khác nhau giữ với id ~2), 621 ảnh nhúng DUY NHẤT (14,3 MB) cần chuyển riêng
+- [ ] T042 (claude) giao diện + gắn cloud trên iPhone; T043 (claude) bộ gộp Google Sheet bằng JS (Apps Script) + ca thử chung với C#
 - [ ] (claude) Bản `ICloudLink` thật cho máy tính (ghép, WebSocket, đồng bộ vào SQLite cục bộ), chuyển các dịch vụ quét/sửa sang cloud, chạy song song bản cũ (GĐ2)
 - [ ] (claude) Máy khách cloud cho iPhone + ảnh lên R2 (GĐ3); chuyển nạp Google Sheet (Apps Script) và tắt MQTT/ntfy cũ (GĐ4)

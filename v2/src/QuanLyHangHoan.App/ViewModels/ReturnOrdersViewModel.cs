@@ -61,6 +61,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private readonly Services.IOrderExportService? _exportService;
     private readonly Services.INewOrderCreator? _newOrderCreator;
     private readonly Services.INewOrderDialogService? _newOrderDialog;
+    private readonly WriteGate _writeGate;
     private List<ReturnOrderRowViewModel> _allRows = [];
     private IReadOnlyList<ReturnOrderRowViewModel> _selectedRows = Array.Empty<ReturnOrderRowViewModel>();
     private long _lastLoadMs;
@@ -80,12 +81,18 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         Services.IOrderExportService? exportService = null,
         Services.INewOrderCreator? newOrderCreator = null,
         Services.INewOrderDialogService? newOrderDialog = null,
-        bool loadInitialData = true)
+        bool loadInitialData = true,
+        WriteGate? writeGate = null)
     {
         _provider = provider;
         _newOrderCreator = newOrderCreator;
         _newOrderDialog = newOrderDialog;
         _exportService = exportService;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
         Scope = scope;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
         _onOpenPhoto = onOpenPhoto;
@@ -116,6 +123,26 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     public ReturnTableScope Scope { get; }
     public IReadOnlyList<SortOptionItem> SortOptions { get; }
     public IReadOnlyList<OrderTypeChipItem> OrderTypeChips { get; }
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        CreateNewOrderCommand.NotifyCanExecuteChanged();
+        ChangeStatusCommand.NotifyCanExecuteChanged();
+        EditUserNoteCommand.NotifyCanExecuteChanged();
+        EditNoteCommand.NotifyCanExecuteChanged();
+        ToggleWatchlistCommand.NotifyCanExecuteChanged();
+        ArchiveRowCommand.NotifyCanExecuteChanged();
+        DeleteRowCommand.NotifyCanExecuteChanged();
+        BulkMarkReceivedCommand.NotifyCanExecuteChanged();
+        BulkArchiveCommand.NotifyCanExecuteChanged();
+        BulkWatchlistCommand.NotifyCanExecuteChanged();
+        BulkDeleteCommand.NotifyCanExecuteChanged();
+        HandleDeleteKeyCommand.NotifyCanExecuteChanged();
+    }
 
     [ObservableProperty]
     private bool _isDemoMode;
@@ -202,9 +229,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     };
 
     /// <summary>"➕ Tạo đơn mới": hỏi thông tin, tạo thẳng vào bảng chính, tải lại và chọn đúng đơn vừa tạo.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task CreateNewOrderAsync()
     {
+        if (!CanWrite) return;
         if (_newOrderCreator is null || _newOrderDialog is null) { _onNotify?.Invoke("Chưa sẵn sàng tạo đơn.", true); return; }
         var input = _newOrderDialog.Ask();
         if (input is null) return;                                   // hủy: không làm gì
@@ -902,9 +930,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
     // ---------------- Thao tác thủ công trên đơn (T013) ----------------
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task ChangeStatusAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -919,9 +948,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task EditUserNoteAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -940,9 +970,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task EditNoteAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -961,9 +992,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task ToggleWatchlistAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -1011,9 +1043,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(reasonResult, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task ArchiveRowAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null) return;
 
@@ -1021,9 +1054,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         await OrderEditHelper.HandleResultAsync(result, _onDataChangedAsync, _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task DeleteRowAsync(ReturnOrderRowViewModel? row = null)
     {
+        if (!CanWrite) return;
         var target = row ?? SelectedRow;
         if (target is null || _editService is null || _dialogService is null) return;
 
@@ -1048,9 +1082,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         _dialogService.ShowHistory(target.OrderId, target.DisplayTracking, entries);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task BulkMarkReceivedAsync()
     {
+        if (!CanWrite) return;
         var targets = GetBulkTargets();
         if (targets.Count == 0 || _editService is null || _dialogService is null) return;
 
@@ -1067,9 +1102,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             _onNotify);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task BulkArchiveAsync()
     {
+        if (!CanWrite) return;
         var targets = GetBulkTargets();
         if (targets.Count == 0 || _editService is null || _dialogService is null) return;
 
@@ -1087,9 +1123,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     }
 
     /// <summary>Thêm (hoặc bỏ) theo dõi cho TẤT CẢ các dòng đang chọn, hỏi lý do một lần.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task BulkWatchlistAsync()
     {
+        if (!CanWrite) return;
         var targets = GetBulkTargets();
         if (targets.Count == 0 || _editService is null || _dialogService is null) return;
 
@@ -1116,9 +1153,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
                 : $"Đã bỏ theo dõi {saved:N0} đơn.", false);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task BulkDeleteAsync()
     {
+        if (!CanWrite) return;
         var targets = GetBulkTargets();
         if (targets.Count == 0 || _editService is null || _dialogService is null) return;
 
@@ -1144,9 +1182,10 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         _onOpenDetail?.Invoke(target.Source);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public Task HandleDeleteKeyAsync()
     {
+        if (!CanWrite) return Task.CompletedTask;
         if (SelectedRows.Count > 1)
         {
             return BulkDeleteAsync();

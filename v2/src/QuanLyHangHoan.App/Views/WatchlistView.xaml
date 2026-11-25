@@ -143,12 +143,18 @@
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="🔄 Đổi trạng thái..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.ChangeStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="✏️ Sửa lý do theo dõi..."
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.EditWatchlistReasonCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="⭐ Bỏ theo dõi"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.RemoveFromWatchlistCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <Separator />

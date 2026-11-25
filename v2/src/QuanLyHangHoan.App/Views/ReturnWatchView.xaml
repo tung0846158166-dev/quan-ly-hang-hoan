@@ -156,6 +156,7 @@
                     <Button DockPanel.Dock="Right"
                             Content="🗑️ Bỏ các dòng đã chọn khỏi bảng"
                             Command="{Binding RemoveFromBoardCommand}"
+                            ToolTip="{Binding WriteDisabledTooltip}"
                             Style="{StaticResource PrimaryActionButtonStyle}"
                             Background="#DC2626"
                             Padding="12,5"
@@ -222,6 +223,8 @@
                             <Separator />
                             <MenuItem Header="🗑️ Bỏ khỏi bảng (Del)"
                                       Foreground="#DC2626"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.RemoveFromBoardCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                         </ContextMenu>

@@ -175,6 +175,8 @@
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="↩ Trả về bảng chính"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.UnarchiveRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                             <MenuItem Header="📜 Xem lịch sử sửa"
@@ -182,6 +184,8 @@
                                       CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="🗑️ Xóa... (Del)"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.DeleteRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
                         </ContextMenu>

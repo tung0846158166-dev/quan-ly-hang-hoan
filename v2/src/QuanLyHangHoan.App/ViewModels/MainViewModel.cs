@@ -36,6 +36,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly ITrayService _trayService;
     private readonly INotificationService _notificationService;
     private readonly AlertNotificationMonitor _alertMonitor;
+    private readonly WriteGate _writeGate = new();
     private readonly Action<Action> _dispatchToUi;
     private readonly TimeSpan _toastDuration;
     private readonly TimeSpan _syncReloadDebounce;
@@ -137,7 +138,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         QuanLyHangHoan.Data.Ai.AiSettingsStore? aiSettingsStore = null,
         Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null,
         Func<int, string, string, IReadOnlyList<QuanLyHangHoan.Data.AuditEntry>>? aiActivityLoader = null,
-        Func<IEnumerable<QuanLyHangHoan.Data.StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? aiReturnWatch = null)
+        Func<IEnumerable<QuanLyHangHoan.Data.StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? aiReturnWatch = null,
+        ICloudLink? cloudLink = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -215,6 +217,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IsDemoMode = isDemoMode
         };
 
+        _writeGate.Changed += OnWriteGateChanged;
+        CloudVm = new CloudStatusViewModel(
+            cloudLink,
+            _writeGate,
+            confirmationService,
+            clipboardService,
+            _dispatchToUi,
+            returnOrderProvider.GetCurrentTime,
+            openCloudSettings: () => NavigateByKey(SettingsViewModel.CloudTabKey),
+            onNotify: ShowToast);
+        CloudVm.PropertyChanged += OnCloudVmPropertyChanged;
+        NotificationsVm.PropertyChanged += OnNotificationsVmPropertyChanged;
+
         _activityLogProvider = activityLogProvider ?? new FakeActivityLogProvider();
         ActivityLogVm = new ActivityLogViewModel(_activityLogProvider, clipboardService) { IsDemoMode = isDemoMode };
         _backupController = backupController ?? new FakeBackupController(returnOrderProvider.GetCurrentTime);
@@ -225,7 +240,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             returnOrderProvider.GetCurrentTime,
             onBackgroundSettingChanged: OnSettingsBackgroundSettingChanged,
             onBackupSettingChanged: OnSettingsBackupSettingChanged,
-            openPhoneSync: () => NavigateByKey("phone_sync"))
+            openPhoneSync: () => NavigateByKey("phone_sync"),
+            cloud: CloudVm)
         {
             IsDemoMode = isDemoMode
         };
@@ -258,7 +274,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService,
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         ShopeeCancelledVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.ShopeeCancelled,
@@ -270,7 +287,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService,
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         TikTokReturnVm = new ReturnOrdersViewModel(
             returnOrderProvider,
             ReturnTableScope.TikTokReturn,
@@ -282,7 +300,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService,
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
 
         NewOrdersVm = new NewOrdersViewModel(newOrderProvider, onOpenDetail: OpenOrderDetail, loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };   // bảng cũ (không còn trên thanh bên)
         // "Bảng đơn mới" thật: cửa sổ lọc các đơn tạo tay/quét tạo từ điện thoại, có đủ thao tác của các bảng khác + nút "Tạo đơn mới".
@@ -300,7 +319,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             exportService: _orderExportService,
             newOrderCreator: resolvedCreator,
             newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService(),
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         Func<string, string, bool> returnWatchConfirm = confirmationService is not null
             ? confirmationService.Confirm
             : (title, message) =>
@@ -318,7 +338,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onOrdersRemoved: ShowReturnWatchUndoToast,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            onGoToMainTable: GoToMainTableFromOrder)
+            onGoToMainTable: GoToMainTableFromOrder,
+            writeGate: _writeGate)
         {
             IsDemoMode = isDemoMode
         };
@@ -327,7 +348,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             dialogService: dialogSvc,
             onDataChangedAsync: ReloadAllDataAsync,
             onNotify: ShowToast,
-            onOpenDetail: OpenOrderDetail) { IsDemoMode = isDemoMode };
+            onOpenDetail: OpenOrderDetail,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         ArchivedOrdersVm = new ArchivedOrdersViewModel(
             archivedOrderProvider,
             onOpenPhoto: OpenOrderPhoto,
@@ -338,7 +360,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             exportService: _orderExportService,
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         DeletedOrdersVm = new DeletedOrdersViewModel(
             deletedOrderProvider,
             editService: _orderEditService,
@@ -346,15 +369,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onDataChangedAsync: ReloadAllDataAsync,
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
-            loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate) { IsDemoMode = isDemoMode };
         StatisticsVm = new StatisticsViewModel(returnOrderProvider, archivedOrderProvider, fileSaveService, loadInitialData: !deferInitialLoad) { IsDemoMode = isDemoMode };
-        LegacyImportVm = new LegacyImportViewModel(legacyImporter, folderPickerService, isDemoMode);
+        LegacyImportVm = new LegacyImportViewModel(legacyImporter, folderPickerService, isDemoMode, writeGate: _writeGate);
         LegacyImportVm.ImportSucceeded += OnLegacyImportSucceededAsync;
         ScanReceiveVm = new ScanReceiveViewModel(
             resolvedScanService,
             soundPlayer,
             imagePicker,
-            isDemoMode: isDemoMode);
+            isDemoMode: isDemoMode,
+            writeGate: _writeGate);
         ScanReceiveVm.ScanReceivedSucceeded += OnScanReceivedSucceededAsync;
         PhoneSyncVm = new PhoneSyncViewModel(
             _syncController,
@@ -366,22 +391,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             folderPickerService,
             confirmationService,
             _dispatchToUi,
-            returnOrderProvider.GetCurrentTime);
+            returnOrderProvider.GetCurrentTime,
+            writeGate: _writeGate);
         GoogleSheetVm = new GoogleSheetViewModel(
             _sheetSyncController,
             clipboardService,
             _dispatchToUi,
-            returnOrderProvider.GetCurrentTime);
+            returnOrderProvider.GetCurrentTime,
+            writeGate: _writeGate);
         SaleworkVm = new SaleworkViewModel(
             _saleworkController,
             confirmationService,
             _dispatchToUi,
-            returnOrderProvider.GetCurrentTime);
+            returnOrderProvider.GetCurrentTime,
+            writeGate: _writeGate);
         FileImportVm = new FileImportViewModel(
             _fileImportController,
             importFilePickerService,
             confirmationService,
-            _dispatchToUi);
+            _dispatchToUi,
+            writeGate: _writeGate);
 
         _pageCache["home"] = HomeVm;
         _pageCache["shopee_return"] = ShopeeReturnVm;
@@ -502,6 +531,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     public bool IsDemoMode { get; }
+    public WriteGate WriteGate => _writeGate;
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+    public CloudStatusViewModel CloudVm { get; }
     public ITrayService TrayService => _trayService;
     public INotificationService NotificationService => _notificationService;
     public HomeViewModel HomeVm { get; }
@@ -757,7 +790,31 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _toastIsWarning;
 
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        UndoDeleteCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnCloudVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CloudStatusViewModel.IsPopupOpen) && CloudVm.IsPopupOpen)
+        {
+            NotificationsVm.CloseCommand.Execute(null);
+        }
+    }
+
+    private void OnNotificationsVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(NotificationCenterViewModel.IsOpen) && NotificationsVm.IsOpen)
+        {
+            CloudVm.ClosePopup();
+        }
+    }
+
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UndoDeleteCommand))]
     private bool _canUndoDelete;
 
     [ObservableProperty]
@@ -883,6 +940,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void NavigateByKey(string key)
     {
+        if (key.Equals(SettingsViewModel.CloudTabKey, StringComparison.OrdinalIgnoreCase) && CloudVm.IsEnabled)
+        {
+            SettingsVm.SelectTab(SettingsViewModel.CloudTabKey);
+            key = "settings";
+        }
         // Các đường nạp đơn nay nằm trong Cài đặt (thẻ riêng): khóa cũ mở Cài đặt đúng thẻ đó.
         var importKey = SettingsViewModel.ImportTabKeys.FirstOrDefault(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
         if (importKey is not null) { SettingsVm.SelectTab(importKey); key = "settings"; }
@@ -929,7 +991,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task<int> RunArchiveSweepAsync(bool reloadIfMoved = true, CancellationToken cancellationToken = default)
     {
-        if (IsDemoMode || _archiveSweeper is null) return 0;
+        if (IsDemoMode || _archiveSweeper is null || !CanWrite) return 0;
         if (Interlocked.CompareExchange(ref _sweepRunning, 1, 0) != 0) return 0;
 
         try
@@ -1332,6 +1394,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _writeGate.Changed -= OnWriteGateChanged;
+        CloudVm.PropertyChanged -= OnCloudVmPropertyChanged;
+        NotificationsVm.PropertyChanged -= OnNotificationsVmPropertyChanged;
+        CloudVm.Dispose();
         _syncController.Handled -= OnSyncHandled;
         _folderWatchController.Completed -= OnFolderWatchCompleted;
         _folderWatchController.ConfigChanged -= OnFolderWatchConfigChanged;
@@ -1419,9 +1485,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         RestartToastTimer();
     }
 
-    [RelayCommand]
+    private bool CanExecuteUndoDelete => CanUndoDelete && CanWrite;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteUndoDelete))]
     public async Task UndoDeleteAsync()
     {
+        if (!CanWrite) return;
         var ids = _pendingUndoOrderIds;
         var isReturnWatch = _pendingUndoIsReturnWatch;
         DismissToast();

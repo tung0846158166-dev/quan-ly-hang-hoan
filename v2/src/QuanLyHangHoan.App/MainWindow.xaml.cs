@@ -91,6 +91,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (e.Key == Key.Escape && vm.CloudVm.IsPopupOpen)
+        {
+            vm.CloudVm.ClosePopup();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.Escape && vm.NotificationsVm.IsOpen)
         {
             vm.NotificationsVm.CloseCommand.Execute(null);

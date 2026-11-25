@@ -23,6 +23,7 @@
                     <Button Command="{Binding RunNowCommand}"
                             Content="{Binding RunNowButtonText}"
                             IsEnabled="{Binding CanRunNow}"
+                            ToolTip="{Binding WriteDisabledTooltip}"
                             Style="{StaticResource PrimaryActionButtonStyle}"
                             Background="#2563EB"
                             Height="34"

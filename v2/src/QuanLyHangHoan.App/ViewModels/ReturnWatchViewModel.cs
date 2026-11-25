@@ -166,6 +166,7 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
     private readonly Action<Order>? _onOpenDetail;
     private readonly Action<Order>? _onGoToMainTable;
     private readonly AlertPolicy _alertPolicy;
+    private readonly WriteGate _writeGate;
 
     private IReadOnlyList<ReturnWatchEntry> _entries = Array.Empty<ReturnWatchEntry>();
     private List<ReturnWatchRowViewModel> _allRows = [];
@@ -181,7 +182,8 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         Action<string, bool>? onNotify = null,
         Action<Order>? onOpenDetail = null,
         Action<Order>? onGoToMainTable = null,
-        AlertPolicy? alertPolicy = null)
+        AlertPolicy? alertPolicy = null,
+        WriteGate? writeGate = null)
     {
         _service = service;
         _clock = clock ?? (() => DateTime.Now);
@@ -192,8 +194,23 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         _onOpenDetail = onOpenDetail;
         _onGoToMainTable = onGoToMainTable;
         _alertPolicy = alertPolicy ?? AlertThresholds.MainPolicy;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
         _lastNow = _clock();
         Pager = new Pager<ReturnWatchRowViewModel>(p => VisibleOrders = p);
+    }
+
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        RemoveFromBoardCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Chia trang 100 kiện/trang (thay cho giới hạn 1.500 dòng trước đây).</summary>
@@ -354,9 +371,10 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task RemoveFromBoardAsync(ReturnWatchRowViewModel? row)
     {
+        if (!CanWrite) return;
         var targets = ResolveTargets(row);
         if (targets.Count == 0) return;
 

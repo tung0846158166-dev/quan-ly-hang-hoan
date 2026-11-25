@@ -14,6 +14,7 @@ public sealed partial class ScanReceiveViewModel : ObservableObject
     private readonly IScanSoundPlayer _soundPlayer;
     private readonly IImageFilePickerService? _imagePicker;
     private readonly Func<DateTime> _debounceClock;
+    private readonly WriteGate _writeGate;
 
     private string? _lastScannedCode;
     private DateTime _lastScannedAt = DateTime.MinValue;
@@ -25,13 +26,30 @@ public sealed partial class ScanReceiveViewModel : ObservableObject
         IScanSoundPlayer? soundPlayer = null,
         IImageFilePickerService? imagePicker = null,
         Func<DateTime>? debounceClock = null,
-        bool isDemoMode = false)
+        bool isDemoMode = false,
+        WriteGate? writeGate = null)
     {
         _scanService = scanService;
         _soundPlayer = soundPlayer ?? new NoOpScanSoundPlayer();
         _imagePicker = imagePicker;
         _debounceClock = debounceClock ?? (() => DateTime.UtcNow);
         IsDemoMode = isDemoMode;
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
+    }
+
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        SubmitScanCommand.NotifyCanExecuteChanged();
+        PickPhotoCommand.NotifyCanExecuteChanged();
     }
 
     public event Func<Task>? ScanReceivedSucceeded;
@@ -114,9 +132,10 @@ public sealed partial class ScanReceiveViewModel : ObservableObject
 
     public bool HasSessionHistory => SessionHistory.Count > 0;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     private void PickPhoto()
     {
+        if (!CanWrite) return;
         var path = _imagePicker?.PickImageFile("Chọn ảnh đính kèm cho lần quét kế tiếp");
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
 
@@ -152,9 +171,10 @@ public sealed partial class ScanReceiveViewModel : ObservableObject
         HasPendingPhoto = false;
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanWrite))]
     public async Task SubmitScanAsync()
     {
+        if (!CanWrite) return;
         var code = (ScanInput ?? string.Empty).Trim();
         ScanInput = string.Empty;
         if (string.IsNullOrEmpty(code) || IsBusy) return;

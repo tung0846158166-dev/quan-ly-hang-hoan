@@ -21,6 +21,7 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
     private readonly IClipboardService _clipboardService;
     private readonly Action<Action> _dispatchToUi;
     private readonly Func<DateTime> _clock;
+    private readonly WriteGate _writeGate;
     private bool _suppressSave;
     private bool _disposed;
 
@@ -28,12 +29,18 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
         ISheetSyncController controller,
         IClipboardService? clipboardService = null,
         Action<Action>? dispatchToUi = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        WriteGate? writeGate = null)
     {
         _controller = controller;
         _clipboardService = clipboardService ?? new WindowsClipboardService();
         _dispatchToUi = dispatchToUi ?? (a => a());
         _clock = clock ?? (() => DateTime.Now);
+        _writeGate = writeGate ?? WriteGate.AlwaysOpen;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed += OnWriteGateChanged;
+        }
 
         _controller.Completed += OnControllerCompleted;
         _controller.ConfigChanged += OnControllerConfigChanged;
@@ -62,6 +69,7 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(ShowSavedUrlState))]
     [NotifyPropertyChangedFor(nameof(ShowUrlEditor))]
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
     private bool _hasUrl;
 
     [ObservableProperty]
@@ -111,7 +119,19 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRunNow))]
     [NotifyPropertyChangedFor(nameof(RunNowButtonText))]
+    [NotifyCanExecuteChangedFor(nameof(RunNowCommand))]
     private bool _isRunning;
+
+    public bool CanWrite => _writeGate.CanWrite;
+    public string? WriteDisabledTooltip => _writeGate.TooltipReason;
+
+    private void OnWriteGateChanged()
+    {
+        OnPropertyChanged(nameof(CanWrite));
+        OnPropertyChanged(nameof(WriteDisabledTooltip));
+        OnPropertyChanged(nameof(CanRunNow));
+        RunNowCommand.NotifyCanExecuteChanged();
+    }
 
     public bool HasUrlError => !string.IsNullOrWhiteSpace(UrlError);
     public bool ShowSavedUrlState => HasUrl && !IsEditingUrl;
@@ -119,7 +139,7 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
     public bool HasToken => !string.IsNullOrWhiteSpace(Token);
     public string DisplayTokenText => HasToken ? Token : "(Lưu địa chỉ Apps Script để tạo token)";
     public bool HasCopiedNotice => !string.IsNullOrWhiteSpace(CopiedNotice);
-    public bool CanRunNow => HasUrl && !IsRunning;
+    public bool CanRunNow => CanWrite && HasUrl && !IsRunning;
     public string RunNowButtonText => IsRunning ? "Đang cập nhật..." : "Cập nhật ngay";
 
     public string LastStatusText
@@ -219,7 +239,7 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
         CopiedNotice = "Đã sao chép token";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRunNow))]
     public async Task RunNowAsync()
     {
         if (!CanRunNow) return;
@@ -333,6 +353,10 @@ public sealed partial class GoogleSheetViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        if (!ReferenceEquals(_writeGate, WriteGate.AlwaysOpen))
+        {
+            _writeGate.Changed -= OnWriteGateChanged;
+        }
         _controller.Completed -= OnControllerCompleted;
         _controller.ConfigChanged -= OnControllerConfigChanged;
     }

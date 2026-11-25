@@ -105,7 +105,17 @@ public sealed class AiChatService : IAiChat
                "- Liệt kê đơn: ghi mã đơn + mã vận đơn (người dùng bấm được bên dưới); kết quả bị cắt (truncated) thì nói rõ.\n" +
                "- Câu mơ hồ: chọn cách hiểu hợp lý, làm luôn, nói rõ đã hiểu thế nào.\n" +
                "- Hỏi cách dùng phần mềm: gọi app_guide, không bịa tính năng. Bạn chỉ ĐỌC dữ liệu, không sửa/xóa/nhận hàng.\n" +
-               "- Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.";
+               "- Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.\n" +
+               SnapshotBlock();
+    }
+
+    /// <summary>Số liệu hiện tại đính sẵn: câu hỏi chỉ cần các số này thì trả lời luôn, KHÔNG gọi công cụ (đỡ tốn token/vòng).</summary>
+    private string SnapshotBlock()
+    {
+        var snap = _tools.Snapshot();
+        if (snap.Length == 0) return "";
+        return "SỐ LIỆU HIỆN TẠI (tính sẵn, đồng, theo kiện): " + snap + "\n" +
+               "- Chỉ cần các số này thì trả lời NGAY, không gọi công cụ. Cần danh sách/lọc khác/chi tiết/kỳ khác thì gọi công cụ ĐỦ trong một lượt rồi trả lời luôn.";
     }
 
     public async Task<AiAnswer> AskAsync(string question, CancellationToken ct = default)
@@ -118,6 +128,7 @@ public sealed class AiChatService : IAiChat
         var trace = new List<string>();
         var tools = JsonNode.Parse(AiOrderTools.DefinitionsFor(question))!;
         var usedModels = new List<string>();
+        var done = new HashSet<string>(StringComparer.Ordinal);
 
         try
         {
@@ -127,7 +138,8 @@ public sealed class AiChatService : IAiChat
                 {
                     ["messages"] = new JsonArray(msgs.Select(m => (JsonNode)m.DeepClone()).ToArray()),
                     ["tools"] = tools.DeepClone(),
-                    ["tool_choice"] = "auto",
+                    // 2 vòng cuối: cấm gọi thêm công cụ, buộc chốt đáp án từ dữ liệu đã có (tránh lòng vòng và "gọi công cụ quá nhiều lần").
+                    ["tool_choice"] = round >= MaxRounds - 2 ? "none" : "auto",
                     ["temperature"] = 0.1,
                 };
                 ShrinkToBudget(body);
@@ -153,10 +165,19 @@ public sealed class AiChatService : IAiChat
                     var fn = call?["function"];
                     var name = fn?["name"]?.GetValue<string>() ?? "";
                     var args = fn?["arguments"]?.GetValue<string>() ?? "{}";
-                    var result = _tools.Execute(name, args);
-                    refs.AddRange(result.Refs);
-                    trace.Add($"{name}({args})");
-                    var json = result.Json.Length > MaxToolChars ? result.Json[..MaxToolChars] + "…(đã cắt bớt)" : result.Json;
+                    string json;
+                    if (!done.Add(name + "|" + args))
+                    {
+                        // Gọi lại y hệt: không chạy lại, không gửi lại kết quả lớn (đã có ở trên).
+                        json = "{\"note\":\"Đã gọi công cụ này với cùng tham số ở trên; dùng kết quả đó để trả lời.\"}";
+                    }
+                    else
+                    {
+                        var result = _tools.Execute(name, args);
+                        refs.AddRange(result.Refs);
+                        trace.Add($"{name}({args})");
+                        json = result.Json.Length > MaxToolChars ? result.Json[..MaxToolChars] + "…(đã cắt bớt)" : result.Json;
+                    }
                     msgs.Add(new JsonObject { ["role"] = "tool", ["tool_call_id"] = id, ["name"] = name, ["content"] = json });
                 }
             }

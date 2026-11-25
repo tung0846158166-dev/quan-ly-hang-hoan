@@ -262,6 +262,10 @@ public sealed class AiFallbackTests
         }
     }
 
+    /// <summary>Cách app thật tuần tự hóa yêu cầu: không thoát chữ Việt thành \uXXXX.</summary>
+    private static readonly System.Text.Json.JsonSerializerOptions WireJson =
+        new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     [Fact]
     public async Task A_typical_request_is_well_under_the_free_tier_limit()
     {
@@ -269,7 +273,7 @@ public sealed class AiFallbackTests
         var svc = new AiChatService(new HttpClient(r), new List<AiEndpoint> { new("groq", AiChatService.GroqBaseUrl, "k", "m") },
             new AiOrderTools(() => Array.Empty<StoredOrder>(), () => Now), () => Now);
         await svc.AskAsync("giá trị chưa về đang là bao nhiêu tiền và sản phẩm nào chưa về nhiều nhất");
-        var chars = r.Bodies[0].ToJsonString().Length;
+        var chars = r.Bodies[0].ToJsonString(WireJson).Length;
         Assert.True(chars / 2.8 < 4500, $"yêu cầu ước {chars / 2.8:0} token, vượt ngân sách 4500");
     }
 
@@ -283,7 +287,8 @@ public sealed class AiFallbackTests
         for (var i = 0; i < 10; i++) await svc.AskAsync("câu hỏi số " + i);
         var last = r.Bodies[^1];
         Assert.True(last["messages"]!.AsArray().Count <= 8);                       // system + tối đa 6 tin lịch sử + câu hỏi
-        Assert.True(last.ToJsonString().Length / 2.8 < 4500);
+        // đo đúng cách gửi thật (không thoát ký tự Việt thành \uXXXX)
+        Assert.True(last.ToJsonString(WireJson).Length / 2.8 < 4500);
     }
 
     [Fact]

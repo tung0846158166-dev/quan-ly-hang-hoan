@@ -167,7 +167,7 @@ public sealed partial class AiOrderTools
         if (Has("nhat ky", "hoat dong", "lich su", "da lam", "nap don", "bao nhieu lan")) Add("recent_activity", "activity_stats");
         if (Has("ket noi", "sao luu", "backup", "thong bao", "dien thoai", "trang thai he thong")) Add("system_status", "notifications");
         if (Has("lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung phan mem")) Add("app_guide");
-        if (want.Count == 3) Add("overview", "find_order");
+        if (want.Count == 3) Add("find_order");   // tổng quan đã có sẵn trong số liệu hiện tại của lời nhắc hệ thống
         var picked = new JsonArray();
         foreach (var t in all)
             if (want.Contains(t!["function"]!["name"]!.GetValue<string>())) picked.Add(t.DeepClone());
@@ -490,6 +490,50 @@ public sealed partial class AiOrderTools
             ["archivedOrders"] = Load().Count(s => s.IsArchived && !s.IsDeleted),
         };
         return new(res.ToJsonString(Json), Array.Empty<AiOrderRef>());
+    }
+
+    /// <summary>
+    /// Ảnh chụp nhanh SỐ LIỆU HIỆN TẠI (nhỏ, ~200 token) gắn sẵn vào lời nhắc hệ thống: các câu hỏi phổ biến (đang chờ bao nhiêu, báo đỏ,
+    /// hôm nay về mấy đơn, sàn/vận chuyển/sản phẩm nào nhiều) trả lời được NGAY, không cần vòng gọi công cụ (tiết kiệm token và giới hạn phút).
+    /// Chỉ chứa số tổng hợp và tên sản phẩm; không có tên/SĐT/địa chỉ. Lỗi đọc dữ liệu thì trả chuỗi rỗng.
+    /// </summary>
+    public string Snapshot()
+    {
+        try
+        {
+            var now = _clock();
+            var today = now.Date;
+            var active = Load().Where(s => !s.IsArchived && !s.IsDeleted).Select(s => s.Order).ToList();
+            var waiting = active.Where(PhoneSnapshot.IsPending).ToList();
+            var received = active.Where(PhoneSnapshot.IsReceived).ToList();
+            var recvToday = received.Where(o => OrderDate(o, "recv") == today).ToList();
+            var recvYesterday = received.Where(o => OrderDate(o, "recv") == today.AddDays(-1)).ToList();
+            var recv7 = received.Where(o => OrderDate(o, "recv") is { } d && d > today.AddDays(-7) && d <= today).ToList();
+            var red = waiting.Where(o => LevelOf(o) == Level.Red).ToList();
+            var yellow = waiting.Where(o => LevelOf(o) == Level.Yellow).ToList();
+            var topProducts = new JsonArray();
+            foreach (var g in waiting.SelectMany(o => o.Items.Select(i => (Name: i.Product, Qty: i.Qty > 0 ? i.Qty : 1)))
+                         .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+                         .GroupBy(x => x.Name.Trim()).Select(g => (Name: g.Key, Qty: g.Sum(x => x.Qty)))
+                         .OrderByDescending(x => x.Qty).Take(5))
+                topProducts.Add(new JsonObject { ["name"] = MaskPhones(g.Name.Length > 40 ? g.Name[..40] : g.Name), ["qty"] = g.Qty });
+            var res = new JsonObject
+            {
+                ["activeOrders"] = active.Count,
+                ["waiting"] = new JsonObject { ["count"] = waiting.Count, ["value"] = Value(waiting) },
+                ["waitingByPlatform"] = Group(waiting, o => Label(o.Platform)),
+                ["waitingByCarrier"] = Group(waiting, o => Label(o.Carrier)),
+                ["red24h"] = new JsonObject { ["count"] = red.Count, ["value"] = Value(red) },
+                ["yellow12h"] = new JsonObject { ["count"] = yellow.Count, ["value"] = Value(yellow) },
+                ["receivedToday"] = new JsonObject { ["count"] = recvToday.Count, ["value"] = Value(recvToday) },
+                ["receivedYesterday"] = new JsonObject { ["count"] = recvYesterday.Count, ["value"] = Value(recvYesterday) },
+                ["received7days"] = new JsonObject { ["count"] = recv7.Count, ["value"] = Value(recv7) },
+                ["watching"] = active.Count(o => o.IsWatchlist),
+            };
+            if (topProducts.Count > 0) res["topWaitingProducts"] = topProducts;
+            return res.ToJsonString(Json);
+        }
+        catch { return ""; }
     }
 
     private static string Label(string? s) => string.IsNullOrWhiteSpace(s) ? "(trống)" : s;

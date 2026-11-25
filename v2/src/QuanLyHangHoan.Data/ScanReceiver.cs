@@ -35,16 +35,16 @@ public static class ScanReceiver
             using var tx = conn.BeginTransaction(); // đọc + ghi cùng giao dịch: kiểm tra lại trạng thái ngay trước khi ghi
 
             var candidates = Load(conn, tx);
-            var m = TrackingResolver.Resolve(candidates, code);
+            var d = ScanDecider.Decide(candidates, code);   // quyết định thuần, dùng chung với bản cloud
 
-            if (m.Kind == MatchKind.NotFound) return new(ScanOutcome.NotFound, false, "Không tìm thấy kiện.", null);
-            if (m.Kind == MatchKind.Ambiguous)
-                return new(ScanOutcome.Ambiguous, false, $"{m.Candidates.Count} kiện cùng khớp mã này, cần kiểm tra thủ công.", null);
+            if (d.Kind == ScanDecisionKind.NotFound) return new(ScanOutcome.NotFound, false, "Không tìm thấy kiện.", null);
+            if (d.Kind == ScanDecisionKind.Ambiguous)
+                return new(ScanOutcome.Ambiguous, false, $"{d.Candidates} kiện cùng khớp mã này, cần kiểm tra thủ công.", null);
 
-            var o = m.Single!;
-            var received = o.Status == ReceiveStatus.Received;
+            var o = d.Order!;
+            var received = d.Kind == ScanDecisionKind.AlreadyReceived;
 
-            if (!received && o.Status is not (ReceiveStatus.NotReturned or ReceiveStatus.NotYetArrived or ""))
+            if (d.Kind == ScanDecisionKind.NeedsManualCheck)
                 return new(ScanOutcome.NeedsManualCheck, false, $"Trạng thái \"{o.Status}\": cần kiểm tra thủ công.", o);
 
             if (!received)

@@ -1,0 +1,16 @@
+{
+  "name": "@qlhh/cloud-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lõi nghiệp vụ THUẦN (không phụ thuộc Cloudflare) cho bản cloud: khớp mã, quyết định quét. Kiểm chứng bằng bộ ca thử chung với C# (cloud/golden).",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

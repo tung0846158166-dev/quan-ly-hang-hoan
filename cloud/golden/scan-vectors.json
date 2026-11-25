@@ -1,0 +1,146 @@
+{
+  "description": "Bộ ca thử DÙNG CHUNG cho quyết định quét kiện (C# ScanDecider và TypeScript cloud/core). Dữ liệu GIẢ. Mọi thay đổi quy tắc phải sửa ở đây rồi cả hai bản cùng đạt. Chỉ gồm đơn ĐANG HOẠT ĐỘNG (đơn lưu trữ/đã xóa lọc trước khi quyết định).",
+  "cases": [
+    {
+      "name": "mã vận đơn riêng, có khoảng trắng và chữ thường",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "TRK1", "status": "Chưa trả" } ],
+      "code": "  trk1 ",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "nhận kiện A không nhận kiện B cùng mã đơn",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O1", "track": "B", "status": "Chưa trả" }
+      ],
+      "code": "A",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "mã giao đi dùng chung -> mơ hồ",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "forwardTrack": "SHARED", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O1", "track": "B", "forwardTrack": "SHARED", "status": "Chưa trả" }
+      ],
+      "code": "SHARED",
+      "expect": { "kind": "ambiguous", "orderId": null, "candidates": 2 }
+    },
+    {
+      "name": "mã đơn gốc có nhiều kiện -> mơ hồ",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O1", "track": "B", "status": "Chưa trả" }
+      ],
+      "code": "O1",
+      "expect": { "kind": "ambiguous", "orderId": null, "candidates": 2 }
+    },
+    {
+      "name": "mã đơn gốc chỉ có một kiện -> nhận",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa trả" },
+        { "id": "c", "orderId": "O2", "track": "C", "status": "Chưa trả" }
+      ],
+      "code": "o2",
+      "expect": { "kind": "receive", "orderId": "c", "candidates": 1 }
+    },
+    {
+      "name": "mã yêu cầu hoàn khớp đúng một kiện",
+      "orders": [
+        { "id": "a", "orderId": "O1", "returnOrderId": "RR9", "track": "A", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O2", "returnOrderId": "RR8", "track": "B", "status": "Chưa trả" }
+      ],
+      "code": "RR9",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "mã riêng của kiện được ưu tiên hơn mã giao đi của kiện khác",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "X1", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O2", "track": "B", "forwardTrack": "X1", "status": "Chưa trả" }
+      ],
+      "code": "X1",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "hai kiện cùng mã riêng -> mơ hồ",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "DUP", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O2", "track": "DUP", "status": "Chưa trả" }
+      ],
+      "code": "DUP",
+      "expect": { "kind": "ambiguous", "orderId": null, "candidates": 2 }
+    },
+    {
+      "name": "mã hoàn (returnTrack), mã phụ (altTrack), mã liên kết tường minh và mã quét thay thế đều là mã riêng",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "returnTrack": "RT-A", "status": "Chưa trả" },
+        { "id": "b", "orderId": "O2", "track": "B", "altTrack": "ALT-B", "status": "Chưa trả" },
+        { "id": "c", "orderId": "O3", "track": "C", "trackingCodes": ["OLD-C"], "status": "Chưa trả" },
+        { "id": "d", "orderId": "O4", "track": "D", "scanAliases": ["ALIAS-D"], "status": "Chưa trả" }
+      ],
+      "multi": [
+        { "code": "rt-a", "expect": { "kind": "receive", "orderId": "a", "candidates": 1 } },
+        { "code": "alt-b", "expect": { "kind": "receive", "orderId": "b", "candidates": 1 } },
+        { "code": "old-c", "expect": { "kind": "receive", "orderId": "c", "candidates": 1 } },
+        { "code": "alias-d", "expect": { "kind": "receive", "orderId": "d", "candidates": 1 } }
+      ]
+    },
+    {
+      "name": "mã không tồn tại",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa trả" } ],
+      "code": "XYZ",
+      "expect": { "kind": "notFound", "orderId": null, "candidates": 0 }
+    },
+    {
+      "name": "mã rỗng hoặc chỉ có khoảng trắng và ký tự vô hình",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa trả" } ],
+      "multi": [
+        { "code": "", "expect": { "kind": "notFound", "orderId": null, "candidates": 0 } },
+        { "code": "   ", "expect": { "kind": "notFound", "orderId": null, "candidates": 0 } },
+        { "code": "​﻿", "expect": { "kind": "notFound", "orderId": null, "candidates": 0 } }
+      ]
+    },
+    {
+      "name": "ký tự vô hình và khoảng trắng giữa mã được bỏ khi so sánh",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "SPX123", "status": "Chưa trả" } ],
+      "code": "spx ​12﻿3",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "chữ Việt có dấu được chuyển thành chữ hoa như nhau",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "MÃ-ĐƠN-1", "status": "Chưa trả" } ],
+      "code": "mã-đơn-1",
+      "expect": { "kind": "receive", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "kiện đã nhận: báo đã nhận, không đổi",
+      "orders": [ { "id": "a", "orderId": "O1", "track": "A", "status": "Hàng đã trả" } ],
+      "code": "A",
+      "expect": { "kind": "alreadyReceived", "orderId": "a", "candidates": 1 }
+    },
+    {
+      "name": "trạng thái cần kiểm tra thủ công",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "status": "Không cần nhận" },
+        { "id": "b", "orderId": "O2", "track": "B", "status": "Bị mất" },
+        { "id": "c", "orderId": "O3", "track": "C", "status": "Trạng thái lạ" }
+      ],
+      "multi": [
+        { "code": "A", "expect": { "kind": "needsManualCheck", "orderId": "a", "candidates": 1 } },
+        { "code": "B", "expect": { "kind": "needsManualCheck", "orderId": "b", "candidates": 1 } },
+        { "code": "C", "expect": { "kind": "needsManualCheck", "orderId": "c", "candidates": 1 } }
+      ]
+    },
+    {
+      "name": "trạng thái 'Chưa về' và trạng thái rỗng vẫn được nhận",
+      "orders": [
+        { "id": "a", "orderId": "O1", "track": "A", "status": "Chưa về" },
+        { "id": "b", "orderId": "O2", "track": "B", "status": "" }
+      ],
+      "multi": [
+        { "code": "A", "expect": { "kind": "receive", "orderId": "a", "candidates": 1 } },
+        { "code": "B", "expect": { "kind": "receive", "orderId": "b", "candidates": 1 } }
+      ]
+    }
+  ]
+}

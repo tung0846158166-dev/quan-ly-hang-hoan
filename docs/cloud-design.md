@@ -1,191 +1,192 @@
-# Thiết kế chuyển sang CLOUD (Cloudflare) — BẢN 2, CHỜ CHỦ DỰ ÁN DUYỆT
+﻿# Thiáº¿t káº¿ chuyá»ƒn sang CLOUD (Cloudflare) â€” Báº¢N 2, CHá»œ CHá»¦ Dá»° ÃN DUYá»†T
 
-Trạng thái: **ĐỀ XUẤT, chưa làm gì.** Bản Electron cũ vẫn là chuẩn đối chiếu; bản v2 hiện tại (SQLite + MQTT/ntfy) chạy bình thường cho tới khi chủ dự án duyệt và kiểm tra bản cloud.
+Tráº¡ng thÃ¡i: **Äá»€ XUáº¤T, chÆ°a lÃ m gÃ¬.** Báº£n Electron cÅ© váº«n lÃ  chuáº©n Ä‘á»‘i chiáº¿u; báº£n v2 hiá»‡n táº¡i (SQLite + MQTT/ntfy) cháº¡y bÃ¬nh thÆ°á»ng cho tá»›i khi chá»§ dá»± Ã¡n duyá»‡t vÃ  kiá»ƒm tra báº£n cloud.
 
-## 0. Những điều chủ dự án đã chốt (bản 2)
-1. **Mất mạng = KHÔNG làm việc.** Máy hiện trạng thái "Mất kết nối" và chặn quét/sửa; không có hàng đợi ngoại tuyến. (Tránh nhiều máy quét cùng một đơn lúc mất mạng rồi dồn lên lệch.)
-2. Không đưa dữ liệu cá nhân người nhận lên cloud; phần dữ liệu thô chỉ giữ các trường cần thiết (xem 3.1).
-3. **Cả điện thoại và máy tính đều xem được ảnh của đơn; chỉ điện thoại mới chụp/quét ảnh.** Ảnh lưu ở R2.
-4. Gói: **R2 10 GB, D1 500 MB** (xem 3.7: D1 là giới hạn chật nhất).
-5. **Điện thoại là một ứng dụng độc lập đầy đủ** (xem danh sách, chi tiết, thống kê, AI, quét...), không chỉ để quét.
-6. **Google Sheet nạp thẳng lên cloud** (Cron của Worker). Các cách nạp khác (file Excel, thư mục, Salework) vẫn chạy ở máy tính.
-7. **MỘT cửa hàng duy nhất, phần mềm nội bộ cho nhân viên dùng** (không bán/cho thuê, không có đăng ký cửa hàng). `shop_id` chỉ là một hằng số, không làm phần quản lý nhiều cửa hàng.
-Chưa trả lời: số ngày giữ ảnh (mặc định 90, xem 3.7).
+## 0. Nhá»¯ng Ä‘iá»u chá»§ dá»± Ã¡n Ä‘Ã£ chá»‘t (báº£n 2)
+1. **Máº¥t máº¡ng = KHÃ”NG lÃ m viá»‡c.** MÃ¡y hiá»‡n tráº¡ng thÃ¡i "Máº¥t káº¿t ná»‘i" vÃ  cháº·n quÃ©t/sá»­a; khÃ´ng cÃ³ hÃ ng Ä‘á»£i ngoáº¡i tuyáº¿n. (TrÃ¡nh nhiá»u mÃ¡y quÃ©t cÃ¹ng má»™t Ä‘Æ¡n lÃºc máº¥t máº¡ng rá»“i dá»“n lÃªn lá»‡ch.)
+2. KhÃ´ng Ä‘Æ°a dá»¯ liá»‡u cÃ¡ nhÃ¢n ngÆ°á»i nháº­n lÃªn cloud; pháº§n dá»¯ liá»‡u thÃ´ chá»‰ giá»¯ cÃ¡c trÆ°á»ng cáº§n thiáº¿t (xem 3.1).
+3. **Cáº£ Ä‘iá»‡n thoáº¡i vÃ  mÃ¡y tÃ­nh Ä‘á»u xem Ä‘Æ°á»£c áº£nh cá»§a Ä‘Æ¡n; chá»‰ Ä‘iá»‡n thoáº¡i má»›i chá»¥p/quÃ©t áº£nh.** áº¢nh lÆ°u á»Ÿ R2.
+4. GÃ³i: **R2 10 GB, D1 500 MB** (xem 3.7: D1 lÃ  giá»›i háº¡n cháº­t nháº¥t).
+5. **Äiá»‡n thoáº¡i lÃ  má»™t á»©ng dá»¥ng Ä‘á»™c láº­p Ä‘áº§y Ä‘á»§** (xem danh sÃ¡ch, chi tiáº¿t, thá»‘ng kÃª, AI, quÃ©t...), khÃ´ng chá»‰ Ä‘á»ƒ quÃ©t.
+6. **Google Sheet náº¡p tháº³ng lÃªn cloud** (Cron cá»§a Worker). CÃ¡c cÃ¡ch náº¡p khÃ¡c (file Excel, thÆ° má»¥c, Salework) váº«n cháº¡y á»Ÿ mÃ¡y tÃ­nh.
+7. **Má»˜T cá»­a hÃ ng duy nháº¥t, pháº§n má»m ná»™i bá»™ cho nhÃ¢n viÃªn dÃ¹ng** (khÃ´ng bÃ¡n/cho thuÃª, khÃ´ng cÃ³ Ä‘Äƒng kÃ½ cá»­a hÃ ng). `shop_id` chá»‰ lÃ  má»™t háº±ng sá»‘, khÃ´ng lÃ m pháº§n quáº£n lÃ½ nhiá»u cá»­a hÃ ng.
+ChÆ°a tráº£ lá»i: sá»‘ ngÃ y giá»¯ áº£nh (máº·c Ä‘á»‹nh 90, xem 3.7).
 
-## 1. Tổng quan
+## 1. Tá»•ng quan
 
 ```
-   iPhone x10 (SwiftUI, ứng dụng đầy đủ)     Máy tính x2 (WPF)
-   ┌────────────────────────────┐          ┌───────────────────────────┐
-   │ giao diện (giữ)            │          │ giao diện (giữ)           │
-   │ bản lưu tạm CHỈ ĐỌC khi    │          │ bản lưu tạm CHỈ ĐỌC khi   │
-   │ mất mạng; mọi GHI cần mạng │          │ mất mạng; mọi GHI cần mạng│
-   │ chụp + gửi ảnh             │          │ xem ảnh; bộ nạp file/     │
-   └────────────┬───────────────┘          │ thư mục/Salework (giữ)    │
-                │ HTTPS + WebSocket        └─────────────┬─────────────┘
-                └───────────────┬────────────────────────┘
-                                ▼
-                 ┌─────────────────────────────┐
-                 │ Cloudflare Worker (API)     │ xác thực thiết bị + quy tắc nghiệp vụ
-                 ├─────────────────────────────┤
-                 │ D1  (500 MB): đơn, kiện,    │ nguồn dữ liệu gốc, dòng GỌN
-                 │      nhật ký, chỉ mục       │
-                 │ DO  : 1 đối tượng/cửa hàng  │ báo thay đổi (WebSocket)
-                 │ R2  (10 GB): ảnh, kho lưu   │ tệp lớn, bản lưu trữ cũ
-                 │ Cron: nạp Google Sheet      │ chạy khi mọi máy tắt
-                 └─────────────────────────────┘
+   iPhone x10 (SwiftUI, á»©ng dá»¥ng Ä‘áº§y Ä‘á»§)     MÃ¡y tÃ­nh x2 (WPF)
+   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”          â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+   â”‚ giao diá»‡n (giá»¯)            â”‚          â”‚ giao diá»‡n (giá»¯)           â”‚
+   â”‚ báº£n lÆ°u táº¡m CHá»ˆ Äá»ŒC khi    â”‚          â”‚ báº£n lÆ°u táº¡m CHá»ˆ Äá»ŒC khi   â”‚
+   â”‚ máº¥t máº¡ng; má»i GHI cáº§n máº¡ng â”‚          â”‚ máº¥t máº¡ng; má»i GHI cáº§n máº¡ngâ”‚
+   â”‚ chá»¥p + gá»­i áº£nh             â”‚          â”‚ xem áº£nh; bá»™ náº¡p file/     â”‚
+   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜          â”‚ thÆ° má»¥c/Salework (giá»¯)    â”‚
+                â”‚ HTTPS + WebSocket        â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                                â–¼
+                 â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                 â”‚ Cloudflare Worker (API)     â”‚ xÃ¡c thá»±c thiáº¿t bá»‹ + quy táº¯c nghiá»‡p vá»¥
+                 â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                 â”‚ D1  (500 MB): Ä‘Æ¡n, kiá»‡n,    â”‚ nguá»“n dá»¯ liá»‡u gá»‘c, dÃ²ng Gá»ŒN
+                 â”‚      nháº­t kÃ½, chá»‰ má»¥c       â”‚
+                 â”‚ DO  : 1 Ä‘á»‘i tÆ°á»£ng/cá»­a hÃ ng  â”‚ bÃ¡o thay Ä‘á»•i (WebSocket)
+                 â”‚ R2  (10 GB): áº£nh, kho lÆ°u   â”‚ tá»‡p lá»›n, báº£n lÆ°u trá»¯ cÅ©
+                 â”‚ Cron: náº¡p Google Sheet      â”‚ cháº¡y khi má»i mÃ¡y táº¯t
+                 â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
-## 2. Quy tắc "mất mạng = dừng"
-- Máy khách có chấm trạng thái: **Đã kết nối / Đang đồng bộ / MẤT KẾT NỐI**.
-- Khi MẤT KẾT NỐI: quét, sửa, đổi trạng thái, nạp, chụp ảnh đều bị **chặn** kèm thông báo rõ. Chỉ **xem** được dữ liệu đã tải lần cuối (nhãn "Dữ liệu cũ lúc HH:mm, chỉ xem").
-- Mọi thao tác ghi chỉ coi là thành công khi **server trả về thành công** (quy tắc bất biến số 6: chỉ ACK sau khi đã lưu bền).
-- Mạng đứt đúng lúc đang gửi (không biết server đã nhận chưa): máy khách gửi lại với **cùng mã thao tác** (`client_op_id`), server nhận trùng thì trả lại kết quả cũ, không làm đôi. Nếu không xác nhận được thì báo "chưa chắc đã nhận, hãy kiểm tra lại đơn trước khi quét lại".
-- Thay đổi so với hiện tại: iPhone hiện có hàng đợi quét khi mất mạng; bản cloud **bỏ hàng đợi này** (đúng yêu cầu).
+## 2. Quy táº¯c "máº¥t máº¡ng = dá»«ng"
+- MÃ¡y khÃ¡ch cÃ³ cháº¥m tráº¡ng thÃ¡i: **ÄÃ£ káº¿t ná»‘i / Äang Ä‘á»“ng bá»™ / Máº¤T Káº¾T Ná»I**.
+- Khi Máº¤T Káº¾T Ná»I: quÃ©t, sá»­a, Ä‘á»•i tráº¡ng thÃ¡i, náº¡p, chá»¥p áº£nh Ä‘á»u bá»‹ **cháº·n** kÃ¨m thÃ´ng bÃ¡o rÃµ. Chá»‰ **xem** Ä‘Æ°á»£c dá»¯ liá»‡u Ä‘Ã£ táº£i láº§n cuá»‘i (nhÃ£n "Dá»¯ liá»‡u cÅ© lÃºc HH:mm, chá»‰ xem").
+- Má»i thao tÃ¡c ghi chá»‰ coi lÃ  thÃ nh cÃ´ng khi **server tráº£ vá» thÃ nh cÃ´ng** (quy táº¯c báº¥t biáº¿n sá»‘ 6: chá»‰ ACK sau khi Ä‘Ã£ lÆ°u bá»n).
+- Máº¡ng Ä‘á»©t Ä‘Ãºng lÃºc Ä‘ang gá»­i (khÃ´ng biáº¿t server Ä‘Ã£ nháº­n chÆ°a): mÃ¡y khÃ¡ch gá»­i láº¡i vá»›i **cÃ¹ng mÃ£ thao tÃ¡c** (`client_op_id`), server nháº­n trÃ¹ng thÃ¬ tráº£ láº¡i káº¿t quáº£ cÅ©, khÃ´ng lÃ m Ä‘Ã´i. Náº¿u khÃ´ng xÃ¡c nháº­n Ä‘Æ°á»£c thÃ¬ bÃ¡o "chÆ°a cháº¯c Ä‘Ã£ nháº­n, hÃ£y kiá»ƒm tra láº¡i Ä‘Æ¡n trÆ°á»›c khi quÃ©t láº¡i".
+- Thay Ä‘á»•i so vá»›i hiá»‡n táº¡i: iPhone hiá»‡n cÃ³ hÃ ng Ä‘á»£i quÃ©t khi máº¥t máº¡ng; báº£n cloud **bá» hÃ ng Ä‘á»£i nÃ y** (Ä‘Ãºng yÃªu cáº§u).
 
 ## 3. Cloud
 
-### 3.1 Dữ liệu và "dữ liệu thô" (đo trên dữ liệu thật hiện tại: 4.962 đơn, DB 180 MB)
-Số liệu đo (chỉ tên trường và dung lượng, không đọc nội dung cá nhân):
-| Phần | Dung lượng | Là gì | Lên cloud? |
+### 3.1 Dá»¯ liá»‡u vÃ  "dá»¯ liá»‡u thÃ´" (Ä‘o trÃªn dá»¯ liá»‡u tháº­t hiá»‡n táº¡i: 4.962 Ä‘Æ¡n, DB 180 MB)
+Sá»‘ liá»‡u Ä‘o (chá»‰ tÃªn trÆ°á»ng vÃ  dung lÆ°á»£ng, khÃ´ng Ä‘á»c ná»™i dung cÃ¡ nhÃ¢n):
+| Pháº§n | Dung lÆ°á»£ng | LÃ  gÃ¬ | LÃªn cloud? |
 |---|---|---|---|
-| `orders.raw_json` | ~76 MB | bản sao nguyên văn của từng đơn từ app cũ | **Không** (giữ ở máy cũ/bản sao lưu) |
-| `extra_json` → `photoHistory` | ~37 MB (chỉ 328 đơn) | ảnh cũ nhúng thẳng vào đơn | **Không nhúng**; chuyển ảnh sang R2 rồi bỏ khỏi dòng đơn |
-| `extra_json` → `rawDetails` | ~2,2 MB | dòng gốc của file nhập (địa chỉ giao, tên đăng nhập người mua, lý do hoàn, mã khiếu nại...) | **Chỉ giữ vài trường cần cho nghiệp vụ** (bên dưới) |
-| `extra_json` → giá/chế độ nhập (`priceModes`...) | ~0,7 MB | cách tính giá khi nhập | Chỉ giữ giá cuối cùng và cờ cần xem lại |
-| `photos.data` | ~52 MB (2.230 ảnh) | ảnh trong CSDL | **Chuyển sang R2** |
-- Trường trong `rawDetails` **được giữ** vì giao diện/cảnh báo dùng: `returnSuccessTime` (giờ hàng về), `returnStatus`, `returnShippingStatus`, `cancelType`, `returnReason`, mã/hãng vận chuyển giao đi và hoàn.
-- **Không đưa lên:** `deliveryAddress`, `buyerUsername`, `buyerReturnNote`, `buyerOrderNote`, tên/SĐT/địa chỉ nếu có, `paymentMethod`, `claimId`... (dữ liệu người mua).
-- Bảng: `orders` (một dòng = một KIỆN), `order_items`, `scan_events`, `audit_log` (lịch sử sửa, không ghi đè), `cell_edit_history`, `return_watch`, `watchlist`, `photos` (chỉ tham chiếu R2), `devices`, `order_index` (chỉ mục kho lưu trữ).
-- Mỗi dòng có `shop_id`, `rev` (số thứ tự tăng dần để đồng bộ phần thay đổi), `updated_at`, `deleted`, `archived`.
-- Dòng gọn ước ~1–2 KB: 4.962 đơn ≈ 5–10 MB. (Ước tính, cần đo lại bằng công cụ nhập thử.)
+| `orders.raw_json` | ~76 MB | báº£n sao nguyÃªn vÄƒn cá»§a tá»«ng Ä‘Æ¡n tá»« app cÅ© | **KhÃ´ng** (giá»¯ á»Ÿ mÃ¡y cÅ©/báº£n sao lÆ°u) |
+| `extra_json` â†’ `photoHistory` | ~37 MB (chá»‰ 328 Ä‘Æ¡n) | áº£nh cÅ© nhÃºng tháº³ng vÃ o Ä‘Æ¡n | **KhÃ´ng nhÃºng**; chuyá»ƒn áº£nh sang R2 rá»“i bá» khá»i dÃ²ng Ä‘Æ¡n |
+| `extra_json` â†’ `rawDetails` | ~2,2 MB | dÃ²ng gá»‘c cá»§a file nháº­p (Ä‘á»‹a chá»‰ giao, tÃªn Ä‘Äƒng nháº­p ngÆ°á»i mua, lÃ½ do hoÃ n, mÃ£ khiáº¿u náº¡i...) | **Chá»‰ giá»¯ vÃ i trÆ°á»ng cáº§n cho nghiá»‡p vá»¥** (bÃªn dÆ°á»›i) |
+| `extra_json` â†’ giÃ¡/cháº¿ Ä‘á»™ nháº­p (`priceModes`...) | ~0,7 MB | cÃ¡ch tÃ­nh giÃ¡ khi nháº­p | Chá»‰ giá»¯ giÃ¡ cuá»‘i cÃ¹ng vÃ  cá» cáº§n xem láº¡i |
+| `photos.data` | ~52 MB (2.230 áº£nh) | áº£nh trong CSDL | **Chuyá»ƒn sang R2** |
+- TrÆ°á»ng trong `rawDetails` **Ä‘Æ°á»£c giá»¯** vÃ¬ giao diá»‡n/cáº£nh bÃ¡o dÃ¹ng: `returnSuccessTime` (giá» hÃ ng vá»), `returnStatus`, `returnShippingStatus`, `cancelType`, `returnReason`, mÃ£/hÃ£ng váº­n chuyá»ƒn giao Ä‘i vÃ  hoÃ n.
+- **KhÃ´ng Ä‘Æ°a lÃªn:** `deliveryAddress`, `buyerUsername`, `buyerReturnNote`, `buyerOrderNote`, tÃªn/SÄT/Ä‘á»‹a chá»‰ náº¿u cÃ³, `paymentMethod`, `claimId`... (dá»¯ liá»‡u ngÆ°á»i mua).
+- Báº£ng: `orders` (má»™t dÃ²ng = má»™t KIá»†N), `order_items`, `scan_events`, `audit_log` (lá»‹ch sá»­ sá»­a, khÃ´ng ghi Ä‘Ã¨), `cell_edit_history`, `return_watch`, `watchlist`, `photos` (chá»‰ tham chiáº¿u R2), `devices`, `order_index` (chá»‰ má»¥c kho lÆ°u trá»¯).
+- Má»—i dÃ²ng cÃ³ `shop_id`, `rev` (sá»‘ thá»© tá»± tÄƒng dáº§n Ä‘á»ƒ Ä‘á»“ng bá»™ pháº§n thay Ä‘á»•i), `updated_at`, `deleted`, `archived`.
+- DÃ²ng gá»n Æ°á»›c ~1â€“2 KB: 4.962 Ä‘Æ¡n â‰ˆ 5â€“10 MB. (Æ¯á»›c tÃ­nh, cáº§n Ä‘o láº¡i báº±ng cÃ´ng cá»¥ nháº­p thá»­.)
 
 ### 3.2 API
-| Việc | Cách |
+| Viá»‡c | CÃ¡ch |
 |---|---|
-| Lấy thay đổi | `GET /sync?since=<rev>` trả mọi dòng đổi từ `rev` đó, có phân trang |
-| Gửi thao tác | `POST /ops` (mỗi thao tác có `client_op_id`) |
-| Quét nhận kiện | `POST /scan` — kiểm tra và cập nhật **một thao tác nguyên tử** |
-| Nạp đơn | `POST /import` — upsert theo khóa kiện (nhập lại cùng kiện thì cập nhật, không cộng lặp) |
-| Ảnh | điện thoại `PUT /photos/<id>` lên R2; máy tính và điện thoại tải bản thu nhỏ để xem |
-| Thiết bị | ghép bằng mã QR, thu hồi từng máy |
+| Láº¥y thay Ä‘á»•i | `GET /sync?since=<rev>` tráº£ má»i dÃ²ng Ä‘á»•i tá»« `rev` Ä‘Ã³, cÃ³ phÃ¢n trang |
+| Gá»­i thao tÃ¡c | `POST /ops` (má»—i thao tÃ¡c cÃ³ `client_op_id`) |
+| QuÃ©t nháº­n kiá»‡n | `POST /scan` â€” kiá»ƒm tra vÃ  cáº­p nháº­t **má»™t thao tÃ¡c nguyÃªn tá»­** |
+| Náº¡p Ä‘Æ¡n | `POST /import` â€” upsert theo khÃ³a kiá»‡n (nháº­p láº¡i cÃ¹ng kiá»‡n thÃ¬ cáº­p nháº­t, khÃ´ng cá»™ng láº·p) |
+| áº¢nh | Ä‘iá»‡n thoáº¡i `PUT /photos/<id>` lÃªn R2; mÃ¡y tÃ­nh vÃ  Ä‘iá»‡n thoáº¡i táº£i báº£n thu nhá» Ä‘á»ƒ xem |
+| Thiáº¿t bá»‹ | ghÃ©p báº±ng mÃ£ QR, thu há»“i tá»«ng mÃ¡y |
 
-### 3.3 Quy tắc nghiệp vụ chạy ở server (BẤT BIẾN, không đổi)
-1. Một mã đơn có nhiều kiện A/B/C, mỗi kiện một mã vận đơn, một dòng, trạng thái/ảnh/ngày nhận riêng.
-2. Nhận kiện A **không** nhận B/C. Cùng mã đơn hoặc mã yêu cầu hoàn **không đủ** để gộp.
-3. Mã giao đi dùng chung hoặc mã đơn gốc có nhiều ứng viên → **ambiguous**, yêu cầu kiểm tra.
-4. Chỉ gộp mã thay thế khi có liên kết tường minh; giữ mã lịch sử.
-5. Nhập lại cùng kiện → cập nhật, không cộng lặp sản phẩm.
-6. Chỉ ACK sau khi server đã ghi bền; ảnh chưa ACK không coi là đã lưu.
-7. Cảnh báo vàng sau 12 giờ, đỏ sau 24 giờ kể từ lúc hàng về (máy khách tự tính).
-8. Không xóa/ghi đè dữ liệu cũ; mọi sửa đổi ghi vào `audit_log`.
+### 3.3 Quy táº¯c nghiá»‡p vá»¥ cháº¡y á»Ÿ server (Báº¤T BIáº¾N, khÃ´ng Ä‘á»•i)
+1. Má»™t mÃ£ Ä‘Æ¡n cÃ³ nhiá»u kiá»‡n A/B/C, má»—i kiá»‡n má»™t mÃ£ váº­n Ä‘Æ¡n, má»™t dÃ²ng, tráº¡ng thÃ¡i/áº£nh/ngÃ y nháº­n riÃªng.
+2. Nháº­n kiá»‡n A **khÃ´ng** nháº­n B/C. CÃ¹ng mÃ£ Ä‘Æ¡n hoáº·c mÃ£ yÃªu cáº§u hoÃ n **khÃ´ng Ä‘á»§** Ä‘á»ƒ gá»™p.
+3. MÃ£ giao Ä‘i dÃ¹ng chung hoáº·c mÃ£ Ä‘Æ¡n gá»‘c cÃ³ nhiá»u á»©ng viÃªn â†’ **ambiguous**, yÃªu cáº§u kiá»ƒm tra.
+4. Chá»‰ gá»™p mÃ£ thay tháº¿ khi cÃ³ liÃªn káº¿t tÆ°á»ng minh; giá»¯ mÃ£ lá»‹ch sá»­.
+5. Nháº­p láº¡i cÃ¹ng kiá»‡n â†’ cáº­p nháº­t, khÃ´ng cá»™ng láº·p sáº£n pháº©m.
+6. Chá»‰ ACK sau khi server Ä‘Ã£ ghi bá»n; áº£nh chÆ°a ACK khÃ´ng coi lÃ  Ä‘Ã£ lÆ°u.
+7. Cáº£nh bÃ¡o vÃ ng sau 12 giá», Ä‘á» sau 24 giá» ká»ƒ tá»« lÃºc hÃ ng vá» (mÃ¡y khÃ¡ch tá»± tÃ­nh).
+8. KhÃ´ng xÃ³a/ghi Ä‘Ã¨ dá»¯ liá»‡u cÅ©; má»i sá»­a Ä‘á»•i ghi vÃ o `audit_log`.
 
-### 3.4 Nhiều máy cùng lúc (khi đều có mạng)
-Quét nhận là câu lệnh có điều kiện (`UPDATE ... WHERE trạng thái = 'Đang chờ'`). Người đến sau nhận "đã nhận trước đó lúc … bởi máy …". Sửa ghi chú/trạng thái khác: người ghi sau thắng nhưng bản cũ luôn còn trong `audit_log`.
+### 3.4 Nhiá»u mÃ¡y cÃ¹ng lÃºc (khi Ä‘á»u cÃ³ máº¡ng)
+QuÃ©t nháº­n lÃ  cÃ¢u lá»‡nh cÃ³ Ä‘iá»u kiá»‡n (`UPDATE ... WHERE tráº¡ng thÃ¡i = 'Äang chá»'`). NgÆ°á»i Ä‘áº¿n sau nháº­n "Ä‘Ã£ nháº­n trÆ°á»›c Ä‘Ã³ lÃºc â€¦ bá»Ÿi mÃ¡y â€¦". Sá»­a ghi chÃº/tráº¡ng thÃ¡i khÃ¡c: ngÆ°á»i ghi sau tháº¯ng nhÆ°ng báº£n cÅ© luÃ´n cÃ²n trong `audit_log`.
 
-### 3.5 Thời gian thực
-Mỗi cửa hàng có một Durable Object giữ WebSocket; có thay đổi thì phát `{rev}`, máy khách gọi `/sync` lấy phần mới. Mất kết nối thì chuyển trạng thái MẤT KẾT NỐI; nối lại thì tự lấy phần còn thiếu rồi mở khóa.
+### 3.5 Thá»i gian thá»±c
+Má»—i cá»­a hÃ ng cÃ³ má»™t Durable Object giá»¯ WebSocket; cÃ³ thay Ä‘á»•i thÃ¬ phÃ¡t `{rev}`, mÃ¡y khÃ¡ch gá»i `/sync` láº¥y pháº§n má»›i. Máº¥t káº¿t ná»‘i thÃ¬ chuyá»ƒn tráº¡ng thÃ¡i Máº¤T Káº¾T Ná»I; ná»‘i láº¡i thÃ¬ tá»± láº¥y pháº§n cÃ²n thiáº¿u rá»“i má»Ÿ khÃ³a.
 
-### 3.6 Nạp Google Sheet ngay trên cloud
-Cron của Worker gọi Apps Script mỗi vài phút (token là **Worker secret**), chạy bộ gộp rồi upsert vào D1. Đây là việc phải **viết lại bằng TypeScript**: nhận dạng tab (`hanghoan/trahang/huy/vandon`), gộp kiện, điền mã vận đơn từ tab ẩn "Vận đơn huỷ" (không ghi đè mã sẵn có), bỏ qua tab thiếu. Dùng bộ ca thử chung với C# (mục 6).
+### 3.6 Náº¡p Google Sheet ngay trÃªn cloud
+Cron cá»§a Worker gá»i Apps Script má»—i vÃ i phÃºt (token lÃ  **Worker secret**), cháº¡y bá»™ gá»™p rá»“i upsert vÃ o D1. ÄÃ¢y lÃ  viá»‡c pháº£i **viáº¿t láº¡i báº±ng TypeScript**: nháº­n dáº¡ng tab (`hanghoan/trahang/huy/vandon`), gá»™p kiá»‡n, Ä‘iá»n mÃ£ váº­n Ä‘Æ¡n tá»« tab áº©n "Váº­n Ä‘Æ¡n huá»·" (khÃ´ng ghi Ä‘Ã¨ mÃ£ sáºµn cÃ³), bá» qua tab thiáº¿u. DÃ¹ng bá»™ ca thá»­ chung vá»›i C# (má»¥c 6).
 
-### 3.6b Giảm tải đọc/ghi khi nạp Google Sheet (đề xuất, xếp từ hiệu quả nhất)
-1. **Chỉ lấy phần thay đổi, không lấy cả Sheet.** Apps Script (phía Sheet của bạn) lọc theo cột "Cập nhật" và trả chỉ các dòng mới/đổi từ mốc lần trước (trừ biên an toàn vài phút). Worker không phải đọc/so cả 5.000 kiện.
-2. **Ngay tại Apps Script kiểm "chữ ký" Sheet** (số dòng + thời điểm sửa gần nhất, lưu bằng `PropertiesService`): không đổi thì trả "không đổi" gần như không tốn gì; Worker dừng ngay, **không ghi D1**.
-3. **Chỉ ghi kiện thật sự khác.** Bảng băm từng kiện lưu thành **một tệp nhỏ trên R2** (không phải 5.000 hàng D1): mỗi vòng đọc 1 tệp, so trong bộ nhớ, rồi chỉ upsert các kiện khác; ghi lại tệp băm khi có thay đổi. Như vậy bước so sánh tốn **0 hàng đọc D1**.
-4. **Đối soát đầy đủ mỗi ngày một lần** (ban đêm) để bắt dòng sửa mà không cập nhật cột "Cập nhật". Tốn khoảng một lượt đọc cả Sheet nhưng chỉ ghi phần khác biệt.
-5. **Chu kỳ theo giờ:** ban ngày (ví dụ 8h–22h) mỗi 3–5 phút, ban đêm 30–60 phút; có nút "Đồng bộ ngay".
-6. **Một lệnh gọi lấy mọi tab** (kể cả tab ẩn "Vận đơn huỷ") thay vì mỗi tab một lệnh.
-7. **Ít chỉ mục D1 hơn:** mỗi chỉ mục làm mỗi lần ghi tốn thêm hàng ghi; chỉ giữ chỉ mục thật sự cần.
-8. **Gộp nhiều câu lệnh ghi vào một lô** (batch) và không tăng `rev` cho kiện không đổi.
-Phương án thay thế: Apps Script **chủ động đẩy** (trigger theo thời gian, đẩy chỉ khi chữ ký đổi) thay vì Worker kéo; trigger `onEdit` không bắt được thay đổi do script/nhập tự động nên chỉ nên dùng trigger theo thời gian.
-Ước tính: nếu mỗi ngày Sheet đổi khoảng 100–300 kiện thì ~1.000–3.000 hàng ghi/ngày thay vì ~2,4 triệu (cách ngây thơ), và gần như 0 hàng đọc cho bước so sánh. Cần đo lại bằng tốc độ đổi thật của Sheet.
+### 3.6b Giáº£m táº£i Ä‘á»c/ghi khi náº¡p Google Sheet (Ä‘á» xuáº¥t, xáº¿p tá»« hiá»‡u quáº£ nháº¥t)
+1. **Chá»‰ láº¥y pháº§n thay Ä‘á»•i, khÃ´ng láº¥y cáº£ Sheet.** Apps Script (phÃ­a Sheet cá»§a báº¡n) lá»c theo cá»™t "Cáº­p nháº­t" vÃ  tráº£ chá»‰ cÃ¡c dÃ²ng má»›i/Ä‘á»•i tá»« má»‘c láº§n trÆ°á»›c (trá»« biÃªn an toÃ n vÃ i phÃºt). Worker khÃ´ng pháº£i Ä‘á»c/so cáº£ 5.000 kiá»‡n.
+2. **Ngay táº¡i Apps Script kiá»ƒm "chá»¯ kÃ½" Sheet** (sá»‘ dÃ²ng + thá»i Ä‘iá»ƒm sá»­a gáº§n nháº¥t, lÆ°u báº±ng `PropertiesService`): khÃ´ng Ä‘á»•i thÃ¬ tráº£ "khÃ´ng Ä‘á»•i" gáº§n nhÆ° khÃ´ng tá»‘n gÃ¬; Worker dá»«ng ngay, **khÃ´ng ghi D1**.
+3. **Chá»‰ ghi kiá»‡n tháº­t sá»± khÃ¡c.** Báº£ng bÄƒm tá»«ng kiá»‡n lÆ°u thÃ nh **má»™t tá»‡p nhá» trÃªn R2** (khÃ´ng pháº£i 5.000 hÃ ng D1): má»—i vÃ²ng Ä‘á»c 1 tá»‡p, so trong bá»™ nhá»›, rá»“i chá»‰ upsert cÃ¡c kiá»‡n khÃ¡c; ghi láº¡i tá»‡p bÄƒm khi cÃ³ thay Ä‘á»•i. NhÆ° váº­y bÆ°á»›c so sÃ¡nh tá»‘n **0 hÃ ng Ä‘á»c D1**.
+4. **Äá»‘i soÃ¡t Ä‘áº§y Ä‘á»§ má»—i ngÃ y má»™t láº§n** (ban Ä‘Ãªm) Ä‘á»ƒ báº¯t dÃ²ng sá»­a mÃ  khÃ´ng cáº­p nháº­t cá»™t "Cáº­p nháº­t". Tá»‘n khoáº£ng má»™t lÆ°á»£t Ä‘á»c cáº£ Sheet nhÆ°ng chá»‰ ghi pháº§n khÃ¡c biá»‡t.
+5. **Chu ká»³ theo giá»:** ban ngÃ y (vÃ­ dá»¥ 8hâ€“22h) má»—i 3â€“5 phÃºt, ban Ä‘Ãªm 30â€“60 phÃºt; cÃ³ nÃºt "Äá»“ng bá»™ ngay".
+6. **Má»™t lá»‡nh gá»i láº¥y má»i tab** (ká»ƒ cáº£ tab áº©n "Váº­n Ä‘Æ¡n huá»·") thay vÃ¬ má»—i tab má»™t lá»‡nh.
+7. **Ãt chá»‰ má»¥c D1 hÆ¡n:** má»—i chá»‰ má»¥c lÃ m má»—i láº§n ghi tá»‘n thÃªm hÃ ng ghi; chá»‰ giá»¯ chá»‰ má»¥c tháº­t sá»± cáº§n.
+8. **Gá»™p nhiá»u cÃ¢u lá»‡nh ghi vÃ o má»™t lÃ´** (batch) vÃ  khÃ´ng tÄƒng `rev` cho kiá»‡n khÃ´ng Ä‘á»•i.
+PhÆ°Æ¡ng Ã¡n thay tháº¿: Apps Script **chá»§ Ä‘á»™ng Ä‘áº©y** (trigger theo thá»i gian, Ä‘áº©y chá»‰ khi chá»¯ kÃ½ Ä‘á»•i) thay vÃ¬ Worker kÃ©o; trigger `onEdit` khÃ´ng báº¯t Ä‘Æ°á»£c thay Ä‘á»•i do script/nháº­p tá»± Ä‘á»™ng nÃªn chá»‰ nÃªn dÃ¹ng trigger theo thá»i gian.
+Æ¯á»›c tÃ­nh: náº¿u má»—i ngÃ y Sheet Ä‘á»•i khoáº£ng 100â€“300 kiá»‡n thÃ¬ ~1.000â€“3.000 hÃ ng ghi/ngÃ y thay vÃ¬ ~2,4 triá»‡u (cÃ¡ch ngÃ¢y thÆ¡), vÃ  gáº§n nhÆ° 0 hÃ ng Ä‘á»c cho bÆ°á»›c so sÃ¡nh. Cáº§n Ä‘o láº¡i báº±ng tá»‘c Ä‘á»™ Ä‘á»•i tháº­t cá»§a Sheet.
 
-### 3.7 Dung lượng
-- **R2 10 GB (ảnh):** ảnh mới thu nhỏ cạnh dài ~1000 px, JPEG ~60% ≈ 80–120 KB. 500 lượt quét/ngày ≈ 40–60 MB/ngày → khoảng 6 tháng đầy. Mặc định **tự xóa ảnh sau 90 ngày** (chỉnh được) và tối đa 5 ảnh/kiện. 2.230 ảnh cũ ≈ 52 MB chuyển sang R2 không đáng kể.
-- **D1 500 MB (dữ liệu):** chật hơn R2. Dòng gọn 1–2 KB cộng chỉ mục thì chạm 500 MB khi khoảng **150.000–250.000 kiện** (ước tính thô). Cách xử lý: đơn ở Kho lưu trữ lâu (mặc định > 12 tháng) được **nén thành tệp theo tháng trên R2**, trong D1 chỉ giữ `order_index` (mã đơn, mã vận đơn, sàn, tháng, vài chục byte/dòng) để vẫn tìm được và mở lại. Chưa cần làm ngay, thiết kế sẵn để không phải đổi lược đồ sau.
+### 3.7 Dung lÆ°á»£ng
+- **R2 10 GB (áº£nh):** áº£nh má»›i thu nhá» cáº¡nh dÃ i ~1000 px, JPEG ~60% â‰ˆ 80â€“120 KB. 500 lÆ°á»£t quÃ©t/ngÃ y â‰ˆ 40â€“60 MB/ngÃ y â†’ khoáº£ng 6 thÃ¡ng Ä‘áº§y. Máº·c Ä‘á»‹nh **tá»± xÃ³a áº£nh sau 90 ngÃ y** (chá»‰nh Ä‘Æ°á»£c) vÃ  tá»‘i Ä‘a 5 áº£nh/kiá»‡n. 2.230 áº£nh cÅ© â‰ˆ 52 MB chuyá»ƒn sang R2 khÃ´ng Ä‘Ã¡ng ká»ƒ.
+- **D1 500 MB (dá»¯ liá»‡u):** cháº­t hÆ¡n R2. DÃ²ng gá»n 1â€“2 KB cá»™ng chá»‰ má»¥c thÃ¬ cháº¡m 500 MB khi khoáº£ng **150.000â€“250.000 kiá»‡n** (Æ°á»›c tÃ­nh thÃ´). CÃ¡ch xá»­ lÃ½: Ä‘Æ¡n á»Ÿ Kho lÆ°u trá»¯ lÃ¢u (máº·c Ä‘á»‹nh > 12 thÃ¡ng) Ä‘Æ°á»£c **nÃ©n thÃ nh tá»‡p theo thÃ¡ng trÃªn R2**, trong D1 chá»‰ giá»¯ `order_index` (mÃ£ Ä‘Æ¡n, mÃ£ váº­n Ä‘Æ¡n, sÃ n, thÃ¡ng, vÃ i chá»¥c byte/dÃ²ng) Ä‘á»ƒ váº«n tÃ¬m Ä‘Æ°á»£c vÃ  má»Ÿ láº¡i. ChÆ°a cáº§n lÃ m ngay, thiáº¿t káº¿ sáºµn Ä‘á»ƒ khÃ´ng pháº£i Ä‘á»•i lÆ°á»£c Ä‘á»“ sau.
 
-### 3.7b Ngân sách hạn mức (theo số liệu chủ dự án cung cấp)
-Hạn mức: **D1** 500 MB, 5 triệu hàng đọc/ngày, 100.000 hàng ghi/ngày. **R2** 10 GB, 1 triệu lượt ghi/tháng, 10 triệu lượt đọc/tháng, tải ra miễn phí.
-Giả định để ước tính: ~5.000 kiện đang dùng, 500 lượt quét/ngày, 12 thiết bị. (Ước tính, sẽ đo lại khi chạy thử.)
+### 3.7b NgÃ¢n sÃ¡ch háº¡n má»©c (theo sá»‘ liá»‡u chá»§ dá»± Ã¡n cung cáº¥p)
+Háº¡n má»©c: **D1** 500 MB, 5 triá»‡u hÃ ng Ä‘á»c/ngÃ y, 100.000 hÃ ng ghi/ngÃ y. **R2** 10 GB, 1 triá»‡u lÆ°á»£t ghi/thÃ¡ng, 10 triá»‡u lÆ°á»£t Ä‘á»c/thÃ¡ng, táº£i ra miá»…n phÃ­.
+Giáº£ Ä‘á»‹nh Ä‘á»ƒ Æ°á»›c tÃ­nh: ~5.000 kiá»‡n Ä‘ang dÃ¹ng, 500 lÆ°á»£t quÃ©t/ngÃ y, 12 thiáº¿t bá»‹. (Æ¯á»›c tÃ­nh, sáº½ Ä‘o láº¡i khi cháº¡y thá»­.)
 
-| Việc | Ước tính | So với hạn mức |
+| Viá»‡c | Æ¯á»›c tÃ­nh | So vá»›i háº¡n má»©c |
 |---|---|---|
-| Quét 500 kiện/ngày (mỗi lượt ghi kiện + sự kiện quét + nhật ký + chỉ mục ≈ 10 hàng) | ~5.000 hàng ghi/ngày | ~5% của 100.000 |
-| Sửa tay, đổi trạng thái, ghi chú | vài nghìn hàng ghi/ngày | thoải mái |
-| Máy khởi động lấy toàn bộ danh sách (12 máy × 5.000 kiện) | ~60.000 hàng đọc/lần mở hết | ~1% của 5 triệu |
-| Lấy phần thay đổi (theo `rev`, có chỉ mục) | rất nhỏ | không đáng kể |
-| Ảnh: 500 lượt quét/ngày × (ảnh gốc + thu nhỏ) | ~30.000 lượt ghi R2/tháng | ~3% của 1 triệu |
-| Xem ảnh (có lưu tạm trên máy + tiêu đề lưu tạm) | vài trăm nghìn lượt đọc/tháng | ~vài % của 10 triệu |
+| QuÃ©t 500 kiá»‡n/ngÃ y (má»—i lÆ°á»£t ghi kiá»‡n + sá»± kiá»‡n quÃ©t + nháº­t kÃ½ + chá»‰ má»¥c â‰ˆ 10 hÃ ng) | ~5.000 hÃ ng ghi/ngÃ y | ~5% cá»§a 100.000 |
+| Sá»­a tay, Ä‘á»•i tráº¡ng thÃ¡i, ghi chÃº | vÃ i nghÃ¬n hÃ ng ghi/ngÃ y | thoáº£i mÃ¡i |
+| MÃ¡y khá»Ÿi Ä‘á»™ng láº¥y toÃ n bá»™ danh sÃ¡ch (12 mÃ¡y Ã— 5.000 kiá»‡n) | ~60.000 hÃ ng Ä‘á»c/láº§n má»Ÿ háº¿t | ~1% cá»§a 5 triá»‡u |
+| Láº¥y pháº§n thay Ä‘á»•i (theo `rev`, cÃ³ chá»‰ má»¥c) | ráº¥t nhá» | khÃ´ng Ä‘Ã¡ng ká»ƒ |
+| áº¢nh: 500 lÆ°á»£t quÃ©t/ngÃ y Ã— (áº£nh gá»‘c + thu nhá») | ~30.000 lÆ°á»£t ghi R2/thÃ¡ng | ~3% cá»§a 1 triá»‡u |
+| Xem áº£nh (cÃ³ lÆ°u táº¡m trÃªn mÃ¡y + tiÃªu Ä‘á» lÆ°u táº¡m) | vÃ i trÄƒm nghÃ¬n lÆ°á»£t Ä‘á»c/thÃ¡ng | ~vÃ i % cá»§a 10 triá»‡u |
 
-**Hai chỗ DỄ VƯỢT hạn mức nếu làm ẩu — thiết kế phải chặn:**
-1. **Nạp Google Sheet bằng Cron.** Nếu mỗi vòng ghi lại toàn bộ 5.000 kiện, cứ 3 phút một lần = 5.000 × 480 = 2,4 triệu hàng ghi/ngày (vượt 24 lần). Bắt buộc: (a) so **chữ ký** nội dung Sheet, không đổi thì không làm gì; (b) khi đổi, chỉ upsert **dòng thật sự khác** (so băm từng kiện); (c) chu kỳ mặc định 5–10 phút, chỉnh được.
-2. **Truy vấn không có chỉ mục** đọc quét cả bảng: mỗi lần tính cả 5.000 hàng. Mọi truy vấn của API phải dùng chỉ mục (theo `rev`, mã đơn, mã vận đơn, trạng thái), có test kiểm tra kế hoạch truy vấn (`EXPLAIN`) và đếm hàng đọc.
-Quy tắc khác: máy khách **không hỏi vòng** (polling), chỉ nhận đẩy qua WebSocket rồi mới lấy phần mới; ảnh gửi kèm tiêu đề lưu tạm lâu; định kỳ dọn ảnh quá hạn.
+**Hai chá»— Dá»„ VÆ¯á»¢T háº¡n má»©c náº¿u lÃ m áº©u â€” thiáº¿t káº¿ pháº£i cháº·n:**
+1. **Náº¡p Google Sheet báº±ng Cron.** Náº¿u má»—i vÃ²ng ghi láº¡i toÃ n bá»™ 5.000 kiá»‡n, cá»© 3 phÃºt má»™t láº§n = 5.000 Ã— 480 = 2,4 triá»‡u hÃ ng ghi/ngÃ y (vÆ°á»£t 24 láº§n). Báº¯t buá»™c: (a) so **chá»¯ kÃ½** ná»™i dung Sheet, khÃ´ng Ä‘á»•i thÃ¬ khÃ´ng lÃ m gÃ¬; (b) khi Ä‘á»•i, chá»‰ upsert **dÃ²ng tháº­t sá»± khÃ¡c** (so bÄƒm tá»«ng kiá»‡n); (c) chu ká»³ máº·c Ä‘á»‹nh 5â€“10 phÃºt, chá»‰nh Ä‘Æ°á»£c.
+2. **Truy váº¥n khÃ´ng cÃ³ chá»‰ má»¥c** Ä‘á»c quÃ©t cáº£ báº£ng: má»—i láº§n tÃ­nh cáº£ 5.000 hÃ ng. Má»i truy váº¥n cá»§a API pháº£i dÃ¹ng chá»‰ má»¥c (theo `rev`, mÃ£ Ä‘Æ¡n, mÃ£ váº­n Ä‘Æ¡n, tráº¡ng thÃ¡i), cÃ³ test kiá»ƒm tra káº¿ hoáº¡ch truy váº¥n (`EXPLAIN`) vÃ  Ä‘áº¿m hÃ ng Ä‘á»c.
+Quy táº¯c khÃ¡c: mÃ¡y khÃ¡ch **khÃ´ng há»i vÃ²ng** (polling), chá»‰ nháº­n Ä‘áº©y qua WebSocket rá»“i má»›i láº¥y pháº§n má»›i; áº£nh gá»­i kÃ¨m tiÃªu Ä‘á» lÆ°u táº¡m lÃ¢u; Ä‘á»‹nh ká»³ dá»n áº£nh quÃ¡ háº¡n.
 
-**Khi chạm hạn mức ghi/ngày của D1** thì mọi thao tác ghi (cả quét) sẽ lỗi cho tới khi hạn mức làm mới (hằng ngày, theo giờ UTC). Cần: đo hạn mức đã dùng ngay trong app (hiện thanh "Hạn mức hôm nay: xx%"), cảnh báo khi quá 70%, và thông báo lỗi rõ ràng. Nếu thực tế gần chạm thì nâng gói trả phí là lối thoát.
+**Khi cháº¡m háº¡n má»©c ghi/ngÃ y cá»§a D1** thÃ¬ má»i thao tÃ¡c ghi (cáº£ quÃ©t) sáº½ lá»—i cho tá»›i khi háº¡n má»©c lÃ m má»›i (háº±ng ngÃ y, theo giá» UTC). Cáº§n: Ä‘o háº¡n má»©c Ä‘Ã£ dÃ¹ng ngay trong app (hiá»‡n thanh "Háº¡n má»©c hÃ´m nay: xx%"), cáº£nh bÃ¡o khi quÃ¡ 70%, vÃ  thÃ´ng bÃ¡o lá»—i rÃµ rÃ ng. Náº¿u thá»±c táº¿ gáº§n cháº¡m thÃ¬ nÃ¢ng gÃ³i tráº£ phÃ­ lÃ  lá»‘i thoÃ¡t.
 
-### 3.7c Gói thực tế của chủ dự án (đã xác nhận)
-Tất cả đều gói **Miễn phí, hóa đơn $0**: Workers 100.000 yêu cầu/ngày (tối đa 1.000 yêu cầu/phút, **10 ms CPU mỗi yêu cầu**); D1 500 MB, 5 triệu hàng đọc + 100.000 hàng ghi/ngày; Durable Object 100.000 yêu cầu/ngày, **5 GB SQLite**; R2 10 GB (đã gắn thẻ, vượt 10 GB tính $0,015/GB/tháng). Chạm trần Workers/D1 thì hệ thống **tạm dừng tới hôm sau, không tự trừ tiền**.
+### 3.7c GÃ³i thá»±c táº¿ cá»§a chá»§ dá»± Ã¡n (Ä‘Ã£ xÃ¡c nháº­n)
+Táº¥t cáº£ Ä‘á»u gÃ³i **Miá»…n phÃ­, hÃ³a Ä‘Æ¡n $0**: Workers 100.000 yÃªu cáº§u/ngÃ y (tá»‘i Ä‘a 1.000 yÃªu cáº§u/phÃºt, **10 ms CPU má»—i yÃªu cáº§u**); D1 500 MB, 5 triá»‡u hÃ ng Ä‘á»c + 100.000 hÃ ng ghi/ngÃ y; Durable Object 100.000 yÃªu cáº§u/ngÃ y, **5 GB SQLite**; R2 10 GB (Ä‘Ã£ gáº¯n tháº», vÆ°á»£t 10 GB tÃ­nh $0,015/GB/thÃ¡ng). Cháº¡m tráº§n Workers/D1 thÃ¬ há»‡ thá»‘ng **táº¡m dá»«ng tá»›i hÃ´m sau, khÃ´ng tá»± trá»« tiá»n**.
 
-Hệ quả thiết kế:
-1. **Trần 100.000 yêu cầu/ngày dùng chung cho mọi máy** và khi chạm là cả cửa hàng ngừng quét tới hôm sau. Mục tiêu: dùng thường xuyên **dưới 30%** (≤ 30.000/ngày). Ước tính: 500 lượt quét × (1 lệnh quét + 12 máy lấy phần mới) ≈ 6.500; mở app/tải danh sách vài nghìn; ảnh là phần dễ tốn nhất. Ảnh **tải lên và xem qua đường dẫn ký sẵn (presigned URL) thẳng với R2** để không tính vào yêu cầu Worker; thông báo qua WebSocket của Durable Object (tính 1/20 yêu cầu mỗi tin).
-2. **10 ms CPU mỗi yêu cầu rất chật.** Không thể gộp/phân tích cả Sheet 5.000 dòng trong Worker. Vì vậy phần nặng (nhận dạng tab, gộp, so băm, lọc phần đổi) chạy ở **Apps Script phía Google** (miễn phí, thời gian chạy dài); Worker chỉ nhận lô nhỏ đã gộp sẵn và ghi (chờ I/O không tính CPU). Mô hình **Apps Script chủ động đẩy** (mục 3.6b) trở thành lựa chọn chính, không còn là phương án thay thế. Logic gộp Sheet chuyển sang JavaScript chạy trong Apps Script (kiểm chứng bằng bộ ca thử chung).
-3. **Có thể dùng SQLite của Durable Object (5 GB) làm kho chính thay D1 (500 MB):** một Durable Object cho cả cửa hàng xử lý ghi tuần tự nên quét nhận "một thao tác nguyên tử" tự nhiên và hết lo trần 500 MB. Đánh đổi: khó xem/sửa trực tiếp hơn D1 và cần chức năng xuất sao lưu. **Quyết định chốt ở đầu giai đoạn 1 sau một lần thử nhanh cả hai** (D1 hay Durable Object SQLite); lược đồ và API viết sao cho đổi được kho phía sau.
-4. Hiển thị thanh "Hạn mức hôm nay" cho yêu cầu Worker và hàng ghi D1; cảnh báo ở 50% và 70%.
-5. Workers AI (10.000 neurons/ngày) không dùng; trợ lý AI vẫn dùng khóa Groq/Gemini của bạn trên từng máy.
+Há»‡ quáº£ thiáº¿t káº¿:
+1. **Tráº§n 100.000 yÃªu cáº§u/ngÃ y dÃ¹ng chung cho má»i mÃ¡y** vÃ  khi cháº¡m lÃ  cáº£ cá»­a hÃ ng ngá»«ng quÃ©t tá»›i hÃ´m sau. Má»¥c tiÃªu: dÃ¹ng thÆ°á»ng xuyÃªn **dÆ°á»›i 30%** (â‰¤ 30.000/ngÃ y). Æ¯á»›c tÃ­nh: 500 lÆ°á»£t quÃ©t Ã— (1 lá»‡nh quÃ©t + 12 mÃ¡y láº¥y pháº§n má»›i) â‰ˆ 6.500; má»Ÿ app/táº£i danh sÃ¡ch vÃ i nghÃ¬n; áº£nh lÃ  pháº§n dá»… tá»‘n nháº¥t. áº¢nh **táº£i lÃªn vÃ  xem qua Ä‘Æ°á»ng dáº«n kÃ½ sáºµn (presigned URL) tháº³ng vá»›i R2** Ä‘á»ƒ khÃ´ng tÃ­nh vÃ o yÃªu cáº§u Worker; thÃ´ng bÃ¡o qua WebSocket cá»§a Durable Object (tÃ­nh 1/20 yÃªu cáº§u má»—i tin).
+2. **10 ms CPU má»—i yÃªu cáº§u ráº¥t cháº­t.** KhÃ´ng thá»ƒ gá»™p/phÃ¢n tÃ­ch cáº£ Sheet 5.000 dÃ²ng trong Worker. VÃ¬ váº­y pháº§n náº·ng (nháº­n dáº¡ng tab, gá»™p, so bÄƒm, lá»c pháº§n Ä‘á»•i) cháº¡y á»Ÿ **Apps Script phÃ­a Google** (miá»…n phÃ­, thá»i gian cháº¡y dÃ i); Worker chá»‰ nháº­n lÃ´ nhá» Ä‘Ã£ gá»™p sáºµn vÃ  ghi (chá» I/O khÃ´ng tÃ­nh CPU). MÃ´ hÃ¬nh **Apps Script chá»§ Ä‘á»™ng Ä‘áº©y** (má»¥c 3.6b) trá»Ÿ thÃ nh lá»±a chá»n chÃ­nh, khÃ´ng cÃ²n lÃ  phÆ°Æ¡ng Ã¡n thay tháº¿. Logic gá»™p Sheet chuyá»ƒn sang JavaScript cháº¡y trong Apps Script (kiá»ƒm chá»©ng báº±ng bá»™ ca thá»­ chung).
+3. **CÃ³ thá»ƒ dÃ¹ng SQLite cá»§a Durable Object (5 GB) lÃ m kho chÃ­nh thay D1 (500 MB):** má»™t Durable Object cho cáº£ cá»­a hÃ ng xá»­ lÃ½ ghi tuáº§n tá»± nÃªn quÃ©t nháº­n "má»™t thao tÃ¡c nguyÃªn tá»­" tá»± nhiÃªn vÃ  háº¿t lo tráº§n 500 MB. ÄÃ¡nh Ä‘á»•i: khÃ³ xem/sá»­a trá»±c tiáº¿p hÆ¡n D1 vÃ  cáº§n chá»©c nÄƒng xuáº¥t sao lÆ°u. **Quyáº¿t Ä‘á»‹nh chá»‘t á»Ÿ Ä‘áº§u giai Ä‘oáº¡n 1 sau má»™t láº§n thá»­ nhanh cáº£ hai** (D1 hay Durable Object SQLite); lÆ°á»£c Ä‘á»“ vÃ  API viáº¿t sao cho Ä‘á»•i Ä‘Æ°á»£c kho phÃ­a sau.
+4. Hiá»ƒn thá»‹ thanh "Háº¡n má»©c hÃ´m nay" cho yÃªu cáº§u Worker vÃ  hÃ ng ghi D1; cáº£nh bÃ¡o á»Ÿ 50% vÃ  70%.
+5. Workers AI (10.000 neurons/ngÃ y) khÃ´ng dÃ¹ng; trá»£ lÃ½ AI váº«n dÃ¹ng khÃ³a Groq/Gemini cá»§a báº¡n trÃªn tá»«ng mÃ¡y.
 
-### 3.8 Bảo mật
-HTTPS; mỗi thiết bị một token riêng (lưu băm), vai trò chủ cửa hàng / nhân viên (điện thoại vẫn là ứng dụng đầy đủ), thu hồi từng máy; mã ghép QR sống 10 phút dùng một lần; khóa bí mật ở Worker secrets. Không mã hóa đầu cuối (server cần đọc mã để khớp/tìm), bù lại không lưu dữ liệu cá nhân người nhận.
+### 3.8 Báº£o máº­t
+HTTPS; má»—i thiáº¿t bá»‹ má»™t token riÃªng (lÆ°u bÄƒm), vai trÃ² chá»§ cá»­a hÃ ng / nhÃ¢n viÃªn (Ä‘iá»‡n thoáº¡i váº«n lÃ  á»©ng dá»¥ng Ä‘áº§y Ä‘á»§), thu há»“i tá»«ng mÃ¡y; mÃ£ ghÃ©p QR sá»‘ng 10 phÃºt dÃ¹ng má»™t láº§n; khÃ³a bÃ­ máº­t á»Ÿ Worker secrets. KhÃ´ng mÃ£ hÃ³a Ä‘áº§u cuá»‘i (server cáº§n Ä‘á»c mÃ£ Ä‘á»ƒ khá»›p/tÃ¬m), bÃ¹ láº¡i khÃ´ng lÆ°u dá»¯ liá»‡u cÃ¡ nhÃ¢n ngÆ°á»i nháº­n.
 
-## 4. Máy tính (WPF)
-**Giữ nguyên:** toàn bộ màn hình, bảng, bộ lọc, thông báo, tìm kiếm, thống kê, xuất file, trợ lý AI.
-**Đổi:**
-1. Lớp dữ liệu: cài đặt mới "cloud + bản lưu tạm chỉ đọc" cho các giao diện trừu tượng (`IReturnOrderProvider`, `IArchivedOrderProvider`, `IScanService`...).
-2. Chấm trạng thái kết nối (mục 2); mất mạng thì khóa mọi nút ghi.
-3. **Máy tính chỉ xem ảnh**, không chụp/đưa ảnh lên.
-4. Bộ nạp thư mục/Excel/Salework giữ cách đọc, đầu ra gửi `/import` (cần mạng). Hai máy cùng nạp một file không gây trùng.
-5. Tắt đồng bộ MQTT/ntfy (ntfy giữ tạm cho thông báo đẩy điện thoại).
+## 4. MÃ¡y tÃ­nh (WPF)
+**Giá»¯ nguyÃªn:** toÃ n bá»™ mÃ n hÃ¬nh, báº£ng, bá»™ lá»c, thÃ´ng bÃ¡o, tÃ¬m kiáº¿m, thá»‘ng kÃª, xuáº¥t file, trá»£ lÃ½ AI.
+**Äá»•i:**
+1. Lá»›p dá»¯ liá»‡u: cÃ i Ä‘áº·t má»›i "cloud + báº£n lÆ°u táº¡m chá»‰ Ä‘á»c" cho cÃ¡c giao diá»‡n trá»«u tÆ°á»£ng (`IReturnOrderProvider`, `IArchivedOrderProvider`, `IScanService`...).
+2. Cháº¥m tráº¡ng thÃ¡i káº¿t ná»‘i (má»¥c 2); máº¥t máº¡ng thÃ¬ khÃ³a má»i nÃºt ghi.
+3. **MÃ¡y tÃ­nh chá»‰ xem áº£nh**, khÃ´ng chá»¥p/Ä‘Æ°a áº£nh lÃªn.
+4. Bá»™ náº¡p thÆ° má»¥c/Excel/Salework giá»¯ cÃ¡ch Ä‘á»c, Ä‘áº§u ra gá»­i `/import` (cáº§n máº¡ng). Hai mÃ¡y cÃ¹ng náº¡p má»™t file khÃ´ng gÃ¢y trÃ¹ng.
+5. Táº¯t Ä‘á»“ng bá»™ MQTT/ntfy (ntfy giá»¯ táº¡m cho thÃ´ng bÃ¡o Ä‘áº©y Ä‘iá»‡n thoáº¡i).
 
-## 5. Điện thoại (SwiftUI) — ứng dụng đầy đủ
-**Giữ nguyên:** các tab (Tổng quan, Quét, Đơn, Lịch sử, Cài đặt), chi tiết đơn, trợ lý AI.
-**Đổi:**
-1. `SyncEngine` + MQTT/ntfy → máy khách cloud (HTTP + WebSocket); bỏ hàng đợi quét ngoại tuyến.
-2. Quét → `POST /scan`; chụp ảnh gắn với kết quả **server xác nhận đúng một kiện** rồi mới tải lên R2; quét sai/không tìm thấy/mơ hồ thì bỏ ảnh.
-3. Tab Đơn/chi tiết hiển thị ảnh của mọi máy (bản thu nhỏ từ R2), có lưu tạm trên máy để cuộn mượt.
-4. Màn Đồng bộ đổi từ mã phòng sang "ghép thiết bị bằng QR" + trạng thái kết nối.
-5. Thông báo khi app đóng: tạm dùng ntfy; về sau Apple Push khi có tài khoản Apple Developer.
+## 5. Äiá»‡n thoáº¡i (SwiftUI) â€” á»©ng dá»¥ng Ä‘áº§y Ä‘á»§
+**Giá»¯ nguyÃªn:** cÃ¡c tab (Tá»•ng quan, QuÃ©t, ÄÆ¡n, Lá»‹ch sá»­, CÃ i Ä‘áº·t), chi tiáº¿t Ä‘Æ¡n, trá»£ lÃ½ AI.
+**Äá»•i:**
+1. `SyncEngine` + MQTT/ntfy â†’ mÃ¡y khÃ¡ch cloud (HTTP + WebSocket); bá» hÃ ng Ä‘á»£i quÃ©t ngoáº¡i tuyáº¿n.
+2. QuÃ©t â†’ `POST /scan`; chá»¥p áº£nh gáº¯n vá»›i káº¿t quáº£ **server xÃ¡c nháº­n Ä‘Ãºng má»™t kiá»‡n** rá»“i má»›i táº£i lÃªn R2; quÃ©t sai/khÃ´ng tÃ¬m tháº¥y/mÆ¡ há»“ thÃ¬ bá» áº£nh.
+3. Tab ÄÆ¡n/chi tiáº¿t hiá»ƒn thá»‹ áº£nh cá»§a má»i mÃ¡y (báº£n thu nhá» tá»« R2), cÃ³ lÆ°u táº¡m trÃªn mÃ¡y Ä‘á»ƒ cuá»™n mÆ°á»£t.
+4. MÃ n Äá»“ng bá»™ Ä‘á»•i tá»« mÃ£ phÃ²ng sang "ghÃ©p thiáº¿t bá»‹ báº±ng QR" + tráº¡ng thÃ¡i káº¿t ná»‘i.
+5. ThÃ´ng bÃ¡o khi app Ä‘Ã³ng: táº¡m dÃ¹ng ntfy; vá» sau Apple Push khi cÃ³ tÃ i khoáº£n Apple Developer.
 
-## 6. Kiểm chứng (giữ AGENTS.md: không tuyên bố PASS cho thứ chưa chạy thật)
-- Bộ ca thử **dùng chung** xuất từ test C# hiện có (khớp mã, ambiguous, kiện A/B/C, nhập lại cùng kiện, gộp Sheet, tab Vận đơn huỷ): C# và TypeScript cùng chạy phải ra cùng kết quả.
-- Worker kiểm thử cục bộ bằng giả lập (không cần tài khoản); thử thật cần tài khoản của bạn.
-- Test: hai máy quét cùng kiện, gửi lặp thao tác, mất mạng giữa chừng, khóa ghi khi mất kết nối.
-- Điện thoại: chỉ kiểm tra biên dịch + `swift test` trên GitHub Actions; chạy thật trên máy do bạn xác nhận.
+## 6. Kiá»ƒm chá»©ng (giá»¯ AGENTS.md: khÃ´ng tuyÃªn bá»‘ PASS cho thá»© chÆ°a cháº¡y tháº­t)
+- Bá»™ ca thá»­ **dÃ¹ng chung** xuáº¥t tá»« test C# hiá»‡n cÃ³ (khá»›p mÃ£, ambiguous, kiá»‡n A/B/C, nháº­p láº¡i cÃ¹ng kiá»‡n, gá»™p Sheet, tab Váº­n Ä‘Æ¡n huá»·): C# vÃ  TypeScript cÃ¹ng cháº¡y pháº£i ra cÃ¹ng káº¿t quáº£.
+- Worker kiá»ƒm thá»­ cá»¥c bá»™ báº±ng giáº£ láº­p (khÃ´ng cáº§n tÃ i khoáº£n); thá»­ tháº­t cáº§n tÃ i khoáº£n cá»§a báº¡n.
+- Test: hai mÃ¡y quÃ©t cÃ¹ng kiá»‡n, gá»­i láº·p thao tÃ¡c, máº¥t máº¡ng giá»¯a chá»«ng, khÃ³a ghi khi máº¥t káº¿t ná»‘i.
+- Äiá»‡n thoáº¡i: chá»‰ kiá»ƒm tra biÃªn dá»‹ch + `swift test` trÃªn GitHub Actions; cháº¡y tháº­t trÃªn mÃ¡y do báº¡n xÃ¡c nháº­n.
 
-## 7. Chuyển đổi dữ liệu
-1. Công cụ nhập dữ liệu cũ lên cloud có **chế độ chạy thử** (đếm, báo lỗi, không ghi) và báo cáo so khớp: số kiện, số ảnh, trường bị bỏ.
-2. Trước khi bỏ `photoHistory` khỏi dòng đơn, công cụ kiểm tra ảnh đó **đã có trong bảng `photos`** hay là ảnh duy nhất; ảnh duy nhất được đưa lên R2 chứ không bỏ (quy tắc 8: không xóa dữ liệu cũ).
-3. Bản SQLite cục bộ giữ nguyên làm bản lưu để quay lại.
-4. Chạy song song bản cũ và bản cloud một thời gian rồi mới chuyển hẳn.
+## 7. Chuyá»ƒn Ä‘á»•i dá»¯ liá»‡u
+1. CÃ´ng cá»¥ nháº­p dá»¯ liá»‡u cÅ© lÃªn cloud cÃ³ **cháº¿ Ä‘á»™ cháº¡y thá»­** (Ä‘áº¿m, bÃ¡o lá»—i, khÃ´ng ghi) vÃ  bÃ¡o cÃ¡o so khá»›p: sá»‘ kiá»‡n, sá»‘ áº£nh, trÆ°á»ng bá»‹ bá».
+2. TrÆ°á»›c khi bá» `photoHistory` khá»i dÃ²ng Ä‘Æ¡n, cÃ´ng cá»¥ kiá»ƒm tra áº£nh Ä‘Ã³ **Ä‘Ã£ cÃ³ trong báº£ng `photos`** hay lÃ  áº£nh duy nháº¥t; áº£nh duy nháº¥t Ä‘Æ°á»£c Ä‘Æ°a lÃªn R2 chá»© khÃ´ng bá» (quy táº¯c 8: khÃ´ng xÃ³a dá»¯ liá»‡u cÅ©).
+3. Báº£n SQLite cá»¥c bá»™ giá»¯ nguyÃªn lÃ m báº£n lÆ°u Ä‘á»ƒ quay láº¡i.
+4. Cháº¡y song song báº£n cÅ© vÃ  báº£n cloud má»™t thá»i gian rá»“i má»›i chuyá»ƒn háº³n.
 
-## 8. Các giai đoạn và cổng nghiệm thu
-| GĐ | Nội dung | Xong khi |
+## 8. CÃ¡c giai Ä‘oáº¡n vÃ  cá»•ng nghiá»‡m thu
+| GÄ | Ná»™i dung | Xong khi |
 |---|---|---|
-| 1 | Lược đồ D1, API, đăng nhập thiết bị, quy tắc quét, **bộ gộp Google Sheet bằng TypeScript + Cron**, bộ ca thử chung, công cụ nhập dữ liệu cũ (chạy thử) | Bộ ca thử đạt ở C# và TypeScript; nhập thử khớp số liệu; Sheet nạp được trên môi trường thử |
-| 2 | Máy tính dùng cloud (bản lưu tạm chỉ đọc, khóa khi mất mạng), chạy song song bản cũ | Hai máy tính cùng dùng, quét trùng xử lý đúng, mất mạng thì khóa ghi, có mạng thì mở khóa |
-| 3 | iPhone dùng cloud, ảnh lên R2 | `swift test` + build đạt; bạn thử trên điện thoại thật |
-| 4 | Tắt MQTT/ntfy cũ, đóng gói bản chạy thật | Bạn xác nhận |
+| 1 | LÆ°á»£c Ä‘á»“ D1, API, Ä‘Äƒng nháº­p thiáº¿t bá»‹, quy táº¯c quÃ©t, **bá»™ gá»™p Google Sheet báº±ng TypeScript + Cron**, bá»™ ca thá»­ chung, cÃ´ng cá»¥ nháº­p dá»¯ liá»‡u cÅ© (cháº¡y thá»­) | Bá»™ ca thá»­ Ä‘áº¡t á»Ÿ C# vÃ  TypeScript; nháº­p thá»­ khá»›p sá»‘ liá»‡u; Sheet náº¡p Ä‘Æ°á»£c trÃªn mÃ´i trÆ°á»ng thá»­ |
+| 2 | MÃ¡y tÃ­nh dÃ¹ng cloud (báº£n lÆ°u táº¡m chá»‰ Ä‘á»c, khÃ³a khi máº¥t máº¡ng), cháº¡y song song báº£n cÅ© | Hai mÃ¡y tÃ­nh cÃ¹ng dÃ¹ng, quÃ©t trÃ¹ng xá»­ lÃ½ Ä‘Ãºng, máº¥t máº¡ng thÃ¬ khÃ³a ghi, cÃ³ máº¡ng thÃ¬ má»Ÿ khÃ³a |
+| 3 | iPhone dÃ¹ng cloud, áº£nh lÃªn R2 | `swift test` + build Ä‘áº¡t; báº¡n thá»­ trÃªn Ä‘iá»‡n thoáº¡i tháº­t |
+| 4 | Táº¯t MQTT/ntfy cÅ©, Ä‘Ã³ng gÃ³i báº£n cháº¡y tháº­t | Báº¡n xÃ¡c nháº­n |
 
-Khối lượng lớn (nhiều tuần). Mỗi giai đoạn nộp riêng để bạn kiểm tra trước khi sang giai đoạn tiếp.
+Khá»‘i lÆ°á»£ng lá»›n (nhiá»u tuáº§n). Má»—i giai Ä‘oáº¡n ná»™p riÃªng Ä‘á»ƒ báº¡n kiá»ƒm tra trÆ°á»›c khi sang giai Ä‘oáº¡n tiáº¿p.
 
-## 9. Rủi ro đã biết
-- Logic nghiệp vụ có **hai bản cài** (C# và TypeScript), nay gồm cả bộ gộp Sheet: rủi ro lệch → bộ ca thử chung.
-- Mất mạng thì cả cửa hàng không quét được (đã chấp nhận theo yêu cầu); Cloudflare lỗi cũng vậy.
-- D1 500 MB sẽ đầy khi dữ liệu rất lớn → chuyển đơn cũ sang R2 (3.7).
-- Ảnh có thể đầy 10 GB nếu không giới hạn → thu nhỏ + tự xóa sau N ngày.
-- Không có mã hóa đầu cuối.
+## 9. Rá»§i ro Ä‘Ã£ biáº¿t
+- Logic nghiá»‡p vá»¥ cÃ³ **hai báº£n cÃ i** (C# vÃ  TypeScript), nay gá»“m cáº£ bá»™ gá»™p Sheet: rá»§i ro lá»‡ch â†’ bá»™ ca thá»­ chung.
+- Máº¥t máº¡ng thÃ¬ cáº£ cá»­a hÃ ng khÃ´ng quÃ©t Ä‘Æ°á»£c (Ä‘Ã£ cháº¥p nháº­n theo yÃªu cáº§u); Cloudflare lá»—i cÅ©ng váº­y.
+- D1 500 MB sáº½ Ä‘áº§y khi dá»¯ liá»‡u ráº¥t lá»›n â†’ chuyá»ƒn Ä‘Æ¡n cÅ© sang R2 (3.7).
+- áº¢nh cÃ³ thá»ƒ Ä‘áº§y 10 GB náº¿u khÃ´ng giá»›i háº¡n â†’ thu nhá» + tá»± xÃ³a sau N ngÃ y.
+- KhÃ´ng cÃ³ mÃ£ hÃ³a Ä‘áº§u cuá»‘i.
 
-## 10. Việc còn cần chủ dự án
-1. **Duyệt** bản 2 này (hoặc nêu chỗ cần sửa).
-2. Trả lời: một hay nhiều cửa hàng; giữ ảnh bao nhiêu ngày (mặc định 90).
-3. Khi tới lúc triển khai: tạo tài khoản Cloudflare và chạy `! npx wrangler login` (tôi không tự đăng nhập hộ).
+## 10. Viá»‡c cÃ²n cáº§n chá»§ dá»± Ã¡n
+1. **Duyá»‡t** báº£n 2 nÃ y (hoáº·c nÃªu chá»— cáº§n sá»­a).
+2. Tráº£ lá»i: má»™t hay nhiá»u cá»­a hÃ ng; giá»¯ áº£nh bao nhiÃªu ngÃ y (máº·c Ä‘á»‹nh 90).
+3. Khi tá»›i lÃºc triá»ƒn khai: táº¡o tÃ i khoáº£n Cloudflare vÃ  cháº¡y `! npx wrangler login` (tÃ´i khÃ´ng tá»± Ä‘Äƒng nháº­p há»™).
+

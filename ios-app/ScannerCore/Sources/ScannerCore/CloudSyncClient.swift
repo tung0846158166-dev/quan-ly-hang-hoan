@@ -85,7 +85,10 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         api = a
         lock.unlock()
         set(.connecting)
-        let t = Task { [weak self] in await self?.run() }
+        let t = Task<Void, Never> { [weak self] in
+            guard let me = self else { return }
+            await me.run()
+        }
         lock.lock(); runTask = t; lock.unlock()
     }
 

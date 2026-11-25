@@ -88,6 +88,18 @@ Mỗi cửa hàng có một Durable Object giữ WebSocket; có thay đổi thì
 ### 3.6 Nạp Google Sheet ngay trên cloud
 Cron của Worker gọi Apps Script mỗi vài phút (token là **Worker secret**), chạy bộ gộp rồi upsert vào D1. Đây là việc phải **viết lại bằng TypeScript**: nhận dạng tab (`hanghoan/trahang/huy/vandon`), gộp kiện, điền mã vận đơn từ tab ẩn "Vận đơn huỷ" (không ghi đè mã sẵn có), bỏ qua tab thiếu. Dùng bộ ca thử chung với C# (mục 6).
 
+### 3.6b Giảm tải đọc/ghi khi nạp Google Sheet (đề xuất, xếp từ hiệu quả nhất)
+1. **Chỉ lấy phần thay đổi, không lấy cả Sheet.** Apps Script (phía Sheet của bạn) lọc theo cột "Cập nhật" và trả chỉ các dòng mới/đổi từ mốc lần trước (trừ biên an toàn vài phút). Worker không phải đọc/so cả 5.000 kiện.
+2. **Ngay tại Apps Script kiểm "chữ ký" Sheet** (số dòng + thời điểm sửa gần nhất, lưu bằng `PropertiesService`): không đổi thì trả "không đổi" gần như không tốn gì; Worker dừng ngay, **không ghi D1**.
+3. **Chỉ ghi kiện thật sự khác.** Bảng băm từng kiện lưu thành **một tệp nhỏ trên R2** (không phải 5.000 hàng D1): mỗi vòng đọc 1 tệp, so trong bộ nhớ, rồi chỉ upsert các kiện khác; ghi lại tệp băm khi có thay đổi. Như vậy bước so sánh tốn **0 hàng đọc D1**.
+4. **Đối soát đầy đủ mỗi ngày một lần** (ban đêm) để bắt dòng sửa mà không cập nhật cột "Cập nhật". Tốn khoảng một lượt đọc cả Sheet nhưng chỉ ghi phần khác biệt.
+5. **Chu kỳ theo giờ:** ban ngày (ví dụ 8h–22h) mỗi 3–5 phút, ban đêm 30–60 phút; có nút "Đồng bộ ngay".
+6. **Một lệnh gọi lấy mọi tab** (kể cả tab ẩn "Vận đơn huỷ") thay vì mỗi tab một lệnh.
+7. **Ít chỉ mục D1 hơn:** mỗi chỉ mục làm mỗi lần ghi tốn thêm hàng ghi; chỉ giữ chỉ mục thật sự cần.
+8. **Gộp nhiều câu lệnh ghi vào một lô** (batch) và không tăng `rev` cho kiện không đổi.
+Phương án thay thế: Apps Script **chủ động đẩy** (trigger theo thời gian, đẩy chỉ khi chữ ký đổi) thay vì Worker kéo; trigger `onEdit` không bắt được thay đổi do script/nhập tự động nên chỉ nên dùng trigger theo thời gian.
+Ước tính: nếu mỗi ngày Sheet đổi khoảng 100–300 kiện thì ~1.000–3.000 hàng ghi/ngày thay vì ~2,4 triệu (cách ngây thơ), và gần như 0 hàng đọc cho bước so sánh. Cần đo lại bằng tốc độ đổi thật của Sheet.
+
 ### 3.7 Dung lượng
 - **R2 10 GB (ảnh):** ảnh mới thu nhỏ cạnh dài ~1000 px, JPEG ~60% ≈ 80–120 KB. 500 lượt quét/ngày ≈ 40–60 MB/ngày → khoảng 6 tháng đầy. Mặc định **tự xóa ảnh sau 90 ngày** (chỉnh được) và tối đa 5 ảnh/kiện. 2.230 ảnh cũ ≈ 52 MB chuyển sang R2 không đáng kể.
 - **D1 500 MB (dữ liệu):** chật hơn R2. Dòng gọn 1–2 KB cộng chỉ mục thì chạm 500 MB khi khoảng **150.000–250.000 kiện** (ước tính thô). Cách xử lý: đơn ở Kho lưu trữ lâu (mặc định > 12 tháng) được **nén thành tệp theo tháng trên R2**, trong D1 chỉ giữ `order_index` (mã đơn, mã vận đơn, sàn, tháng, vài chục byte/dòng) để vẫn tìm được và mở lại. Chưa cần làm ngay, thiết kế sẵn để không phải đổi lược đồ sau.

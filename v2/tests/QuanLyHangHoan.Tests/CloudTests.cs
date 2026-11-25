@@ -226,6 +226,87 @@ public sealed class CloudTests : IDisposable
         Assert.Equal(EditKind.Error, (await svc.RemoveAsync("a", DateTime.Now)).Kind);
         Assert.Single(await svc.LoadAsync(DateTime.Now));   // không đổi gì khi mất kết nối
     }
+    // ------------------------------------------------------------ đẩy đơn đã đổi ở máy lên cloud
+    private static string ImportReply(JsonArray? rejectIds = null)
+    {
+        var rej = new JsonArray();
+        foreach (var id in rejectIds ?? new JsonArray()) rej.Add(new JsonObject { ["id"] = id!.GetValue<string>(), ["reason"] = "khóa không được phép" });
+        return new JsonObject { ["added"] = 1, ["updated"] = 0, ["unchanged"] = 0, ["rejected"] = rej, ["returnWatchAdded"] = 0 }.ToJsonString();
+    }
+
+    [Fact]
+    public async Task Publisher_sends_only_orders_changed_on_this_machine_and_never_buyer_data()
+    {
+        CloudReplica.Apply(Db, new[] { Parcel("a"), Parcel("b") }, 5);          // vừa áp từ cloud: coi như đã đồng bộ
+        Assert.Empty(CloudPublisher.Pending(Db));
+
+        using (var c = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            c.Open();
+            using var u = c.CreateCommand();
+            u.CommandText = "UPDATE orders SET note='sửa ở máy', buyer_note='tên khách 0912345678', raw_json='RAW' WHERE id='a'";
+            u.ExecuteNonQuery();
+        }
+        var h = new Handler(_ => (HttpStatusCode.OK, ImportReply()));
+        var api = new CloudApi(new HttpClient(h), "https://x.workers.dev", "t");
+        var res = await CloudPublisher.PublishAsync(api, Db, "file");
+        Assert.Equal(1, res.Sent);
+        var body = h.Calls.Single().Body;
+        Assert.Equal("sửa ở máy", JsonNode.Parse(body)!["parcels"]![0]!["note"]!.GetValue<string>());
+        Assert.Contains("\"hash\"", body);
+        Assert.DoesNotContain("0912345678", body);       // ghi chú người mua không bao giờ đi
+        Assert.DoesNotContain("buyerNote", body);
+        Assert.DoesNotContain("RAW", body);
+        Assert.Equal("a", JsonNode.Parse(body)!["parcels"]![0]!["id"]!.GetValue<string>());
+
+        // đã ghi nhận: lần sau không gửi nữa
+        Assert.Empty(CloudPublisher.Pending(Db));
+        Assert.Equal(0, (await CloudPublisher.PublishAsync(api, Db, "file")).Sent);
+        Assert.Single(h.Calls);
+    }
+
+    [Fact]
+    public async Task Publisher_batches_by_500_retries_rejected_orders_and_stops_on_unauthorized()
+    {
+        var many = Enumerable.Range(0, 1203).Select(i => Parcel("p" + i)).ToList();
+        CloudReplica.Apply(Db, many, 9);
+        using (var c = new SqliteConnection($"Data Source={Db};Pooling=False"))
+        {
+            c.Open();
+            using var u = c.CreateCommand();
+            u.CommandText = "DELETE FROM cloud_published";       // như dữ liệu cũ chưa từng đẩy
+            u.ExecuteNonQuery();
+        }
+        var reject = new JsonArray("p7");
+        var h = new Handler(r => (HttpStatusCode.OK, ImportReply(h2Calls++ == 0 ? reject : null)));
+        var api = new CloudApi(new HttpClient(h), "https://x.workers.dev", "t");
+        var res = await CloudPublisher.PublishAsync(api, Db, "file");
+        Assert.Equal(1203, res.Sent);
+        Assert.Equal(3, h.Calls.Count);
+        Assert.Equal(new[] { 500, 500, 203 }, h.Calls.Select(c => JsonNode.Parse(c.Body)!["parcels"]!.AsArray().Count).ToArray());
+        Assert.Equal(1, res.Rejected);
+        Assert.Equal("p7", Assert.Single(CloudPublisher.Pending(Db)).Parcel["id"]!.GetValue<string>());   // bị từ chối: để lần sau
+
+        var denied = new CloudApi(new HttpClient(new Handler(_ => (HttpStatusCode.Unauthorized, "{}"))), "https://x.workers.dev", "t");
+        await Assert.ThrowsAsync<CloudApiException>(() => CloudPublisher.PublishAsync(denied, Db, "file"));
+        Assert.Single(CloudPublisher.Pending(Db));            // không ghi nhận gì khi lỗi
+    }
+    private int h2Calls;
+
+    [Fact]
+    public async Task Publisher_sends_local_return_watch_marks_only_when_asked()
+    {
+        CloudReplica.Apply(Db, new[] { Parcel("a") }, 1, new[] { new CloudWatchChange("a", 1764000000123, true) });
+        var h = new Handler(_ => (HttpStatusCode.OK, ImportReply()));
+        var api = new CloudApi(new HttpClient(h), "https://x.workers.dev", "t");
+        await CloudPublisher.PublishAsync(api, Db, "file");
+        Assert.Empty(h.Calls);                                // không có gì đổi, không gửi dấu
+        await CloudPublisher.PublishAsync(api, Db, "file", includeReturnWatch: true);
+        var w = JsonNode.Parse(Assert.Single(h.Calls).Body)!["returnWatch"]!.AsArray();
+        Assert.Equal("a", w[0]!["id"]!.GetValue<string>());
+        Assert.Equal(1764000000123, w[0]!["since"]!.GetValue<long>());
+        Assert.True(w[0]!["off"]!.GetValue<bool>());
+    }
     // ------------------------------------------------------------ phiên ghép
     [Fact]
     public void Session_is_saved_atomically_with_the_token_protected_and_survives_corruption()
@@ -363,6 +444,21 @@ public sealed class CloudLiveTests(ITestOutputHelper output) : IDisposable
         Assert.True(await WaitAsync(() => link.Quota is not null));
         Assert.True(link.Quota!.RequestsUsed > 0);
 
+        // đẩy đơn đã đổi ở máy lên cloud: ghi chú đổi ở máy lên được, nhưng ghi chú của người dùng đặt trên cloud KHÔNG bị đè
+        using (var cn = new SqliteConnection($"Data Source={db};Pooling=False"))
+        {
+            cn.Open();
+            using var up = cn.CreateCommand();
+            up.CommandText = "UPDATE orders SET note='lý do sửa ở máy', user_note='cố ghi đè' WHERE id=$i";
+            up.Parameters.AddWithValue("$i", "live-b-" + suffix);
+            up.ExecuteNonQuery();
+        }
+        var pub = await CloudPublisher.PublishAsync(link.Api!, db, "file");
+        Assert.True(pub.Sent >= 1, "không có gì để đẩy");
+        Assert.Equal(0, (await CloudPublisher.PublishAsync(link.Api!, db, "file")).Sent);      // đã đồng bộ: không gửi lại
+        var echoed = (await ownerApi.SyncAsync(0, 1000)).Parcels.Single(p => p["id"]!.GetValue<string>() == "live-b-" + suffix);
+        Assert.Equal("lý do sửa ở máy", echoed["note"]!.GetValue<string>());
+        Assert.Equal("đã sửa qua cloud", echoed["userNote"]!.GetValue<string>());                // cloud giữ ghi chú người dùng
         // Bảng Hàng Hoàn Về: đơn "Đã đồng ý" do cloud tự đưa vào bảng; máy thấy qua WebSocket; bỏ/đưa lại qua cloud
         var wp = Parcel("live-w-" + suffix); wp["platformStatus"] = "Đã đồng ý";
         Assert.Equal(1, (await ownerApi.ImportAsync("file", "sig2", new[] { wp })).Added);

@@ -11,6 +11,8 @@ namespace QuanLyHangHoan.Data.Cloud;
 public static class CloudReplica
 {
     private const string MetaSql = "CREATE TABLE IF NOT EXISTS cloud_meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)";
+    /// <summary>Băm nội dung từng kiện ở lần cuối ĐỒNG BỘ với cloud (áp từ cloud hoặc đã đẩy lên): kiện nào băm hiện tại khác thì đã đổi ở máy.</summary>
+    internal const string PublishedSql = "CREATE TABLE IF NOT EXISTS cloud_published (id TEXT PRIMARY KEY, hash TEXT NOT NULL)";
 
     private static SqliteConnection Open(string dbPath)
     {
@@ -64,7 +66,7 @@ public static class CloudReplica
     {
         using var c = Open(dbPath);
         using var tx = c.BeginTransaction();
-        using (var m = c.CreateCommand()) { m.Transaction = tx; m.CommandText = MetaSql + ";" + ReturnWatchService.TableSql; m.ExecuteNonQuery(); }
+        using (var m = c.CreateCommand()) { m.Transaction = tx; m.CommandText = MetaSql + ";" + PublishedSql + ";" + ReturnWatchService.TableSql; m.ExecuteNonQuery(); }
         var n = 0;
         foreach (var p in parcels) { ApplyOne(c, tx, p); n++; }
         // Bảng Hàng Hoàn Về: cùng bảng `return_watch` mà màn hình đang đọc; cloud là nguồn gốc nên ghi đè giờ vào + cờ bỏ
@@ -158,6 +160,15 @@ public static class CloudReplica
         P("$is_archived", Flag(p["isArchived"])); P("$archived_at", S(p["archivedAt"]));
         P("$is_deleted", Flag(p["isDeleted"])); P("$deleted_at", S(p["deletedAt"])); P("$deleted_from", S(p["deletedFrom"]));
         cmd.ExecuteNonQuery();
+
+        using (var ph = c.CreateCommand())
+        {
+            ph.Transaction = tx;
+            ph.CommandText = "INSERT INTO cloud_published(id, hash) VALUES($i,$h) ON CONFLICT(id) DO UPDATE SET hash = excluded.hash";
+            ph.Parameters.AddWithValue("$i", id);
+            ph.Parameters.AddWithValue("$h", ParcelMapper.Hash(ParcelMapper.ToParcel(ParcelMapper.ToStored(p))));
+            ph.ExecuteNonQuery();
+        }
 
         // sản phẩm: thay toàn bộ các dòng của kiện này (đúng với nội dung cloud)
         using (var del = c.CreateCommand())

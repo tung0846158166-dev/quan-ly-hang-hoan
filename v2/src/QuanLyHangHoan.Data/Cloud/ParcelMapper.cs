@@ -55,6 +55,14 @@ public static class ParcelMapper
         return new StoredOrder(o, B(p["isArchived"]), S(p["archivedAt"]), B(p["isDeleted"]), S(p["deletedAt"]), S(p["deletedFrom"]));
     }
 
+    /// <summary>Băm ổn định của một kiện (bỏ trường `hash`/`rev`/`updatedAt`): so sánh "đã đồng bộ với cloud chưa".</summary>
+    public static string Hash(JsonObject parcel)
+    {
+        var c = (JsonObject)parcel.DeepClone();
+        c.Remove("hash"); c.Remove("rev"); c.Remove("updatedAt");
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(c.ToJsonString()))).ToLowerInvariant();
+    }
+
     private static readonly string[] RawKeys = { "returnReason", "returnStatus", "returnShippingStatus", "returnSuccessTime", "cancelType" };
     private static readonly string[] TopKeys = { "forwardCarrier", "returnCarrier" };
 

@@ -200,11 +200,23 @@ public sealed class CloudApi
     }
 
     // ---- nhập đơn
-    public async Task<(int Added, int Updated, int Unchanged, int Rejected)> ImportAsync(string source, string signature, IEnumerable<JsonObject> parcels, CancellationToken ct = default)
+    public async Task<CloudImportResult> ImportAsync(string source, string signature, IEnumerable<JsonObject> parcels, IEnumerable<JsonObject>? returnWatch = null, CancellationToken ct = default)
     {
         var arr = new JsonArray();
         foreach (var p in parcels) arr.Add(p);
-        var r = await JsonAsync(HttpMethod.Post, "/import", new JsonObject { ["source"] = source, ["signature"] = signature, ["parcels"] = arr }, ct);
-        return (r["added"]?.GetValue<int>() ?? 0, r["updated"]?.GetValue<int>() ?? 0, r["unchanged"]?.GetValue<int>() ?? 0, (r["rejected"] as JsonArray)?.Count ?? 0);
+        var body = new JsonObject { ["source"] = source, ["signature"] = signature, ["parcels"] = arr };
+        if (returnWatch is not null)
+        {
+            var w = new JsonArray();
+            foreach (var x in returnWatch) w.Add(x);
+            body["returnWatch"] = w;
+        }
+        var r = await JsonAsync(HttpMethod.Post, "/import", body, ct);
+        var rejected = new List<(string Id, string Reason)>();
+        if (r["rejected"] is JsonArray rj)
+            foreach (var x in rj) rejected.Add((x?["id"]?.GetValue<string>() ?? "", x?["reason"]?.GetValue<string>() ?? ""));
+        return new(r["added"]?.GetValue<int>() ?? 0, r["updated"]?.GetValue<int>() ?? 0, r["unchanged"]?.GetValue<int>() ?? 0, rejected, r["returnWatchAdded"]?.GetValue<int>() ?? 0);
     }
 }
+
+public sealed record CloudImportResult(int Added, int Updated, int Unchanged, IReadOnlyList<(string Id, string Reason)> Rejected, int ReturnWatchAdded);

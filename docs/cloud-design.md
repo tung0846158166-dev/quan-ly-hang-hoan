@@ -190,6 +190,11 @@ Khối lượng lớn (nhiều tuần). Mỗi giai đoạn nộp riêng để b�
 - Ảnh có thể đầy 10 GB nếu không giới hạn → thu nhỏ + tự xóa sau N ngày.
 - Không có mã hóa đầu cuối.
 
+## 9b. Phát hiện khi làm tiếp (26/11/2026) - hai việc lớn hơn dự kiến
+1. **Nạp Google Sheet trên cloud (T043) KHÔNG chỉ là "gộp tab".** Nhận diện kiện khi nhập (ParcelUpsert/ParcelMerge/ItemMerge, quy tắc bất biến 1–5) phải **đối chiếu với dữ liệu đã có** (mã riêng, mã đơn, kiện A/B/C) rồi mới biết cập nhật kiện nào hay thêm kiện mới; `Order.Id` của đơn mới là mã ngẫu nhiên sinh lúc nhập. Apps Script không có dữ liệu cũ để đối chiếu, và Worker gói miễn phí chỉ có 10 ms CPU. Hai hướng: **(A, đang dùng)** Sheet vẫn do máy tính nạp (máy nào mở trước thì nạp; Sheet là hàng đợi bền nên không mất gì), bộ đẩy đơn (`CloudPublisher`) đưa kết quả lên cloud cho mọi máy; **(B)** chuyển toàn bộ logic nhận diện/gộp sang TypeScript ngay trên Worker (lớn, rủi ro lệch quy tắc, cần bộ ca thử chung rất đầy đủ). Khuyến nghị: A để chạy thật sớm, B làm sau nếu vẫn cần Sheet cập nhật khi mọi máy tính tắt.
+2. **App iPhone (T042) gắn sâu vào "chờ máy tính xác nhận":** hàng đợi quét, ảnh tạm, lớp phủ sửa cục bộ, lệnh ghi chú/sửa/xóa/theo dõi/nhận đơn hủy, và **tạo đơn mới từ điện thoại** (cloud chưa có thao tác `createOrder`). Chuyển sang cloud là đổi vòng đời quét (ACK từ cloud thay cho ACK từ máy tính, bỏ hàng đợi ngoại tuyến) chứ không chỉ thay đường truyền. Nên làm theo 3 bước có kiểm tra CI: (1) trạng thái + ghép thiết bị + danh sách từ cloud (chỉ xem); (2) quét/ảnh qua cloud; (3) các lệnh sửa/xóa/theo dõi/đơn hủy/tạo đơn mới.
+3. Kết quả chạy thử trên dữ liệu thật (4.962 đơn): chỉ **6,2 MB** lên cloud; 3 dòng trùng id; 2.230 ảnh trong bảng `photos` (49 MB) + **621 ảnh nhúng DUY NHẤT** trong lịch sử ảnh (14,3 MB) cần chuyển riêng để không mất.
+
 ## 10. Việc còn cần chủ dự án
 1. **Duyệt** bản 2 này (hoặc nêu chỗ cần sửa).
 2. Trả lời: một hay nhiều cửa hàng; giữ ảnh bao nhiêu ngày (mặc định 90).

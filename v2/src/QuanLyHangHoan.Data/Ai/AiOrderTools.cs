@@ -166,7 +166,7 @@ public sealed partial class AiOrderTools
         if (Has("trung")) Add("duplicates");
         if (Has("nhat ky", "hoat dong", "lich su", "da lam", "nap don", "bao nhieu lan")) Add("recent_activity", "activity_stats");
         if (Has("ket noi", "sao luu", "backup", "thong bao", "dien thoai", "trang thai he thong")) Add("system_status", "notifications");
-        if (Has("lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung phan mem")) Add("app_guide");
+        if (Has("lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung phan mem", "man hinh", "muc nao", "nut ", "la gi", "y nghia", "phan mem co", "sheet", "bam vao")) Add("app_guide");
         if (want.Count == 3) Add("find_order");   // tổng quan đã có sẵn trong số liệu hiện tại của lời nhắc hệ thống
         var picked = new JsonArray();
         foreach (var t in all)

@@ -352,6 +352,16 @@ public sealed partial class AiOrderTools
             "Theo dõi các đơn khách đã yêu cầu hoàn qua 4 chặng: Đã đồng ý, Đang về, Đã về shop, Đã nhận kho. Đơn quét nhận xong chuyển sang chặng Đã nhận kho."),
         ("thong_ke", "Thống kê",
             "Trang chủ có chỉ số tổng quan, xu hướng 7 ngày và sản phẩm bị hoàn nhiều nhất theo hôm nay/tuần/tháng. Màn Thống kê đơn và sản phẩm xem theo ngày, tuần, tháng."),
+        ("man_hinh", "Các màn hình và việc làm ở mỗi màn",
+            "Trang chủ: 'Cần xử lý ngay', chỉ số, xu hướng 7 ngày, sản phẩm hoàn nhiều. SHOPEE > Hoàn hàng: kiện hoàn Shopee; Đơn hủy: đơn bị hủy/bom (mã vận đơn lấy từ tab ẩn 'Vận đơn huỷ' của Google Sheet nếu có). TIKTOK > Hoàn hàng: kiện hoàn TikTok. " +
+            "CHUNG: Quét nhận hàng (quét mã để nhận); Đồng bộ điện thoại (mã phòng, kết nối, nhật ký); Hàng hoàn về (4 chặng Đã đồng ý, Đang về, Đã về shop, Đã nhận kho); Bảng đơn mới (đơn nhập tay/từ điện thoại); Đang theo dõi (đơn gắn sao); Kho lưu trữ (đơn đã nhận được dời sang); Đã xóa (khôi phục được). " +
+            "NẠP ĐƠN TỰ ĐỘNG: Nạp file Excel (TikTok), Theo dõi thư mục, Google Sheet, Salework. Ngoài ra: Thống kê, Nhật ký hoạt động, chuông Thông báo, Cài đặt (sao lưu, AI, đồng bộ), Ctrl+K tìm toàn cục."),
+        ("y_nghia_du_lieu", "Ý nghĩa dữ liệu và từ khóa thường gặp",
+            "Kiện = một dòng hoàn. Trạng thái: 'Đang chờ' (chưa về kho), 'Đã nhận' (đã quét nhận), 'Không cần nhận', 'Bị mất'. Mỗi kiện có: mã đơn, mã vận đơn, sàn, hãng vận chuyển, sản phẩm (màu, size, số lượng), giá trị, giờ hàng về, ngày nhận, lý do hoàn, loại đơn, trạng thái trên sàn, ghi chú, đang theo dõi hay không. " +
+            "'Quá hạn/báo đỏ' = chờ quá 24 giờ, 'báo vàng' = quá 12 giờ kể từ lúc hàng về. 'Hoàn một phần' = chỉ một số món trong đơn hoàn. 'Đơn bom/hủy' = đơn người mua hủy hoặc không nhận. Ảnh quét chỉ nằm trên điện thoại. Không có tên/SĐT/địa chỉ người nhận."),
+        ("cau_hoi_mau", "Câu hỏi mẫu và cách trả lời",
+            "Đang chờ bao nhiêu/tổng tiền: số liệu hiện tại. Đơn quá hạn: list_orders(status Đang chờ, alert red). Hôm nay về mấy đơn: count_orders(status Đã nhận, date_field recv, from=to=today). Sản phẩm hoàn nhiều: product_stats. Sàn/hãng/ngày/tháng: aggregate(group_by). " +
+            "So sánh kỳ: compare_periods. Kho xử lý nhanh hay chậm: turnaround_stats. Một đơn cụ thể: find_order rồi order_detail. Đơn nhiều kiện: order_groups. Dữ liệu thiếu/sai: data_health. Mã trùng: duplicates. Điện thoại/sao lưu: system_status. Vừa làm gì: recent_activity."),
         ("tro_ly_ai", "Trợ lý AI",
             "Nút ✨ ở góc phải dưới mọi màn hình mở cửa sổ hỏi đáp. Khóa API (Groq, Google) và danh sách mô hình nhập ở Cài đặt. Trợ lý chỉ đọc dữ liệu, không sửa gì; dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận. Hết hạn mức một mô hình thì tự chuyển mô hình khác."),
     };

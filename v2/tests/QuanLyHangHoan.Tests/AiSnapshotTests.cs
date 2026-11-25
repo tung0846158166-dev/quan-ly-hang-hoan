@@ -100,6 +100,29 @@ public sealed class AiSnapshotTests
         Assert.DoesNotContain("0912345678", sys);
     }
 
+    [Theory]
+    [InlineData("man_hinh", "Kho lưu trữ")]
+    [InlineData("y_nghia_du_lieu", "Đang chờ")]
+    [InlineData("cau_hoi_mau", "list_orders")]
+    public void App_guide_has_screen_map_data_dictionary_and_sample_questions(string topic, string mustContain)
+    {
+        var r = Tools().Execute("app_guide", "{\"topic\":\"" + topic + "\"}").Json;
+        Assert.Contains(mustContain, r);
+    }
+
+    [Fact]
+    public async Task System_prompt_lists_app_screens_and_examples_and_software_questions_get_the_guide_tool()
+    {
+        var f = new Capture(_ => Text("ok"));
+        await Svc(f).AskAsync("nút sao lưu ở màn hình nào?");
+        var sys = f.Bodies[0]["messages"]![0]!["content"]!.GetValue<string>();
+        Assert.Contains("CÓ TRONG PHẦN MỀM", sys);
+        Assert.Contains("Kho lưu trữ", sys);
+        Assert.Contains("VÍ DỤ", sys);
+        var names = ((JsonArray)f.Bodies[0]["tools"]!).Select(t => t!["function"]!["name"]!.GetValue<string>()).ToList();
+        Assert.Contains("app_guide", names);
+    }
+
     [Fact]
     public async Task Last_rounds_forbid_more_tool_calls_and_loop_ends_with_a_clear_error()
     {

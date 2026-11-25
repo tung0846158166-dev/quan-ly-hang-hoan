@@ -81,7 +81,7 @@ Quyết định theo `cloud/core` (`decide`), chuẩn đối chiếu `cloud/gold
 
 ## 6. Ảnh
 Điện thoại là nơi duy nhất chụp. Máy tính chỉ xem.
-- `PUT /photos/{photoId}?parcelId=<id>&mime=image/jpeg` (thân là byte ảnh đã thu nhỏ ≤ 400 KB) → `{ "ok": true, "photoId": "...", "sha256": "..." }`. Máy chủ chỉ nhận khi kiện tồn tại và **vừa được quét xác nhận đúng một kiện** bởi chính thiết bị này (hoặc ảnh đã thuộc kiện đó); không thì `409`. Lưu ở R2, tạo bản thu nhỏ (thumb) ~300 px khi tải lên.
+- `PUT /photos/{photoId}?parcelId=<id>&mime=image/jpeg&kind=full|thumb` (thân là byte ảnh; điện thoại tự thu nhỏ: bản `full` ≤ 400 KB, bản `thumb` ~300 px; máy chủ từ chối > 1 MB) → `{ "ok": true, "photoId": "...", "sha256": "..." }`. `photoId` gồm chữ, số, `_`, `-` (6–80 ký tự). Máy chủ chỉ nhận ảnh MỚI khi chính thiết bị này vừa quét xác nhận kiện đó (`received`/`alreadyReceived`) trong vòng **15 phút**; không thì `409`. Thiết bị loại `pc` bị `403` (máy tính chỉ xem). Gửi bản `full` xong thì kiện được gắn `photoId` này (các máy khác nhận qua `/sync`). Gửi `thumb` sau cùng `photoId`. Lưu ở R2.
 - `GET /photos/{photoId}?size=thumb|full` → byte ảnh, có `Cache-Control: private, max-age=2592000` (máy khách lưu tạm).
 - `GET /parcels/{id}/photos` → `[{photoId, takenAt, deviceName}]`.
 - Ảnh tự xóa sau **90 ngày** (Cron của Worker); xóa là thao tác duy nhất được phép xóa cứng và được ghi `audit_log`.

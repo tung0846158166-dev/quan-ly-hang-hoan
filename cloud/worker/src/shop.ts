@@ -1,0 +1,620 @@
+import { DurableObject } from "cloudflare:workers";
+import { decide, ReceiveStatus } from "../../core/src/scan";
+import { Db, SCHEMA, type Row } from "./db";
+import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parcel";
+import type { Env } from "./index";
+
+const DAY_MS = 86_400_000;
+const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
+const VALID_STATUS = new Set<string>(Object.values(ReceiveStatus));
+const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote"]);
+const PHOTO_ID = /^[A-Za-z0-9_-]{6,80}$/;
+const MAX_PHOTO_BYTES = 1_000_000;
+const SCAN_PHOTO_WINDOW_MS = 15 * 60_000;
+
+class ApiError extends Error {
+  constructor(readonly status: number, readonly code: string, message: string) { super(message); }
+}
+const fail = (status: number, code: string, message: string): never => { throw new ApiError(status, code, message); };
+
+interface Device { deviceId: string; name: string; kind: string; role: string }
+
+/** Giờ Việt Nam (UTC+7) theo định dạng app cũ: dd/MM/yyyy HH:mm:ss */
+export function vnTime(ms: number): string {
+  const d = new Date(ms + 7 * 3_600_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getUTCDate())}/${p(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}
+
+const json = (data: unknown, status = 200): Response => Response.json(data, { status });
+const errorResponse = (e: ApiError): Response => json({ error: { code: e.code, message: e.message } }, e.status);
+
+function b64url(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a), eb = new TextEncoder().encode(b);
+  if (ea.length !== eb.length) return false;
+  let r = 0;
+  for (let i = 0; i < ea.length; i++) r |= (ea[i] as number) ^ (eb[i] as number);
+  return r === 0;
+}
+
+export class ShopDO extends DurableObject<Env> {
+  private db: Db;
+  private pendingReq = 0;
+  private lastFlush = Date.now();
+  private flushedWritten = 0;
+  private flushedRead = 0;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.db = new Db(ctx.storage.sql);
+    ctx.blockConcurrencyWhile(async () => {
+      this.db.exec(SCHEMA);
+      this.db.run("INSERT OR IGNORE INTO meta(k, v) VALUES ('rev', '0')");
+    });
+    // Ping/pong tự động, không đánh thức Durable Object (tiết kiệm yêu cầu).
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
+  }
+
+  // ===================================================== điểm vào
+  async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/v1/, "") || "/";
+    try {
+      await this.prime(req, url);
+      const res = await this.route(req, url, path);
+      this.countRequest();
+      return res;
+    } catch (e) {
+      this.countRequest();
+      if (e instanceof ApiError) return errorResponse(e);
+      console.error("lỗi không mong đợi", e);
+      return json({ error: { code: "internal", message: "Lỗi máy chủ, thử lại sau." } }, 500);
+    }
+  }
+
+  private async route(req: Request, url: URL, path: string): Promise<Response> {
+    const m = req.method;
+    // ---- không cần token
+    if (m === "POST" && path === "/pair/bootstrap") return this.pairBootstrap(await this.body(req));
+    if (m === "POST" && path === "/pair/complete") return this.pairComplete(await this.body(req));
+    if (path === "/import" || path === "/import/state") {
+      const dev = this.authImport(req);
+      if (m === "POST" && path === "/import") return this.importParcels(await this.body(req), dev);
+      if (m === "GET" && path === "/import/state") return this.importState(url.searchParams.get("source") ?? "");
+    }
+    if (m === "GET" && path === "/ws") return this.upgradeWs(req, url);
+
+    // ---- cần token thiết bị
+    const dev = this.authDevice(req);
+    if (m === "GET" && path === "/me") return json({ deviceId: dev.deviceId, deviceName: dev.name, role: dev.role });
+    if (m === "POST" && path === "/pair/start") return this.pairStart(dev);
+    if (m === "GET" && path === "/devices") return this.listDevices(dev);
+    if (m === "DELETE" && path.startsWith("/devices/")) return this.revokeDevice(dev, decodeURIComponent(path.slice("/devices/".length)));
+    if (m === "GET" && path === "/sync") return this.sync(url);
+    if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
+    if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
+    if (m === "PUT" && path.startsWith("/photos/")) return this.putPhoto(req, url, decodeURIComponent(path.slice("/photos/".length)), dev);
+    if (m === "GET" && path.startsWith("/photos/")) return this.getPhoto(url, decodeURIComponent(path.slice("/photos/".length)));
+    const pp = /^\/parcels\/([^/]+)\/photos$/.exec(path);
+    if (m === "GET" && pp) return this.parcelPhotos(decodeURIComponent(pp[1] as string));
+    return fail(404, "not_found", "Không có đường dẫn này.");
+  }
+
+  private async body(req: Request): Promise<Record<string, unknown>> {
+    let v: unknown;
+    try { v = await req.json(); } catch { return fail(422, "invalid", "Dữ liệu gửi lên không phải JSON hợp lệ."); }
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return fail(422, "invalid", "Dữ liệu gửi lên không hợp lệ.");
+    return v as Record<string, unknown>;
+  }
+
+  // ===================================================== xác thực
+  private tokenHash(token: string): Promise<string> { return sha256Hex(token); }
+
+  private authDevice(req: Request): Device {
+    const h = req.headers.get("Authorization") ?? "";
+    const token = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
+    return this.deviceByToken(token);
+  }
+
+  /** Token đã được băm sẵn ở `prime` (băm là bất đồng bộ) nên tra cứu ở đây là đồng bộ. */
+  private deviceByToken(token: string): Device {
+    if (!token) return fail(401, "unauthorized", "Thiếu token thiết bị.");
+    return this.lookupToken(token);
+  }
+
+  private tokenCache = new Map<string, string>();
+  private lookupToken(token: string): Device {
+    const hash = this.tokenCache.get(token);
+    if (!hash) return fail(401, "unauthorized", "Token không hợp lệ.");
+    const r = this.db.first<Row>("SELECT device_id, name, kind, role, revoked, last_seen_at FROM devices WHERE token_hash = ?", hash);
+    if (!r || r.revoked) { this.tokenCache.delete(token); return fail(401, "unauthorized", "Thiết bị chưa được ghép hoặc đã bị thu hồi."); }
+    const now = Date.now();
+    if (now - Number(r.last_seen_at) > 5 * 60_000) this.db.run("UPDATE devices SET last_seen_at = ? WHERE device_id = ?", now, r.device_id as string);
+    return { deviceId: r.device_id as string, name: r.name as string, kind: r.kind as string, role: r.role as string };
+  }
+
+  private async prime(req: Request, url: URL): Promise<void> {
+    const h = req.headers.get("Authorization") ?? "";
+    const token = (h.startsWith("Bearer ") ? h.slice(7).trim() : "") || url.searchParams.get("token") || "";
+    if (token && !this.tokenCache.has(token)) this.tokenCache.set(token, await this.tokenHash(token));
+  }
+
+  private authImport(req: Request): Device | null {
+    const key = req.headers.get("X-Import-Key");
+    if (key) {
+      if (!this.env.IMPORT_KEY || !timingSafeEqual(key, this.env.IMPORT_KEY)) return fail(401, "unauthorized", "Khóa nhập không đúng.");
+      return null;
+    }
+    return this.authDevice(req);
+  }
+
+  private requireOwner(dev: Device): void {
+    if (dev.role !== "owner") fail(403, "forbidden", "Chỉ chủ cửa hàng mới làm được việc này.");
+  }
+
+  // ===================================================== ghép thiết bị
+  private newToken(): string { return b64url(crypto.getRandomValues(new Uint8Array(32))); }
+
+  private async createDevice(name: string, kind: string, role: string): Promise<{ deviceId: string; token: string; role: string }> {
+    const token = this.newToken();
+    const deviceId = crypto.randomUUID();
+    const hash = await this.tokenHash(token);
+    this.db.run("INSERT INTO devices(device_id, name, kind, role, token_hash, created_at, last_seen_at) VALUES (?,?,?,?,?,?,?)",
+      deviceId, name, kind, role, hash, Date.now(), Date.now());
+    return { deviceId, token, role };
+  }
+
+  private cleanName(v: unknown): string {
+    const s = typeof v === "string" ? v.trim() : "";
+    if (s.length === 0 || s.length > 80) fail(422, "invalid", "Tên thiết bị phải có từ 1 đến 80 ký tự.");
+    return s;
+  }
+  private cleanKind(v: unknown): string {
+    if (v !== "pc" && v !== "phone") fail(422, "invalid", "Loại thiết bị phải là pc hoặc phone.");
+    return v as string;
+  }
+
+  private async pairBootstrap(b: Record<string, unknown>): Promise<Response> {
+    const count = Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM devices")?.n ?? 0);
+    if (count > 0) return fail(403, "forbidden", "Đã có thiết bị; không dùng được khóa khởi tạo nữa.");
+    const key = typeof b.bootstrapKey === "string" ? b.bootstrapKey : "";
+    if (!this.env.BOOTSTRAP_KEY || !timingSafeEqual(key, this.env.BOOTSTRAP_KEY)) return fail(401, "unauthorized", "Khóa khởi tạo không đúng.");
+    const d = await this.createDevice(this.cleanName(b.deviceName), this.cleanKind(b.kind), "owner");
+    return json(d);
+  }
+
+  private async pairComplete(b: Record<string, unknown>): Promise<Response> {
+    const now = Date.now();
+    // chống dò mã 6 số: tối đa 20 lần sai mỗi 10 phút
+    const failN = Number(this.meta("pairfail_n") ?? 0), failAt = Number(this.meta("pairfail_at") ?? 0);
+    if (now - failAt < 600_000 && failN >= 20) return fail(429, "quota_exceeded", "Nhập sai quá nhiều lần. Thử lại sau 10 phút.");
+    const code = typeof b.code === "string" ? b.code.trim() : "";
+    const row = this.db.first<Row>("SELECT code, expires_at, used FROM pair_codes WHERE code = ?", code);
+    if (!row || row.used || Number(row.expires_at) < now) {
+      if (now - failAt >= 600_000) { this.setMeta("pairfail_n", "1"); this.setMeta("pairfail_at", String(now)); }
+      else this.setMeta("pairfail_n", String(failN + 1));
+      return fail(401, "unauthorized", "Mã ghép không đúng hoặc đã hết hạn.");
+    }
+    const name = this.cleanName(b.deviceName), kind = this.cleanKind(b.kind);
+    this.db.run("UPDATE pair_codes SET used = 1 WHERE code = ?", code);
+    return json(await this.createDevice(name, kind, "staff"));
+  }
+
+  private pairStart(dev: Device): Response {
+    this.requireOwner(dev);
+    const n = crypto.getRandomValues(new Uint32Array(1))[0] as number % 1_000_000;
+    const code = String(n).padStart(6, "0");
+    const expiresAt = Date.now() + 10 * 60_000;
+    this.db.run("DELETE FROM pair_codes WHERE expires_at < ?", Date.now());
+    this.db.run("INSERT OR REPLACE INTO pair_codes(code, expires_at, created_by, used) VALUES (?,?,?,0)", code, expiresAt, dev.deviceId);
+    return json({ code, expiresAt });
+  }
+
+  private listDevices(dev: Device): Response {
+    this.requireOwner(dev);
+    const rows = this.db.all<Row>("SELECT device_id, name, kind, role, last_seen_at, revoked FROM devices ORDER BY created_at");
+    return json(rows.map((r) => ({ deviceId: r.device_id, deviceName: r.name, kind: r.kind, role: r.role, lastSeenAt: r.last_seen_at, revoked: !!r.revoked })));
+  }
+
+  private revokeDevice(dev: Device, id: string): Response {
+    this.requireOwner(dev);
+    if (id === dev.deviceId) return fail(422, "invalid", "Không thu hồi chính thiết bị của chủ.");
+    const n = this.db.run("UPDATE devices SET revoked = 1 WHERE device_id = ?", id);
+    if (n === 0) return fail(404, "not_found", "Không thấy thiết bị.");
+    this.tokenCache.clear();
+    for (const ws of this.ctx.getWebSockets(id)) { try { ws.close(4001, "revoked"); } catch { /* đã đóng */ } }
+    return json({ ok: true });
+  }
+
+  // ===================================================== meta / rev
+  private meta(k: string): string | undefined { return this.db.first<Row>("SELECT v FROM meta WHERE k = ?", k)?.v as string | undefined; }
+  private setMeta(k: string, v: string): void { this.db.run("INSERT INTO meta(k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", k, v); }
+  private nextRev(): number {
+    const r = this.db.first<Row>("UPDATE meta SET v = CAST(v AS INTEGER) + 1 WHERE k = 'rev' RETURNING v");
+    return Number(r?.v ?? 0);
+  }
+  private currentRev(): number { return Number(this.meta("rev") ?? 0); }
+
+  // ===================================================== kiện
+  private loadParcel(id: string): Parcel | undefined {
+    const r = this.db.first<Row>("SELECT data FROM parcels WHERE id = ?", id);
+    return r ? (JSON.parse(r.data as string) as Parcel) : undefined;
+  }
+
+  /** Ghi một kiện (thêm hoặc cập nhật): tăng rev, cập nhật bảng tra mã khi mã đổi. Gọi trong giao dịch. */
+  private writeParcel(p: Parcel, srcHash?: string): number {
+    const rev = this.nextRev();
+    const now = Date.now();
+    const data = JSON.stringify(p);
+    if (srcHash === undefined) {
+      this.db.run("UPDATE parcels SET rev = ?, updated_at = ?, data = ?, status = ?, is_archived = ?, is_deleted = ? WHERE id = ?",
+        rev, now, data, p.status, p.isArchived ? 1 : 0, p.isDeleted ? 1 : 0, p.id);
+    } else {
+      this.db.run(`INSERT INTO parcels(id, rev, updated_at, data, status, is_archived, is_deleted, src_hash) VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET rev = excluded.rev, updated_at = excluded.updated_at, data = excluded.data, status = excluded.status,
+        is_archived = excluded.is_archived, is_deleted = excluded.is_deleted, src_hash = excluded.src_hash`,
+        p.id, rev, now, data, p.status, p.isArchived ? 1 : 0, p.isDeleted ? 1 : 0, srcHash);
+    }
+    this.refreshCodes(p);
+    return rev;
+  }
+
+  private refreshCodes(p: Parcel): void {
+    const want = codesOf(p).map((c) => `${c.kind}|${c.code}`).sort();
+    const have = this.db.all<Row>("SELECT kind, code FROM parcel_codes WHERE parcel_id = ?", p.id).map((r) => `${r.kind}|${r.code}`).sort();
+    if (want.length === have.length && want.every((v, i) => v === have[i])) return;
+    this.db.run("DELETE FROM parcel_codes WHERE parcel_id = ?", p.id);
+    for (const c of codesOf(p)) this.db.run("INSERT OR IGNORE INTO parcel_codes(code, kind, parcel_id) VALUES (?,?,?)", c.code, c.kind, p.id);
+  }
+
+  private audit(deviceId: string, action: string, parcelId: string, before: unknown, after: unknown): void {
+    this.db.run("INSERT INTO audit_log(at, device_id, action, parcel_id, before, after) VALUES (?,?,?,?,?,?)",
+      Date.now(), deviceId, action, parcelId, JSON.stringify(before ?? null), JSON.stringify(after ?? null));
+  }
+
+  private toWire(p: Parcel, rev: number, updatedAt: number): Record<string, unknown> { return { ...p, rev, updatedAt }; }
+
+  // ===================================================== đồng bộ
+  private sync(url: URL): Response {
+    const since = Math.max(0, Number(url.searchParams.get("since") ?? 0) || 0);
+    const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") ?? 500) || 500));
+    const rows = this.db.all<Row>("SELECT data, rev, updated_at FROM parcels WHERE rev > ? ORDER BY rev LIMIT ?", since, limit + 1);
+    const more = rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    const changes = page.map((r) => ({ type: "parcel", rev: Number(r.rev), parcel: this.toWire(JSON.parse(r.data as string) as Parcel, Number(r.rev), Number(r.updated_at)) }));
+    const rev = more ? Number((page[page.length - 1] as Row).rev) : this.currentRev();
+    return json({ rev, more, changes });
+  }
+
+  // ===================================================== thao tác ghi
+  private async ops(b: Record<string, unknown>, dev: Device): Promise<Response> {
+    const ops = Array.isArray(b.ops) ? (b.ops as Record<string, unknown>[]) : fail(422, "invalid", "Thiếu danh sách thao tác.");
+    if (ops.length === 0 || ops.length > 50) fail(422, "invalid", "Mỗi lần gửi từ 1 đến 50 thao tác.");
+    const results: unknown[] = [];
+    let changed = false;
+    for (const op of ops) {
+      const opId = typeof op.opId === "string" ? op.opId : "";
+      if (opId.length < 8 || opId.length > 80) { results.push({ opId, ok: false, error: { code: "invalid", message: "Thiếu hoặc sai opId." } }); continue; }
+      const done = this.db.first<Row>("SELECT result FROM ops_done WHERE op_id = ?", opId);
+      if (done) { results.push(JSON.parse(done.result as string)); continue; }
+      let res: Record<string, unknown>;
+      try {
+        if (op.type !== "scan" && this.quotaSnapshot(false).level === "stop")
+          fail(429, "quota_exceeded", "Hết hạn mức hôm nay: thao tác ghi tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
+        const before = this.currentRev();
+        const result = this.ctx.storage.transactionSync(() => this.runOp(op, dev));
+        const rev = this.currentRev();
+        if (rev !== before) changed = true;
+        res = { opId, ok: true, rev, result };
+      } catch (e) {
+        if (!(e instanceof ApiError)) throw e;
+        res = { opId, ok: false, error: { code: e.code, message: e.message } };
+      }
+      this.db.run("INSERT OR REPLACE INTO ops_done(op_id, result, at) VALUES (?,?,?)", opId, JSON.stringify(res), Date.now());
+      results.push(res);
+    }
+    if (changed) this.broadcast();
+    return json({ results });
+  }
+
+  private runOp(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    switch (op.type) {
+      case "scan": return this.opScan(op, dev);
+      case "setStatus": return this.opSetStatus(op, dev);
+      case "editNote": return this.opEditNote(op, dev);
+      case "setWatch": return this.opMutate(op, dev, "setWatch", (p) => {
+        p.isWatchlist = op.on === true;
+        p.watchlistReason = p.isWatchlist ? this.text(op.reason, 500) : "";
+      });
+      case "archive": return this.opMutate(op, dev, "archive", (p) => { p.isArchived = true; p.archivedAt = vnTime(Date.now()); });
+      case "unarchive": return this.opMutate(op, dev, "unarchive", (p) => { p.isArchived = false; p.archivedAt = ""; });
+      case "delete": return this.opMutate(op, dev, "delete", (p) => { p.deletedFrom = p.isArchived ? "Kho lưu trữ" : "Bảng chính"; p.isDeleted = true; p.deletedAt = vnTime(Date.now()); });
+      case "restore": return this.opMutate(op, dev, "restore", (p) => { p.isDeleted = false; p.deletedAt = ""; p.deletedFrom = ""; });
+      case "editCell": return this.opEditCell(op, dev);
+      default: return fail(422, "invalid", `Loại thao tác không hỗ trợ: ${String(op.type)}`);
+    }
+  }
+
+  private text(v: unknown, max: number): string {
+    const s = typeof v === "string" ? v : "";
+    if (s.length > max) fail(422, "invalid", `Chữ quá dài (tối đa ${max} ký tự).`);
+    return s;
+  }
+
+  private need(id: unknown): Parcel {
+    const pid = typeof id === "string" ? id : "";
+    const p = pid ? this.loadParcel(pid) : undefined;
+    if (!p) return fail(404, "not_found", "Không tìm thấy kiện.");
+    return p;
+  }
+
+  private opScan(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    const code = typeof op.code === "string" ? op.code : "";
+    const key = normalizeForLookup(code);   // ứng viên lấy theo mã đã chuẩn hóa; quyết định cuối do decide() (cùng bộ ca thử với C#)
+    const cands: Parcel[] = key.length === 0 ? [] : this.db.all<Row>(
+      `SELECT DISTINCT p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id
+       WHERE c.code = ? AND p.is_archived = 0 AND p.is_deleted = 0`, key).map((r) => JSON.parse(r.data as string) as Parcel);
+    const d = decide(cands, code);
+    switch (d.kind) {
+      case "notFound": return { outcome: "notFound", ack: false, message: "Không tìm thấy kiện." };
+      case "ambiguous": return { outcome: "ambiguous", ack: false, message: `${d.candidates} kiện cùng khớp mã này, cần kiểm tra thủ công.` };
+      case "needsManualCheck": return { outcome: "needsManualCheck", ack: false, message: `Trạng thái "${d.order?.status}": cần kiểm tra thủ công.`, parcel: d.order };
+      case "alreadyReceived": {
+        const o = d.order as Parcel;
+        this.db.run("INSERT INTO scans(parcel_id, device_id, at, outcome) VALUES (?,?,?,?)", o.id, dev.deviceId, Date.now(), "alreadyReceived");
+        const who = this.db.first<Row>(
+          `SELECT d.name AS name, a.at AS at FROM audit_log a JOIN devices d ON d.device_id = a.device_id
+           WHERE a.parcel_id = ? AND a.action = 'scan.receive' ORDER BY a.id DESC LIMIT 1`, o.id);
+        return {
+          outcome: "alreadyReceived", ack: true, message: "Kiện đã nhận trước đó.", parcel: o,
+          receivedBy: who?.name ?? null, receivedAt: o.recvDate || (who ? vnTime(Number(who.at)) : null),
+        };
+      }
+      case "receive": {
+        const o = d.order as Parcel;
+        const prev = o.status;
+        o.status = ReceiveStatus.received;
+        o.recvDate = vnTime(Date.now());
+        const rev = this.writeParcel(o);   // một Durable Object xử lý tuần tự + giao dịch: không thể có hai máy cùng nhận một kiện
+        this.audit(dev.deviceId, "scan.receive", o.id, { status: prev }, { status: o.status, recvDate: o.recvDate });
+        this.db.run("INSERT INTO scans(parcel_id, device_id, at, outcome) VALUES (?,?,?,?)", o.id, dev.deviceId, Date.now(), "received");
+        return { outcome: "received", ack: true, message: "Đã nhận kiện.", parcel: this.toWire(o, rev, Date.now()), receivedBy: dev.name, receivedAt: o.recvDate };
+      }
+    }
+  }
+
+  private opSetStatus(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    const status = typeof op.status === "string" ? op.status : "";
+    if (!VALID_STATUS.has(status)) return fail(422, "invalid", "Trạng thái không hợp lệ.");
+    return this.opMutate(op, dev, "setStatus", (p) => {
+      if (typeof op.expectedStatus === "string" && p.status !== op.expectedStatus)
+        fail(409, "conflict", `Trạng thái hiện tại là "${p.status}", không phải "${op.expectedStatus}". Tải lại rồi thử lại.`);
+      p.status = status;
+      if (status === ReceiveStatus.received && p.recvDate === "") p.recvDate = vnTime(Date.now());
+    });
+  }
+
+  private opEditNote(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    return this.opMutate(op, dev, "editNote", (p) => {
+      if (op.note !== undefined) p.note = this.text(op.note, 2000);
+      if (op.userNote !== undefined) p.userNote = this.text(op.userNote, 2000);
+    });
+  }
+
+  private opEditCell(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    const field = typeof op.field === "string" ? op.field : "";
+    if (!EDITABLE_CELLS.has(field)) return fail(422, "invalid", `Ô không được sửa: ${field}`);
+    return this.opMutate(op, dev, "editCell", (p) => {
+      const rec = p as unknown as Record<string, unknown>;
+      rec[field] = field === "price" ? Number(op.value) || 0 : this.text(op.value, 2000);
+    });
+  }
+
+  /** Đọc kiện → áp thay đổi → ghi + nhật ký (trước/sau). */
+  private opMutate(op: Record<string, unknown>, dev: Device, action: string, apply: (p: Parcel) => void): Record<string, unknown> {
+    const p = this.need(op.id);
+    const before = JSON.parse(JSON.stringify(p)) as Parcel;
+    apply(p);
+    const rev = this.writeParcel(p);
+    this.audit(dev.deviceId, action, p.id, diffOf(before, p, "before"), diffOf(before, p, "after"));
+    return { parcel: this.toWire(p, rev, Date.now()) };
+  }
+
+  // ===================================================== nhập đơn
+  private async importParcels(b: Record<string, unknown>, _dev: Device | null): Promise<Response> {
+    const source = typeof b.source === "string" ? b.source : "";
+    if (!["sheet", "file", "folder", "salework"].includes(source)) return fail(422, "invalid", "Nguồn nhập không hợp lệ.");
+    const list = Array.isArray(b.parcels) ? b.parcels : fail(422, "invalid", "Thiếu danh sách kiện.");
+    if (list.length > 500) fail(422, "invalid", "Tối đa 500 kiện mỗi lần.");
+    if (this.quotaSnapshot(false).level === "stop") fail(429, "quota_exceeded", "Hết hạn mức hôm nay: nhập đơn tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
+
+    // phần bất đồng bộ (băm) làm trước, phần ghi chạy trong một giao dịch
+    const prepared: { p: Parcel; hash: string }[] = [];
+    const rejected: { id: string; reason: string }[] = [];
+    for (const raw of list) {
+      const v = parseParcel(raw);
+      if (!v.ok) { rejected.push({ id: typeof (raw as { id?: unknown })?.id === "string" ? (raw as { id: string }).id : "", reason: v.reason }); continue; }
+      const given = typeof (raw as { hash?: unknown }).hash === "string" ? (raw as { hash: string }).hash : "";
+      prepared.push({ p: v.parcel, hash: given || (await sha256Hex(canonical(v.parcel))) });
+    }
+
+    let added = 0, updated = 0, unchanged = 0;
+    this.ctx.storage.transactionSync(() => {
+      for (const { p, hash } of prepared) {
+        const ex = this.db.first<Row>("SELECT data, src_hash FROM parcels WHERE id = ?", p.id);
+        if (!ex) { this.writeParcel(p, hash); added++; continue; }
+        if (ex.src_hash === hash) { unchanged++; continue; }
+        const merged = mergeImport(JSON.parse(ex.data as string) as Parcel, p);
+        this.writeParcel(merged, hash);
+        updated++;
+      }
+      const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
+      this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at",
+        source, sig, Date.now());
+    });
+    if (added + updated > 0) this.broadcast();
+    return json({ added, updated, unchanged, rejected });
+  }
+
+  private importState(source: string): Response {
+    const r = this.db.first<Row>("SELECT signature, last_run_at FROM import_state WHERE source = ?", source);
+    const n = Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM parcels")?.n ?? 0);
+    return json({ signature: r?.signature ?? "", lastRunAt: r ? Number(r.last_run_at) : 0, parcelCount: n });
+  }
+
+  // ===================================================== ảnh
+  private async putPhoto(req: Request, url: URL, photoId: string, dev: Device): Promise<Response> {
+    if (!PHOTO_ID.test(photoId)) return fail(422, "invalid", "Mã ảnh không hợp lệ.");
+    const parcelId = url.searchParams.get("parcelId") ?? "";
+    const kind = url.searchParams.get("kind") === "thumb" ? "thumb" : "full";
+    const mime = (url.searchParams.get("mime") ?? "image/jpeg").toLowerCase();
+    if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") return fail(422, "invalid", "Chỉ nhận ảnh JPEG, PNG hoặc WebP.");
+    if (dev.kind === "pc") return fail(403, "forbidden", "Chỉ điện thoại mới được tải ảnh lên.");
+    const parcel = this.loadParcel(parcelId);
+    if (!parcel) return fail(404, "not_found", "Không tìm thấy kiện.");
+    const existing = this.db.first<Row>("SELECT device_id, parcel_id FROM photos WHERE photo_id = ?", photoId);
+    if (existing && existing.parcel_id !== parcelId) return fail(409, "conflict", "Mã ảnh đã thuộc kiện khác.");
+    if (!existing) {
+      const scan = this.db.first<Row>(
+        "SELECT at FROM scans WHERE parcel_id = ? AND device_id = ? AND outcome IN ('received','alreadyReceived') ORDER BY at DESC LIMIT 1", parcelId, dev.deviceId);
+      if (!scan || Date.now() - Number(scan.at) > SCAN_PHOTO_WINDOW_MS)
+        return fail(409, "conflict", "Chỉ lưu ảnh cho kiện vừa được quét xác nhận đúng một kiện bởi chính thiết bị này.");
+    }
+    const bytes = await req.arrayBuffer();
+    if (bytes.byteLength === 0) return fail(422, "invalid", "Ảnh rỗng.");
+    if (bytes.byteLength > MAX_PHOTO_BYTES) return fail(413, "invalid", "Ảnh quá lớn (tối đa 1 MB sau khi thu nhỏ).");
+    const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) => x.toString(16).padStart(2, "0")).join("");
+    await this.env.IMAGES.put(`${kind === "thumb" ? "t" : "p"}/${photoId}`, bytes, { httpMetadata: { contentType: mime } });
+    const now = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at) VALUES (?,?,?,?,?,?,?)",
+        photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, now);
+      else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ? WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ? WHERE photo_id = ?", bytes.byteLength, mime, photoId);
+      if (kind === "full" && parcel.photoId !== photoId) {
+        const before = parcel.photoId;
+        parcel.photoId = photoId;
+        this.writeParcel(parcel);
+        this.audit(dev.deviceId, "photo.attach", parcelId, { photoId: before }, { photoId });
+      }
+    });
+    this.broadcast();
+    return json({ ok: true, photoId, sha256: sha });
+  }
+
+  private async getPhoto(url: URL, photoId: string): Promise<Response> {
+    const row = this.db.first<Row>("SELECT mime, deleted_at FROM photos WHERE photo_id = ?", photoId);
+    if (!row) return fail(404, "not_found", "Không thấy ảnh.");
+    if (Number(row.deleted_at) > 0) return fail(410, "gone", "Ảnh đã hết hạn lưu (tự xóa sau 90 ngày).");
+    const wantThumb = url.searchParams.get("size") === "thumb";
+    let obj = wantThumb ? await this.env.IMAGES.get(`t/${photoId}`) : null;
+    if (!obj) obj = await this.env.IMAGES.get(`p/${photoId}`);
+    if (!obj) return fail(404, "not_found", "Không thấy tệp ảnh.");
+    return new Response(obj.body, { headers: { "Content-Type": String(row.mime), "Cache-Control": "private, max-age=2592000" } });
+  }
+
+  private parcelPhotos(parcelId: string): Response {
+    const rows = this.db.all<Row>(
+      `SELECT p.photo_id, p.taken_at, p.deleted_at, d.name FROM photos p LEFT JOIN devices d ON d.device_id = p.device_id
+       WHERE p.parcel_id = ? ORDER BY p.taken_at DESC`, parcelId);
+    return json(rows.map((r) => ({ photoId: r.photo_id, takenAt: r.taken_at, deviceName: r.name ?? "", expired: Number(r.deleted_at) > 0 })));
+  }
+
+  // ===================================================== thời gian thực
+  private async upgradeWs(req: Request, url: URL): Promise<Response> {
+    if (req.headers.get("Upgrade") !== "websocket") return fail(426, "invalid", "Cần nâng cấp WebSocket.");
+    const dev = this.deviceByToken(url.searchParams.get("token") ?? "");
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1], [dev.deviceId]);
+    pair[1].send(JSON.stringify({ t: "rev", rev: this.currentRev() }));
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer): void { /* ping/pong do auto-response xử lý */ }
+  webSocketClose(ws: WebSocket, code: number): void { try { ws.close(code, "bye"); } catch { /* đã đóng */ } }
+
+  private broadcast(): void {
+    const msg = JSON.stringify({ t: "rev", rev: this.currentRev() });
+    for (const ws of this.ctx.getWebSockets()) { try { ws.send(msg); } catch { /* socket hỏng */ } }
+  }
+
+  // ===================================================== hạn mức
+  private dayKey(): string { return new Date().toISOString().slice(0, 10); }
+
+  private countRequest(): void {
+    this.pendingReq++;
+    const now = Date.now();
+    if (this.pendingReq >= 10 || now - this.lastFlush > 60_000) this.flushQuota();
+  }
+
+  private flushQuota(): void {
+    const day = this.dayKey();
+    const w = this.db.rowsWritten - this.flushedWritten, r = this.db.rowsRead - this.flushedRead;
+    // ghi chính bảng hạn mức cũng tốn khoảng 2 hàng ghi
+    this.db.run(`INSERT INTO quota(day, requests, rows_written, rows_read) VALUES (?,?,?,?)
+      ON CONFLICT(day) DO UPDATE SET requests = requests + excluded.requests, rows_written = rows_written + excluded.rows_written, rows_read = rows_read + excluded.rows_read`,
+      day, this.pendingReq, w + 2, r);
+    this.flushedWritten = this.db.rowsWritten; this.flushedRead = this.db.rowsRead;
+    this.pendingReq = 0; this.lastFlush = Date.now();
+  }
+
+  private quotaSnapshot(flush: boolean): Record<string, unknown> & { level: string } {
+    if (flush) this.flushQuota();
+    const day = this.dayKey();
+    const row = this.db.first<Row>("SELECT requests, rows_written, rows_read FROM quota WHERE day = ?", day);
+    const requests = Number(row?.requests ?? 0) + this.pendingReq;
+    const written = Number(row?.rows_written ?? 0) + (this.db.rowsWritten - this.flushedWritten);
+    const read = Number(row?.rows_read ?? 0) + (this.db.rowsRead - this.flushedRead);
+    const frac = Math.max(requests / LIMITS.requests, written / LIMITS.rowsWritten, read / LIMITS.rowsRead);
+    const level = frac >= 0.98 ? "stop" : frac >= 0.7 ? "warn" : "ok";
+    return {
+      day, requests: { used: requests, limit: LIMITS.requests }, rowsWritten: { used: written, limit: LIMITS.rowsWritten },
+      rowsRead: { used: read, limit: LIMITS.rowsRead }, level,
+    };
+  }
+
+  // ===================================================== dọn định kỳ (Cron)
+  async cleanup(): Promise<{ photosExpired: number; opsPurged: number }> {
+    const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
+    const cutoff = Date.now() - days * DAY_MS;
+    const old = this.db.all<Row>("SELECT photo_id, parcel_id FROM photos WHERE deleted_at = 0 AND taken_at < ? LIMIT 200", cutoff);
+    for (const p of old) {
+      await this.env.IMAGES.delete([`p/${p.photo_id}`, `t/${p.photo_id}`]);
+      this.db.run("UPDATE photos SET deleted_at = ? WHERE photo_id = ?", Date.now(), p.photo_id as string);
+      this.audit("system", "photo.expire", p.parcel_id as string, { photoId: p.photo_id }, null);
+    }
+    const purged = this.db.run("DELETE FROM ops_done WHERE at < ?", Date.now() - 7 * DAY_MS);
+    this.flushQuota();
+    return { photosExpired: old.length, opsPurged: purged };
+  }
+}
+
+/** Chuẩn hóa mã để tra bảng `parcel_codes` (giống `normalize` của lõi). */
+function normalizeForLookup(code: string): string {
+  return code.replace(/[\s​﻿]+/gu, "").toUpperCase();
+}
+
+function diffOf(before: Parcel, after: Parcel, side: "before" | "after"): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const b = before as unknown as Record<string, unknown>, a = after as unknown as Record<string, unknown>;
+  for (const k of Object.keys(a)) if (JSON.stringify(b[k]) !== JSON.stringify(a[k])) out[k] = side === "before" ? b[k] : a[k];
+  return out;
+}
+
+/** Trường do người dùng sửa trên cloud không bị nhập đè (cloud/API.md mục 7). */
+function mergeImport(existing: Parcel, incoming: Parcel): Parcel {
+  const m: Parcel = { ...incoming };
+  m.userNote = existing.userNote;
+  m.isWatchlist = existing.isWatchlist;
+  m.watchlistReason = existing.watchlistReason;
+  if (existing.photoId) m.photoId = existing.photoId;
+  m.isArchived = existing.isArchived; m.archivedAt = existing.archivedAt;
+  m.isDeleted = existing.isDeleted; m.deletedAt = existing.deletedAt; m.deletedFrom = existing.deletedFrom;
+  if (existing.status === ReceiveStatus.received) { m.status = existing.status; m.recvDate = existing.recvDate; }
+  return m;
+}

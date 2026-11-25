@@ -1,0 +1,15 @@
+﻿{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "app-backend",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "SHOP", "class_name": "ShopDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ShopDO"] }],
+  "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "app-images" }],
+  "triggers": { "crons": ["17 20 * * *"] },
+  "vars": { "PHOTO_RETENTION_DAYS": "90" }
+}
+

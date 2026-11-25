@@ -265,6 +265,128 @@ final class AIChatTests: XCTestCase {
         XCTAssertEqual(models[0], models[1])
     }
 
+    // MARK: số liệu tính sẵn, chống vòng lặp, chờ ngắn, Gemini
+
+    func testSnapshotHasCurrentCountsAndNoPersonalData() {
+        let snap = tools([
+            row(c: "VN001", o: "SHP1", q: 2, rv: true, rcd: "25/11/2026 09:00:00", nt: "Gọi 0912345678"),
+            row(c: "VN002", o: "SHP2", rv: true, rcd: "25/11/2026 11:30"),
+            row(c: "VN003", o: "SHP3", rv: true, rcd: "24/11/2026 10:00:00"),
+            row(c: "VN004", o: "SHP4", n: "Quần jean", q: 3, rv: false, pr: 100000),
+        ]).snapshot()
+        let j = obj(snap)
+        XCTAssertEqual(j["activeOrders"] as? Int, 4)
+        XCTAssertEqual((j["waiting"] as? [String: Any])?["count"] as? Int, 1)
+        XCTAssertEqual((j["receivedToday"] as? [String: Any])?["count"] as? Int, 2)
+        XCTAssertEqual((j["receivedYesterday"] as? [String: Any])?["count"] as? Int, 1)
+        XCTAssertEqual((j["received7days"] as? [String: Any])?["count"] as? Int, 3)
+        XCTAssertEqual(((j["topWaitingProducts"] as? [[String: Any]])?.first)?["name"] as? String, "Quần jean")
+        XCTAssertFalse(snap.contains("0912345678"))
+        XCTAssertLessThan(snap.count, 1500)
+    }
+
+    func testSystemPromptCarriesSnapshotSoSimpleQuestionNeedsNoTool() async throws {
+        var systems: [String] = []
+        let f = Fake { _, _, req in
+            systems.append(((req["messages"] as? [[String: Any]])?.first?["content"] as? String) ?? "")
+            return (200, self.ok("Đang chờ 1 kiện."))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m")]
+        let a = try await service(f, one).ask("đang chờ bao nhiêu đơn?")
+        XCTAssertEqual(a.text, "Đang chờ 1 kiện.")
+        XCTAssertEqual(systems.count, 1)
+        XCTAssertTrue(systems[0].contains("SỐ LIỆU HIỆN TẠI"))
+        XCTAssertTrue(systems[0].contains("receivedToday"))
+        XCTAssertTrue(systems[0].contains("CÓ TRONG APP"))
+    }
+
+    func testLastRoundsForbidToolCallsAndEndWithClearError() async {
+        var choices: [String] = []
+        var n = 0
+        let f = Fake { _, _, req in
+            n += 1
+            choices.append((req["tool_choice"] as? String) ?? "")
+            return (200, self.toolCall("count_orders", "{\"from\":\"\(n)\"}"))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m")]
+        do { _ = try await service(f, one).ask("đếm đơn"); XCTFail("phải báo lỗi") } catch {}
+        XCTAssertEqual(choices.first, "auto")
+        XCTAssertEqual(Array(choices.suffix(2)), ["none", "none"])
+    }
+
+    func testIdenticalRepeatedToolCallIsNotExecutedTwice() async throws {
+        var turn = 0
+        var toolContents: [String] = []
+        let f = Fake { _, _, req in
+            turn += 1
+            if turn == 1 { return (200, self.toolCall("count_orders", "{}")) }
+            if turn == 2 { return (200, self.toolCall("count_orders", "{}")) }
+            toolContents = ((req["messages"] as? [[String: Any]]) ?? []).filter { ($0["role"] as? String) == "tool" }.map { ($0["content"] as? String) ?? "" }
+            return (200, self.ok("xong"))
+        }
+        let one = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m")]
+        let a = try await service(f, one).ask("đếm đơn")
+        XCTAssertEqual(a.text, "xong")
+        XCTAssertEqual(a.trace.filter { $0.hasPrefix("count_orders") }.count, 1)
+        XCTAssertEqual(toolContents.count, 2)
+        XCTAssertTrue(toolContents[0].contains("total"))
+        XCTAssertTrue(toolContents[1].contains("Đã gọi công cụ này"))
+    }
+
+    func testShortPerMinuteLimitWaitsAndRetriesSameModel() async throws {
+        let wait = #"{"error":{"message":"Rate limit reached on tokens per minute (TPM). Please try again in 300ms."}}"#
+        var n = 0
+        let f = Fake { _, _, _ in
+            n += 1
+            return n == 1 ? (429, wait) : (200, self.ok("xong"))
+        }
+        let eps = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m1"),
+                   AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m2")]
+        let a = try await service(f, eps).ask("đếm đơn")
+        XCTAssertEqual(a.text, "xong")
+        XCTAssertEqual(f.calls.map { $0.split(separator: "|").last.map(String.init) ?? "" }, ["m1", "m1"])
+    }
+
+    func testLongWaitLimitStillFallsBackToNextModel() async throws {
+        let wait = #"{"error":{"message":"Rate limit. Please try again in 45s."}}"#
+        let f = Fake { _, m, _ in m == "m1" ? (429, wait) : (200, self.ok("từ m2")) }
+        let eps = [AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m1"),
+                   AIEndpoint(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: "k", model: "m2")]
+        let a = try await service(f, eps).ask("đếm đơn")
+        XCTAssertEqual(a.text, "từ m2")
+        XCTAssertEqual(f.calls.count, 2)
+    }
+
+    func testGeminiToolsLoseEmptyPropertiesAndUnsupportedKeys() {
+        var body: [String: Any] = ["tools": [
+            ["type": "function", "function": ["name": "a", "parameters": ["type": "object", "properties": [String: Any]()]]],
+            ["type": "function", "function": ["name": "b", "parameters": ["type": "object", "additionalProperties": false,
+                "properties": ["x": ["type": "string", "default": "1"]]]]],
+        ]]
+        AIChatService.sanitizeToolsForGemini(&body)
+        let tools = body["tools"] as? [[String: Any]] ?? []
+        XCTAssertNil((tools[0]["function"] as? [String: Any])?["parameters"])
+        let b = String(data: (try? JSONSerialization.data(withJSONObject: (tools[1]["function"] as? [String: Any])?["parameters"] ?? [:])) ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertFalse(b.contains("additionalProperties"))
+        XCTAssertFalse(b.contains("default"))
+        XCTAssertTrue(b.contains("\"x\""))
+    }
+
+    func testBadRequestWithoutReadableReasonShowsRawBodyAndHidesOrgIds() {
+        let ep = AIEndpoint(provider: "gemini", baseURL: AIEndpoint.geminiBaseURL, apiKey: "k", model: "g")
+        let msg = AIChatService.describe(ep, 400, "Unknown field at tools[3] org_01abcDEF123 oops")
+        XCTAssertTrue(msg.contains("Unknown field at tools[3]"))
+        XCTAssertFalse(msg.contains("org_01abcDEF123"))
+        XCTAssertTrue(msg.contains("org_…"))
+    }
+
+    func testAppGuideHasScreenMapDataDictionaryAndSampleQuestions() {
+        let t = tools()
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"man_hinh"}"#).json.contains("Lịch sử"))
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"y_nghia_du_lieu"}"#).json.contains("Đang chờ"))
+        XCTAssertTrue(t.execute(name: "app_guide", argsJSON: #"{"topic":"cau_hoi_mau"}"#).json.contains("list_orders"))
+    }
+
     func testListRowsAreCompactNoEmptyFields() {
         var r = OrderRow(k: "m", c: "T1", o: "O1", p: "Shopee", n: "Áo", co: "", sz: "", q: 1, rd: "", due: 0, st: "Chưa trả")
         r.pr = 1000

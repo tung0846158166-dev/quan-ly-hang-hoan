@@ -115,9 +115,19 @@ public final class AIChatService {
         - Dữ liệu là bản điện thoại nhận từ máy tính ở lần đồng bộ gần nhất, có thể chưa mới nhất.
         - Liệt kê đơn: ghi mã đơn + mã vận đơn (người dùng chạm được bên dưới); kết quả bị cắt (truncated) thì nói rõ.
         - Câu mơ hồ: chọn cách hiểu hợp lý, làm luôn, nói rõ đã hiểu thế nào.
-        - Hỏi cách dùng app: gọi app_guide, không bịa tính năng. Bạn chỉ ĐỌC dữ liệu, không sửa/xóa/nhận hàng.
+        - Hỏi cách dùng/ý nghĩa/màn hình nào: gọi app_guide (topic man_hinh, y_nghia_du_lieu, cau_hoi_mau, quet...), không bịa tính năng. Bạn chỉ ĐỌC dữ liệu, không sửa/xóa/nhận hàng.
         - Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.
+        CÓ TRONG APP: 5 tab Tổng quan, Quét, Đơn, Lịch sử, Cài đặt (mã phòng, đồng bộ, thông báo, ảnh, Trợ lý AI); nút ✨ hỏi AI; ảnh quét lưu trên điện thoại.
+        VÍ DỤ: 'còn bao nhiêu đơn chưa về/tổng tiền' → dùng số liệu có sẵn. 'đơn nào quá hạn/báo đỏ' → list_orders(status Đang chờ, alert red). 'hôm nay về những đơn nào' → list_orders(status Đã nhận, date_field recv, from=to=today). 'sản phẩm hoàn nhiều nhất tháng này' → product_stats. 'tuần này so với tuần trước' → compare_periods. 'sàn/hãng nào nhiều' → aggregate(group_by platform|carrier). 'tìm đơn SPXVN...' → find_order.
+        \(snapshotBlock())
         """
+    }
+
+    /// Số liệu hiện tại đính sẵn: câu hỏi chỉ cần các số này thì trả lời luôn, KHÔNG gọi công cụ (đỡ tốn token/vòng).
+    private func snapshotBlock() -> String {
+        let snap = tools.snapshot()
+        if snap.isEmpty { return "" }
+        return "SỐ LIỆU HIỆN TẠI (tính sẵn, đồng, theo kiện): " + snap + "\n- Chỉ cần các số này thì trả lời NGAY, không gọi công cụ. Cần danh sách/lọc khác/chi tiết/kỳ khác thì gọi công cụ ĐỦ trong một lượt rồi trả lời luôn."
     }
 
     public func ask(_ question: String) async throws -> AIAnswer {
@@ -134,8 +144,10 @@ public final class AIChatService {
         }
         defer { tools.releaseCache() }
 
-        for _ in 0..<Self.maxRounds {
-            var body: [String: Any] = ["messages": msgs, "tools": toolsObj, "tool_choice": "auto", "temperature": 0.1]
+        var done = Set<String>()
+        for round in 0..<Self.maxRounds {
+            // 2 vòng cuối: cấm gọi thêm công cụ, buộc chốt đáp án từ dữ liệu đã có.
+            var body: [String: Any] = ["messages": msgs, "tools": toolsObj, "tool_choice": round >= Self.maxRounds - 2 ? "none" : "auto", "temperature": 0.1]
             Self.shrinkToBudget(&body)
             let (message, ep) = try await postWithFallback(body)
             if !used.contains(ep.label) { used.append(ep.label) }
@@ -158,10 +170,16 @@ public final class AIChatService {
                 let fn = call["function"] as? [String: Any]
                 let name = (fn?["name"] as? String) ?? ""
                 let args = (fn?["arguments"] as? String) ?? "{}"
-                let result = tools.execute(name: name, argsJSON: args)
-                refs += result.refs
-                trace.append("\(name)(\(args))")
-                let json = result.json.count > Self.maxToolChars ? String(result.json.prefix(Self.maxToolChars)) + "…(đã cắt bớt)" : result.json
+                let json: String
+                if !done.insert(name + "|" + args).inserted {
+                    // Gọi lại y hệt: không chạy lại, không gửi lại kết quả lớn (đã có ở trên).
+                    json = #"{"note":"Đã gọi công cụ này với cùng tham số ở trên; dùng kết quả đó để trả lời."}"#
+                } else {
+                    let result = tools.execute(name: name, argsJSON: args)
+                    refs += result.refs
+                    trace.append("\(name)(\(args))")
+                    json = result.json.count > Self.maxToolChars ? String(result.json.prefix(Self.maxToolChars)) + "…(đã cắt bớt)" : result.json
+                }
                 msgs.append(["role": "tool", "tool_call_id": id, "name": name, "content": json])
             }
         }
@@ -233,11 +251,19 @@ public final class AIChatService {
             if let until = restUntil[ep.label], until > now() { continue }
             var attempt = body
             attempt["model"] = ep.model
-            for pass in 0..<2 {
+            if ep.provider == "gemini" { Self.sanitizeToolsForGemini(&attempt) }
+            var waited = false
+            for pass in 0..<3 {
                 do {
                     let msg = try await post(ep, attempt)
                     return (msg, ep)
                 } catch let e as AIError {
+                    // Chạm giới hạn theo PHÚT và máy chủ báo chờ chỉ vài giây: chờ rồi thử lại đúng mô hình này, đừng bỏ sang mô hình khác.
+                    if e.statusCode == 429 && !waited, let wait = Self.shortRetryDelay(e) {
+                        waited = true
+                        try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                        continue
+                    }
                     // 413: yêu cầu vượt giới hạn kích thước của mô hình này: thử lại NGAY với chỉ các công cụ cốt lõi trước khi bỏ sang mô hình khác.
                     if e.statusCode == 413 && pass == 0 && Self.keepCoreToolsOnly(&attempt) { continue }
                     if e.statusCode != 0 {
@@ -271,6 +297,54 @@ public final class AIChatService {
         var msg = "Cả \(endpoints.count) mô hình đều không dùng được lúc này:"
         for (ep, e) in errors { msg += "\n• \(ep.label): \(e.message)" }
         throw AIError(msg)
+    }
+
+    /// Thời gian chờ tối đa (giây) cho một lần chờ-rồi-thử-lại khi chạm giới hạn ngắn.
+    static var shortRetryMax: TimeInterval = 8
+
+    /// Máy chủ báo "try again in 659ms" / "1.5s" (≤ shortRetryMax) thì trả số giây cần chờ (+0,25 giây), ngược lại nil.
+    static func shortRetryDelay(_ e: AIError) -> TimeInterval? {
+        var secs: Double?
+        if let ra = e.retryAfter { secs = ra }
+        else if let re = try? NSRegularExpression(pattern: #"try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(ms|s|m)\b"#, options: [.caseInsensitive]),
+                let m = re.firstMatch(in: e.body, range: NSRange(e.body.startIndex..., in: e.body)),
+                let r1 = Range(m.range(at: 1), in: e.body), let r2 = Range(m.range(at: 2), in: e.body),
+                let v = Double(e.body[r1]) {
+            switch e.body[r2].lowercased() {
+            case "ms": secs = v / 1000
+            case "m": secs = v * 60
+            default: secs = v
+            }
+        }
+        guard let s = secs, s <= shortRetryMax else { return nil }
+        return max(0, s) + 0.25
+    }
+
+    /// Gemini kén lược đồ công cụ: bỏ `properties` rỗng và các khóa nó thường không nhận (additionalProperties, default).
+    static func sanitizeToolsForGemini(_ body: inout [String: Any]) {
+        guard let tools = body["tools"] as? [[String: Any]] else { return }
+        func strip(_ node: Any) -> Any {
+            if var d = node as? [String: Any] {
+                d.removeValue(forKey: "additionalProperties")
+                d.removeValue(forKey: "default")
+                for (k, v) in d { d[k] = strip(v) }
+                return d
+            }
+            if let a = node as? [Any] { return a.map { strip($0) } }
+            return node
+        }
+        body["tools"] = tools.map { tool -> [String: Any] in
+            var t = tool
+            if var fn = t["function"] as? [String: Any] {
+                if var p = fn["parameters"] as? [String: Any] {
+                    p = (strip(p) as? [String: Any]) ?? p
+                    if let props = p["properties"] as? [String: Any], props.isEmpty { fn.removeValue(forKey: "parameters") }
+                    else { fn["parameters"] = p }
+                }
+                t["function"] = fn
+            }
+            return t
+        }
     }
 
     static func shouldFallback(_ code: Int) -> Bool {
@@ -315,6 +389,12 @@ public final class AIChatService {
             if let o = obj as? [String: Any], let e = o["error"] as? [String: Any], let m = e["message"] as? String { detail = m }
             else if let a = obj as? [[String: Any]], let e = a.first?["error"] as? [String: Any], let m = e["message"] as? String { detail = m }
         }
+        if detail.isEmpty {
+            // Không đọc được lý do dạng JSON: hiện nguyên văn (gọn lại), che mã tổ chức.
+            let raw = body.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            detail = raw.replacingOccurrences(of: #"org_[A-Za-z0-9]+"#, with: "org_…", options: .regularExpression)
+        }
+        detail = detail.replacingOccurrences(of: #"org_[A-Za-z0-9]+"#, with: "org_…", options: .regularExpression)
         let who = ep.provider
         let head: String
         switch code {

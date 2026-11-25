@@ -159,8 +159,8 @@ public final class AIOrderTools {
         if has(["trung"]) { want.insert("duplicates") }
         if has(["lich su quet", "da quet", "luot quet", "quet nhieu", "lich su"]) { want.insert("scan_history") }
         if has(["ket noi", "sao luu", "backup", "thong bao", "may tinh", "trang thai he thong"]) { want.insert("system_status") }
-        if has(["lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung app"]) { want.insert("app_guide") }
-        if want.count == 3 { want.formUnion(["overview", "find_order"]) }
+        if has(["lam sao", "o dau", "huong dan", "cach ", "tinh nang", "cai dat", "dung app", "man hinh", "tab ", "nut ", "la gi", "y nghia", "bam vao"]) { want.insert("app_guide") }
+        if want.count == 3 { want.insert("find_order") }   // tổng quan đã có sẵn trong số liệu hiện tại của lời nhắc hệ thống
         let picked = all.filter { want.contains((($0["function"] as? [String: Any])?["name"] as? String) ?? "") }
         guard JSONSerialization.isValidJSONObject(picked),
               let out = try? JSONSerialization.data(withJSONObject: picked, options: [.withoutEscapingSlashes]),
@@ -477,6 +477,41 @@ public final class AIOrderTools {
         res["watching"] = active.filter { $0.wl }.count
         res["archivedOrders"] = load().filter { $0.isArchived }.count
         return AIToolResult(json: Self.json(res))
+    }
+
+    /// Ảnh chụp nhanh SỐ LIỆU HIỆN TẠI (nhỏ) gắn sẵn vào lời nhắc hệ thống: câu hỏi phổ biến trả lời được NGAY, không cần vòng gọi công cụ.
+    /// Chỉ số tổng hợp và tên sản phẩm; không có tên/SĐT/địa chỉ. Không có dữ liệu thì vẫn trả số 0.
+    public func snapshot() -> String {
+        let today = calendar.startOfDay(for: now())
+        let day7 = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        let active = load().filter { !$0.isArchived }
+        let waiting = active.filter { Self.isWaiting($0) }
+        func receivedDay(_ r: OrderRow) -> Date? {
+            guard r.rv, let d = OrderStats.parseDate(r.rcd, calendar: calendar) else { return nil }
+            return calendar.startOfDay(for: d)
+        }
+        func box(_ rs: [OrderRow]) -> [String: Any] { ["count": rs.count, "value": Self.totalValue(rs)] }
+        let rToday = active.filter { receivedDay($0) == today }
+        let rYesterday = active.filter { receivedDay($0) == yesterday }
+        let r7 = active.filter { if let d = receivedDay($0) { return d >= day7 && d <= today } else { return false } }
+        var qtyByProduct: [String: Int] = [:]
+        for r in waiting where !r.n.isEmpty { qtyByProduct[r.n, default: 0] += max(r.q, 1) }
+        let top = qtyByProduct.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(5)
+            .map { ["name": Self.maskPhones(String($0.key.prefix(40))), "qty": $0.value] as [String: Any] }
+        var res: [String: Any] = [:]
+        res["activeOrders"] = active.count
+        res["waiting"] = box(waiting)
+        res["waitingByPlatform"] = group(waiting) { Self.label($0.p) }
+        res["waitingByCarrier"] = group(waiting) { Self.label($0.cr) }
+        res["red24h"] = box(waiting.filter { level($0) == .red })
+        res["yellow12h"] = box(waiting.filter { level($0) == .yellow })
+        res["receivedToday"] = box(rToday)
+        res["receivedYesterday"] = box(rYesterday)
+        res["received7days"] = box(r7)
+        res["watching"] = active.filter { $0.wl }.count
+        if !top.isEmpty { res["topWaitingProducts"] = Array(top) }
+        return Self.json(res)
     }
 
     private func count(_ a: [String: Any]) -> AIToolResult {
@@ -1040,6 +1075,14 @@ public final class AIOrderTools {
          "Tab Lịch sử liệt kê các lượt quét, trạng thái đã được máy tính xác nhận hay còn chờ gửi. Số trên tab là số lượt đang chờ."),
         ("don", "Danh sách đơn",
          "Tab Đơn xem các kiện máy tính gửi sang, lọc theo trạng thái, mở chi tiết đơn (sản phẩm, mã, mốc thời gian, ghi chú, ảnh)."),
+        ("man_hinh", "Các màn hình và việc làm ở mỗi màn",
+         "5 tab: Tổng quan (số đơn đang chờ, cảnh báo vàng/đỏ, nhận hôm nay, đơn cần xử lý); Quét (camera quét mã vận đơn, gửi sang máy tính); Đơn (các kiện máy tính gửi sang, lọc theo trạng thái, mở chi tiết có ảnh quét); Lịch sử (các lượt quét, đã xác nhận hay còn chờ gửi); Cài đặt (mã phòng, máy chủ MQTT riêng, đồng bộ, thông báo, dung lượng ảnh, Trợ lý AI). Nút ✨ ở góc phải dưới mọi màn hình mở hỏi đáp AI."),
+        ("y_nghia_du_lieu", "Ý nghĩa dữ liệu và từ khóa thường gặp",
+         "Kiện = một dòng hoàn. Trạng thái: 'Đang chờ' (chưa về kho), 'Đã nhận' (đã quét nhận). Mỗi kiện có: mã đơn, mã vận đơn, sàn, hãng vận chuyển, sản phẩm (màu, size, số lượng), giá trị, giờ hàng về, ngày nhận, loại đơn, trạng thái trên sàn, ghi chú, đang theo dõi hay không. " +
+         "'Quá hạn/báo đỏ' = chờ quá 24 giờ, 'báo vàng' = quá 12 giờ kể từ lúc hàng về. 'Đơn bom/hủy' = đơn người mua hủy hoặc không nhận. Ảnh quét chỉ nằm trên điện thoại. Không có tên/SĐT/địa chỉ người nhận. Dữ liệu là bản nhận từ máy tính ở lần đồng bộ gần nhất."),
+        ("cau_hoi_mau", "Câu hỏi mẫu và cách trả lời",
+         "Đang chờ bao nhiêu/tổng tiền: số liệu hiện tại. Đơn quá hạn: list_orders(status Đang chờ, alert red). Hôm nay về mấy đơn: count_orders(status Đã nhận, date_field recv, from=to=today). Sản phẩm hoàn nhiều: product_stats. Sàn/hãng/ngày/tháng: aggregate(group_by). " +
+         "So sánh kỳ: compare_periods. Một đơn cụ thể: find_order rồi order_detail. Đơn nhiều kiện: order_groups. Điện thoại/đồng bộ: system_status. Vừa làm gì: recent_activity."),
         ("tro_ly_ai", "Trợ lý AI",
          "Nút ✨ mở cửa sổ hỏi đáp. Khóa API (Groq, Google) và danh sách mô hình nhập ở Cài đặt > Trợ lý AI, lưu trong Keychain của điện thoại. Trợ lý chỉ đọc dữ liệu, không gửi tên, số điện thoại, địa chỉ người nhận. Hết hạn mức mô hình này thì tự chuyển mô hình khác."),
     ]

@@ -228,7 +228,9 @@ public sealed class AiChatService : IAiChat
             if (_restUntil.TryGetValue(ep.Label, out var until) && until > Now()) continue;
             var attempt = (JsonObject)body.DeepClone();
             attempt["model"] = ep.Model;
-            for (var pass = 0; pass < 2; pass++)
+            if (ep.Provider == "gemini") SanitizeToolsForGemini(attempt);
+            var waited = false;
+            for (var pass = 0; pass < 3; pass++)
             {
                 try
                 {
@@ -236,6 +238,13 @@ public sealed class AiChatService : IAiChat
                     return (msg, ep);
                 }
                 catch (OperationCanceledException) { throw; }
+                catch (AiHttpException ex) when (ex.Code == HttpStatusCode.TooManyRequests && !waited && ShortRetryDelay(ex) is { } wait)
+                {
+                    // Chạm giới hạn theo PHÚT và máy chủ báo chờ chỉ vài giây: chờ rồi thử lại đúng mô hình này, đừng bỏ sang mô hình khác.
+                    waited = true;
+                    await Task.Delay(wait, ct).ConfigureAwait(false);
+                    continue;
+                }
                 catch (AiHttpException ex) when (ex.Code == HttpStatusCode.RequestEntityTooLarge && pass == 0 && KeepCoreToolsOnly(attempt))
                 {
                     // 413: yêu cầu vượt giới hạn kích thước của mô hình này: thử lại NGAY với chỉ các công cụ cốt lõi trước khi bỏ sang mô hình khác.
@@ -272,6 +281,45 @@ public sealed class AiChatService : IAiChat
         var sb = new StringBuilder($"Cả {_endpoints.Count} mô hình đều không dùng được lúc này:");
         foreach (var (ep, ex) in errors) sb.Append("\n• ").Append(ep.Label).Append(": ").Append(ex.Message);
         throw new AiException(sb.ToString());
+    }
+
+    /// <summary>Thời gian chờ ngắn (tối đa <see cref="ShortRetryMax"/>) mà máy chủ báo trong 429 ("try again in 659ms" / "in 2.5s" / Retry-After); null nếu không có hoặc quá lâu.</summary>
+    public static TimeSpan ShortRetryMax { get; set; } = TimeSpan.FromSeconds(8);
+
+    private static TimeSpan? ShortRetryDelay(AiHttpException ex)
+    {
+        TimeSpan? d = ex.RetryAfter;
+        if (d is null)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(ex.Body ?? "", @"try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(ms|s|m)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (m.Success && double.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v))
+                d = m.Groups[2].Value.ToLowerInvariant() switch { "ms" => TimeSpan.FromMilliseconds(v), "s" => TimeSpan.FromSeconds(v), _ => TimeSpan.FromMinutes(v) };
+        }
+        if (d is null || d.Value > ShortRetryMax) return null;
+        return d.Value + TimeSpan.FromMilliseconds(250);
+    }
+
+    /// <summary>Gemini (đường OpenAI-compat) từ chối lược đồ công cụ có "properties" rỗng hoặc "additionalProperties": bỏ các phần đó cho yêu cầu gửi Gemini.</summary>
+    public static void SanitizeToolsForGemini(JsonObject body)
+    {
+        if (body["tools"] is not JsonArray tools) return;
+        foreach (var t in tools)
+        {
+            if (t?["function"] is not JsonObject fn || fn["parameters"] is not JsonObject prm) continue;
+            StripUnsupported(prm);
+            if (prm["properties"] is not JsonObject props || props.Count == 0) fn.Remove("parameters");
+        }
+    }
+
+    private static void StripUnsupported(JsonNode? node)
+    {
+        if (node is JsonObject o)
+        {
+            o.Remove("additionalProperties");
+            o.Remove("default");
+            foreach (var kv in o.ToList()) StripUnsupported(kv.Value);
+        }
+        else if (node is JsonArray a) foreach (var x in a) StripUnsupported(x);
     }
 
     /// <summary>Chỉ giữ 3 công cụ cốt lõi. Trả true nếu đã bỏ bớt công cụ (đáng thử lại).</summary>
@@ -349,6 +397,10 @@ public sealed class AiChatService : IAiChat
             detail = root?["error"]?["message"]?.GetValue<string>() ?? (root as JsonArray)?[0]?["error"]?["message"]?.GetValue<string>() ?? "";
         }
         catch { /* bỏ qua */ }
+        // Không có câu lý do đọc được (đa số do định dạng lạ): hiện nguyên văn đoạn đầu để biết máy chủ chê gì.
+        if (string.IsNullOrWhiteSpace(detail) && !string.IsNullOrWhiteSpace(body))
+            detail = System.Text.RegularExpressions.Regex.Replace(body.Trim(), @"\s+", " ");
+        detail = System.Text.RegularExpressions.Regex.Replace(detail, @"org_[A-Za-z0-9]+", "org_…");   // không hiện mã tổ chức
         var who = ep.Provider;
         var head = code switch
         {

@@ -1,3 +1,4 @@
+import { fromWorkersAi, toWorkersAi, workersAiErrorStatus } from "./workersai";
 import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
@@ -769,7 +770,7 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   private aiStatus(): Response {
-    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, nvidia: !!this.env.NVIDIA_API_KEY, cloudflare: !!(this.env.CF_AI_TOKEN && this.env.CF_ACCOUNT_ID), usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
+    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, nvidia: !!this.env.NVIDIA_API_KEY, cloudflare: !!this.workersAiBinding(), usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
   }
 
   /**
@@ -778,7 +779,7 @@ export class ShopDO extends DurableObject<Env> {
    */
   private async aiProxy(req: Request, provider: AiProvider): Promise<Response> {
     const key = provider === "groq" ? this.env.GROQ_API_KEY : provider === "gemini" ? this.env.GEMINI_API_KEY
-      : provider === "nvidia" ? this.env.NVIDIA_API_KEY : (this.env.CF_ACCOUNT_ID ? this.env.CF_AI_TOKEN : undefined);
+      : provider === "nvidia" ? this.env.NVIDIA_API_KEY : (this.workersAiBinding() ? "binding" : undefined);
     if (!key) return fail(503, "ai_not_configured", "Chưa cấu hình khóa AI trên cloud (chủ cửa hàng đặt khóa bằng wrangler secret put).");
     if (this.aiUsedToday() >= this.aiLimit())
       return fail(429, "ai_quota", "Hôm nay đã dùng hết số lượt hỏi AI cho cả cửa hàng. Thử lại sau 07:00 sáng mai (giờ Việt Nam).");
@@ -787,8 +788,8 @@ export class ShopDO extends DurableObject<Env> {
     if (body.byteLength === 0 || body.byteLength > 1_000_000) return fail(422, "invalid", "Nội dung gửi AI rỗng hoặc quá lớn.");
     this.setMeta("ai_day", this.dayKey());
     this.setMeta("ai_n", String(this.aiUsedToday() + 1));
-    const base = provider === "cloudflare"
-      ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.env.CF_ACCOUNT_ID ?? "")}/ai/v1` : AI_BASE[provider];
+    if (provider === "cloudflare") return this.workersAi(body);
+    const base = AI_BASE[provider];
     let up: Response;
     try {
       up = await fetch(`${base}/chat/completions`, {
@@ -802,6 +803,34 @@ export class ShopDO extends DurableObject<Env> {
     const ra = up.headers.get("Retry-After");
     if (ra) headers.set("Retry-After", ra);
     return new Response(up.body, { status: up.status, headers });
+  }
+
+  /** Binding Workers AI (AI_OFF=1 khi chạy thử cục bộ: không gọi Workers AI thật). */
+  private workersAiBinding(): Ai | undefined { return this.env.AI_OFF === "1" ? undefined : this.env.AI; }
+
+  /** Workers AI gắn thẳng vào Worker (binding AI): đổi chuẩn OpenAI <-> Workers AI (src/workersai.ts). */
+  private async workersAi(body: ArrayBuffer): Promise<Response> {
+    let req: Record<string, unknown>;
+    try { req = JSON.parse(new TextDecoder().decode(body)) as Record<string, unknown>; }
+    catch { return fail(422, "invalid", "Nội dung gửi AI không phải JSON."); }
+    const call = toWorkersAi(req);
+    const ai = this.workersAiBinding()!;
+    try {
+      // mô hình hiểu thẳng chuẩn OpenAI (tin "tool", tool_calls): gửi nguyên văn để không mất ngữ cảnh gọi công cụ
+      const native: Record<string, unknown> = { messages: req.messages };
+      for (const k of ["tools", "tool_choice", "temperature", "max_tokens"]) if (req[k] !== undefined) native[k] = req[k];
+      let out: unknown;
+      try { out = await ai.run(call.model as Parameters<Ai["run"]>[0], native as never); }
+      catch (e) {
+        if (workersAiErrorStatus(e) === 429) throw e;
+        out = await ai.run(call.model as Parameters<Ai["run"]>[0], call.input as never);   // mô hình cũ: dạng riêng của Workers AI
+      }
+      return json(fromWorkersAi(call.model, out));
+    } catch (e) {
+      const status = workersAiErrorStatus(e);
+      return new Response(JSON.stringify({ error: { message: "Workers AI: " + String((e as Error)?.message ?? e).slice(0, 300) } }),
+        { status, headers: { "Content-Type": "application/json" } });
+    }
   }
 
   // ===================================================== thời gian thực

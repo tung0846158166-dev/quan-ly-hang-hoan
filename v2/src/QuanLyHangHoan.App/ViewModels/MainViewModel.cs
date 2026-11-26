@@ -52,6 +52,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly NavigationItem _tiktokReturnNavItem;
     private readonly NavigationItem _scanReceiveNavItem;
     private readonly NavigationItem _phoneSyncNavItem;
+    private readonly bool _cloudMode;
     private readonly NavigationItem _returnWatchNavItem;
     private readonly NavigationItem _newOrdersNavItem;
     private readonly NavigationItem _watchlistNavItem;
@@ -465,6 +466,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _saleworkNavItem = new NavigationItem(
             "salework", "🛒", "Salework", "NẠP ĐƠN TỰ ĐỘNG", () => SaleworkVm);
 
+        // Chế độ cloud: điện thoại đồng bộ qua cloud, bỏ màn "Đồng bộ điện thoại" (MQTT + mã phòng) (chủ dự án 26/11/2026).
+        _cloudMode = cloudLink is not null;
         NavigationItems =
         [
             _homeNavItem,
@@ -472,7 +475,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _shopeeCancelledNavItem,
             _tiktokReturnNavItem,
             _scanReceiveNavItem,
-            _phoneSyncNavItem,
+            .. (_cloudMode ? Array.Empty<NavigationItem>() : new[] { _phoneSyncNavItem }),
             _returnWatchNavItem,
             _newOrdersNavItem,
             _watchlistNavItem,
@@ -601,7 +604,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Kiểm tra sức khỏe kết nối đồng bộ (gọi mỗi 30 giây ở bản thật; test gọi trực tiếp).</summary>
     public void CheckSyncHealthOnce()
-        => _notificationCenter.ReportConnection(_syncController.SyncEnabled, _syncController.ConnectedBrokers > 0 || _syncController.NtfyConnected);
+        => _notificationCenter.ReportConnection(_syncController.SyncEnabled && !_cloudMode, _syncController.ConnectedBrokers > 0 || _syncController.NtfyConnected);
 
     private void AddSyncNotification(SyncHandled item, bool isSuccess, bool isNewOrder)
     {

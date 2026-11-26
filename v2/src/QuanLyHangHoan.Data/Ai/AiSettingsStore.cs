@@ -79,18 +79,28 @@ public sealed class AiSettingsStore
         try
         {
             var p = ModelPath(provider);
-            if (File.Exists(p) && File.ReadAllText(p).Trim() is { Length: > 0 } m) return provider == Gemini ? CleanGeminiModels(m) : m;
+            if (File.Exists(p) && File.ReadAllText(p).Trim() is { Length: > 0 } m) return CleanModels(provider, m);
         }
         catch { /* dùng mặc định */ }
         return DefaultModels(provider);
     }
 
     /// <summary>Bỏ mô hình Google đã ngừng (gemini-1.x, gemini-2.x); bỏ hết thì dùng danh sách mặc định.</summary>
-    public static string CleanGeminiModels(string models)
+    public static string CleanGeminiModels(string models) => CleanModels(Gemini, models);
+
+    /// <summary>Bỏ mô hình nhà cung cấp đã ngừng (thử thật 26/11/2026); bỏ hết thì dùng danh sách mặc định.</summary>
+    public static string CleanModels(string provider, string models)
     {
+        string[] retired = provider switch
+        {
+            Gemini => new[] { "gemini-1.", "gemini-2." },
+            Nvidia => new[] { "meta/llama-3" },
+            Cloudflare => new[] { "@cf/meta/llama-3.3", "@cf/qwen/qwen3-30b" },
+            _ => Array.Empty<string>(),
+        };
         var kept = (models ?? "").Split(',').Select(x => x.Trim()).Where(x => x.Length > 0)
-            .Where(x => !System.Text.RegularExpressions.Regex.IsMatch(x, @"^gemini-[12]\.", System.Text.RegularExpressions.RegexOptions.IgnoreCase)).ToList();
-        return kept.Count == 0 ? AiChatService.DefaultGeminiModels : string.Join(", ", kept);
+            .Where(x => !retired.Any(r => x.StartsWith(r, StringComparison.OrdinalIgnoreCase))).ToList();
+        return kept.Count == 0 ? DefaultModels(provider) : string.Join(", ", kept);
     }
 
     public void SaveModel(string model) => SaveModel(Groq, model);

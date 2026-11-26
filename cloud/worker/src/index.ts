@@ -17,9 +17,10 @@ export interface Env {
   GEMINI_API_KEY?: string;
   /** Khóa NVIDIA NIM (build.nvidia.com), tuyến AI dự phòng cuối: `wrangler secret put NVIDIA_API_KEY`. */
   NVIDIA_API_KEY?: string;
-  /** Cloudflare Workers AI (cổng chuẩn OpenAI): mã tài khoản + token có quyền Workers AI (`wrangler secret put CF_ACCOUNT_ID` / `CF_AI_TOKEN`). */
-  CF_ACCOUNT_ID?: string;
-  CF_AI_TOKEN?: string;
+  /** Cloudflare Workers AI gắn thẳng vào Worker (wrangler.jsonc "ai": { "binding": "AI" }), không cần token. */
+  AI?: Ai;
+  /** "1" = tắt Workers AI (chỉ dùng khi chạy thử cục bộ). */
+  AI_OFF?: string;
   /** Số lượt hỏi AI tối đa mỗi ngày cho cả cửa hàng (bảo vệ hạn mức yêu cầu của gói miễn phí). */
   AI_DAILY_LIMIT?: string;
 }

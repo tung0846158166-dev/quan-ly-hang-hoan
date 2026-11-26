@@ -638,13 +638,11 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     expect((await ask(phoneA, "openai")).status).toBe(404);   // nhà cung cấp lạ: không chuyển tiếp
   });
 
-  it("Cloudflare Workers AI: chuyển tiếp tới cổng chuẩn OpenAI của tài khoản bằng token AI của cloud", async () => {
+  it("Cloudflare Workers AI: không có binding AI (máy thử) thì báo chưa cấu hình, không gọi mạng", async () => {
     stubUpstream();
     const res = await ask(phoneA, "cloudflare");
-    expect(res.status).toBe(200);
-    expect(seen[0]!.url).toBe("https://api.cloudflare.com/client/v4/accounts/acc123/ai/v1/chat/completions");
-    expect(seen[0]!.auth).toBe("Bearer test-cf-token");
-    expect(await res.text()).not.toContain("test-cf-token");
+    expect(res.status).toBe(503);
+    expect(seen).toHaveLength(0);
   });
 
   it("cần token thiết bị; chưa cấu hình khóa nhà cung cấp thì báo rõ", async () => {
@@ -671,7 +669,7 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     expect(over.status).toBe(429);
     expect((await over.json() as any).error.code).toBe("ai_quota");
     const st = (await call("GET", "/ai/status", undefined, owner)).data;
-    expect(st).toMatchObject({ groq: true, gemini: false, nvidia: true, cloudflare: true, usedToday: 5, dailyLimit: 5 });
+    expect(st).toMatchObject({ groq: true, gemini: false, nvidia: true, cloudflare: false, usedToday: 5, dailyLimit: 5 });
   });
 
   it("từ chối nội dung rỗng", async () => {

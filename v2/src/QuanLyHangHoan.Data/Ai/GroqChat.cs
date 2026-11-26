@@ -46,9 +46,11 @@ public sealed class AiChatService : IAiChat
     public const string GeminiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai";
     /// <summary>NVIDIA NIM (build.nvidia.com), chuẩn OpenAI: tuyến dự phòng cuối sau Groq và Google.</summary>
     public const string NvidiaBaseUrl = "https://integrate.api.nvidia.com/v1";
-    public const string DefaultNvidiaModels = "meta/llama-3.3-70b-instruct";
+    /// <summary>Thử thật 26/11/2026: nemotron-3-ultra gọi công cụ + trả lời ~3 giây; meta/llama-3.3 đã bị NVIDIA ngừng (26/08/2026).</summary>
+    public const string DefaultNvidiaModels = "nvidia/nemotron-3-ultra-550b-a55b, nvidia/nemotron-3.5-lightning-30b-a3b";
     /// <summary>Cloudflare Workers AI: chỉ dùng qua cổng AI của cloud (cần mã tài khoản Cloudflare). Tuyến dự phòng sau NVIDIA.</summary>
-    public const string DefaultCloudflareModels = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+    /// <summary>Thử thật 26/11/2026: gpt-oss-120b và llama-4-scout gọi công cụ + trả lời đúng; llama-3.3 lặp gọi công cụ; qwen3-30b đã ngừng.</summary>
+    public const string DefaultCloudflareModels = "@cf/openai/gpt-oss-120b, @cf/meta/llama-4-scout-17b-16e-instruct";
     public const string DefaultBaseUrl = GroqBaseUrl;
     public const string DefaultModel = "openai/gpt-oss-120b";
     public const string DefaultGroqModels = "openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b";

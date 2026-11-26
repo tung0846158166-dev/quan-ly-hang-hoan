@@ -112,8 +112,8 @@ final class AIChatViewModel: ObservableObject {
     init() {
         groqModels = UserDefaults.standard.string(forKey: "ai.models.groq") ?? AIEndpoint.defaultGroqModels
         geminiModels = AIEndpoint.cleanGeminiModels(UserDefaults.standard.string(forKey: "ai.models.gemini") ?? AIEndpoint.defaultGeminiModels)
-        nvidiaModels = UserDefaults.standard.string(forKey: "ai.models.nvidia") ?? AIEndpoint.defaultNvidiaModels
-        cloudflareModels = UserDefaults.standard.string(forKey: "ai.models.cloudflare") ?? AIEndpoint.defaultCloudflareModels
+        nvidiaModels = AIEndpoint.cleanModels(provider: "nvidia", UserDefaults.standard.string(forKey: "ai.models.nvidia") ?? AIEndpoint.defaultNvidiaModels)
+        cloudflareModels = AIEndpoint.cleanModels(provider: "cloudflare", UserDefaults.standard.string(forKey: "ai.models.cloudflare") ?? AIEndpoint.defaultCloudflareModels)
         refreshKeys()
         status = hasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Chạm ⚙ để nhập khóa Groq và/hoặc Google."
     }

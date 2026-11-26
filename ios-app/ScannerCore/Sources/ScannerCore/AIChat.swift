@@ -17,9 +17,24 @@ public struct AIEndpoint: Equatable {
     public static let defaultGeminiModels = "gemini-4-hydrogen, gemini-3.8-flash, gemini-3.5-flash-lite"
     /// NVIDIA NIM (build.nvidia.com), chuẩn OpenAI: tuyến dự phòng sau Groq và Google.
     public static let nvidiaBaseURL = "https://integrate.api.nvidia.com/v1"
-    public static let defaultNvidiaModels = "meta/llama-3.3-70b-instruct"
+    public static let defaultNvidiaModels = "nvidia/nemotron-3-ultra-550b-a55b, nvidia/nemotron-3.5-lightning-30b-a3b"
     /// Cloudflare Workers AI: chỉ dùng qua cổng AI của cloud. Tuyến dự phòng cuối.
-    public static let defaultCloudflareModels = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    public static let defaultCloudflareModels = "@cf/openai/gpt-oss-120b, @cf/meta/llama-4-scout-17b-16e-instruct"
+
+    /// Bỏ mô hình đã ngừng của NVIDIA / Cloudflare (thử thật 26/11/2026); bỏ hết thì dùng mặc định.
+    public static func cleanModels(provider: String, _ models: String) -> String {
+        let retired: [String]
+        let fallback: String
+        switch provider {
+        case "nvidia": retired = ["meta/llama-3"]; fallback = defaultNvidiaModels
+        case "cloudflare": retired = ["@cf/meta/llama-3.3", "@cf/qwen/qwen3-30b"]; fallback = defaultCloudflareModels
+        case "gemini": return cleanGeminiModels(models)
+        default: return models
+        }
+        let kept = models.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { m in !m.isEmpty && !retired.contains { m.lowercased().hasPrefix($0) } }
+        return kept.isEmpty ? fallback : kept.joined(separator: ", ")
+    }
     /// Mô hình Google dự phòng cuối (gemini-2.x đã bị Google ngừng, thử thật 26/11/2026).
     public static let fallbackGeminiModel = "gemini-3.5-flash-lite"
 

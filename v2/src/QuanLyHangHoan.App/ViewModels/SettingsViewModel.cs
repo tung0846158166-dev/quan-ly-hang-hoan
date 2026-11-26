@@ -81,6 +81,8 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Trạng thái và cài đặt Cloud (chỉ hiện thẻ Cloud khi IsEnabled == true).</summary>
     public CloudStatusViewModel? Cloud { get; }
+    /// <summary>Thẻ "Đồng bộ điện thoại" (mã phòng MQTT) chỉ hiện khi KHÔNG chạy cloud.</summary>
+    public bool ShowPhoneSyncSettings => Cloud?.IsEnabled != true;
 
     // ---------------- các thẻ (tab): Chung + 4 đường nạp đơn + Cloud (khi bật cloud) ----------------
     public const string GeneralTabKey = "general";

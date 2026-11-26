@@ -9,6 +9,7 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ShopDO"] }],
   "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "app-images" }],
+  "ai": { "binding": "AI" },
   "triggers": { "crons": ["17 20 * * *"] },
   "vars": { "PHOTO_RETENTION_DAYS": "90" }
 }

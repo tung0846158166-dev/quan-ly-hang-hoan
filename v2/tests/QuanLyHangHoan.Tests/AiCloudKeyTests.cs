@@ -104,7 +104,7 @@ public sealed class AiNvidiaFallbackTests : IDisposable
         var local = new AiSettingsStore(Path.Combine(_dir, "local"));
         local.SaveKey(AiSettingsStore.Nvidia, "nv-key");
         Assert.True(local.HasKey);
-        var ep = Assert.Single(local.BuildEndpoints().Where(e => e.Model == "meta/llama-3.3-70b-instruct"));
+        var ep = Assert.Single(local.BuildEndpoints().Where(e => e.Model == "nvidia/nemotron-3-ultra-550b-a55b"));
         Assert.Equal(AiChatService.NvidiaBaseUrl, ep.BaseUrl);
         Assert.Equal("nv-key", ep.ApiKey);
     }
@@ -124,7 +124,7 @@ public sealed class AiCloudflareFallbackTests : IDisposable
         Assert.Equal(new[] { "groq", "gemini", "nvidia", "cloudflare" }, providers);
         var cf = s.BuildEndpoints().Last();
         Assert.Equal("https://x.workers.dev/v1/ai/cloudflare", cf.BaseUrl);
-        Assert.Equal("@cf/meta/llama-3.3-70b-instruct-fp8-fast", cf.Model);
+        Assert.Equal("@cf/meta/llama-4-scout-17b-16e-instruct", cf.Model);
     }
 
     [Fact]
@@ -133,5 +133,16 @@ public sealed class AiCloudflareFallbackTests : IDisposable
         var s = new AiSettingsStore(_dir);
         s.SaveKey(AiSettingsStore.Groq, "g");
         Assert.DoesNotContain(s.BuildEndpoints(), e => e.Provider == "cloudflare");
+    }
+}
+
+public sealed class AiRetiredModelTests
+{
+    [Fact]
+    public void Retired_nvidia_and_cloudflare_models_are_dropped()
+    {
+        Assert.Equal(AiChatService.DefaultNvidiaModels, AiSettingsStore.CleanModels(AiSettingsStore.Nvidia, "meta/llama-3.3-70b-instruct"));
+        Assert.Equal("@cf/openai/gpt-oss-120b", AiSettingsStore.CleanModels(AiSettingsStore.Cloudflare, "@cf/meta/llama-3.3-70b-instruct-fp8-fast, @cf/openai/gpt-oss-120b"));
+        Assert.Equal("openai/gpt-oss-120b", AiSettingsStore.CleanModels(AiSettingsStore.Groq, "openai/gpt-oss-120b"));
     }
 }

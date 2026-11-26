@@ -142,6 +142,12 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(try CloudAPI(baseURL: "https://a.workers.dev", token: nil).aiEndpoints(st, groqModels: "m", geminiModels: "g").isEmpty)
     }
 
+    func testRetiredNvidiaAndCloudflareModelsAreDropped() {
+        XCTAssertEqual(AIEndpoint.cleanModels(provider: "nvidia", "meta/llama-3.3-70b-instruct"), AIEndpoint.defaultNvidiaModels)
+        XCTAssertEqual(AIEndpoint.cleanModels(provider: "cloudflare", "@cf/meta/llama-3.3-70b-instruct-fp8-fast, @cf/openai/gpt-oss-120b"), "@cf/openai/gpt-oss-120b")
+        XCTAssertFalse(AIEndpoint.defaultNvidiaModels.contains("meta/llama-3"))
+    }
+
     func testRetiredGeminiModelsAreDropped() {
         XCTAssertEqual(AIEndpoint.cleanGeminiModels("gemini-2.5-flash, gemini-4-hydrogen, gemini-3.5-flash-lite"), "gemini-4-hydrogen, gemini-3.5-flash-lite")
         XCTAssertEqual(AIEndpoint.cleanGeminiModels("gemini-2.5-flash, gemini-2.5-flash-lite"), AIEndpoint.defaultGeminiModels)

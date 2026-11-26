@@ -271,7 +271,8 @@ public partial class App : Application
 
         if (!isDemoMode)
         {
-            realSyncController?.Start();
+            // chế độ cloud: không chạy MQTT/ntfy (điện thoại đồng bộ qua cloud)
+            if (_cloud is null) realSyncController?.Start();
             if (realFolderWatchController?.Enabled == true)
             {
                 realFolderWatchController.Start();

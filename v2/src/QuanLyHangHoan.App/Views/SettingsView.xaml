@@ -117,8 +117,9 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Đồng bộ điện thoại -->
-                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14">
+                <!-- Đồng bộ điện thoại (chỉ khi không chạy cloud) -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
+                        Visibility="{Binding ShowPhoneSyncSettings, Converter={StaticResource BoolToVis}}">
                     <StackPanel>
                         <TextBlock Text="📱 Đồng bộ điện thoại" Style="{StaticResource SettingsTitleStyle}" />
                         <TextBlock Text="Mã phòng (nhập đúng mã này vào app iPhone):" Style="{StaticResource SettingsHintStyle}" Margin="0,0,0,6" />

@@ -232,7 +232,11 @@ public partial class App : Application
                 newOrderDialogService: new WindowsNewOrderDialogService(),
                 diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)),
                 // Chưa bật cloud: null giữ nguyên giao diện/hành vi cũ.
-                cloudLink: _cloud?.Link);
+                cloudLink: _cloud?.Link,
+                cloudImportLog: _cloud is { } cl
+                    ? ct => cl.Link.Api is { } api ? api.ImportLogAsync(ct)
+                        : throw new QuanLyHangHoan.Data.Cloud.CloudApiException("unavailable", "Chưa kết nối cloud.", 0)
+                    : null);
             if (_cloud is { } cloud)
             {
                 var vmForCloud = mainViewModel;

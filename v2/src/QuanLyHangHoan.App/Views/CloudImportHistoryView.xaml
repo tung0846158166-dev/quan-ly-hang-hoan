@@ -1,0 +1,63 @@
+<UserControl x:Class="QuanLyHangHoan.App.Views.CloudImportHistoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:CloudImportHistoryViewModel}"
+             UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display">
+
+    <Grid Background="{DynamicResource AppBgBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="20,14">
+            <DockPanel LastChildFill="True">
+                <Button DockPanel.Dock="Right" Command="{Binding RefreshCommand}" Content="Tải lại" Padding="16,6" Cursor="Hand" VerticalAlignment="Center" />
+                <StackPanel>
+                    <TextBlock Text="📊 Lịch sử đồng bộ Google Sheet" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                    <TextBlock Text="{Binding Intro}" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,4,12,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <DockPanel Grid.Row="1" Margin="20,12,20,12">
+            <TextBlock DockPanel.Dock="Top" Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,8" />
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:CloudImportRow}">
+                            <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1"
+                                    CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="170" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding When}" FontFamily="Consolas" FontSize="12.5" Foreground="{DynamicResource InkSecondaryBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Source}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Summary}" FontSize="12.5" TextWrapping="Wrap" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource InkSecondaryBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasAmbiguous}" Value="True">
+                                                        <Setter Property="Foreground" Value="#DC2626" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Grid>
+</UserControl>

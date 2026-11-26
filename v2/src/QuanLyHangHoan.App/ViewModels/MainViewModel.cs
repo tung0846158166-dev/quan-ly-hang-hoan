@@ -140,7 +140,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Func<IReadOnlyList<QuanLyHangHoan.Data.StoredOrder>>? aiOrderLoader = null,
         Func<int, string, string, IReadOnlyList<QuanLyHangHoan.Data.AuditEntry>>? aiActivityLoader = null,
         Func<IEnumerable<QuanLyHangHoan.Data.StoredOrder>, IReadOnlyDictionary<string, (long Since, int Stage)>>? aiReturnWatch = null,
-        ICloudLink? cloudLink = null)
+        ICloudLink? cloudLink = null,
+        Func<CancellationToken, Task<IReadOnlyList<QuanLyHangHoan.Data.Cloud.CloudImportRun>>>? cloudImportLog = null)
     {
         _notificationCenter = notificationCenter ?? new NotificationCenter(new InMemoryNotificationStore(), returnOrderProvider.GetCurrentTime);
         _returnOrderProvider = returnOrderProvider;
@@ -421,7 +422,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["phone_sync"] = PhoneSyncVm;
         _pageCache["file_import"] = FileImportVm;
         _pageCache["folder_watch"] = FolderWatchVm;
-        _pageCache["google_sheet"] = GoogleSheetVm;
+        // chế độ cloud: thẻ Google Sheet chỉ còn lịch sử đồng bộ lấy từ cloud (chủ dự án 26/11/2026)
+        CommunityToolkit.Mvvm.ComponentModel.ObservableObject googleSheetPage = cloudImportLog is null ? GoogleSheetVm : (CloudImportHistoryVm = new CloudImportHistoryViewModel(cloudImportLog));
+        _pageCache["google_sheet"] = googleSheetPage;
         _pageCache["salework"] = SaleworkVm;
         _pageCache["return_watch"] = ReturnWatchVm;
         _pageCache["new_orders"] = NewCreatedVm;
@@ -431,7 +434,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["stats"] = StatisticsVm;
         _pageCache["legacy_import"] = LegacyImportVm;
         _pageCache["settings"] = SettingsVm;
-        SettingsVm.AttachImportPages(k => k switch { "file_import" => FileImportVm, "folder_watch" => FolderWatchVm, "google_sheet" => GoogleSheetVm, "salework" => SaleworkVm, _ => null });
+        SettingsVm.AttachImportPages(k => k switch { "file_import" => FileImportVm, "folder_watch" => FolderWatchVm, "google_sheet" => googleSheetPage, "salework" => SaleworkVm, _ => null });
         _pageCache["help"] = HelpVm;
         _pageCache["activity"] = ActivityLogVm;
 
@@ -462,7 +465,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _folderWatchNavItem = new NavigationItem(
             "folder_watch", "📁", "Theo dõi thư mục", "NẠP ĐƠN TỰ ĐỘNG", () => FolderWatchVm);
         _googleSheetNavItem = new NavigationItem(
-            "google_sheet", "📊", "Google Sheet", "NẠP ĐƠN TỰ ĐỘNG", () => GoogleSheetVm);
+            "google_sheet", "📊", "Google Sheet", "NẠP ĐƠN TỰ ĐỘNG", () => googleSheetPage);
         _saleworkNavItem = new NavigationItem(
             "salework", "🛒", "Salework", "NẠP ĐƠN TỰ ĐỘNG", () => SaleworkVm);
 
@@ -642,6 +645,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public PhoneSyncViewModel PhoneSyncVm { get; }
     public FolderWatchViewModel FolderWatchVm { get; }
     public GoogleSheetViewModel GoogleSheetVm { get; }
+    /// <summary>Chế độ cloud: lịch sử đồng bộ thay cho màn nạp Sheet (null khi không chạy cloud).</summary>
+    public CloudImportHistoryViewModel? CloudImportHistoryVm { get; private set; }
     public SaleworkViewModel SaleworkVm { get; }
     public FileImportViewModel FileImportVm { get; }
 

@@ -50,6 +50,9 @@
         <DataTemplate DataType="{x:Type vm:ScanReceiveViewModel}">
             <views:ScanReceiveView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CloudImportHistoryViewModel}">
+            <views:CloudImportHistoryView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:PhoneSyncViewModel}">
             <views:PhoneSyncView />
         </DataTemplate>

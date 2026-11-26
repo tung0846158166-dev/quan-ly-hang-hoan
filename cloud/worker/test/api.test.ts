@@ -45,7 +45,7 @@ async function stub() {
   return E.SHOP.get(E.SHOP.idFromName("main"));
 }
 
-const TABLES = ["import_issues", "return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
+const TABLES = ["import_issues", "import_log", "return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
 
 // Trạng thái Durable Object được giữ giữa các test: xóa sạch bảng + ảnh trước mỗi test rồi tạo lại thiết bị.
 beforeEach(async () => {
@@ -428,6 +428,20 @@ describe("nhập từ Google Sheet (cloud tự đối chiếu, cùng bộ gộp 
     expect(await all()).toHaveLength(2);
     const issues = await call("GET", "/import/issues", undefined, undefined, { "X-Import-Key": "test-import-key" });
     expect(issues.data[0]).toMatchObject({ source: "sheet", candidates: 2 });
+  });
+
+  it("lịch sử đồng bộ: các lô gửi liền nhau gộp thành MỘT lượt, có số thêm/cập nhật; máy nào cũng xem được (token thiết bị)", async () => {
+    await sendSheet([sheetParcel({ returnOrderId: "", track: "SPXVN000000401" })]);
+    await sendSheet([sheetParcel({ returnOrderId: "", track: "SPXVN000000402" }), sheetParcel({ returnOrderId: "", track: "SPXVN000000401", platformStatus: "Đã về shop" })]);
+    await call("POST", "/import", { source: "file", parcels: [] }, owner);
+    expect((await call("GET", "/import/log", undefined, undefined)).status).toBe(401);
+    const log = await call("GET", "/import/log", undefined, phoneA);
+    expect(log.status).toBe(200);
+    const sheet = (log.data as any[]).filter((r) => r.source === "sheet");
+    expect(sheet).toHaveLength(1);
+    expect(sheet[0]).toMatchObject({ batches: 2, sent: 3, added: 2, updated: 1, ambiguous: 0 });
+    expect(sheet[0].end).toBeGreaterThanOrEqual(sheet[0].start);
+    expect((log.data as any[]).some((r) => r.source === "file")).toBe(true);
   });
 
   it("kiện đã xóa thì bỏ qua (không nạp lại); kiện ở kho lưu trữ chỉ được bổ sung, không thành dòng mới", async () => {

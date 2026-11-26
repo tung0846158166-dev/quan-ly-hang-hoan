@@ -11,7 +11,7 @@ import type { Env } from "./index";
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
 /** Đổi khi SCHEMA/nâng cấp lược đồ đổi: lần khởi động sau sẽ chạy lại migrate(). */
-const SCHEMA_VERSION = "2026-11-26.1";
+const SCHEMA_VERSION = "2026-11-26.2";
 
 /** Lỗi Cloudflare khi hết lượt ghi Durable Object (gói miễn phí). */
 export function isWriteQuotaError(e: unknown): boolean {
@@ -145,6 +145,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path === "/sync") return this.sync(url);
     if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
+    if (m === "GET" && path === "/import/log") return this.importLog();
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     const ai = /^\/ai\/(groq|gemini|nvidia|cloudflare)\/chat\/completions$/.exec(path);
@@ -578,6 +579,7 @@ export class ShopDO extends DurableObject<Env> {
       const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
       this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at",
         source, sig, Date.now());
+      this.logImport(source, list.length, added, updated, rejected.length, 0);
     });
     if (added + updated + watchAdded + watchFixed > 0) this.broadcast();
     return json({ added, updated, unchanged, rejected, returnWatchAdded: watchAdded, returnWatchFixed: watchFixed });
@@ -664,6 +666,7 @@ export class ShopDO extends DurableObject<Env> {
       for (const a of res.ambiguous)
         this.db.run("INSERT INTO import_issues(at, source, data) VALUES (?,?,?)", now, "sheet", JSON.stringify(a));
       this.db.run("DELETE FROM import_issues WHERE id NOT IN (SELECT id FROM import_issues ORDER BY id DESC LIMIT 500)");
+      this.logImport("sheet", list.length, res.added.length, res.updated.length, res.skippedDeleted, res.ambiguous.length);
       const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
       this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES ('sheet',?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at", sig, now);
     });
@@ -672,6 +675,32 @@ export class ShopDO extends DurableObject<Env> {
       added: res.added.length, updated: res.updated.length, enrichedArchived: res.enrichedArchived.length, written,
       skippedDeleted: res.skippedDeleted, skippedArchivedUnchanged: res.skippedArchivedUnchanged, ambiguous: res.ambiguous, rejected,
     });
+  }
+
+  /** Một dòng lịch sử mỗi lô nhập (giữ 2.000 dòng gần nhất). */
+  private logImport(source: string, sent: number, added: number, updated: number, skipped: number, ambiguous: number): void {
+    this.db.run("INSERT INTO import_log(at, source, sent, added, updated, skipped, ambiguous) VALUES (?,?,?,?,?,?,?)",
+      Date.now(), source, sent, added, updated, skipped, ambiguous);
+    this.db.run("DELETE FROM import_log WHERE id NOT IN (SELECT id FROM import_log ORDER BY id DESC LIMIT 2000)");
+  }
+
+  /** Lịch sử đồng bộ: các lô cùng nguồn cách nhau < 3 phút gộp thành MỘT lượt (Apps Script gửi theo lô 50). Mới nhất trước. */
+  private importLog(): Response {
+    const rows = this.db.all<Row>("SELECT at, source, sent, added, updated, skipped, ambiguous FROM import_log ORDER BY id ASC");
+    const runs: { source: string; start: number; end: number; batches: number; sent: number; added: number; updated: number; skipped: number; ambiguous: number }[] = [];
+    const last = new Map<string, (typeof runs)[number]>();
+    for (const r of rows) {
+      const at = Number(r.at), src = String(r.source);
+      let run = last.get(src);
+      if (!run || at - run.end > 180_000) {
+        run = { source: src, start: at, end: at, batches: 0, sent: 0, added: 0, updated: 0, skipped: 0, ambiguous: 0 };
+        runs.push(run); last.set(src, run);
+      }
+      run.end = at; run.batches++;
+      run.sent += Number(r.sent); run.added += Number(r.added); run.updated += Number(r.updated);
+      run.skipped += Number(r.skipped); run.ambiguous += Number(r.ambiguous);
+    }
+    return json(runs.reverse().slice(0, 200));
   }
 
   private importIssues(): Response {

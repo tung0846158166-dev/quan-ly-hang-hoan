@@ -182,6 +182,21 @@ public sealed class CloudApi
     public async Task<JsonArray> HistoryAsync(string parcelId, CancellationToken ct = default) =>
         (await JsonAsync(HttpMethod.Get, $"/parcels/{Uri.EscapeDataString(parcelId)}/history", null, ct)) as JsonArray ?? new JsonArray();
 
+    /// <summary>Lịch sử đồng bộ: các lượt nhập đơn cloud đã nhận (Google Sheet, nạp từ máy tính), mới nhất trước.</summary>
+    public async Task<IReadOnlyList<CloudImportRun>> ImportLogAsync(CancellationToken ct = default) =>
+        ParseImportLog(await JsonAsync(HttpMethod.Get, "/import/log", null, ct));
+
+    public static IReadOnlyList<CloudImportRun> ParseImportLog(JsonNode node)
+    {
+        var list = new List<CloudImportRun>();
+        if (node is not JsonArray arr) return list;
+        static long L(JsonNode? n) => n is JsonValue v && v.TryGetValue<double>(out var d) ? (long)d : 0;
+        foreach (var x in arr.OfType<JsonObject>())
+            list.Add(new CloudImportRun(x["source"]?.GetValue<string>() ?? "", L(x["start"]), L(x["end"]), (int)L(x["batches"]), (int)L(x["sent"]),
+                (int)L(x["added"]), (int)L(x["updated"]), (int)L(x["skipped"]), (int)L(x["ambiguous"])));
+        return list;
+    }
+
     // ---- hạn mức, AI
     public async Task<CloudQuotaInfo> QuotaAsync(CancellationToken ct = default)
     {
@@ -230,3 +245,5 @@ public sealed class CloudApi
 }
 
 public sealed record CloudImportResult(int Added, int Updated, int Unchanged, IReadOnlyList<(string Id, string Reason)> Rejected, int ReturnWatchAdded);
+/// <summary>Một lượt đồng bộ cloud đã nhận (các lô cùng nguồn gửi liền nhau gộp lại). Thời gian: mili giây Unix.</summary>
+public sealed record CloudImportRun(string Source, long Start, long End, int Batches, int Sent, int Added, int Updated, int Skipped, int Ambiguous);

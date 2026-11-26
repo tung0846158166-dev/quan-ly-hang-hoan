@@ -240,9 +240,8 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         }
         guard let obj = (try? JSONSerialization.jsonObject(with: Data(text.utf8))) as? [String: Any], let t = obj["t"] as? String else { return }
         if t == "rev", CloudAPI.int(obj["rev"]) > store.rev {
-            set(.syncing)
+            // đang kết nối: lấy phần mới âm thầm, không đổi trạng thái (tránh nhấp nháy khi cloud có nhiều thay đổi)
             try await pull(a)
-            set(.connected)
         } else if t == "quota", let q = try? await a.quota() {
             setQuota(q)
         }

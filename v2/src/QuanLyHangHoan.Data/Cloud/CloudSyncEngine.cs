@@ -170,9 +170,9 @@ public sealed class CloudSyncEngine : IDisposable
                 var t = msg?["t"]?.GetValue<string>();
                 if (t == "rev" && (msg!["rev"]?.GetValue<long>() ?? 0) > CloudReplica.GetRev(_dbPath))
                 {
-                    Set(CloudConnState.Syncing);
+                    // đang kết nối: lấy phần mới ÂM THẦM, không đổi trạng thái (trước đây đổi Đang đồng bộ <-> Đã kết nối
+                    // sau mỗi thay đổi làm đèn trạng thái nhấp nháy liên tục khi cloud có nhiều thay đổi - 26/11/2026)
                     await PullAsync(link.Token).ConfigureAwait(false);
-                    Set(CloudConnState.Connected);
                 }
                 else if (t == "quota") _ = RefreshQuotaAsync(link.Token);
             }

@@ -61,7 +61,7 @@ public sealed class CloudMode : IDisposable
             if (Interlocked.Exchange(ref _reloadPending, 1) == 1) return;
             _ = Task.Run(async () =>
             {
-                await Task.Delay(400).ConfigureAwait(false);   // gom các lô /sync liên tiếp
+                await Task.Delay(2000).ConfigureAwait(false);   // gom các lô /sync liên tiếp: nạp lại bảng tối đa ~2 giây/lần (đỡ nhấp nháy)
                 Interlocked.Exchange(ref _reloadPending, 0);
                 dispatchToUi(() => _ = reloadOnUi());
             });

@@ -785,6 +785,7 @@ export class ShopDO extends DurableObject<Env> {
     if (bytes.byteLength > MAX_PHOTO_BYTES) return fail(413, "invalid", "Ảnh quá lớn (tối đa 1 MB sau khi thu nhỏ).");
     const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) => x.toString(16).padStart(2, "0")).join("");
     await this.env.IMAGES.put(`${kind === "thumb" ? "t" : "p"}/${photoId}`, bytes, { httpMetadata: { contentType: mime } });
+    let attached = false;
     this.ctx.storage.transactionSync(() => {
       if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at, keep) VALUES (?,?,?,?,?,?,?,?)",
         photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt, legacy ? 1 : 0);
@@ -796,9 +797,12 @@ export class ShopDO extends DurableObject<Env> {
         parcel.photoId = photoId;
         this.writeParcel(parcel);
         this.audit(dev.deviceId, "photo.attach", parcelId, { photoId: before }, { photoId });
+        attached = true;
       }
     });
-    this.broadcast();
+    // chỉ báo các máy khi đơn thật sự đổi (ảnh gắn vào đơn); ảnh thêm không đổi đơn thì không báo
+    // (chuyển hàng nghìn ảnh cũ từng làm máy tính/điện thoại đồng bộ liên tục, nhấp nháy - 26/11/2026)
+    if (attached) this.broadcast();
     return json({ ok: true, photoId, sha256: sha });
   }
 

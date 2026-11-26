@@ -39,6 +39,8 @@ final class CloudTests: XCTestCase {
         """#)
         let r = CloudRowMapper.row(p, now: now)!
         XCTAssertEqual(r.k, "m"); XCTAssertEqual(r.c, "TRK1"); XCTAssertEqual(r.o, "O1")
+        // thao tác và ảnh qua cloud dùng MÃ KIỆN cloud, không phải khóa dòng hiển thị
+        XCTAssertEqual(r.pid, "a"); XCTAssertEqual(r.cloudId, "a"); XCTAssertNotEqual(r.id, "a")
         XCTAssertEqual(r.p, "TikTok Shop")
         XCTAssertEqual(r.n, "Áo | Quần")
         XCTAssertEqual(r.co, "Đen | ")                 // giống C#: ghép cả ô trống

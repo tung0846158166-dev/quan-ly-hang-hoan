@@ -807,7 +807,7 @@ final class SyncEngine: ObservableObject {
             return
         }
         if cloudActive {
-            cloudWrite(rows: [row], ops: [CloudOps.setWatch(id: row.id, on: watch, reason: t)], done: watch ? "Đã lưu theo dõi" : "Đã bỏ theo dõi")
+            cloudWrite(rows: [row], ops: [CloudOps.setWatch(id: row.cloudId, on: watch, reason: t)], done: watch ? "Đã lưu theo dõi" : "Đã bỏ theo dõi")
             return
         }
         let rid = nextRequestId(prefix: "note")
@@ -831,7 +831,7 @@ final class SyncEngine: ObservableObject {
         }
         if cloudActive {
             guard let st = fields["st"] as? String else { return }
-            cloudWrite(rows: [row], ops: [CloudOps.setStatus(id: row.id, status: st)], done: "Đã cập nhật trạng thái")
+            cloudWrite(rows: [row], ops: [CloudOps.setStatus(id: row.cloudId, status: st)], done: "Đã cập nhật trạng thái")
             return
         }
         let rid = nextRequestId(prefix: "edit")
@@ -856,7 +856,7 @@ final class SyncEngine: ObservableObject {
         }
         if cloudActive {
             guard let st = fields["st"] as? String else { return }
-            cloudWrite(rows: rows, ops: rows.map { CloudOps.setStatus(id: $0.id, status: st) }, done: "Đã cập nhật \(rows.count) đơn")
+            cloudWrite(rows: rows, ops: rows.map { CloudOps.setStatus(id: $0.cloudId, status: st) }, done: "Đã cập nhật \(rows.count) đơn")
             return
         }
         let st = fields["st"] as? String
@@ -886,7 +886,7 @@ final class SyncEngine: ObservableObject {
             return
         }
         if cloudActive {
-            cloudWrite(rows: [row], ops: [CloudOps.delete(id: row.id)], done: "Đã xóa đơn (khôi phục được trên máy tính)")
+            cloudWrite(rows: [row], ops: [CloudOps.delete(id: row.cloudId)], done: "Đã xóa đơn (khôi phục được trên máy tính)")
             return
         }
         let rid = nextRequestId(prefix: "del")

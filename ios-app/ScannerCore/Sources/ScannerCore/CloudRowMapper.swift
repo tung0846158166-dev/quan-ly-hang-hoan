@@ -113,6 +113,7 @@ public enum CloudRowMapper {
         let nt = join([p.note, p.userNote].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, 200)
         if !nt.isEmpty { row.nt = nt }
         if k == "c" { row.ci = p.id }
+        row.pid = p.id
         return row
     }
 

@@ -104,7 +104,7 @@ struct DetailView: View {
                     productsCard
                     photosCard
                     if engine.cloudActive {
-                        CloudPhotosCard(parcelId: live.id)   // T042: ảnh trên cloud (cả ảnh máy khác chụp)
+                        CloudPhotosCard(parcelId: live.cloudId)   // T042: ảnh trên cloud (cả ảnh máy khác chụp)
                     }
 
                     if live.inReturnWatch {

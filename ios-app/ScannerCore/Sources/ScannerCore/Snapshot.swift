@@ -23,6 +23,7 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var rcd: String = ""     // ngày giờ nhận tại kho (khi đã nhận)
     public var lv: Int = -1         // mức cảnh báo do PC tính: 2 = Báo Đỏ (>=24h), 1 = Báo Vàng (>=12h), 0 = an toàn; -1 = PC cũ không gửi
     public var ci: String = ""      // id đơn trong bảng đơn hủy trên PC (để đánh dấu đã nhận từ điện thoại); PC cũ không gửi
+    public var pid: String? = nil   // chế độ cloud: mã kiện trên cloud (dùng cho mọi thao tác/ảnh qua cloud); dữ liệu cũ không có
     public var ps: String = ""      // cột Trạng thái sàn trên PC (vd "Huỷ sau chuẩn bị · Đã huỷ"); PC cũ không gửi
     public var x: String = ""       // các mã khác của đơn, cách nhau dấu cách (mã vận đơn hoàn/giao, mã yêu cầu trả hàng); PC cũ không gửi
     public var rw: Int = 0          // Bảng Hàng Hoàn Về: giờ đơn vào bảng (ms epoch); 0 = không nằm trong bảng; PC cũ không gửi
@@ -48,6 +49,9 @@ public struct OrderRow: Codable, Identifiable, Equatable, Hashable {
     public var lookupCodes: [String] {
         ([c, o] + x.split(separator: " ").map(String.init)).map { $0.uppercased() }.filter { !$0.isEmpty }
     }
+
+    /// Mã kiện để gửi lên cloud: mã kiện cloud nếu có, không thì khóa dòng (luồng cũ).
+    public var cloudId: String { (pid?.isEmpty == false) ? pid! : id }
 
     /// Khóa định danh an toàn cho SwiftUI List/ForEach: phân biệt kiện khác `ci` hoặc khác mã đơn `o` khi `c` trùng.
     public var id: String {

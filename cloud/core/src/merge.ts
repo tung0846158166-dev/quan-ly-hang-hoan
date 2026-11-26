@@ -277,6 +277,9 @@ export function fillTrackless(order: MOrder, match: Incoming): void {
   if (match.platformStatus) order.platformStatus = match.platformStatus;
   if (match.returnedAt) order.returnedAt = match.returnedAt;
   if (match.returnDate && !order.returnDate) order.returnDate = match.returnDate;
+  // đơn huỷ bị đặt "Không cần nhận" chỉ vì lúc nhập chưa có mã: có mã rồi thì chờ nhận (quyết định chủ dự án 26/11/2026)
+  if (order.status === "Không cần nhận" && order.orderType === "Đơn hủy" && order.trackingCodes.length > 0)
+    order.status = order.platform === "TikTok" ? "Chưa về" : "Chưa trả";
   if (match.items.some((i) => i.product) && !order.items.some((i) => i.product && !PLACEHOLDER.test(i.product)))
     order.items = match.items.map(itemFromIncoming);
 }

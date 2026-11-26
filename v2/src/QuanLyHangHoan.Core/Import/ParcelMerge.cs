@@ -96,6 +96,10 @@ public static class ParcelMerge
         if (match.PlatformStatus.Length > 0) order.PlatformStatus = match.PlatformStatus;
         if (match.ReturnedAt.Length > 0) order.ReturnedAt = match.ReturnedAt;
         if (match.ReturnDate.Length > 0 && order.ReturnDate.Length == 0) order.ReturnDate = match.ReturnDate;
+        // Đơn huỷ bị đặt "Không cần nhận" CHỈ vì lúc nhập chưa có mã (ShopeeMapper/TikTokMapper.ForNewRow): có mã rồi thì chờ nhận
+        // (quyết định chủ dự án 26/11/2026: đơn "Huỷ sau chuẩn bị" có hàng về). Trạng thái khác (đã nhận, bị mất, ...) không đụng tới.
+        if (order.Status == ReceiveStatus.NotNeeded && order.OrderType == "Đơn hủy" && order.TrackingCodes.Count > 0)
+            order.Status = order.Platform == "TikTok" ? ReceiveStatus.NotYetArrived : ReceiveStatus.NotReturned;
         if (match.Items.Any(i => i.Product.Length > 0) &&
             !order.Items.Any(i => i.Product.Length > 0 && !Regex.IsMatch(i.Product, "Sản phẩm mới|Chưa rõ sản phẩm")))
             order.Items = match.Items.Select(i => new OrderItem

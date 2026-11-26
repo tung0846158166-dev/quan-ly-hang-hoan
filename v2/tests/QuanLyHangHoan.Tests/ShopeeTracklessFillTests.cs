@@ -72,4 +72,41 @@ public sealed class ShopeeTracklessFillTests
         Assert.Equal(2, m3.Count);
         Assert.Equal("SPXVN000000999", m3[0].Track);
     }
+
+    // Quyết định chủ dự án 26/11/2026: đơn huỷ "Huỷ sau chuẩn bị" CÓ hàng về. App đặt "Không cần nhận" chỉ vì lúc nhập chưa có mã;
+    // khi được điền mã thì chuyển sang chờ nhận để kho quét nhận + tính cảnh báo 12h/24h.
+    private static Order OldCancel(string id, string orderId, string platform = "Shopee") => new()
+    {
+        Id = id, OrderId = orderId, Platform = platform, OrderType = "Đơn hủy", PlatformStatus = "Huỷ sau chuẩn bị · Đã huỷ",
+        Status = ReceiveStatus.NotNeeded, Items = new() { new OrderItem { Product = "Áo thun", Qty = 1 } },
+    };
+
+    [Fact]
+    public void Cancelled_order_marked_not_needed_only_for_lack_of_a_code_becomes_awaiting_receipt_when_the_code_is_filled()
+    {
+        var main = new List<Order> { OldCancel("a", "SP1") };
+        var inc = Incoming("SP1", "SPXVN000000101"); inc.OrderType = "Đơn hủy"; inc.ReturnTrack = ""; inc.PlatformStatus = "Huỷ sau chuẩn bị · Đã huỷ";
+        Run(main, inc);
+        Assert.Single(main);
+        Assert.Equal("SPXVN000000101", main[0].Track);
+        Assert.Equal(ReceiveStatus.NotReturned, main[0].Status);
+    }
+
+    [Fact]
+    public void Filling_a_code_never_touches_other_receive_statuses()
+    {
+        foreach (var st in new[] { ReceiveStatus.Received, ReceiveStatus.Lost, ReceiveStatus.NotReturned })
+        {
+            var o = OldCancel("a", "SP1"); o.Status = st;
+            var main = new List<Order> { o };
+            var inc = Incoming("SP1", "SPXVN000000101"); inc.OrderType = "Đơn hủy";
+            Run(main, inc);
+            Assert.Equal(st, main[0].Status);
+        }
+        // đơn KHÔNG phải đơn huỷ mà "Không cần nhận" (chủ shop tự đặt): giữ nguyên
+        var r = Old("b", "SP2"); r.Status = ReceiveStatus.NotNeeded;
+        var m2 = new List<Order> { r };
+        Run(m2, Incoming("SP2", "SPXVN000000102"));
+        Assert.Equal(ReceiveStatus.NotNeeded, m2[0].Status);
+    }
 }

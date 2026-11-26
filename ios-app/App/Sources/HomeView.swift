@@ -494,24 +494,11 @@ struct HomeView: View {
 
             if !store.hasData {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Chưa có dữ liệu sản phẩm. Kết nối máy tính hoặc bật dữ liệu mẫu để xem")
+                    Text("Chưa có dữ liệu sản phẩm")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if !store.isDemoMode {
-                        Button {
-                            Haptics.medium()
-                            engine.setDemoMode(true)
-                        } label: {
-                            Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                                .font(Theme.Typography.secondaryBold)
-                                .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                        .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
-                    }
                 }
             } else if top3.isEmpty {
                 HStack(spacing: 8) {
@@ -915,23 +902,12 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(engine.cloudActive ? "Đang tải dữ liệu từ cloud" : "Chưa ghép cloud")
                         .font(Theme.Typography.navTitle)
-                    Text(engine.cloudActive ? "Danh sách đơn sẽ hiện sau vài giây." : "Ghép cloud bằng mật khẩu cửa hàng hoặc xem thử ngay với dữ liệu mẫu.")
+                    Text(engine.cloudActive ? "Danh sách đơn sẽ hiện sau vài giây." : "Ghép cloud bằng mật khẩu cửa hàng (Cài đặt → Cloud).")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Button {
-                Haptics.medium()
-                engine.setDemoMode(true)
-            } label: {
-                Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(Theme.Typography.secondaryBold)
-                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
 
             if !engine.cloudActive {
                 VStack(alignment: .leading, spacing: 6) {

@@ -607,21 +607,10 @@ struct ProductStatsView: View {
             IconTile(systemName: "chart.bar.doc.horizontal.fill", color: Theme.accent, size: 46, cornerRadius: 13)
             Text("Chưa có dữ liệu sản phẩm")
                 .font(Theme.Typography.navTitle)
-            Text("Kết nối máy tính hoặc bật dữ liệu mẫu để xem bảng xếp hạng sản phẩm bị hoàn.")
+            Text("Đang tải dữ liệu từ cloud. Chưa ghép thì vào Cài đặt → Cloud.")
                 .font(Theme.Typography.secondary)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button {
-                Haptics.medium()
-                engine.setDemoMode(true)
-            } label: {
-                Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(Theme.Typography.primaryBold)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: Theme.minTapTarget)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
         }
         .frame(maxWidth: .infinity)
         .card(padding: 20, radius: Theme.cardRadius)

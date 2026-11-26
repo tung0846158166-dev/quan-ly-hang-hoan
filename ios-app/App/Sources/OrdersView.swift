@@ -518,22 +518,11 @@ struct OrdersView: View {
             IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 46, cornerRadius: 13)
             Text("Chưa có dữ liệu đơn")
                 .font(Theme.Typography.navTitle)
-            Text("Kết nối máy tính ở Cài đặt hoặc bật chế độ xem thử để khám phá giao diện.")
+            Text("Đang tải dữ liệu từ cloud. Chưa ghép thì vào Cài đặt → Cloud.")
                 .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
-            Button {
-                Haptics.medium()
-                engine.setDemoMode(true)
-            } label: {
-                Label("Xem thử với dữ liệu mẫu", systemImage: "sparkles")
-                    .font(Theme.Typography.secondaryBold)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: Theme.minTapTarget)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
         }
         .padding(20)
     }

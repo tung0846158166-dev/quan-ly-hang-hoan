@@ -40,20 +40,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                // MARK: - Dữ liệu mẫu
-                Section {
-                    HStack(spacing: 10) {
-                        IconTile(systemName: "sparkles", color: Theme.accent, size: 28, cornerRadius: 7)
-                        Toggle("Xem thử với dữ liệu mẫu", isOn: demoBinding)
-                            .font(Theme.Typography.primary)
-                            .tint(Theme.accent)
-                    }
-                } header: {
-                    Text("Chế độ xem thử")
-                } footer: {
-                    Text("Hiển thị ~60 đơn mẫu đầy đủ các trường hợp để xem trước giao diện. Không gửi bất kỳ lệnh nào lên cloud và giữ nguyên dữ liệu thật khi tắt.")
-                }
-
                 // MARK: - Cloud (T042)
                 Section {
                     NavigationLink {

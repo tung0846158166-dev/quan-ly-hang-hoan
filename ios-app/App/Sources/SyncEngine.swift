@@ -132,6 +132,8 @@ final class SyncEngine: ObservableObject {
 
     /// Bật/tắt chế độ xem thử dữ liệu mẫu. Tắt sẽ khôi phục nguyên vẹn lịch sử và danh sách đơn thật.
     func setDemoMode(_ on: Bool) {
+        // chủ dự án 26/11/2026: đã có dữ liệu thật, bỏ chế độ xem thử (chỉ còn cho phép TẮT nếu đang bật)
+        if on { return }
         if on {
             guard !isDemoMode else { return }
             flushPersist()

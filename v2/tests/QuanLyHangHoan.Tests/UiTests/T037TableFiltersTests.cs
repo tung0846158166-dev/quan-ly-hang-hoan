@@ -159,6 +159,7 @@ public class T037TableFiltersTests
     {
         var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now));
         vm.LoadOrders(Enumerable.Range(1, 250).Select(i => new Order { OrderId = "P" + i, Track = "TP" + i, Platform = "Shopee", OrderType = "Đơn hủy" }).ToList(), Now);
+        vm.SelectedSortOption = vm.SortOptions.Single(o => o.Key == "default");   // test phân trang: xếp theo STT cho dễ đối chiếu
         Assert.Equal(3, vm.TotalPages);
         Assert.Equal(100, vm.VisibleOrders.Count);
         Assert.Equal(250, vm.VisibleCount);
@@ -183,10 +184,11 @@ public class T037TableFiltersTests
         Assert.Equal(1, vm.CurrentPage);
         Assert.Equal(vm.VisibleCount, vm.FilteredOrders.Count);
         // Chọn đơn bằng lệnh (từ Trang chủ / tìm kiếm) tự nhảy tới đúng trang.
+        // Chọn đơn tự xóa lọc về mặc định "Mới nạp" (dòng nạp sau lên đầu): P30 nằm ở trang 3.
         vm.ResetAllFiltersCommand.Execute(null);
-        Assert.True(vm.SelectOrder("P230", "TP230"));
+        Assert.True(vm.SelectOrder("P30", "TP30"));
         Assert.Equal(3, vm.CurrentPage);
-        Assert.Equal("P230", vm.SelectedRow!.OrderId);
+        Assert.Equal("P30", vm.SelectedRow!.OrderId);
         Assert.Contains(vm.SelectedRow, vm.VisibleOrders);
         // Ít hơn một trang: không hiện thanh chuyển trang.
         vm.SearchText = "P7";

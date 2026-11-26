@@ -105,7 +105,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
 
         SortOptions =
         [
-            new SortOptionItem("default", "Mặc định (STT)"),
+            new SortOptionItem("import_desc", "Mới nạp (Mới → Cũ)"),   // mặc định: đơn mới nạp nhất lên đầu (chủ dự án 26/11/2026)
+            new SortOptionItem("default", "Theo STT"),
             new SortOptionItem("alert_desc", "Cảnh báo: Đỏ → Vàng → An toàn"),
             new SortOptionItem("return_desc", "Ngày hoàn (Mới → Cũ)"),
             new SortOptionItem("return_asc", "Ngày hoàn (Cũ → Mới)"),
@@ -820,6 +821,11 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
                     var h = b.ElapsedHours.CompareTo(a.ElapsedHours);
                     return h != 0 ? h : a.Stt.CompareTo(b.Stt);
                 });
+                break;
+
+            case "import_desc":
+                // cùng mốc thời gian: dòng nạp sau (STT lớn hơn) lên trước
+                filtered.Sort((a, b) => CompareNullableDateDesc(a.NewestKey, b.NewestKey, b.Stt, a.Stt));
                 break;
 
             case "return_desc":

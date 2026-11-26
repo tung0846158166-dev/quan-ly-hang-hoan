@@ -20,6 +20,7 @@ public sealed class ReturnOrderRowViewModel
         ArrivedAtDate = AlertThresholds.TryParseVietnamDateTime(source.ReturnedAt);
         ShipDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ShipDate);
         ReturnDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ReturnDate);
+        ImportedAtParsed = AlertThresholds.TryParseVietnamDateTime(source.ImportedAt);
         AlertLevel = AlertThresholds.EvaluateOrder(source, now, policy);
 
         if (ArrivedAtDate is not null && AlertLevel is AlertLevel.Safe or AlertLevel.Yellow or AlertLevel.Red)
@@ -105,6 +106,10 @@ public sealed class ReturnOrderRowViewModel
     public DateTime? ArrivedAtDate { get; }
     public DateTime? ShipDateParsed { get; }
     public DateTime? ReturnDateParsed { get; }
+    /// <summary>Giờ nạp đơn (ISO của dữ liệu cũ hoặc giờ Việt Nam của đơn tạo mới).</summary>
+    public DateTime? ImportedAtParsed { get; }
+    /// <summary>Khóa "mới nạp": giờ nạp; đơn cũ không có giờ nạp thì dùng ngày hoàn, rồi ngày giao.</summary>
+    public DateTime? NewestKey => ImportedAtParsed ?? ReturnDateParsed ?? ShipDateParsed;
 
     public AlertLevel AlertLevel { get; }
     public int AlertPriority { get; }

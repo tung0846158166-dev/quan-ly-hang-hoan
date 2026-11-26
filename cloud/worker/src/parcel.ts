@@ -9,7 +9,7 @@ export const PARCEL_KEYS = new Set([
   "importWeek", "importedAt", "isWatchlist", "watchlistReason", "isPartialReturn", "photoId", "items", "extra",
   "isArchived", "archivedAt", "isDeleted", "deletedAt", "deletedFrom",
   // khiếu nại (26/11/2026): CHỈ có khi đơn đang/đã khiếu nại (đơn thường không có khóa -> băm cũ không đổi)
-  "complaintStatus", "complaintAt", "complaintNote",
+  "complaintStatus", "complaintAt", "complaintNote", "complaintDoneAt",
   // do máy chủ/nguồn thêm, bỏ qua khi lưu
   "rev", "updatedAt", "hash",
 ]);
@@ -31,6 +31,8 @@ export interface Parcel {
   items: Item[]; extra: Record<string, string | number | boolean>;
   isArchived: boolean; archivedAt: string; isDeleted: boolean; deletedAt: string; deletedFrom: string;
   complaintStatus?: string; complaintAt?: string; complaintNote?: string;
+  /** Lúc khiếu nại xong (Thành công / Thất bại); đơn khiếu nại Thành công tự lưu trữ sau 30 ngày kể từ đây (27/11/2026). */
+  complaintDoneAt?: string;
 }
 
 /** Trạng thái khiếu nại hợp lệ ("" = bỏ khiếu nại). */
@@ -38,7 +40,7 @@ export const COMPLAINT_STATUS = new Set(["Đang xử lý", "Thành công", "Th�
 
 /** Chép các trường khiếu nại (nếu có) từ `from` sang `to`; không có thì xóa khỏi `to`. */
 export function copyComplaint(from: Parcel | null | undefined, to: Parcel): void {
-  for (const k of ["complaintStatus", "complaintAt", "complaintNote"] as const) {
+  for (const k of ["complaintStatus", "complaintAt", "complaintNote", "complaintDoneAt"] as const) {
     const v = from?.[k];
     if (v) to[k] = v; else delete to[k];
   }
@@ -96,6 +98,7 @@ export function parseParcel(raw: unknown): Validation | Invalid {
     p.complaintStatus = str(o.complaintStatus);
     if (str(o.complaintAt)) p.complaintAt = str(o.complaintAt);
     if (str(o.complaintNote)) p.complaintNote = str(o.complaintNote);
+    if (str(o.complaintDoneAt)) p.complaintDoneAt = str(o.complaintDoneAt);
   }
   return { ok: true, parcel: p };
 }

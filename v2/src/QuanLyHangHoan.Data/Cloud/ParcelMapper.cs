@@ -38,7 +38,7 @@ public static class ParcelMapper
             Note = S(p["note"]), UserNote = S(p["userNote"]), ImportWeek = S(p["importWeek"]), ImportedAt = S(p["importedAt"]),
             IsWatchlist = B(p["isWatchlist"]), WatchlistReason = S(p["watchlistReason"]), IsPartialReturn = B(p["isPartialReturn"]),
             PhotoId = S(p["photoId"]),
-            ComplaintStatus = S(p["complaintStatus"]), ComplaintAt = S(p["complaintAt"]), ComplaintNote = S(p["complaintNote"]),
+            ComplaintStatus = S(p["complaintStatus"]), ComplaintAt = S(p["complaintAt"]), ComplaintNote = S(p["complaintNote"]), ComplaintDoneAt = S(p["complaintDoneAt"]),
         };
         if (p["items"] is JsonArray items)
             foreach (var i in items)
@@ -149,6 +149,7 @@ public static class ParcelMapper
             parcel["complaintStatus"] = o.ComplaintStatus;
             if (o.ComplaintAt.Length > 0) parcel["complaintAt"] = o.ComplaintAt;
             if (o.ComplaintNote.Length > 0) parcel["complaintNote"] = o.ComplaintNote;
+            if (o.ComplaintDoneAt.Length > 0) parcel["complaintDoneAt"] = o.ComplaintDoneAt;
         }
         return parcel;
     }

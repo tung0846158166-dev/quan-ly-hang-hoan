@@ -1176,3 +1176,25 @@ describe("chuyển cloud sang tài khoản khác (/admin/transfer/*, 27/11/2026)
     expect((await call("POST", "/admin/transfer/import", { table: "parcels", rows: [] }, owner)).status).toBe(409);
   });
 });
+
+describe("ngày khiếu nại xong (27/11/2026)", () => {
+  const get = async (id: string) => (await call("GET", "/sync?since=0&limit=1000", undefined, owner)).data.changes
+    .find((c: any) => c.type === "parcel" && c.parcel.id === id)?.parcel;
+  const edit = (id: string, value: string) =>
+    call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editCell", id, field: "complaintStatus", value }] }, owner);
+
+  it("chuyển Thành công / Thất bại thì ghi ngày xong; quay lại Đang xử lý thì xóa", async () => {
+    await importParcels([parcel("d1")]);
+    await edit("d1", "Đang xử lý");
+    expect((await get("d1")).complaintDoneAt).toBeUndefined();
+    await edit("d1", "Thành công");
+    const done = (await get("d1")).complaintDoneAt;
+    expect(done).toMatch(/\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2}/);
+    await edit("d1", "Đang xử lý");
+    expect((await get("d1")).complaintDoneAt).toBeUndefined();
+    await edit("d1", "Thất bại");
+    expect((await get("d1")).complaintDoneAt).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    await edit("d1", "");
+    expect((await get("d1")).complaintDoneAt).toBeUndefined();
+  }, 30_000);
+});

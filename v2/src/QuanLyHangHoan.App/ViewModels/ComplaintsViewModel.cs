@@ -40,6 +40,17 @@ public sealed class ComplaintRowViewModel
     public string ComplaintStatus => Source.ComplaintStatus;
     public string ComplaintAt => Source.ComplaintAt;
     public string ComplaintNote => Source.ComplaintNote;
+    public string ComplaintDoneAt => Source.ComplaintDoneAt;
+    /// <summary>Khiếu nại Thành công: ngày sẽ tự vào Kho lưu trữ (30 ngày sau khi xong).</summary>
+    public string AutoArchiveText
+    {
+        get
+        {
+            if (IsArchived || Source.ComplaintStatus != ComplaintStatuses.Success) return "";
+            var d = QuanLyHangHoan.Core.Alerts.ArchivePolicy.ParseRecvDate(Source.ComplaintDoneAt);
+            return d is null ? "" : "Tự lưu trữ " + (d.Value + QuanLyHangHoan.Core.Alerts.ArchivePolicy.ComplaintSuccessAfter).ToString("dd/MM/yyyy");
+        }
+    }
     public string SearchBlob { get; }
 }
 

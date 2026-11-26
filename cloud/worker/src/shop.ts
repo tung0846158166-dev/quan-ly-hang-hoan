@@ -646,8 +646,11 @@ export class ShopDO extends DurableObject<Env> {
       const v = this.text(op.value, 50).trim();
       if (v && !COMPLAINT_STATUS.has(v)) return fail(422, "invalid", "Trạng thái khiếu nại không hợp lệ.");
       return this.opMutate(op, dev, "editCell", (p) => {
-        if (!v) { delete p.complaintStatus; delete p.complaintAt; delete p.complaintNote; return; }
+        if (!v) { delete p.complaintStatus; delete p.complaintAt; delete p.complaintNote; delete p.complaintDoneAt; return; }
         if (!p.complaintStatus || !p.complaintAt) p.complaintAt = vnTime(Date.now());
+        // ngày khiếu nại xong: ghi khi chuyển sang Thành công / Thất bại; quay lại Đang xử lý thì xóa
+        if (v === "Đang xử lý") delete p.complaintDoneAt;
+        else if (v !== p.complaintStatus || !p.complaintDoneAt) p.complaintDoneAt = vnTime(Date.now());
         p.complaintStatus = v;
       });
     }

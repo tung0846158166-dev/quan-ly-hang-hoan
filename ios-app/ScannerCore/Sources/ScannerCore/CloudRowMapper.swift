@@ -112,7 +112,7 @@ public enum CloudRowMapper {
         }
         let nt = join([p.note, p.userNote].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, 200)
         if !nt.isEmpty { row.nt = nt }
-        if !p.complaintStatus.isEmpty { row.kn = p.complaintStatus; row.kna = p.complaintAt; row.knn = clip(p.complaintNote, 300) }
+        if !p.complaintStatus.isEmpty { row.kn = p.complaintStatus; row.kna = p.complaintAt; row.knn = clip(p.complaintNote, 300); row.knd = p.complaintDoneAt }
         if k == "c" { row.ci = p.id }
         row.pid = p.id
         return row

@@ -37,7 +37,8 @@ public static class LegacyImporter
             -- 1 = v2 đã quét/sửa tay/dời lưu trữ/nạp file: nhập lại dữ liệu cũ CHỈ được bổ sung chỗ trống, không ghi đè.
             v2_modified INTEGER NOT NULL DEFAULT 0,
             -- khiếu nại (26/11/2026): "" = không khiếu nại
-            complaint_status TEXT NOT NULL DEFAULT '', complaint_at TEXT NOT NULL DEFAULT '', complaint_note TEXT NOT NULL DEFAULT ''
+            complaint_status TEXT NOT NULL DEFAULT '', complaint_at TEXT NOT NULL DEFAULT '', complaint_note TEXT NOT NULL DEFAULT '',
+            complaint_done_at TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS ix_orders_order_id ON orders(order_id);
         CREATE INDEX IF NOT EXISTS ix_orders_track ON orders(track);

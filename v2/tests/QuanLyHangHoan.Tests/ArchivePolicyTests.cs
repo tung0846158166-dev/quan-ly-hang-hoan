@@ -69,4 +69,18 @@ public sealed class ArchivePolicyTests : IDisposable
         Assert.False(all.Single(x => x.Order.Track == "C").IsArchived);
         Assert.False(all.Single(x => x.Order.Track == "D").IsArchived); // đã xóa: không đụng
     }
+
+    // chủ dự án 27/11/2026: đơn khiếu nại chỉ tự lưu trữ khi khiếu nại THÀNH CÔNG được 30 ngày
+    [Theory]
+    [InlineData("Đang xử lý", "", "Hàng đã trả", false)]                     // đang khiếu nại: không bao giờ tự lưu trữ
+    [InlineData("Thành công", "25/10/2026 12:00:00", "Hàng đã trả", false)]  // mới 29 ngày
+    [InlineData("Thành công", "24/10/2026 12:00:00", "Hàng đã trả", true)]   // đủ 30 ngày
+    [InlineData("Thành công", "20/10/2026 09:00:00", "Bị mất", true)]        // khiếu nại hàng mất thành công: cũng lưu trữ
+    [InlineData("Thành công", "", "Hàng đã trả", false)]                     // không rõ ngày xong: không đoán
+    [InlineData("Thất bại", "01/10/2026 12:00:00", "Hàng đã trả", false)]    // thất bại: chưa có quy tắc -> giữ ở bảng chính
+    public void Complained_orders_archive_only_30_days_after_success(string complaint, string doneAt, string status, bool expected)
+    {
+        var o = new Order { Status = status, RecvDate = "01/10/2026 10:00:00", ComplaintStatus = complaint, ComplaintAt = "01/10/2026 10:00:00", ComplaintDoneAt = doneAt };
+        Assert.Equal(expected, ArchivePolicy.ShouldArchive(o, Now));
+    }
 }

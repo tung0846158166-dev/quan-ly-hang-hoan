@@ -95,6 +95,8 @@ public sealed class Order
     /// <summary>Lúc bắt đầu khiếu nại (dd/MM/yyyy HH:mm:ss).</summary>
     public string ComplaintAt { get; set; } = "";
     public string ComplaintNote { get; set; } = "";
+    /// <summary>Lúc khiếu nại xong (Thành công / Thất bại). Khiếu nại Thành công: tự lưu trữ sau 30 ngày kể từ đây.</summary>
+    public string ComplaintDoneAt { get; set; } = "";
     public bool IsPartialReturn { get; set; }
 
     public string PhotoId { get; set; } = "";          // trỏ tới file ảnh

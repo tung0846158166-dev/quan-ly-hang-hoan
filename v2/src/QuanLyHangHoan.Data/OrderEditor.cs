@@ -75,9 +75,15 @@ public static class OrderEditor
             if (field == EditField.ComplaintStatus)
             {
                 if (newValue.Length == 0)
-                    Exec(conn, tx, "UPDATE orders SET complaint_at='', complaint_note='' WHERE id=$id", ("$id", orderId));
-                else if (old.Length == 0 || (Scalar(conn, tx, "SELECT complaint_at FROM orders WHERE id=$id", orderId)?.ToString() ?? "").Length == 0)
-                    Exec(conn, tx, "UPDATE orders SET complaint_at=$d WHERE id=$id", ("$d", Stamp(now)), ("$id", orderId));
+                    Exec(conn, tx, "UPDATE orders SET complaint_at='', complaint_note='', complaint_done_at='' WHERE id=$id", ("$id", orderId));
+                else
+                {
+                    if (old.Length == 0 || (Scalar(conn, tx, "SELECT complaint_at FROM orders WHERE id=$id", orderId)?.ToString() ?? "").Length == 0)
+                        Exec(conn, tx, "UPDATE orders SET complaint_at=$d WHERE id=$id", ("$d", Stamp(now)), ("$id", orderId));
+                    // ngày xong: ghi khi sang Thành công / Thất bại, xóa khi quay lại Đang xử lý
+                    Exec(conn, tx, "UPDATE orders SET complaint_done_at=$d WHERE id=$id",
+                        ("$d", newValue == ComplaintStatuses.Processing ? "" : Stamp(now)), ("$id", orderId));
+                }
             }
 
             // Đánh dấu "đã nhận" thủ công: đặt giờ nhận nếu CHƯA có (giữ giờ nhận đầu tiên, không ghi đè).

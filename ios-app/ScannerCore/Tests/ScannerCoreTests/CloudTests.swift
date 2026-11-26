@@ -374,10 +374,11 @@ final class CloudTests: XCTestCase {
     // Khiếu nại (chủ dự án 26/11/2026): trường từ cloud -> dòng hiển thị; lệnh gửi lên cloud
     func testComplaintFieldsReachTheRowAndOpsAreBuilt() {
         let now = Date()
-        let r = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","complaintStatus":"Đang xử lý","complaintAt":"26/11/2026 10:00:00","complaintNote":"gửi Shopee"}"#), now: now)!
+        let r = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","complaintStatus":"Đang xử lý","complaintAt":"26/11/2026 10:00:00","complaintNote":"gửi Shopee","complaintDoneAt":"27/11/2026 09:00:00"}"#), now: now)!
         XCTAssertEqual(r.kn, "Đang xử lý")
         XCTAssertEqual(r.kna, "26/11/2026 10:00:00")
         XCTAssertEqual(r.knn, "gửi Shopee")
+        XCTAssertEqual(r.knd, "27/11/2026 09:00:00")
         XCTAssertTrue(r.isComplaint)
         let plain = CloudRowMapper.row(parcel(#"{"id":"b","track":"T2"}"#), now: now)!
         XCTAssertFalse(plain.isComplaint)

@@ -18,8 +18,19 @@ public sealed record ArchivePolicy(TimeSpan After)
 
     public static bool ShouldArchive(Order o, DateTime now) => Default.Check(o, now);
 
+    /// <summary>Đơn khiếu nại Thành công: tự lưu trữ sau chừng này kể từ lúc khiếu nại xong (chủ dự án 27/11/2026).</summary>
+    public static readonly TimeSpan ComplaintSuccessAfter = TimeSpan.FromDays(30);
+
     public bool Check(Order o, DateTime now)
     {
+        // đơn đang/đã khiếu nại: KHÔNG theo quy tắc 24h. Chỉ tự lưu trữ khi khiếu nại Thành công đủ 30 ngày (kể cả hàng mất);
+        // Đang xử lý / Thất bại: giữ ở bảng chính. Không rõ ngày xong: không đoán.
+        if (o.ComplaintStatus.Length > 0)
+        {
+            if (o.ComplaintStatus != ComplaintStatuses.Success) return false;
+            var done = ParseRecvDate(o.ComplaintDoneAt);
+            return done is not null && now - done.Value >= ComplaintSuccessAfter;
+        }
         if (o.Status != ReceiveStatus.Received) return false;
         var recv = ParseRecvDate(o.RecvDate);
         return recv is not null && now - recv.Value >= After;

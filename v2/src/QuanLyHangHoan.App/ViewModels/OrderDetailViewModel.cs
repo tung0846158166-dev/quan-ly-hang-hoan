@@ -108,6 +108,7 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         IsWatchlist = order.IsWatchlist;
         ComplaintBanner = order.ComplaintStatus.Length == 0 ? ""
             : $"⚖️ KHIẾU NẠI: {order.ComplaintStatus}" + (order.ComplaintAt.Length > 0 ? $" (từ {order.ComplaintAt})" : "")
+              + (order.ComplaintDoneAt.Length > 0 ? $" • xong {order.ComplaintDoneAt}" : "")
               + (order.ComplaintNote.Length > 0 ? " — " + order.ComplaintNote : "");
         WatchlistBanner = !order.IsWatchlist ? ""
             : "⭐ ĐANG THEO DÕI" + (string.IsNullOrWhiteSpace(order.WatchlistReason) ? " (chưa ghi lý do)" : " — " + order.WatchlistReason.Trim());

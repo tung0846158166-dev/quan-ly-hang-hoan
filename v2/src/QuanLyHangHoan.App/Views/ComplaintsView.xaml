@@ -136,6 +136,8 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Ngày khiếu nại" Binding="{Binding ComplaintAt}" Width="140" />
+                        <DataGridTextColumn Header="Ngày xong" Binding="{Binding ComplaintDoneAt}" Width="140" />
+                        <DataGridTextColumn Header="Lưu trữ" Binding="{Binding AutoArchiveText}" Width="150" />
                         <DataGridTextColumn Header="Sàn" Binding="{Binding Platform}" Width="80" />
                         <DataGridTextColumn Header="Mã đơn hàng" Binding="{Binding OrderId}" Width="150" />
                         <DataGridTextColumn Header="Mã vận đơn" Binding="{Binding DisplayTracking}" Width="200" />

@@ -1238,6 +1238,10 @@ struct DetailView: View {
                         StatusPill(text: live.kn, color: live.kn == "Thành công" ? Theme.success : (live.kn == "Thất bại" ? Theme.danger : Theme.purple))
                         if !live.kna.isEmpty { Text("từ \(live.kna)").font(.caption2).foregroundStyle(.secondary) }
                     }
+                    if !live.knd.isEmpty {
+                        Text("Xong lúc \(live.knd)" + (live.kn == "Thành công" && !live.isArchived ? " • tự vào Lưu trữ sau 30 ngày" : ""))
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
                     if !live.knn.isEmpty {
                         Text(live.knn).font(.subheadline).fixedSize(horizontal: false, vertical: true)
                     }

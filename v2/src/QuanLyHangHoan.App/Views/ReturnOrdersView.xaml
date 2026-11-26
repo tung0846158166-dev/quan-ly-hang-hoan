@@ -335,6 +335,8 @@
                     <TextBox Text="{Binding ProductFilter, UpdateSourceTrigger=PropertyChanged, Delay=300}" Width="190" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" ToolTip="Gõ một phần tên sản phẩm (không cần dấu)" />
                     <TextBlock Text="ĐVVC:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <ComboBox ItemsSource="{Binding CarrierOptions}" SelectedItem="{Binding CarrierFilter}" Width="150" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
+                    <TextBlock Text="Trạng thái kiện:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding PlatformStatusOptions}" SelectedItem="{Binding PlatformStatusFilter}" Width="190" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
                     <ComboBox Visibility="Collapsed" ItemsSource="{Binding PhotoOptions}" SelectedItem="{Binding PhotoOption}" Width="130" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
                     <TextBlock Text="Ngày hoàn từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <DatePicker SelectedDate="{Binding DateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" />

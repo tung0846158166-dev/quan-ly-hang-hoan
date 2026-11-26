@@ -288,6 +288,24 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<string> _carrierOptions = [AllCarriers];
 
     public const string AllCarriers = "Tất cả ĐVVC";
+
+    // ---- Lọc theo cột "Trạng thái kiện" (trạng thái trên sàn), chủ dự án 26/11/2026 ----
+    public const string AllPlatformStatuses = "Tất cả trạng thái kiện";
+    public const string EmptyPlatformStatus = "(Trống)";
+    [ObservableProperty] private string _platformStatusFilter = AllPlatformStatuses;
+    [ObservableProperty] private ObservableCollection<string> _platformStatusOptions = [AllPlatformStatuses];
+    partial void OnPlatformStatusFilterChanged(string value) => AdvancedFilterChanged();
+
+    private void RebuildPlatformStatusOptions()
+    {
+        var all = _allRows.Select(r => r.PlatformStatus?.Trim() ?? string.Empty).ToList();
+        var set = all.Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
+        if (all.Any(c => c.Length == 0)) set.Add(EmptyPlatformStatus);
+        var keep = PlatformStatusFilter;
+        PlatformStatusOptions = new ObservableCollection<string>([AllPlatformStatuses, .. set]);
+        PlatformStatusFilter = PlatformStatusOptions.Contains(keep) ? keep : AllPlatformStatuses;
+    }
     public IReadOnlyList<string> PhotoOptions { get; } = ["Ảnh: tất cả", "Có ảnh", "Chưa có ảnh"];
 
     [ObservableProperty] private string _photoOption = "Ảnh: tất cả";
@@ -296,6 +314,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     public int AdvancedFilterCount =>
         (ProductFilter.Trim().Length > 0 ? 1 : 0)
         + (CarrierFilter != AllCarriers ? 1 : 0)
+        + (PlatformStatusFilter != AllPlatformStatuses ? 1 : 0)
         + (PhotoFilter != "all" ? 1 : 0)
         + (DateFrom.HasValue || DateTo.HasValue ? 1 : 0);
 
@@ -322,6 +341,11 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private bool MatchesAdvanced(ReturnOrderRowViewModel row)
     {
         if (CarrierFilter != AllCarriers && !row.Carrier.Equals(CarrierFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        if (PlatformStatusFilter != AllPlatformStatuses)
+        {
+            var ps = row.PlatformStatus?.Trim() ?? string.Empty;
+            if (PlatformStatusFilter == EmptyPlatformStatus ? ps.Length > 0 : !ps.Equals(PlatformStatusFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        }
         if (PhotoFilter == "with" && !row.HasPhoto) return false;
         if (PhotoFilter == "without" && row.HasPhoto) return false;
         if (_productKw.Length > 0 && !row.ItemsBlob.Contains(_productKw, StringComparison.Ordinal)) return false;
@@ -537,6 +561,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         var previousId = SelectedRow?.Source.Id;
         _allRows = rows;
         RebuildCarrierOptions();
+        RebuildPlatformStatusOptions();
         sw.Stop();
         _lastLoadMs = sw.ElapsedMilliseconds;
 
@@ -622,6 +647,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             SearchText = string.Empty;
             ProductFilter = string.Empty;
             CarrierFilter = AllCarriers;
+            PlatformStatusFilter = AllPlatformStatuses;
             PhotoOption = "Ảnh: tất cả";
             DateFrom = null;
             DateTo = null;
@@ -677,6 +703,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             _lastLoadMs = sw.ElapsedMilliseconds;
             _allRows = rows;
             RebuildCarrierOptions();
+            RebuildPlatformStatusOptions();
 
             RecalculatePlatformAndOrderTypeCounts();
             RecalculateStatusCounts();

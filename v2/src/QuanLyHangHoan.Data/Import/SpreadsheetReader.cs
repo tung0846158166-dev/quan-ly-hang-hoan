@@ -196,7 +196,40 @@ public static class SpreadsheetReader
     }
 
     // ================= csv =================
-    public static List<Dictionary<string, string>> ReadCsv(string text)
+    public static List<Dictionary<string, string>> ReadCsv(string text) => BestTable(new List<string[][]> { ParseCsv(text) });
+
+    /// <summary>
+    /// Tab tra mã "Vận đơn huỷ" (Google Sheet): chỉ có 2 cột mã (Mã đơn, Mã vận đơn), có dòng tên + mô tả phía trên. Bộ đọc bảng chung
+    /// (cần thêm cột hàng/SL/trạng thái) bỏ qua nó. Đọc riêng: dòng tiêu đề đầu tiên có CẢ "Mã đơn" và "Mã vận đơn"; không có thì trả rỗng.
+    /// Giống hệt qlhhTrackTable_ của Apps Script.
+    /// </summary>
+    public static List<Dictionary<string, string>> ReadCsvTrackTable(string text)
+    {
+        var matrix = ParseCsv(text);
+        for (var h = 0; h < matrix.Length; h++)
+        {
+            var keys = matrix[h].Select(NormalizeHeader).ToList();
+            if (!keys.Contains("madon") || !keys.Contains("mavandon")) continue;
+            var names = HeaderNames(matrix[h]);
+            var rows = new List<Dictionary<string, string>>();
+            for (var r = h + 1; r < matrix.Length; r++)
+            {
+                var d = new Dictionary<string, string>();
+                var any = false;
+                for (var c = 0; c < names.Count; c++)
+                {
+                    var v = c < matrix[r].Length ? matrix[r][c] ?? "" : "";
+                    d[names[c]] = v;
+                    if (!string.IsNullOrWhiteSpace(v)) any = true;
+                }
+                if (any) rows.Add(d);
+            }
+            return rows;
+        }
+        return new List<Dictionary<string, string>>();
+    }
+
+    private static string[][] ParseCsv(string text)
     {
         text = text.TrimStart('﻿');
         var firstLine = text.Split('\n', 2)[0];
@@ -220,7 +253,7 @@ public static class SpreadsheetReader
             else cell.Append(ch);
         }
         if (cell.Length > 0 || row.Count > 0) { row.Add(cell.ToString()); matrix.Add(row.ToArray()); }
-        return BestTable(new List<string[][]> { matrix.ToArray() });
+        return matrix.ToArray();
     }
 
     // ================= tìm bảng đơn hàng =================

@@ -246,7 +246,7 @@ public sealed class SheetSyncService : IDisposable
         var hash = Hash(string.Join("\u0002", texts.Select(t => t.Tab + "\u0001" + t.Text)));
         if (!manual && hash == Config.LastHash) return new SheetRunResult { Ran = true, Ok = true, Unchanged = true, Note = "Sheet không thay đổi" };
 
-        var tabs = texts.Select(t => { try { return SpreadsheetReader.DropPersonalColumns(SpreadsheetReader.ReadCsv(t.Text)); } catch (Exception) { return new List<Dictionary<string, string>>(); } }).ToList();
+        var tabs = texts.Select(t => ReadTab(t.Tab, t.Text)).ToList();
         var build = SheetPipeline.Build(tabs, Config.SkipTypes, Config.MaxDays, now);
         if (build.Rows.Count == 0)
             throw new InvalidOperationException("Không tab nào có dòng dữ liệu đơn hàng (cần dòng tiêu đề có Mã đơn hàng / Mã vận đơn).");
@@ -282,6 +282,18 @@ public sealed class SheetSyncService : IDisposable
     }
 
     /// <summary>Đọc một tab tùy chọn: mọi lỗi (mạng, Google, {"error"...}, trang HTML) đều trả null để không làm hỏng việc đồng bộ.</summary>
+    /// <summary>CSV một tab -> dòng. Tab tra mã "Vận đơn huỷ" đọc bằng bộ đọc riêng (chỉ có 2 cột mã); tab khác dùng bộ đọc bảng chung. Lỗi -> rỗng.</summary>
+    public static List<Dictionary<string, string>> ReadTab(string tab, string text)
+    {
+        try
+        {
+            return string.Equals(tab.Trim(), SheetPipeline.TrackTabName, StringComparison.OrdinalIgnoreCase)
+                ? SpreadsheetReader.ReadCsvTrackTable(text)
+                : SpreadsheetReader.DropPersonalColumns(SpreadsheetReader.ReadCsv(text));
+        }
+        catch (Exception) { return new List<Dictionary<string, string>>(); }
+    }
+
     private async Task<string?> TryFetchOptionalTabAsync(string url, string token, DateTime now, string tab, CancellationToken ct)
     {
         try

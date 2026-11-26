@@ -1,4 +1,5 @@
 using System.IO;
+using QuanLyHangHoan.Data.Import;
 using QuanLyHangHoan.Core.Import;
 using QuanLyHangHoan.Data;
 using QuanLyHangHoan.Data.Sheet;
@@ -154,5 +155,43 @@ public sealed class SheetTrackTabTests : IDisposable
         Assert.True(r.Ok, r.Note);
         Assert.Contains(urls, u => IsTrackTab(u) && u.Contains("token="));
         Assert.DoesNotContain("SPX999", r.Note);   // ghi chú không lộ dữ liệu tra
+    }
+}
+
+/// <summary>Tab "Vận đơn huỷ" THẬT: dòng tên tab + dòng mô tả trước tiêu đề, chỉ 2 cột mã. Bộ đọc bảng chung bỏ qua nó (lỗi 26/11/2026). Dữ liệu GIẢ.</summary>
+public sealed class SheetTrackTabReaderTests
+{
+    private const string RealShape =
+        "Vận đơn huỷ,\"Mã vận đơn của đơn huỷ / bom để app đối chiếu. Tab kỹ thuật, đang ẩn.\"\n" +
+        "Mã đơn,Mã vận đơn\n" +
+        "HUYGIA1,SPXVN0000000071\n" +
+        ",SPXVN0000000072\n" +
+        "HUYGIA3,SPXVN0000000073\n";
+
+    [Fact]
+    public void Real_shaped_track_tab_is_read_and_becomes_a_lookup_tab()
+    {
+        var rows = SpreadsheetReader.ReadCsvTrackTable(RealShape);
+        Assert.Equal(3, rows.Count);
+        Assert.Equal("vandon", SheetPipeline.TabKind(rows));
+        var map = SheetPipeline.TrackMap(rows);
+        Assert.Equal("SPXVN0000000071", map["HUYGIA1"]);
+        Assert.Equal(2, map.Count);
+    }
+
+    [Fact]
+    public void Track_reader_needs_both_order_and_track_headers()
+    {
+        Assert.Empty(SpreadsheetReader.ReadCsvTrackTable("Mã đơn,Ghi chú\nA1,x\n"));
+        Assert.Empty(SpreadsheetReader.ReadCsvTrackTable(""));
+    }
+
+    [Fact]
+    public void Sync_reads_the_track_tab_with_the_track_reader()
+    {
+        var tabs = SheetSyncService.ReadTab(SheetPipeline.TrackTabName, RealShape);
+        Assert.Equal("vandon", SheetPipeline.TabKind(tabs));
+        // tab khác vẫn đọc bằng bộ đọc bảng chung (không đổi)
+        Assert.Empty(SheetSyncService.ReadTab("Hàng hoàn", RealShape));
     }
 }

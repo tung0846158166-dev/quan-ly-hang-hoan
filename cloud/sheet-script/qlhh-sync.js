@@ -116,9 +116,34 @@ function qlhhTable_(values) {
   });
 }
 
-/** Đọc một tab như máy tính đọc (xem qlhhTable_). */
+/**
+ * Tab ẩn "Vận đơn huỷ" chỉ có 2 cột mã (Mã đơn, Mã vận đơn) và có dòng tên + mô tả phía trên: bộ đọc bảng chung (cần thêm cột
+ * hàng/SL/trạng thái) bỏ qua nó. Đọc riêng: dòng tiêu đề đầu tiên có CẢ "Mã đơn" và "Mã vận đơn". Không thấy thì trả [].
+ */
+function qlhhTrackTable_(values) {
+  var matrix = values.map(qlhhTrimRow_);
+  for (var h = 0; h < matrix.length; h++) {
+    var keys = matrix[h].map(qlhhNormHeader_);
+    if (keys.indexOf("madon") < 0 || keys.indexOf("mavandon") < 0) continue;
+    var names = qlhhHeaderNames_(matrix[h]), rows = [];
+    for (var r = h + 1; r < matrix.length; r++) {
+      var d = {}, any = false;
+      for (var c = 0; c < names.length; c++) {
+        var v = c < matrix[r].length ? matrix[r][c] : "";
+        d[names[c]] = v;
+        if (v.trim() !== "") any = true;
+      }
+      if (any) rows.push(d);
+    }
+    return rows;
+  }
+  return [];
+}
+
+/** Đọc một tab như máy tính đọc (xem qlhhTable_); tab tra mã "Vận đơn huỷ" đọc bằng qlhhTrackTable_. */
 function qlhhReadTab_(sheet) {
-  return qlhhTable_(sheet.getDataRange().getDisplayValues());
+  var values = sheet.getDataRange().getDisplayValues();
+  return QLHH.key(sheet.getName()) === QLHH.key(QLHH.TRACK_TAB_NAME) ? qlhhTrackTable_(values) : qlhhTable_(values);
 }
 
 function qlhhSheets_(ss, cfg) {

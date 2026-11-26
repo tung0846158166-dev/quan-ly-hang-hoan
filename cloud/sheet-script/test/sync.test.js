@@ -175,4 +175,31 @@ t("thiếu khóa: báo lỗi rõ, không gọi mạng", () => {
   assert.strictEqual(e.posts.length, 0);
 });
 
-console.log(`Đồng bộ Apps Script (giả lập): ${pass}/9 đạt`);
+// Tab ẩn "Vận đơn huỷ" thật có dòng tên tab + dòng mô tả TRƯỚC tiêu đề, và chỉ có 2 cột mã (không có cột hàng/SL/trạng thái):
+// bộ đọc bảng chung bỏ qua nó, nên trước đây đơn "Huỷ sau chuẩn bị" không bao giờ được điền mã (lỗi 26/11/2026).
+const cancelHeader = ["Ngày", "Mã", "Mã đơn", "Loại", "Ai huỷ", "Lý do", "Khách ghi", "Sản phẩm", "SL", "Tiền", "Hành trình", "Trạng thái", "Cập nhật", "Mã SP"];
+const cancelRow = (n, loai) => ["20/11/2026 10:00", "HUYGIA" + n, "HUYGIA" + n, loai, "Khách", "Đổi ý", "", "Áo thun giả", "1", "100.000 ₫",
+  "Tạo vận đơn → Huỷ vận đơn", "Đã huỷ", "20/11/2026 11:00", "1"];
+const trackTab = (pairs) => [["Vận đơn huỷ", "Mã vận đơn của đơn huỷ / bom để app đối chiếu. Tab kỹ thuật, đang ẩn."], ["Mã đơn", "Mã vận đơn"], ...pairs];
+
+t("tab ẩn 'Vận đơn huỷ' (có dòng tên + mô tả, chỉ 2 cột mã): điền mã cho đơn huỷ chưa có mã", () => {
+  const e = env({
+    "Huỷ · chi tiết": [["Huỷ · chi tiết", "", "Mỗi dòng là 1 đơn huỷ"], cancelHeader, cancelRow(1, "Huỷ sau chuẩn bị"), cancelRow(2, "Huỷ sau chuẩn bị")],
+    "Vận đơn huỷ": trackTab([["HUYGIA1", "SPXVN0000000071"]]),
+  });
+  e.ctx.qlhhSyncToCloud(false);
+  const sent = e.posts.flatMap((p) => p.body.parcels);
+  assert.strictEqual(sent.length, 2, "tab tra mã không được thành đơn");
+  const p1 = sent.find((p) => p.orderId === "HUYGIA1"), p2 = sent.find((p) => p.orderId === "HUYGIA2");
+  assert.ok([p1.track, p1.forwardTrack, ...(p1.trackingCodes || [])].includes("SPXVN0000000071"), "đơn có trong tab tra mã phải có mã: " + JSON.stringify(p1));
+  assert.ok(![p2.track, p2.forwardTrack].some(Boolean), "đơn không có trong tab tra mã: để trống, không đoán");
+});
+
+t("đọc tab tra mã: chỉ nhận dòng tiêu đề có CẢ 'Mã đơn' và 'Mã vận đơn'", () => {
+  const e = env({});
+  const rows = e.ctx.qlhhTrackTable_(trackTab([["A1", "T1"], ["", "T2"], ["B2", ""]]));
+  assert.strictEqual(JSON.stringify(rows.map((r) => [r["Mã đơn"], r["Mã vận đơn"]])), JSON.stringify([["A1", "T1"], ["", "T2"], ["B2", ""]]));
+  assert.strictEqual(e.ctx.qlhhTrackTable_([["Mã đơn", "Ghi chú"], ["A1", "x"]]).length, 0);
+});
+
+console.log(`Đồng bộ Apps Script (giả lập): ${pass}/11 đạt`);

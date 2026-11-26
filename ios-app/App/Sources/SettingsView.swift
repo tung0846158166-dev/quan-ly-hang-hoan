@@ -59,6 +59,13 @@ struct SettingsView: View {
 
                 // MARK: - Dữ liệu
                 Section("Dữ liệu") {
+                    if engine.cloudActive {
+                        NavigationLink {
+                            SaleworkImportView()
+                        } label: {
+                            Label("Nạp đơn từ Salework", systemImage: "square.and.arrow.down.on.square")
+                        }
+                    }
                     if engine.pendingCloudPhotos > 0 {
                         settingsRow(icon: "photo.on.rectangle.angled", color: Theme.warning, title: "Ảnh chờ gửi lên cloud") {
                             Text("\(engine.pendingCloudPhotos) ảnh").font(.subheadline).foregroundStyle(.secondary)

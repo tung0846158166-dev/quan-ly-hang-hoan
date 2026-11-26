@@ -171,6 +171,11 @@ public final class CloudAPI {
         return obj
     }
 
+    /// POST JSON, trả đối tượng JSON (dùng cho các phần mở rộng trong module, vd. nạp Salework).
+    func postJSON(_ path: String, body: [String: Any]) async throws -> [String: Any] {
+        try await json("POST", path, body: body)
+    }
+
     // ---- ghép thiết bị
     public func pairComplete(code: String, deviceName: String, kind: String = "phone") async throws -> CloudPaired {
         let r = try await json("POST", "/pair/complete", body: ["code": code, "deviceName": deviceName, "kind": kind])

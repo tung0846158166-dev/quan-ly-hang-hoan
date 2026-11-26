@@ -332,9 +332,32 @@ final class SyncEngine: ObservableObject {
     }
 
     /// Gọi khi app trở lại foreground: kiểm tra lại quyền thông báo và đánh thức đồng bộ nếu cần.
+    private var keepAliveTask: UIBackgroundTaskIdentifier = .invalid
+
+    /// Xuống nền: xin iOS cho chạy thêm (~30 giây) để kết nối cloud vẫn sống khi lướt qua app khác rồi quay lại.
+    func handleBackground() {
+        flushPersist(background: true)
+        guard cloudActive, keepAliveTask == .invalid else { return }
+        keepAliveTask = UIApplication.shared.beginBackgroundTask(withName: "GiuKetNoiCloud") { [weak self] in
+            self?.endKeepAlive()
+        }
+    }
+
+    private func endKeepAlive() {
+        guard keepAliveTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(keepAliveTask)
+        keepAliveTask = .invalid
+    }
+
     func handleForeground() {
         snapshot.refreshAuthorization()
-        if cloudActive { Task { await cloud.syncNow(); await drainCloudPhotos() }; refreshAIDigest(force: true); return }
+        endKeepAlive()
+        if cloudActive {
+            cloud.resumeFromBackground()    // còn sống thì giữ nguyên; mất thì nối lại ngay
+            Task { await cloud.syncNow(); await drainCloudPhotos() }
+            refreshAIDigest(force: true)
+            return
+        }
         guard !isDemoMode, !room.isEmpty else { return }
         if !channelUp {
             sseTask?.cancel(); sseTask = nil

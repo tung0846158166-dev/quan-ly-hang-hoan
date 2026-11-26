@@ -44,7 +44,7 @@ struct ScanView: View {
                 Task { @MainActor in eng?.handleCameraCodes(codes) }
             }
             engine.snapshotProvider = { [weak cam] in cam?.snapshotJPEG() }
-            if !camera.running && camera.restReason == nil {
+            if !camera.running && (camera.restReason == nil || camera.restBySystem) {
                 camera.start()
             }
             UIApplication.shared.isIdleTimerDisabled = true

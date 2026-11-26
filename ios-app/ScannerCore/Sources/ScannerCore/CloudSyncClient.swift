@@ -40,6 +40,8 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
     private var session: CloudSavedSession?
     private var api: CloudAPI?
     private var runTask: Task<Void, Never>?
+    /// Lần cuối nhận tin từ cloud (WebSocket). Quay lại app thì dựa vào đây để quyết định có nối lại ngay không.
+    private let seen = LastSeen()
 
     public var onChange: (() -> Void)?
     /// Có dữ liệu mới từ cloud đã áp vào `store`: giao diện nạp lại danh sách (có thể gọi từ luồng nền).
@@ -118,6 +120,16 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
 
     private func baseURLValue() -> String? { lock.lock(); defer { lock.unlock() }; return session?.baseURL }
 
+    /// Gọi khi app quay lại màn hình. Kết nối còn sống: giữ nguyên, không nhấp nháy trạng thái.
+    /// Đã mất / đang chờ nối lại / im lặng quá lâu (app bị iOS tạm dừng): nối lại NGAY, không chờ hết thời gian chờ.
+    public func resumeFromBackground(now: Date = Date()) {
+        guard baseURLValue() != nil, state != .revoked, state != .unpaired else { return }
+        if CloudResumePolicy.shouldReconnect(state: state, lastHeard: seen.value, now: now, pingEvery: pingEvery) {
+            lock.lock(); let s = session; lock.unlock()
+            if let s { attach(s) }
+        }
+    }
+
     public func syncNow() async {
         guard let a = currentAPI else { return }
         do { try await pull(a); if let q = try? await a.quota() { setQuota(q) } }
@@ -191,6 +203,7 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
 
     private func run() async {
         var backoff: UInt64 = 2
+        var quickRetry = false   // vừa rớt khỏi một kết nối tốt: thử lại NGAY một lần, hiện "Đang kết nối" chứ chưa báo mất
         while !Task.isCancelled {
             guard let a = currentAPI, let url = a.webSocketURL() else { set(.unpaired); return }
             set(.connecting)
@@ -198,13 +211,16 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
             ws.resume()
             do {
                 let first = try await ws.receive()        // máy chủ gửi ngay {"t":"rev"} khi nối thành công; token sai thì lỗi ở đây
+                seen.touch()
                 set(.syncing)
                 try await pull(a)
                 if let q = try? await a.quota() { setQuota(q) }
                 set(.connected)
                 backoff = 2
+                quickRetry = true
                 try await listen(ws, api: a, first: first)
                 if Task.isCancelled { ws.cancel(with: .goingAway, reason: nil); return }
+                if quickRetry { quickRetry = false; set(.connecting); continue }
                 set(.disconnected, error: "Mất kết nối cloud. Đang thử nối lại...")
             } catch is CancellationError {
                 ws.cancel(with: .goingAway, reason: nil)
@@ -215,6 +231,12 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
                 if let revoked = await isRevoked(a), revoked {
                     set(.revoked, error: "Thiết bị đã bị thu hồi khỏi cloud.")
                     return
+                }
+                if quickRetry {
+                    quickRetry = false
+                    set(.connecting)
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    continue
                 }
                 let msg = (error as? CloudAPIError)?.message ?? "Mất kết nối cloud. Đang thử nối lại..."
                 set(.disconnected, error: msg)
@@ -249,7 +271,7 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
 
     private func listen(_ ws: URLSessionWebSocketTask, api a: CloudAPI, first: URLSessionWebSocketTask.Message) async throws {
         try await handle(first, api: a)
-        let seen = LastSeen()
+        let seen = self.seen
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { [self] in
                 while !Task.isCancelled {
@@ -284,4 +306,16 @@ private final class LastSeen: @unchecked Sendable {
     private var t = Date()
     func touch() { lock.lock(); t = Date(); lock.unlock() }
     var value: Date { lock.lock(); defer { lock.unlock() }; return t }
+}
+
+/// Quyết định khi app quay lại màn hình (tách riêng để test).
+public enum CloudResumePolicy {
+    /// true = nối lại ngay. Kết nối còn mới (nghe thấy cloud trong ~2 nhịp ping) thì giữ nguyên.
+    public static func shouldReconnect(state: CloudState, lastHeard: Date, now: Date, pingEvery: TimeInterval) -> Bool {
+        switch state {
+        case .unpaired, .revoked: return false
+        case .disconnected, .connecting: return true
+        case .connected, .syncing: return now.timeIntervalSince(lastHeard) > pingEvery * 2
+        }
+    }
 }

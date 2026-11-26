@@ -15,6 +15,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var denied = false
     /// Camera tự nghỉ (lâu không quét được mã, máy quá nóng, hoặc có cuộc gọi); chạm để quét tiếp.
     @Published var restReason: String?
+    /// `restReason` do hệ thống (cuộc gọi, app khác chiếm camera), không phải do lâu không quét: quay lại app thì tự chạy tiếp.
+    private(set) var restBySystem = false
     /// Khung hình "đứng" ngay lúc nhận mã (phủ lên khung xem trước ~0,2 giây rồi camera chạy tiếp). nil = đang chạy bình thường.
     @Published var frozenFrame: UIImage?
     /// Mã của nhãn đang giữ trước camera (đã quét). Rỗng = không giữ nhãn nào. Màn quét dùng để hiện dấu "ĐÃ QUÉT" lớn trên camera.
@@ -53,14 +55,19 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         observers.append(nc.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.applyThermalAndIdle()
         })
-        observers.append(nc.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: .main) { [weak self] _ in
+        observers.append(nc.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: .main) { [weak self] note in
             guard let self = self else { return }
             self.pausedBySystem = true
             self.idleTimer?.invalidate()
             self.idleTimer = nil
             self.running = false
             self.torchOn = false
+            // app chỉ xuống nền (lướt sang app khác): không coi là "tạm nghỉ" — quay lại màn quét camera tự chạy tiếp
+            let raw = (note.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber)?.intValue
+            let reason = raw.flatMap { AVCaptureSession.InterruptionReason(rawValue: $0) }
+            if reason == .videoDeviceNotAvailableInBackground || UIApplication.shared.applicationState != .active { return }
             self.restReason = "Camera tạm dừng do có cuộc gọi hoặc ứng dụng khác đang dùng."
+            self.restBySystem = true
         })
         observers.append(nc.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: .main) { [weak self] _ in
             guard let self = self, self.pausedBySystem else { return }
@@ -134,6 +141,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         wantsRunning = true
         pausedBySystem = false
         restReason = nil
+        restBySystem = false
         lastCodeAt = Date()
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:

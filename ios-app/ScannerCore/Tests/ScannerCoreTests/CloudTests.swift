@@ -348,4 +348,15 @@ final class CloudTests: XCTestCase {
         XCTAssertEqual(paths.last, "/v1/pair/complete")
         XCTAssertEqual(client.state, .unpaired)
     }
+
+    // chủ dự án 26/11/2026: lướt sang app khác < 15 giây rồi quay lại không được mất kết nối
+    func testResumePolicyKeepsAFreshConnectionAndReconnectsOtherwise() {
+        let now = Date()
+        XCTAssertFalse(CloudResumePolicy.shouldReconnect(state: .connected, lastHeard: now.addingTimeInterval(-8), now: now, pingEvery: 10))
+        XCTAssertTrue(CloudResumePolicy.shouldReconnect(state: .connected, lastHeard: now.addingTimeInterval(-60), now: now, pingEvery: 10))
+        XCTAssertTrue(CloudResumePolicy.shouldReconnect(state: .disconnected, lastHeard: now, now: now, pingEvery: 10))
+        XCTAssertTrue(CloudResumePolicy.shouldReconnect(state: .connecting, lastHeard: now, now: now, pingEvery: 10))
+        XCTAssertFalse(CloudResumePolicy.shouldReconnect(state: .revoked, lastHeard: .distantPast, now: now, pingEvery: 10))
+        XCTAssertFalse(CloudResumePolicy.shouldReconnect(state: .unpaired, lastHeard: .distantPast, now: now, pingEvery: 10))
+    }
 }

@@ -842,6 +842,18 @@ final class SyncEngine: ObservableObject {
         }
     }
 
+    /// Khiếu nại (chỉ chế độ cloud): đặt / đổi trạng thái; "" = bỏ khiếu nại.
+    func sendComplaint(_ row: OrderRow, status: String) {
+        guard cloudActive else { banner = Banner(code: row.c, text: "Khiếu nại cần kết nối cloud", color: Theme.warning); return }
+        let done = status.isEmpty ? "Đã bỏ khiếu nại" : (row.kn.isEmpty ? "Đã khiếu nại (Đang xử lý)" : "Khiếu nại: \(status)")
+        cloudWrite(rows: [row], ops: [CloudOps.complaint(id: row.cloudId, status: status)], done: done)
+    }
+
+    func sendComplaintNote(_ row: OrderRow, note: String) {
+        guard cloudActive else { return }
+        cloudWrite(rows: [row], ops: [CloudOps.complaintNote(id: row.cloudId, note: note.trimmingCharacters(in: .whitespacesAndNewlines))], done: "Đã lưu ghi chú khiếu nại")
+    }
+
     func sendOrderNote(_ row: OrderRow, note: String, watch: Bool = true) {
         let t = note.trimmingCharacters(in: .whitespacesAndNewlines)
         if isDemoMode {

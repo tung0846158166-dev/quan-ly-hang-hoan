@@ -370,4 +370,22 @@ final class CloudTests: XCTestCase {
         XCTAssertEqual(s.parcel(id: "a")?.status, "Bị mất")
         XCTAssertEqual(s.rev, 21)
     }
+
+    // Khiếu nại (chủ dự án 26/11/2026): trường từ cloud -> dòng hiển thị; lệnh gửi lên cloud
+    func testComplaintFieldsReachTheRowAndOpsAreBuilt() {
+        let now = Date()
+        let r = CloudRowMapper.row(parcel(#"{"id":"a","track":"T","complaintStatus":"Đang xử lý","complaintAt":"26/11/2026 10:00:00","complaintNote":"gửi Shopee"}"#), now: now)!
+        XCTAssertEqual(r.kn, "Đang xử lý")
+        XCTAssertEqual(r.kna, "26/11/2026 10:00:00")
+        XCTAssertEqual(r.knn, "gửi Shopee")
+        XCTAssertTrue(r.isComplaint)
+        let plain = CloudRowMapper.row(parcel(#"{"id":"b","track":"T2"}"#), now: now)!
+        XCTAssertFalse(plain.isComplaint)
+        let op = CloudOps.complaint(id: "a", status: "Thành công")
+        XCTAssertEqual(op["type"] as? String, "editCell")
+        XCTAssertEqual(op["field"] as? String, "complaintStatus")
+        XCTAssertEqual(op["value"] as? String, "Thành công")
+        XCTAssertEqual(CloudOps.complaintNote(id: "a", note: "x")["field"] as? String, "complaintNote")
+        XCTAssertEqual(CloudOps.complaintStatuses, ["Đang xử lý", "Thành công", "Thất bại"])
+    }
 }

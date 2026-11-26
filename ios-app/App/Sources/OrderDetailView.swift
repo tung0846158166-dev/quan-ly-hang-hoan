@@ -16,6 +16,9 @@ struct DetailView: View {
 
     @State private var copiedCode: String?
     @State private var showNoteSheet = false
+    @State private var showComplaintNote = false
+    @State private var complaintNoteDraft = ""
+    @State private var askRemoveComplaint = false
     @State private var showStatusSheet = false
     @State private var noteDraft = ""
     @State private var watchDraft = false
@@ -114,6 +117,7 @@ struct DetailView: View {
                     relatedCodesCard
                     timelineCard
                     notesCard
+                    complaintCard
                 }
                 .padding(.horizontal, Theme.screenPadding)
                 .padding(.top, 8)
@@ -1197,6 +1201,67 @@ struct DetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
             }
+        }
+    }
+
+    // MARK: - Thẻ "Khiếu nại" (chủ dự án 26/11/2026)
+    private var complaintCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionTitleRow(title: "Khiếu nại", icon: "exclamationmark.bubble.fill", iconColor: Theme.purple)
+                Spacer()
+                if engine.cloudActive {
+                    Menu {
+                        ForEach(CloudOps.complaintStatuses, id: \.self) { st in
+                            Button(st) { Haptics.tap(); engine.sendComplaint(live, status: st) }
+                                .disabled(st == live.kn)
+                        }
+                        if live.isComplaint {
+                            Divider()
+                            Button("Ghi chú khiếu nại…") { complaintNoteDraft = live.knn; showComplaintNote = true }
+                            Button("Bỏ khiếu nại", role: .destructive) { askRemoveComplaint = true }
+                        }
+                    } label: {
+                        Text(live.isComplaint ? "Đổi" : "Khiếu nại")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Theme.purple.opacity(0.15))
+                            .foregroundColor(Theme.purple)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            if live.isComplaint {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        StatusPill(text: live.kn, color: live.kn == "Thành công" ? Theme.success : (live.kn == "Thất bại" ? Theme.danger : Theme.purple))
+                        if !live.kna.isEmpty { Text("từ \(live.kna)").font(.caption2).foregroundStyle(.secondary) }
+                    }
+                    if !live.knn.isEmpty {
+                        Text(live.knn).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.subtleFill)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                Text(engine.cloudActive ? "Chưa khiếu nại. Bấm \"Khiếu nại\" để bắt đầu (trạng thái Đang xử lý)." : "Khiếu nại cần kết nối cloud.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
+        .alert("Ghi chú khiếu nại", isPresented: $showComplaintNote) {
+            TextField("Đã gửi gì, sàn trả lời gì, được đền bao nhiêu…", text: $complaintNoteDraft)
+            Button("Lưu") { engine.sendComplaintNote(live, note: complaintNoteDraft) }
+            Button("Hủy", role: .cancel) {}
+        }
+        .confirmationDialog("Bỏ khiếu nại đơn này?", isPresented: $askRemoveComplaint, titleVisibility: .visible) {
+            Button("Bỏ khiếu nại", role: .destructive) { engine.sendComplaint(live, status: "") }
+        } message: {
+            Text("Xóa trạng thái, ngày và ghi chú khiếu nại.")
         }
     }
 

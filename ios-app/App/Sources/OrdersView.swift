@@ -9,6 +9,7 @@ enum OrderFilter: String, CaseIterable {
     case soon = "Sắp hạn"
     case partialReturn = "Hoàn 1 phần"
     case watch = "Theo dõi"
+    case complaint = "Khiếu nại"
     case received = "Đã nhận"
     case cancelled = "Đơn hủy"
     case archived = "Lưu trữ"
@@ -19,6 +20,7 @@ enum OrderFilter: String, CaseIterable {
         switch self {
         case .overdue: return Theme.danger
         case .soon, .watch: return Theme.warning
+        case .complaint: return Theme.purple
         case .received: return Theme.success
         case .partialReturn: return Theme.purple
         default: return Theme.accent
@@ -77,6 +79,7 @@ struct OrdersView: View {
         case .soon: return r.pd && r.k == "m" && r.alertLevel(now: now) == .soon
         case .partialReturn: return DashboardMetrics.isPartialReturn(r)
         case .watch: return r.wl && r.k == "m"
+        case .complaint: return r.isComplaint
         case .received: return r.rv && r.k == "m"
         case .cancelled: return r.isCancelled
         case .pre: return r.pre
@@ -111,6 +114,7 @@ struct OrdersView: View {
             if DashboardMetrics.isPartialReturn(r) { counts[.partialReturn, default: 0] += 1 }
             if r.isCancelled { counts[.cancelled, default: 0] += 1 }
             if r.isArchived { counts[.archived, default: 0] += 1 }
+            if r.isComplaint { counts[.complaint, default: 0] += 1 }
             if r.pre { counts[.pre, default: 0] += 1 }
             if belongs(r, filter, now: now) { shown.append(r) }
         }
@@ -401,6 +405,12 @@ struct OrdersView: View {
                     Image(systemName: "star.fill")
                         .font(.system(size: 10))
                         .foregroundColor(Theme.warning)
+                }
+                if r.isComplaint {
+                    Text("⚖️ \(r.kn)")
+                        .font(Theme.Typography.microBold)
+                        .foregroundColor(Theme.purple)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if r.pd && r.due > 0 {

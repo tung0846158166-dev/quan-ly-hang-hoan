@@ -12,6 +12,10 @@ public enum CloudOps {
     /// Theo dõi đơn + lý do (ở app là "ghi chú theo dõi").
     public static func setWatch(id: String, on: Bool, reason: String) -> [String: Any] { ["type": "setWatch", "id": id, "on": on, "reason": reason] }
     public static func delete(id: String) -> [String: Any] { ["type": "delete", "id": id] }
+    /// Khiếu nại: "" = bỏ khiếu nại (cloud xóa cả ngày + ghi chú); đặt lần đầu cloud tự ghi ngày khiếu nại.
+    public static let complaintStatuses = ["Đang xử lý", "Thành công", "Thất bại"]
+    public static func complaint(id: String, status: String) -> [String: Any] { ["type": "editCell", "id": id, "field": "complaintStatus", "value": status] }
+    public static func complaintNote(id: String, note: String) -> [String: Any] { ["type": "editCell", "id": id, "field": "complaintNote", "value": note] }
     /// Tạo đơn mới (quét chế độ "Đơn mới"): cloud tự nhận sàn/hãng; mã đã có ở bất kỳ đâu thì KHÔNG tạo lại.
     public static func newOrder(code: String) -> [String: Any] { ["type": "newOrder", "code": code, "origin": "phone"] }
     /// Đơn hủy: đánh dấu đã nhận / chưa nhận.

@@ -47,6 +47,8 @@ public struct CloudParcel: Codable, Equatable, Identifiable {
     public var note = "", userNote = "", importWeek = "", importedAt = ""
     public var isWatchlist = false, isPartialReturn = false
     public var watchlistReason = "", photoId = ""
+    /// Khiếu nại: "" = không; "Đang xử lý" | "Thành công" | "Thất bại".
+    public var complaintStatus = "", complaintAt = "", complaintNote = ""
     public var items: [CloudParcelItem] = []
     /// Chỉ các khóa trong danh sách trắng (returnReason, returnStatus, returnSuccessTime, ...), giá trị đã đổi sang chuỗi.
     public var extra: [String: String] = [:]
@@ -62,6 +64,7 @@ public struct CloudParcel: Codable, Equatable, Identifiable {
         case platform, orderType, platformStatus, preOrder, status, carrier
         case shipDate, returnDate, recvDate, returnedAt, deadline, price, note, userNote, importWeek, importedAt
         case isWatchlist, isPartialReturn, watchlistReason, photoId, items, extra
+        case complaintStatus, complaintAt, complaintNote
         case isArchived, isDeleted, archivedAt, deletedAt, deletedFrom, rev, updatedAt
     }
 
@@ -77,6 +80,7 @@ public struct CloudParcel: Codable, Equatable, Identifiable {
         price = c.num(.price); note = c.str(.note); userNote = c.str(.userNote); importWeek = c.str(.importWeek); importedAt = c.str(.importedAt)
         isWatchlist = c.flag(.isWatchlist); isPartialReturn = c.flag(.isPartialReturn)
         watchlistReason = c.str(.watchlistReason); photoId = c.str(.photoId)
+        complaintStatus = c.str(.complaintStatus); complaintAt = c.str(.complaintAt); complaintNote = c.str(.complaintNote)
         items = (try? c.decode([CloudParcelItem].self, forKey: .items)) ?? []
         if let scalars = try? c.decode([String: CloudScalar].self, forKey: .extra) {
             for (k, v) in scalars { extra[k] = v.text }

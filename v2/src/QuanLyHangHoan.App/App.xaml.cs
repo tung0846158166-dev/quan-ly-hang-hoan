@@ -31,6 +31,7 @@ public partial class App : Application
     {
         DispatcherUnhandledException += (_, args) => LogCrash("Lỗi không bắt được (giao diện)", args.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, args) => { if (args.ExceptionObject is Exception ex) LogCrash("Lỗi không bắt được (nền)", ex); };
+        ApplyAppIconToAllWindows();
         try
         {
             StartCore(e);
@@ -42,6 +43,22 @@ public partial class App : Application
                 "Quản lý hàng hoàn", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    /// <summary>
+    /// Biểu tượng "HOÀN HÀNG" cho MỌI cửa sổ (thanh taskbar, Alt+Tab, góc tiêu đề) thay biểu tượng mặc định của Windows (27/11/2026).
+    /// </summary>
+    private static void ApplyAppIconToAllWindows()
+    {
+        try
+        {
+            var icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri("pack://application:,,,/QuanLyHangHoan.App;component/app.ico", UriKind.Absolute));
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, _) =>
+            {
+                if (s is Window w && w.Icon is null) w.Icon = icon;
+            }));
+        }
+        catch (Exception) { /* thiếu biểu tượng: dùng biểu tượng mặc định, không làm hỏng khởi động */ }
     }
 
     private void StartCore(StartupEventArgs e)

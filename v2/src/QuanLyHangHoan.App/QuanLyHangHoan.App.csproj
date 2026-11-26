@@ -24,7 +24,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Biểu tượng tệp chạy (lối tắt, Explorer) + cửa sổ (thanh taskbar, Alt+Tab) — cùng biểu tượng bộ cài (27/11/2026) -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
 
   <!-- Bản máy PHỤ (26/11/2026): dotnet publish -p:Edition=Secondary -> bỏ "Tạo mã ghép" + "Thiết bị đã ghép" (AppEdition.cs) -->
   <PropertyGroup Condition="'$(Edition)' == 'Secondary'">

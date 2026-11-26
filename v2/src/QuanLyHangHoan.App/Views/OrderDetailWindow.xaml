@@ -130,6 +130,12 @@
                       Padding="0,0,4,0">
             <StackPanel>
 
+                <!-- Đang theo dõi: dải nổi bật + lý do (chủ dự án 26/11/2026) -->
+                <Border Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,10"
+                        Visibility="{Binding IsWatchlist, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding WatchlistBanner}" Foreground="#92400E" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap" />
+                </Border>
+
                 <!-- 1. Tổng quan -->
                 <Border Style="{StaticResource DetailSectionCardStyle}"
                         Visibility="{Binding HasOverviewGroup, Converter={StaticResource BoolToVis}}">

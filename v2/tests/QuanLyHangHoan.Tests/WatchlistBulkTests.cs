@@ -74,6 +74,18 @@ public sealed class WatchlistBulkTests
     }
 
     [Fact]
+    public void Main_table_rows_show_a_star_with_the_watch_reason()
+    {
+        var w = new ReturnOrderRowViewModel(W("a"), 1, new DateTime(2026, 11, 26));
+        Assert.Equal("⭐", w.WatchMark);
+        Assert.Equal("Đang theo dõi: kiểm", w.WatchTooltip);
+        var plain = W("b"); plain.IsWatchlist = false;
+        var p = new ReturnOrderRowViewModel(plain, 2, new DateTime(2026, 11, 26));
+        Assert.Equal("", p.WatchMark);
+        Assert.Null(p.WatchTooltip);
+    }
+
+    [Fact]
     public async Task Nothing_happens_when_the_user_cancels()
     {
         var (vm, edit, dlg) = Make();

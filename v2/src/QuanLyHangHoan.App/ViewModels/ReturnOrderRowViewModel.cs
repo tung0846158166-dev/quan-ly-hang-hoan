@@ -109,6 +109,11 @@ public sealed class ReturnOrderRowViewModel
     public string RecvDate => Source.RecvDate;
     public decimal Price => Source.Price;
     public bool IsWatchlist => Source.IsWatchlist;
+    /// <summary>Nhãn cột ⭐ (trống nếu không theo dõi) và lời nhắc khi rê chuột: lý do theo dõi.</summary>
+    public string WatchMark => Source.IsWatchlist ? "⭐" : "";
+    public string? WatchTooltip => Source.IsWatchlist
+        ? "Đang theo dõi" + (string.IsNullOrWhiteSpace(Source.WatchlistReason) ? "" : ": " + Source.WatchlistReason.Trim())
+        : null;
     public bool IsPartialReturn => Source.IsPartialReturn;
 
     public string DisplayTracking { get; }

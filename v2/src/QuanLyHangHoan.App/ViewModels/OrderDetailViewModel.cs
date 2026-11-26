@@ -106,6 +106,8 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         ForwardCarrier = Dash(import?.ForwardCarrier);
         ReturnCarrier = Dash(import?.ReturnCarrier);
         IsWatchlist = order.IsWatchlist;
+        WatchlistBanner = !order.IsWatchlist ? ""
+            : "⭐ ĐANG THEO DÕI" + (string.IsNullOrWhiteSpace(order.WatchlistReason) ? " (chưa ghi lý do)" : " — " + order.WatchlistReason.Trim());
         WatchlistText = order.IsWatchlist
             ? (string.IsNullOrWhiteSpace(order.WatchlistReason) ? "⭐ Có theo dõi" : $"⭐ Có — {order.WatchlistReason.Trim()}")
             : "Không";
@@ -280,6 +282,8 @@ public sealed partial class OrderDetailViewModel : ObservableObject
     public string ReturnCarrier { get; }
     public bool IsWatchlist { get; }
     public string WatchlistText { get; }
+    /// <summary>Dải nổi bật đầu chi tiết khi đơn đang được theo dõi (lý do theo dõi).</summary>
+    public string WatchlistBanner { get; private set; } = "";
 
     // Mã
     public bool HasCodesGroup { get; }

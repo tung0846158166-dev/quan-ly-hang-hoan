@@ -516,6 +516,16 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
+                        <!-- 1b. Đang theo dõi: ⭐ + lý do khi rê chuột (chủ dự án 26/11/2026) -->
+                        <DataGridTemplateColumn Header="⭐" Width="34" SortMemberPath="IsWatchlist">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding WatchMark}" ToolTip="{Binding WatchTooltip}" FontSize="14"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
                         <!-- 2. Cảnh báo (Vàng > 12h / Đỏ > 24h) -->
                         <DataGridTemplateColumn Header="Cảnh báo (12h / 24h)" Width="165" SortMemberPath="AlertPriority">
                             <DataGridTemplateColumn.CellTemplate>

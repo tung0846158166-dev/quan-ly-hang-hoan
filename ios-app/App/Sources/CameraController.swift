@@ -15,6 +15,11 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var denied = false
     /// Camera tự nghỉ (lâu không quét được mã, máy quá nóng, hoặc có cuộc gọi); chạm để quét tiếp.
     @Published var restReason: String?
+    /// Khung hình "đứng" ngay lúc nhận mã (phủ lên khung xem trước ~0,2 giây rồi camera chạy tiếp). nil = đang chạy bình thường.
+    @Published var frozenFrame: UIImage?
+    /// Thời gian đứng (giây), đổi được qua UserDefaults "scanFreezeSec"; 0 = tắt. CHỈ dùng trên main thread.
+    private var freezeGate = ScanFreezeGate(duration: UserDefaults.standard.object(forKey: "scanFreezeSec") as? Double ?? ScanFreezeGate.defaultDuration)
+    private var unfreezeWork: DispatchWorkItem?
 
     // ---- Chống nóng máy ----
     // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 15 giây không thấy mã nào thì 15 hình/giây;
@@ -188,6 +193,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         running = false
         torchOn = false
         lastRegion = .zero
+        unfreezeWork?.cancel()
+        frozenFrame = nil
         frameLock.lock()
         latestBuffer = nil
         frameLock.unlock()
@@ -333,6 +340,9 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         let candidates = found
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.running, self.wantsRunning else { return }
+            // khung đang đứng sau mã trước: bỏ (không kéo dài thời gian đứng)
+            guard self.freezeGate.accept() else { return }
+            self.freezeFrame()
             let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
             self.lastCodeAt = Date()
             if wasIdle && ProcessInfo.processInfo.thermalState != .serious { self.setFPS(self.activeFPS) }
@@ -342,6 +352,22 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                 self.onCode?(first)
             }
         }
+    }
+
+    /// Phủ khung hình hiện tại lên khung xem trước trong `freezeGate.duration` giây (camera vẫn chạy bên dưới).
+    private func freezeFrame() {
+        let d = freezeGate.duration
+        guard d > 0 else { return }
+        frameLock.lock()
+        let px = latestBuffer
+        frameLock.unlock()
+        if let px = px, let cg = ciContext.createCGImage(CIImage(cvPixelBuffer: px), from: CIImage(cvPixelBuffer: px).extent) {
+            frozenFrame = UIImage(cgImage: cg)
+        }
+        unfreezeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.frozenFrame = nil }
+        unfreezeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + d, execute: work)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

@@ -31,6 +31,11 @@ public sealed class CloudMode : IDisposable
     public IOrderEditService Edit { get; }
     public IReturnWatchService ReturnWatch { get; }
 
+    /// <summary>Báo kết quả đẩy cho người dùng (câu, là lỗi?). Chỉ phát khi có gửi hoặc có lỗi. Có thể phát từ luồng nền.</summary>
+    public event Action<string, bool>? Published;
+
+    private readonly CloudPublishTrigger _trigger = new();
+
     /// <summary>Kết quả lần đẩy đơn gần nhất (để hiển thị/chẩn đoán).</summary>
     public string LastPublishNote { get; private set; } = "";
 
@@ -56,6 +61,8 @@ public sealed class CloudMode : IDisposable
                 dispatchToUi(() => _ = reloadOnUi());
             });
         };
+        // nạp lúc mất mạng thì chưa đẩy được: nối lại là đẩy bù ngay
+        Link.Changed += () => { if (_trigger.OnLinkChanged(Link.CanWrite)) _ = PublishAsync("reconnect"); };
         Link.Start();
     }
 
@@ -67,11 +74,12 @@ public sealed class CloudMode : IDisposable
         try
         {
             var r = await CloudPublisher.PublishAsync(api, _dbPath, source).ConfigureAwait(false);
+            if (CloudPublishTrigger.Note(r) is { } note) Published?.Invoke(note, r.Rejected > 0);
             LastPublishNote = r.Sent == 0 ? "Không có đơn mới cần đẩy lên cloud."
                 : $"Đã đẩy {r.Sent:N0} đơn lên cloud (mới {r.Added:N0}, cập nhật {r.Updated:N0}" + (r.Rejected > 0 ? $", bị từ chối {r.Rejected:N0}" : "") + ").";
         }
-        catch (CloudApiException ex) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message; }
-        catch (Exception ex) when (ex is IOException or Microsoft.Data.Sqlite.SqliteException) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message; }
+        catch (CloudApiException ex) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message + " (sẽ đẩy lại khi nối lại / lần nạp sau)"; Published?.Invoke(LastPublishNote, true); }
+        catch (Exception ex) when (ex is IOException or Microsoft.Data.Sqlite.SqliteException) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message; Published?.Invoke(LastPublishNote, true); }
         finally { _publishGate.Release(); }
     }
 

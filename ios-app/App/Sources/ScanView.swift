@@ -153,6 +153,19 @@ struct ScanView: View {
             ZStack {
                 CameraPreview(controller: camera)
 
+                // nhận được mã: khung hình đứng ~0,2 giây (chủ dự án 26/11/2026) rồi chạy tiếp
+                if let still = camera.frozenFrame {
+                    GeometryReader { g in
+                        Image(uiImage: still)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: g.size.width, height: g.size.height)
+                            .clipped()
+                    }
+                    .allowsHitTesting(false)
+                    .transition(.identity)
+                }
+
                 if engine.cloudLocked {
                     CloudScanLockOverlay()   // T042: mất kết nối cloud = không quét
                 }

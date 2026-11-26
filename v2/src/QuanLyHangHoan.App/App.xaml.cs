@@ -240,6 +240,7 @@ public partial class App : Application
                 realFolderWatchController.Completed += r => { _ = cloud.PublishAsync("folder"); };
                 realSaleworkController.Completed += r => { _ = cloud.PublishAsync("salework"); };
                 realFileImport.Completed += r => { _ = cloud.PublishAsync("file"); };
+                cloud.Published += (note, isError) => Dispatcher.BeginInvoke(() => vmForCloud.ShowToast(note, isError));
             }
         }
 

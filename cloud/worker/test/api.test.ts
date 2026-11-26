@@ -1099,3 +1099,80 @@ describe("khiếu nại (26/11/2026)", () => {
     expect(p.complaintStatus).toBe("Đang xử lý");
   }, 30_000);
 });
+
+describe("chuyển cloud sang tài khoản khác (/admin/transfer/*, 27/11/2026)", () => {
+  const TABLES_COPY = ["parcels", "parcel_codes", "return_watch", "audit_log", "scans", "photos", "import_state", "ai_digest", "import_log", "import_issues", "devices", "meta"];
+  const exportAll = async (token: string) => {
+    const out: Record<string, any[]> = {};
+    for (const t of TABLES_COPY) {
+      out[t] = [];
+      for (let offset = 0; ; ) {
+        const r = await call("GET", `/admin/transfer/export?table=${t}&offset=${offset}&limit=2`, undefined, token);
+        expect(r.status).toBe(200);
+        out[t]!.push(...r.data.rows);
+        if (!r.data.more) break;
+        offset += r.data.rows.length;
+      }
+    }
+    return out;
+  };
+  const syncParcels = async () => (await call("GET", "/sync?since=0&limit=1000", undefined, owner)).data.changes
+    .filter((c: any) => c.type === "parcel").map((c: any) => { const { rev, updatedAt, ...p } = c.parcel; return p; })
+    .sort((a: any, b: any) => a.id.localeCompare(b.id));
+
+  it("chỉ chủ cửa hàng xuất được; bảng lạ bị từ chối", async () => {
+    expect((await call("GET", "/admin/transfer/export?table=parcels", undefined, phoneA)).status).toBe(403);
+    expect((await call("GET", "/admin/transfer/export?table=quota", undefined, owner)).status).toBe(422);
+  });
+
+  it("chép đầy đủ: đơn, trạng thái kho, lịch sử, ảnh, khiếu nại giữ nguyên; thiết bị cũ chỉ giữ tên (đã thu hồi)", async () => {
+    await importParcels([parcel("t1"), parcel("t2", { status: "Không cần nhận" })]);
+    await scan(phoneA, "TRK-t1");
+    await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editCell", id: "t2", field: "complaintStatus", value: "Đang xử lý" }] }, owner);
+    const jpeg = new Uint8Array([0xff, 0xd8, 9, 8, 7]);
+    expect((await SELF.fetch(`${BASE}/photos/photo_transfer_01?parcelId=t1&mime=image/jpeg`, { method: "PUT", headers: { Authorization: `Bearer ${phoneA}` }, body: jpeg })).status).toBe(200);
+    const before = await syncParcels();
+    const dump = await exportAll(owner);
+    const blob = await SELF.fetch(`${BASE}/admin/transfer/blob?key=p/photo_transfer_01`, { headers: { Authorization: `Bearer ${owner}` } });
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(jpeg);
+
+    // giả lập cloud MỚI: xóa sạch dữ liệu (giữ thiết bị chủ hiện tại để gọi lệnh)
+    const s = await stub();
+    await runInDurableObject(s, (_i: ShopDO, st: DurableObjectState) => {
+      for (const t of ["parcels", "parcel_codes", "return_watch", "audit_log", "scans", "photos", "import_state", "ai_digest", "import_log", "import_issues"]) st.storage.sql.exec(`DELETE FROM ${t}`);
+      st.storage.sql.exec("UPDATE meta SET v = '0' WHERE k = 'rev'");
+    });
+    await E.IMAGES.delete(["p/photo_transfer_01", "t/photo_transfer_01"]);
+
+    expect((await call("POST", "/admin/transfer/begin", { confirm: "CHEP_DU_LIEU_CLOUD" }, owner)).status).toBe(200);
+    for (const t of TABLES_COPY) {
+      for (let i = 0; i < dump[t]!.length; i += 2) {
+        const r = await call("POST", "/admin/transfer/import", { table: t, rows: dump[t]!.slice(i, i + 2) }, owner);
+        expect(r.status).toBe(200);
+      }
+    }
+    expect((await SELF.fetch(`${BASE}/admin/transfer/blob?key=p/photo_transfer_01`, { method: "PUT", headers: { Authorization: `Bearer ${owner}` }, body: jpeg })).status).toBe(200);
+    const end = await call("POST", "/admin/transfer/end", {}, owner);
+    expect(end.status).toBe(200);
+    expect(end.data.counts.parcels).toBe(2);
+
+    expect(await syncParcels()).toEqual(before);
+    const p1 = (await syncParcels()).find((p: any) => p.id === "t1");
+    expect(p1.status).toBe("Hàng đã trả");
+    expect(p1.photoId).toBe("photo_transfer_01");
+    expect((await syncParcels()).find((p: any) => p.id === "t2").complaintStatus).toBe("Đang xử lý");
+    const ph = await SELF.fetch(`${BASE}/photos/photo_transfer_01`, { headers: { Authorization: `Bearer ${owner}` } });
+    expect(new Uint8Array(await ph.arrayBuffer())).toEqual(jpeg);
+    // lịch sử còn tên máy đã quét
+    const h = await call("GET", "/parcels/t1/history", undefined, owner);
+    expect(JSON.stringify(h.data)).toContain("Điện thoại A");
+    // sau khi chép xong, cổng ghi đóng lại
+    expect((await call("POST", "/admin/transfer/import", { table: "parcels", rows: [] }, owner)).status).toBe(409);
+  }, 60_000);
+
+  it("không mở chép vào cloud đã có dữ liệu", async () => {
+    await importParcels([parcel("x1")]);
+    expect((await call("POST", "/admin/transfer/begin", { confirm: "CHEP_DU_LIEU_CLOUD" }, owner)).status).toBe(409);
+    expect((await call("POST", "/admin/transfer/import", { table: "parcels", rows: [] }, owner)).status).toBe(409);
+  });
+});

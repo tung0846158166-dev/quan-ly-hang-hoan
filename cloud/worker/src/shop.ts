@@ -166,6 +166,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     if (m === "PUT" && path === "/admin/ai-config") { this.requireOwner(dev); return this.putAiConfig(await this.body(req)); }
+    if (path.startsWith("/admin/transfer/")) { this.requireOwner(dev); return this.transfer(req, url, path.slice("/admin/transfer/".length)); }
     const ai = /^\/ai\/(groq|gemini|nvidia|cloudflare)\/chat\/completions$/.exec(path);
     if (m === "POST" && ai) return this.aiProxy(req, ai[1] as AiProvider);
     if (m === "PUT" && path.startsWith("/photos/")) return this.putPhoto(req, url, decodeURIComponent(path.slice("/photos/".length)), dev);
@@ -227,6 +228,102 @@ export class ShopDO extends DurableObject<Env> {
       return null;
     }
     return this.authDevice(req);
+  }
+
+  // ===================================================== chuyển cloud sang tài khoản khác (27/11/2026)
+  /**
+   * Chép NGUYÊN TRẠNG dữ liệu cloud cũ sang cloud mới (khác tài khoản Cloudflare): công cụ scripts/cloud-transfer.mjs đọc từng bảng
+   * (`export`) + từng ảnh (`blob`) ở cloud cũ, rồi ghi y hệt vào cloud mới (`begin` -> `import` + `blob` -> `end`).
+   * Chỉ chủ cửa hàng. Cổng ghi chỉ mở khi cloud mới CÒN TRỐNG (chưa có đơn) và đóng lại ở `end`.
+   * Thiết bị cũ chép sang ở trạng thái THU HỒI (giữ tên người quét trong lịch sử; máy cũ phải ghép lại).
+   */
+  private static readonly TRANSFER_TABLES = new Set(["parcels", "parcel_codes", "return_watch", "audit_log", "scans", "photos",
+    "import_state", "ai_digest", "import_log", "import_issues", "devices", "meta"]);
+
+  private async transfer(req: Request, url: URL, action: string): Promise<Response> {
+    const m = req.method;
+    const table = (url.searchParams.get("table") ?? "").trim();
+    const blobKey = (url.searchParams.get("key") ?? "").trim();
+    const validKey = /^[pt]\/[A-Za-z0-9_.~-]{1,200}$/.test(blobKey);
+    if (m === "GET" && action === "export") {
+      if (!ShopDO.TRANSFER_TABLES.has(table)) return fail(422, "invalid", "Bảng không chép được.");
+      const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+      const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 200));
+      const order = table === "parcel_codes" ? "code, kind, parcel_id" : table === "meta" ? "k" : "rowid";
+      const rows = this.db.all<Row>(`SELECT * FROM ${table} ORDER BY ${order} LIMIT ? OFFSET ?`, limit + 1, offset);
+      return json({ rows: rows.slice(0, limit), more: rows.length > limit });
+    }
+    if (m === "GET" && action === "blob") {
+      if (!validKey) return fail(422, "invalid", "Khóa ảnh không hợp lệ.");
+      const obj = await this.env.IMAGES.get(blobKey);
+      if (!obj) return fail(404, "not_found", "Không có ảnh.");
+      return new Response(obj.body, { headers: { "Content-Type": obj.httpMetadata?.contentType ?? "application/octet-stream" } });
+    }
+    if (m === "GET" && action === "counts") return json({ counts: this.transferCounts() });
+
+    // ---- ghi (cloud mới)
+    if (m === "POST" && action === "begin") {
+      const b = await this.body(req);
+      if (b.confirm !== "CHEP_DU_LIEU_CLOUD") return fail(422, "invalid", "Thiếu xác nhận.");
+      if (Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM parcels")?.n ?? 0) > 0)
+        return fail(409, "conflict", "Cloud này đã có dữ liệu: chỉ chép vào cloud mới còn trống.");
+      this.setMeta("transfer_open", "1");
+      return json({ ok: true });
+    }
+    if (this.meta("transfer_open") !== "1") return fail(409, "conflict", "Chưa mở chép dữ liệu (cần cloud mới còn trống + lệnh begin).");
+    if (m === "POST" && action === "import") {
+      const b = await this.body(req);
+      const t = typeof b.table === "string" ? b.table : "";
+      if (!ShopDO.TRANSFER_TABLES.has(t)) return fail(422, "invalid", "Bảng không chép được.");
+      const rows = Array.isArray(b.rows) ? (b.rows as Record<string, unknown>[]).slice(0, 1000) : [];
+      const cols = new Set(this.db.all<Row>(`PRAGMA table_info(${t})`).map((c) => String(c.name)));
+      let written = 0;
+      this.ctx.storage.transactionSync(() => {
+        for (const r of rows) {
+          if (typeof r !== "object" || r === null) continue;
+          const row = { ...r } as Record<string, unknown>;
+          if (t === "meta") {
+            const k = String(row.k ?? "");
+            if (!k || k === "schema" || k === "transfer_open") continue;
+            if (k === "rev") { if (Number(row.v) > this.currentRev()) this.setMeta("rev", String(Number(row.v))); continue; }
+          }
+          if (t === "devices") row.revoked = 1;   // máy cũ: chỉ giữ tên, không dùng được nữa
+          const keys = Object.keys(row).filter((k) => cols.has(k));
+          if (keys.length === 0) continue;
+          const verb = t === "devices" ? "INSERT OR IGNORE" : "INSERT OR REPLACE";
+          this.db.run(`${verb} INTO ${t}(${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`,
+            ...keys.map((k) => { const v = row[k]; return v === null || v === undefined ? null : typeof v === "number" ? v : String(v); }) as SqlStorageValue[]);
+          written++;
+        }
+      });
+      return json({ written });
+    }
+    if (m === "PUT" && action === "blob") {
+      if (!validKey) return fail(422, "invalid", "Khóa ảnh không hợp lệ.");
+      const bytes = await req.arrayBuffer();
+      if (bytes.byteLength === 0 || bytes.byteLength > 5 * 1024 * 1024) return fail(422, "invalid", "Ảnh rỗng hoặc quá lớn.");
+      await this.env.IMAGES.put(blobKey, bytes, { httpMetadata: { contentType: req.headers.get("Content-Type") ?? "image/jpeg" } });
+      return json({ ok: true });
+    }
+    if (m === "POST" && action === "end") {
+      const maxRev = Math.max(
+        Number(this.db.first<Row>("SELECT MAX(rev) AS r FROM parcels")?.r ?? 0),
+        Number(this.db.first<Row>("SELECT MAX(rev) AS r FROM return_watch")?.r ?? 0));
+      if (maxRev > this.currentRev()) this.setMeta("rev", String(maxRev));
+      this.db.run("DELETE FROM meta WHERE k = 'transfer_open'");
+      this.broadcast();
+      return json({ ok: true, counts: this.transferCounts() });
+    }
+    return fail(404, "not_found", "Không có lệnh này.");
+  }
+
+  /** Số dòng mỗi bảng (đối chiếu cloud cũ / cloud mới). */
+  private transferCounts(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const t of ShopDO.TRANSFER_TABLES) out[t] = Number(this.db.first<Row>(`SELECT COUNT(*) AS n FROM ${t}`)?.n ?? 0);
+    out.photosLive = Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM photos WHERE deleted_at = 0")?.n ?? 0);
+    out.received = Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM parcels WHERE status = 'Hàng đã trả'")?.n ?? 0);
+    return out;
   }
 
   private requireOwner(dev: Device): void {

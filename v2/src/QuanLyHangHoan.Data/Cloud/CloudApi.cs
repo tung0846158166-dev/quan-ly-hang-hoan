@@ -123,6 +123,22 @@ public sealed class CloudApi
         return (r["code"]?.GetValue<string>() ?? "", DateTimeOffset.FromUnixTimeMilliseconds(r["expiresAt"]?.GetValue<long>() ?? 0).LocalDateTime);
     }
 
+    /// <summary>Chủ cửa hàng: các thiết bị đã ghép (không bao giờ kèm token).</summary>
+    public async Task<IReadOnlyList<CloudDeviceInfo>> DevicesAsync(CancellationToken ct = default)
+    {
+        var list = new List<CloudDeviceInfo>();
+        if (await JsonAsync(HttpMethod.Get, "/devices", null, ct) is not JsonArray arr) return list;
+        static long L(JsonNode? n) => n is JsonValue v && v.TryGetValue<double>(out var d) ? (long)d : 0;
+        foreach (var x in arr.OfType<JsonObject>())
+            list.Add(new CloudDeviceInfo(x["deviceId"]?.GetValue<string>() ?? "", x["deviceName"]?.GetValue<string>() ?? "", x["kind"]?.GetValue<string>() ?? "",
+                x["role"]?.GetValue<string>() ?? "", L(x["lastSeenAt"]), x["revoked"] is JsonValue rv && rv.TryGetValue<bool>(out var b) && b));
+        return list;
+    }
+
+    /// <summary>Chủ cửa hàng thu hồi một thiết bị (máy mất / nhân viên nghỉ): token của máy đó hết dùng được ngay.</summary>
+    public async Task RevokeDeviceAsync(string deviceId, CancellationToken ct = default) =>
+        await JsonAsync(HttpMethod.Delete, "/devices/" + Uri.EscapeDataString(deviceId), null, ct);
+
     public async Task<(string DeviceId, string DeviceName, string Role)> MeAsync(CancellationToken ct = default)
     {
         var r = await JsonAsync(HttpMethod.Get, "/me", null, ct);
@@ -181,6 +197,21 @@ public sealed class CloudApi
 
     public async Task<JsonArray> HistoryAsync(string parcelId, CancellationToken ct = default) =>
         (await JsonAsync(HttpMethod.Get, $"/parcels/{Uri.EscapeDataString(parcelId)}/history", null, ct)) as JsonArray ?? new JsonArray();
+
+    /// <summary>Gợi ý AI theo khung giờ (mới nhất trước).</summary>
+    public async Task<IReadOnlyList<CloudAiDigest>> AiDigestsAsync(int limit = 12, CancellationToken ct = default) =>
+        ParseDigests(await JsonAsync(HttpMethod.Get, "/ai/digests?limit=" + limit, null, ct));
+
+    public static IReadOnlyList<CloudAiDigest> ParseDigests(JsonNode node)
+    {
+        var list = new List<CloudAiDigest>();
+        if (node is not JsonArray arr) return list;
+        static long L(JsonNode? n) => n is JsonValue v && v.TryGetValue<double>(out var d) ? (long)d : 0;
+        foreach (var x in arr.OfType<JsonObject>())
+            list.Add(new CloudAiDigest(L(x["id"]), L(x["at"]), x["slot"]?.GetValue<string>() ?? "", x["text"]?.GetValue<string>() ?? "",
+                x["byAi"] is JsonValue b && b.TryGetValue<bool>(out var bb) && bb));
+        return list;
+    }
 
     /// <summary>Lịch sử đồng bộ: các lượt nhập đơn cloud đã nhận (Google Sheet, nạp từ máy tính), mới nhất trước.</summary>
     public async Task<IReadOnlyList<CloudImportRun>> ImportLogAsync(CancellationToken ct = default) =>
@@ -247,3 +278,9 @@ public sealed class CloudApi
 public sealed record CloudImportResult(int Added, int Updated, int Unchanged, IReadOnlyList<(string Id, string Reason)> Rejected, int ReturnWatchAdded);
 /// <summary>Một lượt đồng bộ cloud đã nhận (các lô cùng nguồn gửi liền nhau gộp lại). Thời gian: mili giây Unix.</summary>
 public sealed record CloudImportRun(string Source, long Start, long End, int Batches, int Sent, int Added, int Updated, int Skipped, int Ambiguous);
+
+/// <summary>Một thiết bị đã ghép với cửa hàng. LastSeenAt: mili giây Unix (0 = chưa thấy).</summary>
+public sealed record CloudDeviceInfo(string DeviceId, string DeviceName, string Kind, string Role, long LastSeenAt, bool Revoked);
+
+/// <summary>Một bản gợi ý AI theo khung giờ. At: mili giây Unix; ByAi=false: bản viết theo quy tắc (AI lỗi/hết lượt).</summary>
+public sealed record CloudAiDigest(long Id, long At, string Slot, string Text, bool ByAi);

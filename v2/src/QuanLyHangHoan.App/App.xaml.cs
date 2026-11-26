@@ -11,6 +11,7 @@ public partial class App : Application
     private MainViewModel? _mainViewModel;
     private CloudMode? _cloud;
     private ISingleInstanceGuard? _singleInstanceGuard;
+    private System.Threading.Timer? _digestTimer;
     private ITrayService? _trayService;
 
     /// <summary>Ghi lỗi khởi động/lỗi không bắt được vào thư mục dữ liệu để biết vì sao app không hiện (không có nhật ký thì chỉ thấy "mở lên rồi mất").</summary>
@@ -157,7 +158,11 @@ public partial class App : Application
 
             var sqliteProvider = new SqliteOrderProvider(AppPaths.DatabasePath);
             ILegacyImporter sqliteImporter = new SqliteLegacyImporter(AppPaths.LegacyCopiesFolder, AppPaths.DatabasePath);
-            IArchiveSweeper archiveSweeper = new SqliteArchiveSweeper(AppPaths.DatabasePath);
+            // chế độ cloud: tự lưu trữ và tạo đơn mới đều đi qua cloud (không ghi riêng vào máy)
+            IArchiveSweeper archiveSweeper = _cloud is { } cs
+                ? new CloudArchiveSweeper(AppPaths.DatabasePath, () => cs.Link.CanWrite,
+                    (ops, ct) => cs.Link.Api is { } a ? a.OpsAsync(ops, ct) : throw new QuanLyHangHoan.Data.Cloud.CloudApiException("unavailable", "Chưa kết nối cloud.", 0))
+                : new SqliteArchiveSweeper(AppPaths.DatabasePath);
             // Công tắc cloud: --cloud hoặc đã ghép thiết bị. Tắt thì mọi thứ như cũ (SQLite cục bộ + MQTT).
             _cloud = CloudMode.IsEnabled(e.Args) ? new CloudMode(AppPaths.DatabasePath, new DpapiProtector()) : null;
             var cloudForPhotos = _cloud;
@@ -190,6 +195,7 @@ public partial class App : Application
             IFileImportController realFileImport = new RealFileImportController(AppPaths.DatabasePath, () => DateTime.Now);
             IReturnWatchService sqliteReturnWatch = _cloud?.ReturnWatch ?? new SqliteReturnWatchService(AppPaths.DatabasePath);
             var aiStore = new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder);
+            var notifCenter = isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath));
             mainViewModel = new MainViewModel(
                 sqliteProvider,
                 sqliteProvider,
@@ -227,8 +233,11 @@ public partial class App : Application
                 aiReturnWatch: all => QuanLyHangHoan.Data.ReturnWatchService.ActiveMarks(AppPaths.DatabasePath, all),
                 activityLogProvider: new SqliteActivityLogProvider(AppPaths.DatabasePath),
                 orderExportService: new OrderExportService(fileSaveService),
-                notificationCenter: isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath)),
-                newOrderCreator: isDemoMode ? null : new SqliteNewOrderCreator(AppPaths.DatabasePath),
+                notificationCenter: notifCenter,
+                newOrderCreator: isDemoMode ? null : _cloud is { } cn
+                    ? new CloudNewOrderCreator(() => cn.Link.CanWrite,
+                        (op, ct) => cn.Link.Api is { } a ? a.OpAsync(op, ct) : throw new QuanLyHangHoan.Data.Cloud.CloudApiException("unavailable", "Chưa kết nối cloud.", 0))
+                    : new SqliteNewOrderCreator(AppPaths.DatabasePath),
                 newOrderDialogService: new WindowsNewOrderDialogService(),
                 diagnosticsProvider: new SqliteDiagnosticsProvider(AppPaths.DatabasePath, new UiSettingsStore(AppPaths.SettingsPath, isDemoMode: false)),
                 // Chưa bật cloud: null giữ nguyên giao diện/hành vi cũ.
@@ -249,6 +258,18 @@ public partial class App : Application
                 // AI dùng khóa trên cloud (token thiết bị); khóa trên máy không dùng nữa
                 aiStore.UseCloud(() => cloud.AiAccess);
                 cloud.AiAccessChanged += () => Dispatcher.BeginInvoke(() => vmForCloud.AiChatVm.RefreshKeyState());
+                // gợi ý AI theo khung giờ (cloud viết lúc 8:00, 10:30, 13:30, 16:30, 19:00, 21:00): hỏi mỗi 10 phút, đưa vào chuông thông báo
+                if (notifCenter is not null)
+                {
+                    var poller = new CloudDigestPoller(
+                        ct => cloud.Link.Api is { } a ? a.AiDigestsAsync(12, ct) : throw new QuanLyHangHoan.Data.Cloud.CloudApiException("unavailable", "Chưa kết nối cloud.", 0),
+                        System.IO.Path.Combine(AppPaths.BaseFolder, "ai_digest_seen.txt"));
+                    _digestTimer = new System.Threading.Timer(async _ =>
+                    {
+                        foreach (var d in await poller.PollAsync())
+                            _ = Dispatcher.BeginInvoke(() => notifCenter.Add(NotificationLevel.Info, "ai", $"✨ AI gợi ý lúc {d.Slot}", d.Text));
+                    }, null, TimeSpan.FromSeconds(20), TimeSpan.FromMinutes(10));
+                }
             }
         }
 

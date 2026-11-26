@@ -415,6 +415,40 @@
                 </StackPanel>
             </Border>
 
+            <!-- Thẻ 5: Thiết bị đã ghép (chỉ chủ cửa hàng): thu hồi máy mất -->
+            <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
+                    Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Right" Content="Tải danh sách" Command="{Binding RefreshDevicesCommand}" Padding="12,5" Cursor="Hand" />
+                        <TextBlock Text="📱 Thiết bị đã ghép (Chủ cửa hàng)" Style="{StaticResource CloudCardTitleStyle}" Margin="0" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <TextBlock Text="Điện thoại tự ghép bằng mật khẩu cửa hàng. Mất máy hoặc nhân viên nghỉ: bấm Thu hồi, máy đó mất quyền vào cloud ngay."
+                               Style="{StaticResource CloudHintStyle}" Margin="0,0,0,8" />
+                    <TextBlock Text="{Binding DevicesStatus}" Style="{StaticResource CloudHintStyle}" Margin="0,0,0,8" />
+                    <ItemsControl ItemsSource="{Binding Devices}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Padding="0,8">
+                                    <DockPanel>
+                                        <Button DockPanel.Dock="Right" Content="Thu hồi" Padding="12,4" Cursor="Hand" Foreground="#DC2626"
+                                                Command="{Binding DataContext.RevokeDeviceCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"
+                                                Visibility="{Binding CanRevoke, Converter={StaticResource BoolToVis}}" />
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                            <TextBlock FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}">
+                                                <Run Text="{Binding KindText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding StatusText, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -79,6 +79,20 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertEqual(r.status, .error); XCTAssertTrue(r.message.contains("Mất kết nối")); XCTAssertTrue(t.requests.isEmpty)
     }
 
+    // MARK: gợi ý AI theo khung giờ
+
+    func testDigestsParseAndOnlyTheNewestUnseenIsNotified() async throws {
+        let t = Transport { r in
+            XCTAssertTrue(r.url!.absoluteString.contains("/v1/ai/digests"))
+            return (200, #"[{"id":5,"at":1795000000000,"slot":"13:30","text":"• Nhận 3 đơn đỏ","byAi":true},{"id":4,"at":1,"slot":"10:30","text":"• a","byAi":false},{"id":3,"text":""}]"#)
+        }
+        let list = try await CloudAPI(baseURL: "https://a.workers.dev", token: "t", transport: t).aiDigests()
+        XCTAssertEqual(list.map { $0.id }, [5, 4])
+        XCTAssertNil(CloudAIDigest.toNotify(list, lastSeen: nil))      // lần đầu: chỉ ghi nhớ
+        XCTAssertEqual(CloudAIDigest.toNotify(list, lastSeen: 4)?.id, 5)
+        XCTAssertNil(CloudAIDigest.toNotify(list, lastSeen: 5))
+    }
+
     // MARK: kết quả quét
 
     func testScanOutcomesMapToStatusesAndOnlyReceivedIsAConfirmedSuccess() {

@@ -45,7 +45,7 @@ async function stub() {
   return E.SHOP.get(E.SHOP.idFromName("main"));
 }
 
-const TABLES = ["import_issues", "import_log", "return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
+const TABLES = ["import_issues", "import_log", "ai_digest", "return_watch", "devices","pair_codes", "parcels", "parcel_codes", "ops_done", "audit_log", "scans", "photos", "import_state", "quota"];
 
 // Trạng thái Durable Object được giữ giữa các test: xóa sạch bảng + ảnh trước mỗi test rồi tạo lại thiết bị.
 beforeEach(async () => {
@@ -720,6 +720,22 @@ describe("tạo đơn mới qua cloud (máy tính nhập tay, điện thoại qu
     await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "delete", id: a.parcel.id }] }, owner);
     expect((await op(phoneA, { code: "840000000001" })).data.results[0].result).toMatchObject({ outcome: "duplicate", where: "mục Đã xóa" });
     expect((await op(phoneA, { code: "  " })).data.results[0].result.outcome).toBe("invalid");
+  });
+});
+
+describe("gợi ý AI theo khung giờ", () => {
+  it("chủ chạy thử được; AI không dùng được thì vẫn lưu bản viết theo quy tắc; mọi máy đọc được; nhân viên không tự chạy", async () => {
+    vi.stubGlobal("fetch", async () => new Response("{}", { status: 500 }));   // Groq lỗi -> dùng bản quy tắc
+    const r = await call("POST", "/admin/ai-digest", {}, owner);
+    vi.unstubAllGlobals();
+    expect(r.status).toBe(200);
+    expect(r.data.byAi).toBe(false);
+    expect(r.data.text).toContain("Đang chờ nhận");
+    expect((await call("POST", "/admin/ai-digest", {}, phoneA)).status).toBe(403);
+    const list = await call("GET", "/ai/digests", undefined, phoneA);
+    expect(list.data).toHaveLength(1);
+    expect(list.data[0]).toMatchObject({ id: r.data.id, text: r.data.text, byAi: false });
+    expect((await call("GET", "/ai/digests", undefined, undefined)).status).toBe(401);
   });
 });
 

@@ -10,7 +10,8 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ShopDO"] }],
   "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "app-images" }],
   "ai": { "binding": "AI" },
-  "triggers": { "crons": ["17 20 * * *"] },
+  // giờ UTC: 01:00/12:00/14:00 = 8:00/19:00/21:00 VN; 03:30/06:30/09:30 = 10:30/13:30/16:30 VN (gợi ý AI); 20:17 = dọn dẹp
+  "triggers": { "crons": ["17 20 * * *", "0 1,12,14 * * *", "30 3,6,9 * * *"] },
   "vars": { "PHOTO_RETENTION_DAYS": "90" }
 }
 

@@ -485,7 +485,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _archiveNavItem,
             _deletedNavItem,
             new NavigationItem("stats", "📊", "Thống kê đơn & sản phẩm", "CHUNG", () => StatisticsVm),
-            new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm),
+            // chế độ cloud: dữ liệu cũ đã chuyển lên cloud, nhập lại vào máy sẽ lệch với cloud -> ẩn
+            .. (_cloudMode ? Array.Empty<NavigationItem>() : new[] { new NavigationItem("legacy_import", "📂", "Nhập dữ liệu cũ", "CHUNG", () => LegacyImportVm) }),
             new NavigationItem("activity", "🧾", "Nhật ký hoạt động", "CHUNG", () => ActivityLogVm),
             new NavigationItem("settings", "⚙️", "Cài đặt", "CHUNG", () => SettingsVm),
             new NavigationItem("help", "❓", "Trợ giúp", "CHUNG", () => HelpVm)

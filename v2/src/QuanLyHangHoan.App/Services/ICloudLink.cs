@@ -54,6 +54,10 @@ public interface ICloudLink
     Task<string?> PairAsync(string baseUrl, string code, string deviceName, CancellationToken ct = default);
     /// <summary>Chủ tạo mã ghép cho thiết bị khác; trả (mã, hết hạn) hoặc lỗi.</summary>
     Task<(string? Code, DateTime? ExpiresAt, string? Error)> StartPairingAsync(CancellationToken ct = default);
+    /// <summary>Chủ cửa hàng: danh sách thiết bị đã ghép (hoặc lỗi tiếng Việt).</summary>
+    Task<(IReadOnlyList<QuanLyHangHoan.Data.Cloud.CloudDeviceInfo> Devices, string? Error)> ListDevicesAsync(CancellationToken ct = default);
+    /// <summary>Chủ cửa hàng thu hồi một thiết bị; trả null nếu thành công, ngược lại thông báo lỗi.</summary>
+    Task<string?> RevokeDeviceAsync(string deviceId, CancellationToken ct = default);
     /// <summary>Lấy ngay phần thay đổi từ cloud.</summary>
     Task SyncNowAsync(CancellationToken ct = default);
     /// <summary>Quên ghép trên máy này (không thu hồi trên cloud).</summary>

@@ -6,6 +6,7 @@ import ScannerCore
 struct NotificationsView: View {
     @EnvironmentObject var store: SnapshotStore
     @EnvironmentObject var router: NotificationRouter
+    @EnvironmentObject var engine: SyncEngine
     @State private var overdueRows: [OrderRow] = []
     @State private var soonRows: [OrderRow] = []
     @State private var upcoming: [PlannedNotice] = []
@@ -18,6 +19,22 @@ struct NotificationsView: View {
     var body: some View {
         let now = listNowMs
         return List {
+            if let d = engine.aiDigest {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles").foregroundColor(Theme.accent)
+                            Text("AI gợi ý lúc \(d.slot)").font(.subheadline.bold())
+                            Spacer()
+                            if !d.byAi { Text("tóm tắt tự động").font(.caption2).foregroundStyle(.secondary) }
+                        }
+                        Text(d.text).font(.footnote)
+                    }
+                    .padding(.vertical, 4)
+                } footer: {
+                    Text("Cloud viết gợi ý lúc 8:00, 10:30, 13:30, 16:30, 19:00 và 21:00 từ số liệu tổng hợp (không có thông tin khách).")
+                }
+            }
             if !store.notificationsAllowed {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {

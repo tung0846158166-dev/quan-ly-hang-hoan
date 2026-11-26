@@ -43,6 +43,22 @@ public sealed class FakeCloudLink : ICloudLink
             ? Task.FromResult<(string?, DateTime?, string?)>((ValidCode, DateTime.Now.AddMinutes(10), null))
             : Task.FromResult<(string?, DateTime?, string?)>((null, null, "Chỉ chủ cửa hàng mới tạo được mã ghép."));
 
+    public List<QuanLyHangHoan.Data.Cloud.CloudDeviceInfo> Devices { get; } = new();
+    public List<string> Revoked { get; } = new();
+
+    public Task<(IReadOnlyList<QuanLyHangHoan.Data.Cloud.CloudDeviceInfo> Devices, string? Error)> ListDevicesAsync(CancellationToken ct = default) =>
+        Task.FromResult<(IReadOnlyList<QuanLyHangHoan.Data.Cloud.CloudDeviceInfo>, string?)>(Role == "owner" ? (Devices.ToList(), null)
+            : (Array.Empty<QuanLyHangHoan.Data.Cloud.CloudDeviceInfo>(), "Chỉ chủ cửa hàng mới xem được danh sách thiết bị."));
+
+    public Task<string?> RevokeDeviceAsync(string deviceId, CancellationToken ct = default)
+    {
+        if (Role != "owner") return Task.FromResult<string?>("Chỉ chủ cửa hàng mới thu hồi được thiết bị.");
+        Revoked.Add(deviceId);
+        var i = Devices.FindIndex(d => d.DeviceId == deviceId);
+        if (i >= 0) Devices[i] = Devices[i] with { Revoked = true };
+        return Task.FromResult<string?>(null);
+    }
+
     public Task SyncNowAsync(CancellationToken ct = default) { SyncNowCalls++; LastSyncAt = DateTime.Now; Changed?.Invoke(); return Task.CompletedTask; }
 
     public void Unpair() { UnpairCalls++; State = CloudState.Unpaired; Role = null; DeviceName = null; Changed?.Invoke(); }

@@ -112,6 +112,22 @@ public sealed class CloudLinkService : ICloudLink, IDisposable
         catch (CloudApiException ex) { return (null, null, ex.Message); }
     }
 
+    public async Task<(IReadOnlyList<CloudDeviceInfo> Devices, string? Error)> ListDevicesAsync(CancellationToken ct = default)
+    {
+        if (Api is not { } api) return (Array.Empty<CloudDeviceInfo>(), "Chưa ghép thiết bị với cloud.");
+        if (Role != "owner") return (Array.Empty<CloudDeviceInfo>(), "Chỉ chủ cửa hàng mới xem được danh sách thiết bị.");
+        try { return (await api.DevicesAsync(ct).ConfigureAwait(false), null); }
+        catch (CloudApiException ex) { return (Array.Empty<CloudDeviceInfo>(), ex.Message); }
+    }
+
+    public async Task<string?> RevokeDeviceAsync(string deviceId, CancellationToken ct = default)
+    {
+        if (Api is not { } api) return "Chưa ghép thiết bị với cloud.";
+        if (Role != "owner") return "Chỉ chủ cửa hàng mới thu hồi được thiết bị.";
+        try { await api.RevokeDeviceAsync(deviceId, ct).ConfigureAwait(false); return null; }
+        catch (CloudApiException ex) { return ex.Message; }
+    }
+
     public async Task SyncNowAsync(CancellationToken ct = default)
     {
         var e = Engine;

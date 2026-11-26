@@ -425,6 +425,34 @@ public sealed partial class CloudStatusViewModel : ObservableObject, IDisposable
 
     private bool CanUnpair => IsEnabled && State != CloudState.Unpaired;
 
+    // ---------------------------------------------------------------- thiết bị đã ghép (chủ cửa hàng)
+    public System.Collections.ObjectModel.ObservableCollection<CloudDeviceRow> Devices { get; } = new();
+    [ObservableProperty] private string _devicesStatus = string.Empty;
+
+    [RelayCommand]
+    public async Task RefreshDevicesAsync()
+    {
+        Devices.Clear();
+        if (_link is null || !IsOwner) { DevicesStatus = string.Empty; return; }
+        var (list, error) = await _link.ListDevicesAsync();
+        foreach (var d in list) Devices.Add(CloudDeviceRow.From(d));
+        DevicesStatus = error ?? $"{list.Count(d => !d.Revoked)} thiết bị đang dùng, {list.Count(d => d.Revoked)} đã thu hồi.";
+    }
+
+    [RelayCommand]
+    public async Task RevokeDeviceAsync(CloudDeviceRow? row)
+    {
+        if (_link is null || row is null || !row.CanRevoke) return;
+        var ok = _confirmationService.Confirm("Thu hồi thiết bị",
+            $"Thu hồi \"{row.Name}\"?\n\nMáy này sẽ mất quyền vào cloud NGAY (không xem, không quét được). Muốn dùng lại phải ghép lại bằng mật khẩu cửa hàng.");
+        if (!ok) return;
+        var err = await _link.RevokeDeviceAsync(row.DeviceId);
+        if (err is not null) { DevicesStatus = err; return; }
+        var i = Devices.IndexOf(row);
+        if (i >= 0) Devices[i] = row with { Revoked = true };
+        _onNotify?.Invoke($"Đã thu hồi \"{row.Name}\".", false);
+    }
+
     [RelayCommand(CanExecute = nameof(CanUnpair))]
     public void Unpair()
     {
@@ -619,4 +647,15 @@ public sealed partial class CloudStatusViewModel : ObservableObject, IDisposable
         }
         StopCountdownTimer();
     }
+}
+
+/// <summary>Một dòng trong danh sách thiết bị đã ghép.</summary>
+public sealed record CloudDeviceRow(string DeviceId, string Name, string Kind, string Role, long LastSeenAt, bool Revoked)
+{
+    public static CloudDeviceRow From(QuanLyHangHoan.Data.Cloud.CloudDeviceInfo d) => new(d.DeviceId, d.DeviceName, d.Kind, d.Role, d.LastSeenAt, d.Revoked);
+    public string KindText => (Kind == "phone" ? "📱 Điện thoại" : "💻 Máy tính") + (Role == "owner" ? " · Chủ cửa hàng" : " · Nhân viên");
+    public string StatusText => Revoked ? "Đã thu hồi"
+        : LastSeenAt > 0 ? "Hoạt động lần cuối " + DateTimeOffset.FromUnixTimeMilliseconds(LastSeenAt).LocalDateTime.ToString("dd/MM HH:mm") : "Chưa hoạt động";
+    /// <summary>Không thu hồi máy chủ cửa hàng và máy đã thu hồi.</summary>
+    public bool CanRevoke => !Revoked && Role != "owner";
 }

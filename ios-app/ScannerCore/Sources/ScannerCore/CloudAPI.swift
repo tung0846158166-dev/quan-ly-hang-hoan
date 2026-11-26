@@ -290,6 +290,16 @@ public final class CloudAPI {
         return out
     }
 
+    /// Gợi ý AI theo khung giờ làm việc (cloud viết lúc 8:00, 10:30, 13:30, 16:30, 19:00, 21:00), mới nhất trước.
+    public func aiDigests(limit: Int = 6) async throws -> [CloudAIDigest] {
+        let data = try await perform("GET", "/ai/digests?limit=\(limit)")
+        let arr = ((try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]]) ?? []
+        return arr.compactMap { x in
+            guard let id = (x["id"] as? NSNumber)?.intValue, let text = x["text"] as? String, !text.isEmpty else { return nil }
+            return CloudAIDigest(id: id, at: (x["at"] as? NSNumber)?.int64Value ?? 0, slot: x["slot"] as? String ?? "", text: text, byAi: x["byAi"] as? Bool ?? false)
+        }
+    }
+
     /// Danh sách ảnh của một kiện trên cloud (mới nhất trước), kể cả ảnh do máy khác chụp.
     public func parcelPhotos(parcelId: String) async throws -> [CloudPhotoInfo] {
         let id = parcelId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? parcelId
@@ -316,4 +326,16 @@ public struct CloudAIStatus: Equatable {
         self.groq = groq; self.gemini = gemini; self.nvidia = nvidia; self.cloudflare = cloudflare
     }
     public var any: Bool { groq || gemini || nvidia || cloudflare }
+}
+
+/// Một bản gợi ý AI theo khung giờ. `at`: mili giây Unix; byAi=false: bản viết theo quy tắc (AI lỗi/hết lượt).
+public struct CloudAIDigest: Equatable, Identifiable {
+    public let id: Int, at: Int64, slot: String, text: String, byAi: Bool
+    public init(id: Int, at: Int64, slot: String, text: String, byAi: Bool) { self.id = id; self.at = at; self.slot = slot; self.text = text; self.byAi = byAi }
+
+    /// Bản cần hiện thông báo: chỉ bản mới nhất và chỉ khi mới hơn bản đã báo (lần đầu: không báo, chỉ ghi nhớ).
+    public static func toNotify(_ list: [CloudAIDigest], lastSeen: Int?) -> CloudAIDigest? {
+        guard let newest = list.max(by: { $0.id < $1.id }), let seen = lastSeen, newest.id > seen else { return nil }
+        return newest
+    }
 }

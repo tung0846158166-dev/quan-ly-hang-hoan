@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import AudioToolbox
+import UserNotifications
 import Security
 import ScannerCore
 
@@ -323,7 +324,7 @@ final class SyncEngine: ObservableObject {
     /// Gọi khi app trở lại foreground: kiểm tra lại quyền thông báo và đánh thức đồng bộ nếu cần.
     func handleForeground() {
         snapshot.refreshAuthorization()
-        if cloudActive { Task { await cloud.syncNow() }; return }
+        if cloudActive { Task { await cloud.syncNow() }; refreshAIDigest(force: true); return }
         guard !isDemoMode, !room.isEmpty else { return }
         if !channelUp {
             sseTask?.cancel(); sseTask = nil
@@ -1196,7 +1197,33 @@ extension SyncEngine {
     }
 
     /// Dựng danh sách dòng từ bản sao cloud (chạy nền) rồi đưa vào `snapshot` mà mọi màn hình đang đọc.
+    /// Gợi ý AI mới nhất từ cloud (hiện ở đầu tab Thông báo).
+    @Published var aiDigest: CloudAIDigest?
+    private var digestCheckedAt = Date.distantPast
+
+    /// Hỏi cloud bản gợi ý mới (tối đa 5 phút/lần). Bản mới hơn bản đã báo thì hiện thông báo trên iPhone.
+    func refreshAIDigest(force: Bool = false) {
+        guard cloudActive, let api = cloud.currentAPI, force || Date().timeIntervalSince(digestCheckedAt) > 300 else { return }
+        digestCheckedAt = Date()
+        Task { @MainActor [weak self] in
+            guard let self, let list = try? await api.aiDigests() else { return }
+            self.aiDigest = list.max(by: { $0.id < $1.id })
+            let key = "aiDigestLastSeen"
+            let seen = UserDefaults.standard.object(forKey: key) as? Int
+            if let n = CloudAIDigest.toNotify(list, lastSeen: seen) {
+                let c = UNMutableNotificationContent()
+                c.title = "✨ AI gợi ý lúc \(n.slot)"
+                c.body = n.text
+                c.sound = .default
+                try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "ai-digest-\(n.id)", content: c,
+                    trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)))
+            }
+            if let m = list.map({ $0.id }).max() { UserDefaults.standard.set(m, forKey: key) }
+        }
+    }
+
     func applyCloudRows() {
+        refreshAIDigest()
         let store = cloud.store
         let now = Date()
         let at = cloud.lastSyncAt ?? now

@@ -1,5 +1,6 @@
 import { fromWorkersAi, toWorkersAi, workersAiErrorStatus } from "./workersai";
 import { buildNewParcel, ownCodes, parseNewOrder } from "./neworder";
+import { answerText, buildStats, digestMessages, ruleText } from "./digest";
 import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
@@ -12,7 +13,7 @@ import type { Env } from "./index";
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
 /** Đổi khi SCHEMA/nâng cấp lược đồ đổi: lần khởi động sau sẽ chạy lại migrate(). */
-const SCHEMA_VERSION = "2026-11-26.2";
+const SCHEMA_VERSION = "2026-11-26.3";
 
 /** Lỗi Cloudflare khi hết lượt ghi Durable Object (gói miễn phí). */
 export function isWriteQuotaError(e: unknown): boolean {
@@ -147,6 +148,8 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
     if (m === "GET" && path === "/import/log") return this.importLog();
+    if (m === "GET" && path === "/ai/digests") return this.listDigests(url);
+    if (m === "POST" && path === "/admin/ai-digest") { this.requireOwner(dev); return json(await this.runDigest()); }
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     const ai = /^\/ai\/(groq|gemini|nvidia|cloudflare)\/chat\/completions$/.exec(path);
@@ -949,6 +952,50 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   // ===================================================== dọn định kỳ (Cron)
+  /**
+   * Gợi ý AI theo khung giờ làm việc (cron: 8:00, 10:30, 13:30, 16:30, 19:00, 21:00 giờ Việt Nam). Số liệu tổng hợp, không dữ liệu khách.
+   * Thứ tự: Workers AI trong Worker -> Groq -> bản viết theo quy tắc. Luôn lưu một bản (không bỏ lượt).
+   */
+  async runDigest(): Promise<{ id: number; at: number; slot: string; text: string; byAi: boolean }> {
+    const now = Date.now();
+    const parcels = this.db.all<Row>("SELECT data FROM parcels WHERE is_archived = 0 AND is_deleted = 0").map((r) => JSON.parse(r.data as string) as Parcel);
+    const amb = Number(this.db.first<Row>("SELECT COUNT(*) AS n FROM import_issues WHERE at > ?", now - DAY_MS)?.n ?? 0);
+    const stats = buildStats(parcels, now, amb);
+    let text = "", byAi = false;
+    const canAi = this.aiUsedToday() < this.aiLimit() && this.quotaSnapshot(false).level !== "stop";
+    if (canAi) {
+      const messages = digestMessages(stats);
+      const ai = this.workersAiBinding();
+      if (ai) {
+        try { text = answerText(fromWorkersAi("@cf/openai/gpt-oss-120b", await ai.run("@cf/openai/gpt-oss-120b" as Parameters<Ai["run"]>[0], { messages } as never))); }
+        catch { text = ""; }
+      }
+      if (!text && this.env.GROQ_API_KEY) {
+        try {
+          const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST", signal: AbortSignal.timeout(30_000),
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.env.GROQ_API_KEY}` },
+            body: JSON.stringify({ model: "openai/gpt-oss-120b", messages }),
+          });
+          if (r.ok) text = answerText(await r.json());
+        } catch { text = ""; }
+      }
+      if (text) { byAi = true; this.setMeta("ai_day", this.dayKey()); this.setMeta("ai_n", String(this.aiUsedToday() + 1)); }
+    }
+    if (!text) text = ruleText(stats);
+    this.db.run("INSERT INTO ai_digest(at, slot, text, by_ai, stats) VALUES (?,?,?,?,?)", now, stats.slot, text, byAi ? 1 : 0, JSON.stringify(stats));
+    this.db.run("DELETE FROM ai_digest WHERE id NOT IN (SELECT id FROM ai_digest ORDER BY id DESC LIMIT 200)");
+    const id = Number(this.db.first<Row>("SELECT MAX(id) AS id FROM ai_digest")?.id ?? 0);
+    return { id, at: now, slot: stats.slot, text, byAi };
+  }
+
+  /** Các bản gợi ý gần nhất (mới nhất trước). Máy nào đã ghép cũng xem được. */
+  private listDigests(url: URL): Response {
+    const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit")) || 12));
+    const rows = this.db.all<Row>("SELECT id, at, slot, text, by_ai FROM ai_digest ORDER BY id DESC LIMIT ?", limit);
+    return json(rows.map((r) => ({ id: Number(r.id), at: Number(r.at), slot: r.slot, text: r.text, byAi: !!r.by_ai })));
+  }
+
   async cleanup(): Promise<{ photosExpired: number; opsPurged: number }> {
     const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
     const cutoff = Date.now() - days * DAY_MS;

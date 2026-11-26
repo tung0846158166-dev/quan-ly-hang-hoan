@@ -33,8 +33,12 @@ export default {
     return shop(env).fetch(req);
   },
 
-  /** Cron hằng ngày: xóa ảnh quá hạn 90 ngày, dọn nhật ký thao tác cũ. */
-  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
-    await shop(env).cleanup();
+  /**
+   * Cron: "17 20 * * *" = dọn dẹp hằng ngày (ảnh quá 90 ngày, nhật ký cũ);
+   * còn lại = gợi ý AI theo khung giờ làm việc (giờ Việt Nam 8:00, 10:30, 13:30, 16:30, 19:00, 21:00).
+   */
+  async scheduled(event: ScheduledController, env: Env): Promise<void> {
+    if (event.cron === "17 20 * * *") await shop(env).cleanup();
+    else await shop(env).runDigest();
   },
 } satisfies ExportedHandler<Env>;

@@ -8,6 +8,22 @@ namespace QuanLyHangHoan.Data;
 /// <summary>Tự dời lưu trữ: đặt cờ is_archived + archived_at cho đơn đủ điều kiện. Không xóa, không đụng đơn đã xóa/đã lưu trữ.</summary>
 public static class ArchiveSweep
 {
+    /// <summary>Chỉ ĐỌC: mã (id) các đơn đủ điều kiện dời vào lưu trữ. Chế độ cloud gửi thao tác "archive" lên cloud thay vì sửa máy.</summary>
+    public static IReadOnlyList<string> DueIds(string dbPath, DateTime now, ArchivePolicy? policy = null)
+    {
+        var due = new List<string>();
+        if (!File.Exists(dbPath)) return due;
+        policy ??= ArchivePolicy.Default;
+        using var conn = new SqliteConnection($"Data Source={dbPath};Pooling=False");
+        conn.Open();
+        using var q = conn.CreateCommand();
+        q.CommandText = "SELECT id, status, recv_date FROM orders WHERE is_archived=0 AND is_deleted=0";
+        using var r = q.ExecuteReader();
+        while (r.Read())
+            if (policy.Check(new Order { Status = r.GetString(1), RecvDate = r.GetString(2) }, now)) due.Add(r.GetString(0));
+        return due;
+    }
+
     /// <returns>Số đơn vừa được dời.</returns>
     public static int Run(string dbPath, DateTime now, ArchivePolicy? policy = null)
     {

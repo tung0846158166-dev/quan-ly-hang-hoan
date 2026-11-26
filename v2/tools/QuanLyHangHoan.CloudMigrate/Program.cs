@@ -1,8 +1,10 @@
 using QuanLyHangHoan.Data.Cloud;
+using QuanLyHangHoan.Data.Sheet;
 
 // Công cụ chuyển dữ liệu cũ lên cloud. Mặc định chỉ CHẠY THỬ (không mạng, không in nội dung đơn).
 //   dry-run --db <data.db> [--out <thư mục>]
 //   upload  --db <data.db> --url <địa chỉ Worker> [--watch] --yes        (token chủ: biến môi trường QLHH_CLOUD_TOKEN)
+//   login-pc [--db <data.db>] --url <địa chỉ Worker> [--replace] --yes  (cài phiên chủ vào app máy tính)
 //   photos  --db <data.db> --url <địa chỉ Worker> [--include-history] [--keep-as-new] --yes
 // Token KHÔNG nhận qua tham số (tránh lọt vào lịch sử lệnh) và không bao giờ được in ra.
 static string? Arg(string[] a, string name)
@@ -35,7 +37,7 @@ try
         return 0;
     }
 
-    if (cmd is "upload" or "photos")
+    if (cmd is "upload" or "photos" or "login-pc")
     {
         if (!Flag(args, "--yes")) { Console.WriteLine("Thiếu --yes. Hãy chạy 'dry-run' trước rồi thêm --yes để thật sự ghi lên cloud."); return 2; }
         var url = Arg(args, "--url");
@@ -45,6 +47,18 @@ try
         var api = new CloudApi(http, url, token);
         var me = await api.MeAsync();
         if (me.Role != "owner") { Console.WriteLine("Token này không phải của chủ cửa hàng."); return 2; }
+
+        if (cmd == "login-pc")
+        {
+            // Cài phiên CHỦ cửa hàng vào app máy tính (máy chủ phải là thiết bị chủ để tạo mã ghép cho điện thoại).
+            // Token mã hóa bằng DPAPI của người dùng Windows này, giống hệt khi ghép trong app; không in token.
+            var dir = Arg(args, "--dir") ?? Path.GetDirectoryName(db)!;
+            var sessionPath = Path.Combine(dir, "cloud_session.json");
+            if (File.Exists(sessionPath) && !Flag(args, "--replace")) { Console.WriteLine("Máy này đã ghép cloud (có cloud_session.json). Thêm --replace nếu muốn thay."); return 2; }
+            new CloudSessionStore(sessionPath, new DpapiProtector()).Save(new CloudSession(url!.Trim(), token!, me.DeviceId, me.DeviceName, me.Role));
+            Console.WriteLine($"Đã cài phiên chủ cửa hàng cho app máy tính: thiết bị '{me.DeviceName}' ({me.Role}). Mở app là chạy chế độ cloud.");
+            return 0;
+        }
 
         if (cmd == "upload")
         {

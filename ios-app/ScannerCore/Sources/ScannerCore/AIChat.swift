@@ -150,7 +150,6 @@ public final class AIChatService {
         - Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.
         CÓ TRONG APP: 5 tab Tổng quan, Quét, Đơn, Lịch sử, Cài đặt (kết nối cloud, thông báo, ảnh, Trợ lý AI); nút ✨ hỏi AI; ảnh quét lưu trên điện thoại.
         VÍ DỤ: 'còn bao nhiêu đơn chưa về/tổng tiền' → dùng số liệu có sẵn. 'đơn nào quá hạn/báo đỏ' → list_orders(status Đang chờ, alert red). 'hôm nay về những đơn nào' → list_orders(status Đã nhận, date_field recv, from=to=today). 'sản phẩm hoàn nhiều nhất tháng này' → product_stats. 'tuần này so với tuần trước' → compare_periods. 'sàn/hãng nào nhiều' → aggregate(group_by platform|carrier). 'tìm đơn SPXVN...' → find_order.
-        \(AIShorthand.glossary)
         \(snapshotBlock())
         """
     }

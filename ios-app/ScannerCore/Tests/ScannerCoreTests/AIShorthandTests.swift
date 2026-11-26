@@ -27,19 +27,36 @@ final class AIShorthandTests: XCTestCase {
             ("tq", "Tổng quan hiện tại: bao nhiêu kiện đang chờ, đã nhận hôm nay, báo đỏ, báo vàng và tổng giá trị đang chờ."),
             ("tìm 5678", "Tìm đơn có mã đơn hoặc mã vận đơn chứa 5678."),
             ("SPXVN06446806070B", "Tìm đơn có mã đơn hoặc mã vận đơn chứa SPXVN06446806070B."),
+            ("chờ spx", "Đếm và liệt kê các kiện của SPX Express đang chờ (chưa về)."),
+            ("bn jt", "Có bao nhiêu kiện của J&T Express đang chờ (chưa về)?"),
+            ("trễ sp", "Liệt kê các kiện Shopee đang chờ bị báo đỏ (chờ quá 24 giờ kể từ lúc hàng về)."),
+            ("cho mình xem đơn đỏ shopee nhé", "Liệt kê các kiện Shopee đang chờ bị báo đỏ (chờ quá 24 giờ kể từ lúc hàng về)."),
+            ("Hôm nay có bao nhiêu đơn về?", "Có bao nhiêu kiện đã nhận về kho hôm nay?"),
+            ("mất", "Đếm và liệt kê các kiện bị mất."),
+            ("hỏng tuần", "Đếm và liệt kê các kiện bị hư hỏng tuần này."),
+            ("kcn", "Đếm và liệt kê các kiện không cần nhận."),
+            ("td", "Đếm và liệt kê các kiện đang theo dõi."),
+            ("lt tháng", "Đếm và liệt kê các kiện trong Kho lưu trữ tháng này."),
+            ("gtb tt", "Đếm và liệt kê các kiện TikTok giao không thành công."),
+            ("mới hn", "Đếm và liệt kê các kiện mới nạp hôm nay."),
+            ("mới", "Đếm và liệt kê các kiện mới nạp hôm nay."),
+            ("trùng", "Có đơn nào bị trùng lặp không? Liệt kê nếu có."),
+            ("nhật ký hq", "Có những hoạt động gì hôm qua (nhật ký)?"),
+            ("tình hình thế nào", "Tổng quan hiện tại: bao nhiêu kiện đang chờ, đã nhận hôm nay, báo đỏ, báo vàng và tổng giá trị đang chờ."),
+            ("top spx", "Sản phẩm nào hoàn nhiều nhất tuần này qua SPX Express?"),
+            ("sản phẩm hoàn nhiều nhất tháng", "Sản phẩm nào hoàn nhiều nhất tháng này?"),
+            ("bn về 7n tiền", "Có bao nhiêu kiện đã nhận về kho 7 ngày qua? Tổng giá trị bao nhiêu?"),
         ]
         for (input, expected) in cases { XCTAssertEqual(AIShorthand.expand(input), expected, input) }
     }
 
     func testFullOrUnknownQuestionsAreLeftAlone() {
-        for q in ["Hôm nay có bao nhiêu đơn về?", "xin chào", "đỏ sp nhưng bỏ đơn đã lưu trữ", ""] {
+        for q in ["Đơn nào hoàn vì lý do sai size?","xin chào","đỏ sp nhưng bỏ đơn đã lưu trữ","hãng spx",""] {
             XCTAssertNil(AIShorthand.expand(q), q)
         }
     }
 
-    func testGlossaryMentionsMainShortcuts() {
-        for k in ["sp", "tt", "lz", "hn", "hq", "đỏ", "vàng", "bn", "ds", "top", "so", "tq"] {
-            XCTAssertTrue(AIShorthand.glossary.contains(k), k)
-        }
+    func testEveryQuickAskButtonExpands() {
+        for q in AIShorthand.quickAsks { XCTAssertNotNil(AIShorthand.expand(q.short), q.short) }
     }
 }

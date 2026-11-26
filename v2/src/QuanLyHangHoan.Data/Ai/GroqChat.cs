@@ -118,7 +118,6 @@ public sealed class AiChatService : IAiChat
                "VÍ DỤ: 'còn bao nhiêu đơn chưa về/tổng tiền' → dùng số liệu có sẵn. 'đơn nào quá hạn/báo đỏ' → list_orders(status Đang chờ, alert red). 'hôm nay về những đơn nào' → list_orders(status Đã nhận, date_field recv, from=to=today). " +
                "'sản phẩm hoàn nhiều nhất tháng này' → product_stats(from đầu tháng). 'tuần này so với tuần trước' → compare_periods. 'sàn/hãng nào nhiều' → aggregate(group_by platform|carrier). 'tìm đơn SPXVN...' → find_order. 'đơn hủy' → count_orders/list_orders(order_type 'Hủy').\n" +
                "- Dữ liệu không có tên, SĐT, địa chỉ người nhận (đã ẩn). Công cụ lỗi hoặc không có dữ liệu: nói thẳng và gợi ý cách hỏi khác.\n" +
-               QuanLyHangHoan.Core.Ai.AiShorthand.Glossary + "\n" +
                SnapshotBlock();
     }
 

@@ -5,7 +5,7 @@ using QuanLyHangHoan.Data.Sheet;
 //   dry-run --db <data.db> [--out <thư mục>]
 //   upload  --db <data.db> --url <địa chỉ Worker> [--watch] --yes        (token chủ: biến môi trường QLHH_CLOUD_TOKEN)
 //   login-pc [--db <data.db>] --url <địa chỉ Worker> [--replace] --yes  (cài phiên chủ vào app máy tính)
-//   photos  --db <data.db> --url <địa chỉ Worker> [--include-history] [--keep-as-new] --yes
+//   photos  --db <data.db> --url <địa chỉ Worker> [--include-history] [--all-ages] [--keep-as-new] --yes   (--all-ages: cả ảnh quá 90 ngày, cloud giữ vĩnh viễn ảnh cũ)
 // Token KHÔNG nhận qua tham số (tránh lọt vào lịch sử lệnh) và không bao giờ được in ra.
 static string? Arg(string[] a, string name)
 {
@@ -68,7 +68,7 @@ try
         }
 
         var progress = new Progress<string>(Console.WriteLine);
-        var pr = await CloudMigration.UploadPhotosAsync(api, db, new PhotoMigrationOptions(Flag(args, "--include-history"), Flag(args, "--keep-as-new"), 90, progress));
+        var pr = await CloudMigration.UploadPhotosAsync(api, db, new PhotoMigrationOptions(Flag(args, "--include-history"), Flag(args, "--keep-as-new"), Flag(args, "--all-ages") ? 36500 : 90, progress));
         Console.WriteLine($"Ảnh: đã chuyển {pr.Uploaded:N0}; bỏ vì quá hạn lưu {pr.SkippedExpired:N0}; quá lớn/rỗng {pr.SkippedTooBig:N0}; kiện chưa có trên cloud {pr.SkippedNoParcel:N0}; lỗi {pr.Failed:N0}.");
         foreach (var f in pr.FailReasons) Console.WriteLine("  lỗi: " + f);
         return pr.Failed > 0 || pr.SkippedNoParcel > 0 ? 3 : 0;

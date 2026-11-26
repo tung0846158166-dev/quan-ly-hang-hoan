@@ -14,7 +14,7 @@ import type { Env } from "./index";
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
 /** Đổi khi SCHEMA/nâng cấp lược đồ đổi: lần khởi động sau sẽ chạy lại migrate(). */
-const SCHEMA_VERSION = "2026-11-26.3";
+const SCHEMA_VERSION = "2026-11-26.4";
 
 /** Lỗi Cloudflare khi hết lượt ghi Durable Object (gói miễn phí). */
 export function isWriteQuotaError(e: unknown): boolean {
@@ -99,6 +99,12 @@ export class ShopDO extends DurableObject<Env> {
         this.db.exec("ALTER TABLE return_watch ADD COLUMN auto INTEGER NOT NULL DEFAULT 0");
         // một lần lúc nâng cấp: dấu chưa ai bỏ/khôi phục coi như tự thêm (gửi lại dữ liệu cũ cùng giá trị thì không đổi gì)
         this.db.exec("UPDATE return_watch SET auto = 1 WHERE parcel_id NOT IN (SELECT parcel_id FROM audit_log WHERE action IN ('rwRemove','rwRestore'))");
+      }
+      // cột "keep": 1 = ảnh dữ liệu cũ chuyển từ máy tính, giữ vĩnh viễn (chủ dự án 26/11/2026); ảnh điện thoại chụp vẫn 90 ngày
+      if (!this.db.all<Row>("PRAGMA table_info(photos)").some((c) => c.name === "keep")) {
+        this.db.exec("ALTER TABLE photos ADD COLUMN keep INTEGER NOT NULL DEFAULT 0");
+        // một lần lúc nâng cấp: ảnh do MÁY TÍNH tải lên (chỉ có thể là ảnh cũ chuyển sang) -> giữ
+        this.db.exec("UPDATE photos SET keep = 1 WHERE device_id IN (SELECT device_id FROM devices WHERE kind = 'pc')");
       }
       this.db.run("INSERT OR REPLACE INTO meta(k, v) VALUES ('schema', ?)", SCHEMA_VERSION);
   }
@@ -761,10 +767,8 @@ export class ShopDO extends DurableObject<Env> {
     let takenAt = Date.now();
     if (legacy && url.searchParams.has("takenAt")) {
       const t = Number(url.searchParams.get("takenAt"));
-      const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
       if (!Number.isFinite(t) || t <= 0) return fail(422, "invalid", "Giờ chụp không hợp lệ.");
-      if (t < Date.now() - days * DAY_MS) return fail(422, "expired", `Ảnh đã quá ${days} ngày, vượt hạn lưu.`);
-      takenAt = Math.min(t, Date.now());
+      takenAt = Math.min(t, Date.now());   // ảnh cũ: giữ giờ chụp gốc, không giới hạn tuổi (giữ vĩnh viễn)
     }
     const parcel = this.loadParcel(parcelId);
     if (!parcel) return fail(404, "not_found", "Không tìm thấy kiện.");
@@ -782,8 +786,8 @@ export class ShopDO extends DurableObject<Env> {
     const sha = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((x) => x.toString(16).padStart(2, "0")).join("");
     await this.env.IMAGES.put(`${kind === "thumb" ? "t" : "p"}/${photoId}`, bytes, { httpMetadata: { contentType: mime } });
     this.ctx.storage.transactionSync(() => {
-      if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at) VALUES (?,?,?,?,?,?,?)",
-        photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt);
+      if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at, keep) VALUES (?,?,?,?,?,?,?,?)",
+        photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt, legacy ? 1 : 0);
       else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ? WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ? WHERE photo_id = ?", bytes.byteLength, mime, photoId);
       // ảnh cũ: chỉ gắn khi kiện chưa có ảnh HOẶC đang trỏ mã ảnh của máy tính (không có trên cloud, vd. "ph-..."); không đè ảnh cloud đang gắn
       const attachLegacy = parcel.photoId === "" || !this.db.first<Row>("SELECT 1 AS x FROM photos WHERE photo_id = ? AND deleted_at = 0", parcel.photoId);
@@ -1023,7 +1027,7 @@ export class ShopDO extends DurableObject<Env> {
   async cleanup(): Promise<{ photosExpired: number; opsPurged: number }> {
     const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
     const cutoff = Date.now() - days * DAY_MS;
-    const old = this.db.all<Row>("SELECT photo_id, parcel_id FROM photos WHERE deleted_at = 0 AND taken_at < ? LIMIT 200", cutoff);
+    const old = this.db.all<Row>("SELECT photo_id, parcel_id FROM photos WHERE deleted_at = 0 AND keep = 0 AND taken_at < ? LIMIT 200", cutoff);
     for (const p of old) {
       await this.env.IMAGES.delete([`p/${p.photo_id}`, `t/${p.photo_id}`]);
       this.db.run("UPDATE photos SET deleted_at = ? WHERE photo_id = ?", Date.now(), p.photo_id as string);

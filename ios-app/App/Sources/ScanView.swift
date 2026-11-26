@@ -137,7 +137,6 @@ struct ScanView: View {
                 // kết quả lượt quét: dòng gọn trên camera, bên trái "Hôm nay" (chỗ chủ dự án vạch ở ảnh 21), không che camera
                 if let b = statusBanner {
                     ScanStatusLine(banner: b, icon: bannerIcon(for: b.color))
-                        .layoutPriority(1)
                 } else if engine.pendingCount > 0 && !engine.isDemoMode {
                     StatusPill(text: "Chờ gửi \(engine.pendingCount)", color: Theme.warning)
                 }
@@ -146,6 +145,8 @@ struct ScanView: View {
                     .font(Theme.Typography.captionBold)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()   // luôn một hàng, không bị câu kết quả dài ép thành cột dọc (ảnh 29)
             }
             .padding(.horizontal, 2)
         }

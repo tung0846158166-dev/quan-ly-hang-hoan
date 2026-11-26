@@ -197,7 +197,7 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Visibility="Collapsed" Header="Ảnh" Binding="{Binding PhotoIndicator}" Width="92">
+                        <DataGridTextColumn Header="Ảnh" Binding="{Binding PhotoIndicator}" Width="92">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="HorizontalAlignment" Value="Center" />

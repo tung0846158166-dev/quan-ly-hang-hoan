@@ -102,6 +102,9 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(dup.text.contains("Điện thoại A"))
         let amb = CloudScanPresentation.map(result(.ambiguous, message: "2 kiện cùng khớp mã này"))
         XCTAssertEqual(amb.status, .ambiguous); XCTAssertTrue(amb.reviewRequired); XCTAssertEqual(amb.text, "2 kiện cùng khớp mã này")
+        // ảnh 29: giờ đầy đủ làm câu quá dài -> rút gọn
+        XCTAssertEqual(CloudScanPresentation.map(result(.alreadyReceived, by: "Tùng", at: "26/11/2026 13:58:07")).text, "Quét trùng: đã nhận bởi Tùng lúc 13:58 26/11")
+        XCTAssertEqual(CloudScanPresentation.shortTime("10:05"), "10:05")
         XCTAssertEqual(CloudScanPresentation.map(result(.notFound)).status, .notFound)
         let err = CloudScanPresentation.map(result(.error, message: "Mất kết nối cloud giữa chừng"))
         XCTAssertEqual(err.status, .error)

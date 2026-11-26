@@ -99,12 +99,21 @@ public enum CloudScanPresentation {
         public let reviewRequired: Bool
     }
 
+    /// "26/11/2026 13:58:07" -> "13:58 26/11" (gọn cho dòng kết quả trên camera); dạng khác giữ nguyên.
+    public static func shortTime(_ s: String) -> String {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        guard let re = try? NSRegularExpression(pattern: #"^(\d{1,2})/(\d{1,2})/\d{4}\s+(\d{1,2}):(\d{2})"#),
+              let m = re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) else { return t }
+        func g(_ i: Int) -> String { Range(m.range(at: i), in: t).map { String(t[$0]) } ?? "" }
+        return "\(g(3)):\(g(4)) \(g(1))/\(g(2))"
+    }
+
     public static func map(_ r: CloudScanResult) -> View {
         switch r.outcome {
         case .received:
             return View(status: .success, text: "Đã nhận hoàn kho", tone: .success, confirmed: true, reviewRequired: false)
         case .alreadyReceived:
-            let who = [r.receivedBy, r.receivedAt].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " lúc ")
+            let who = [r.receivedBy, r.receivedAt.map(shortTime)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " lúc ")
             return View(status: .duplicate, text: who.isEmpty ? "Quét trùng: kiện đã nhận trước đó" : "Quét trùng: đã nhận bởi \(who)",
                         tone: .danger, confirmed: true, reviewRequired: false)
         case .ambiguous:

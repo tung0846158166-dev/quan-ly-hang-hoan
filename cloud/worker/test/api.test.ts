@@ -565,16 +565,15 @@ describe("ảnh", () => {
     const row = await runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => state.storage.sql.exec("SELECT taken_at FROM photos WHERE photo_id='legacy_001'").one());
     expect(row.taken_at).toBe(recent);
 
+    // chủ dự án 26/11/2026: ảnh dữ liệu cũ (kể cả quá 90 ngày) được nhận và GIỮ VĨNH VIỄN để điện thoại cũng xem được
     const tooOld = Date.now() - 200 * 86_400_000;
-    const old = await put(owner, "legacy_002", `parcelId=p1&legacy=1&takenAt=${tooOld}`);
-    expect(old.status).toBe(422);
-    expect((await old.json() as any).error.code).toBe("expired");
+    expect((await put(owner, "legacy_002", `parcelId=p1&legacy=1&takenAt=${tooOld}`)).status).toBe(200);
 
     // ảnh cũ thứ hai không đè ảnh đang gắn của kiện
     expect((await put(owner, "legacy_003", `parcelId=p1&legacy=1&takenAt=${recent}`)).status).toBe(200);
     const again = (await call("GET", "/sync?since=0", undefined, owner)).data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === "p1");
     expect(again.parcel.photoId).toBe("legacy_001");
-    expect((await call("GET", "/parcels/p1/photos", undefined, owner)).data).toHaveLength(2);
+    expect((await call("GET", "/parcels/p1/photos", undefined, owner)).data).toHaveLength(3);
     // không có takenAt: coi như mới chụp
     expect((await put(owner, "legacy_004", "parcelId=p2&legacy=1")).status).toBe(200);
   });
@@ -606,6 +605,20 @@ describe("ảnh", () => {
     expect(await E.IMAGES.get("p/photo_old1")).toBeNull();
     const out2 = await runInDurableObject(s, (inst: ShopDO) => inst.cleanup());
     expect(out2.photosExpired).toBe(0);
+  });
+
+  it("ảnh dữ liệu cũ (chuyển từ máy tính) không bao giờ bị cron xóa; ảnh điện thoại vẫn hết hạn sau 90 ngày", async () => {
+    await importParcels([parcel("p1")]);
+    const ancient = Date.now() - 400 * 86_400_000;
+    expect((await put(owner, "legacy_keep", `parcelId=p1&legacy=1&takenAt=${ancient}`)).status).toBe(200);
+    await scan(phoneA, "TRK-p1");
+    expect((await put(phoneA, "phone_old", "parcelId=p1")).status).toBe(200);
+    const s = await stub();
+    await runInDurableObject(s, (_i: ShopDO, state: DurableObjectState) => { state.storage.sql.exec("UPDATE photos SET taken_at = 1 WHERE photo_id = 'phone_old'"); });
+    const out = await runInDurableObject(s, (inst: ShopDO) => inst.cleanup());
+    expect(out.photosExpired).toBe(1);
+    expect((await SELF.fetch(`${BASE}/photos/legacy_keep`, { headers: { Authorization: `Bearer ${phoneA}` } })).status).toBe(200);
+    expect((await SELF.fetch(`${BASE}/photos/phone_old`, { headers: { Authorization: `Bearer ${phoneA}` } })).status).toBe(410);
   });
 });
 

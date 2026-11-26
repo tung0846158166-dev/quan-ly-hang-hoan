@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS scans (id INTEGER PRIMARY KEY AUTOINCREMENT, parcel_i
 CREATE INDEX IF NOT EXISTS scans_parcel ON scans(parcel_id, device_id, at);
 CREATE TABLE IF NOT EXISTS photos (
   photo_id TEXT PRIMARY KEY, parcel_id TEXT NOT NULL, device_id TEXT NOT NULL, mime TEXT NOT NULL,
-  size INTEGER NOT NULL, thumb_size INTEGER NOT NULL DEFAULT 0, taken_at INTEGER NOT NULL, deleted_at INTEGER NOT NULL DEFAULT 0
+  size INTEGER NOT NULL, thumb_size INTEGER NOT NULL DEFAULT 0, taken_at INTEGER NOT NULL, deleted_at INTEGER NOT NULL DEFAULT 0,
+  keep INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS photos_parcel ON photos(parcel_id);
 CREATE INDEX IF NOT EXISTS photos_taken ON photos(taken_at);

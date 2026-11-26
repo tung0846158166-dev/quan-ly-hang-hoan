@@ -45,7 +45,7 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource InfoBlueTextBrush}" />
                         <TextBlock Text="{Binding MissingPhotoText, StringFormat=' • {0}'}"
-                                   Visibility="Collapsed"
+                                   Visibility="{Binding HasMissingPhotos, Converter={StaticResource BoolToVis}}"
                                    FontSize="12"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AlertYellowTextBrush}" />

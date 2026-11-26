@@ -8,6 +8,8 @@ export const PARCEL_KEYS = new Set([
   "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "price", "note", "userNote",
   "importWeek", "importedAt", "isWatchlist", "watchlistReason", "isPartialReturn", "photoId", "items", "extra",
   "isArchived", "archivedAt", "isDeleted", "deletedAt", "deletedFrom",
+  // khiếu nại (26/11/2026): CHỈ có khi đơn đang/đã khiếu nại (đơn thường không có khóa -> băm cũ không đổi)
+  "complaintStatus", "complaintAt", "complaintNote",
   // do máy chủ/nguồn thêm, bỏ qua khi lưu
   "rev", "updatedAt", "hash",
 ]);
@@ -28,6 +30,18 @@ export interface Parcel {
   isWatchlist: boolean; watchlistReason: string; isPartialReturn: boolean; photoId: string;
   items: Item[]; extra: Record<string, string | number | boolean>;
   isArchived: boolean; archivedAt: string; isDeleted: boolean; deletedAt: string; deletedFrom: string;
+  complaintStatus?: string; complaintAt?: string; complaintNote?: string;
+}
+
+/** Trạng thái khiếu nại hợp lệ ("" = bỏ khiếu nại). */
+export const COMPLAINT_STATUS = new Set(["Đang xử lý", "Thành công", "Thất bại"]);
+
+/** Chép các trường khiếu nại (nếu có) từ `from` sang `to`; không có thì xóa khỏi `to`. */
+export function copyComplaint(from: Parcel | null | undefined, to: Parcel): void {
+  for (const k of ["complaintStatus", "complaintAt", "complaintNote"] as const) {
+    const v = from?.[k];
+    if (v) to[k] = v; else delete to[k];
+  }
 }
 
 export interface Validation { ok: true; parcel: Parcel }
@@ -77,6 +91,12 @@ export function parseParcel(raw: unknown): Validation | Invalid {
     photoId: str(o.photoId), items, extra,
     isArchived: o.isArchived === true, archivedAt: str(o.archivedAt), isDeleted: o.isDeleted === true, deletedAt: str(o.deletedAt), deletedFrom: str(o.deletedFrom),
   };
+  if (str(o.complaintStatus)) {
+    if (!COMPLAINT_STATUS.has(str(o.complaintStatus))) return { ok: false, reason: "trạng thái khiếu nại không hợp lệ" };
+    p.complaintStatus = str(o.complaintStatus);
+    if (str(o.complaintAt)) p.complaintAt = str(o.complaintAt);
+    if (str(o.complaintNote)) p.complaintNote = str(o.complaintNote);
+  }
   return { ok: true, parcel: p };
 }
 

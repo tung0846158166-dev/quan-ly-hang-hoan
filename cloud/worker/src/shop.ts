@@ -6,7 +6,7 @@ import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { resolve } from "../../core/src/tracking";
 import { Db, SCHEMA, type Row } from "./db";
-import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parcel";
+import { canonical, codesOf, COMPLAINT_STATUS, copyComplaint, parseParcel, sha256Hex, type Parcel } from "./parcel";
 import { returnWatchEligible } from "./returnwatch";
 import { applyImport, type MOrder, type OtherEntry } from "../../core/src/merge";
 import { lookupKeys, orderToParcel, parcelToOrder, parseIncoming, vnToday } from "./sheetimport";
@@ -24,7 +24,7 @@ export function isWriteQuotaError(e: unknown): boolean {
   return /Exceeded allowed rows written/i.test(String((e as { message?: unknown })?.message ?? e));
 }
 const VALID_STATUS = new Set<string>(Object.values(ReceiveStatus));
-const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote", "watchlistReason"]);
+const EDITABLE_CELLS = new Set(["complaintStatus", "complaintNote", "platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote", "watchlistReason"]);
 const PHOTO_ID = /^[A-Za-z0-9_-]{6,80}$/;
 const MAX_PHOTO_BYTES = 1_000_000;
 // ảnh gửi sau lượt quét: điện thoại giữ ảnh trong hàng chờ khi mất mạng rồi gửi lại (chủ dự án 26/11/2026) -> cho 3 ngày;
@@ -544,6 +544,23 @@ export class ShopDO extends DurableObject<Env> {
   private opEditCell(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
     const field = typeof op.field === "string" ? op.field : "";
     if (!EDITABLE_CELLS.has(field)) return fail(422, "invalid", `Ô không được sửa: ${field}`);
+    if (field === "complaintStatus") {
+      // khiếu nại (26/11/2026): "" = bỏ khiếu nại (xóa cả ngày + ghi chú); đặt lần đầu thì ghi ngày khiếu nại
+      const v = this.text(op.value, 50).trim();
+      if (v && !COMPLAINT_STATUS.has(v)) return fail(422, "invalid", "Trạng thái khiếu nại không hợp lệ.");
+      return this.opMutate(op, dev, "editCell", (p) => {
+        if (!v) { delete p.complaintStatus; delete p.complaintAt; delete p.complaintNote; return; }
+        if (!p.complaintStatus || !p.complaintAt) p.complaintAt = vnTime(Date.now());
+        p.complaintStatus = v;
+      });
+    }
+    if (field === "complaintNote") {
+      return this.opMutate(op, dev, "editCell", (p) => {
+        if (!p.complaintStatus) fail(409, "conflict", "Đơn chưa khiếu nại.");
+        const v = this.text(op.value, 2000);
+        if (v) p.complaintNote = v; else delete p.complaintNote;
+      });
+    }
     return this.opMutate(op, dev, "editCell", (p) => {
       const rec = p as unknown as Record<string, unknown>;
       rec[field] = field === "price" ? Number(op.value) || 0 : this.text(op.value, 2000);
@@ -1158,6 +1175,7 @@ function mergeImport(existing: Parcel, incoming: Parcel, edited: ReadonlySet<str
   // rà lỗi 26/11/2026: trạng thái kho + ngày nhận CHỈ đổi bằng quét / đổi trạng thái trên cloud. Nhập file không bao giờ nhận kiện
   // (từng có kiện thành "Hàng đã trả" không ngày nhận do máy tính gộp theo mã đơn) và không trả kiện đã đổi về trạng thái cũ.
   m.status = cancelReady ? incoming.status : existing.status;
+  copyComplaint(existing, m);   // khiếu nại do người dùng đặt: nhập file không bao giờ đổi/xóa
   m.recvDate = existing.recvDate;
   // ô người dùng đã sửa trên cloud: giữ, nhập không đè
   const ex = existing as unknown as Record<string, unknown>, mm = m as unknown as Record<string, unknown>;

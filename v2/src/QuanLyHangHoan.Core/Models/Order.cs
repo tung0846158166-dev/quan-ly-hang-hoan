@@ -90,6 +90,11 @@ public sealed class Order
     public string ImportedAt { get; set; } = "";
     public bool IsWatchlist { get; set; }
     public string WatchlistReason { get; set; } = "";
+    /// <summary>Khiếu nại (26/11/2026): "" = không khiếu nại; "Đang xử lý" | "Thành công" | "Thất bại".</summary>
+    public string ComplaintStatus { get; set; } = "";
+    /// <summary>Lúc bắt đầu khiếu nại (dd/MM/yyyy HH:mm:ss).</summary>
+    public string ComplaintAt { get; set; } = "";
+    public string ComplaintNote { get; set; } = "";
     public bool IsPartialReturn { get; set; }
 
     public string PhotoId { get; set; } = "";          // trỏ tới file ảnh

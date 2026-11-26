@@ -1056,3 +1056,46 @@ describe("máy tính nạp file qua cloud (/import/mapped, nguồn file/folder, 
     expect((await post({ source: "file", kind: "shopee", mode: "xoa", parcels: [] })).status).toBe(422);
   });
 });
+
+describe("khiếu nại (26/11/2026)", () => {
+  const get = async (id: string) => {
+    const s = await call("GET", "/sync?since=0&limit=1000", undefined, owner);
+    return s.data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === id)?.parcel;
+  };
+  const edit = (id: string, field: string, value: string) =>
+    call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editCell", id, field, value }] }, pc).then((r) => r.data.results[0]);
+
+  it("đánh dấu khiếu nại: trạng thái Đang xử lý + ngày khiếu nại; đổi Thành công / Thất bại; bỏ khiếu nại", async () => {
+    await importParcels([parcel("k1")]);
+    expect((await get("k1")).complaintStatus).toBeUndefined();
+    expect((await edit("k1", "complaintStatus", "Đang xử lý")).ok).toBe(true);
+    let p = await get("k1");
+    expect(p.complaintStatus).toBe("Đang xử lý");
+    expect(p.complaintAt).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+    const at = p.complaintAt;
+    await edit("k1", "complaintStatus", "Thành công");
+    p = await get("k1");
+    expect(p.complaintStatus).toBe("Thành công");
+    expect(p.complaintAt).toBe(at);                     // ngày khiếu nại giữ nguyên
+    await edit("k1", "complaintNote", "Shopee đã đền 120k");
+    expect((await get("k1")).complaintNote).toBe("Shopee đã đền 120k");
+    await edit("k1", "complaintStatus", "");
+    p = await get("k1");
+    expect(p.complaintStatus).toBeUndefined();
+    expect(p.complaintAt).toBeUndefined();
+  });
+
+  it("trạng thái khiếu nại lạ bị từ chối", async () => {
+    await importParcels([parcel("k2")]);
+    expect((await edit("k2", "complaintStatus", "Bậy")).ok).toBe(false);
+  });
+
+  it("nhập lại đơn (máy tính / Sheet / Salework) không xóa khiếu nại", async () => {
+    await importParcels([parcel("k3")]);
+    await edit("k3", "complaintStatus", "Đang xử lý");
+    await importParcels([parcel("k3", { platformStatus: "Đã hoàn tiền" })]);
+    await call("POST", "/import/sheet", { signature: "s", parcels: [{ platform: "Shopee", orderId: "O-k3", track: "TRK-k3", platformStatus: "Hoàn tất" }] }, undefined, { "X-Import-Key": "test-import-key" });
+    const p = await get("k3");
+    expect(p.complaintStatus).toBe("Đang xử lý");
+  });
+});

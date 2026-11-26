@@ -78,7 +78,7 @@ public sealed class WatchlistBulkTests
     {
         var w = new ReturnOrderRowViewModel(W("a"), 1, new DateTime(2026, 11, 26));
         Assert.Equal("⭐", w.WatchMark);
-        Assert.Equal("Đang theo dõi: kiểm", w.WatchTooltip);
+        Assert.Equal("⭐ Đang theo dõi: kiểm", w.WatchTooltip);
         var plain = W("b"); plain.IsWatchlist = false;
         var p = new ReturnOrderRowViewModel(plain, 2, new DateTime(2026, 11, 26));
         Assert.Equal("", p.WatchMark);

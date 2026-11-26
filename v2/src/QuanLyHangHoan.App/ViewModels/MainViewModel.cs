@@ -56,6 +56,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly NavigationItem _returnWatchNavItem;
     private readonly NavigationItem _newOrdersNavItem;
     private readonly NavigationItem _watchlistNavItem;
+    private readonly NavigationItem _complaintsNavItem;
     private readonly NavigationItem _archiveNavItem;
     private readonly NavigationItem _deletedNavItem;
     private readonly NavigationItem _fileImportNavItem;
@@ -352,6 +353,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             writeGate: _writeGate) { IsDemoMode = isDemoMode };
+        ComplaintsVm = new ComplaintsViewModel(
+            editService: _orderEditService,
+            dialogService: dialogSvc,
+            onDataChangedAsync: ReloadAllDataAsync,
+            onNotify: ShowToast,
+            onOpenDetail: OpenOrderDetail,
+            writeGate: _writeGate);
         ArchivedOrdersVm = new ArchivedOrdersViewModel(
             archivedOrderProvider,
             onOpenPhoto: OpenOrderPhoto,
@@ -429,6 +437,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["return_watch"] = ReturnWatchVm;
         _pageCache["new_orders"] = NewCreatedVm;
         _pageCache["watchlist"] = WatchlistVm;
+        _pageCache["complaints"] = ComplaintsVm;
         _pageCache["archive"] = ArchivedOrdersVm;
         _pageCache["deleted"] = DeletedOrdersVm;
         _pageCache["stats"] = StatisticsVm;
@@ -456,6 +465,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             "new_orders", "📥", "Bảng đơn mới", "CHUNG", () => NewCreatedVm, NewCreatedVm.TotalCount.ToString("N0"));
         _watchlistNavItem = new NavigationItem(
             "watchlist", "⭐", "Đang theo dõi", "CHUNG", () => WatchlistVm, WatchlistVm.ActiveWatchlistCount.ToString("N0"));
+        _complaintsNavItem = new NavigationItem(
+            "complaints", "⚖️", "Khiếu nại", "CHUNG", () => ComplaintsVm, ComplaintsVm.ProcessingCount.ToString("N0"));
         _archiveNavItem = new NavigationItem(
             "archive", "📦", "Kho lưu trữ", "CHUNG", () => ArchivedOrdersVm, ArchivedOrdersVm.TotalCount.ToString("N0"));
         _deletedNavItem = new NavigationItem(
@@ -482,6 +493,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _returnWatchNavItem,
             _newOrdersNavItem,
             _watchlistNavItem,
+            _complaintsNavItem,
             _archiveNavItem,
             _deletedNavItem,
             new NavigationItem("stats", "📊", "Thống kê đơn & sản phẩm", "CHUNG", () => StatisticsVm),
@@ -496,6 +508,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ShopeeCancelledVm.CountsUpdated += SyncSidebarKpis;
         TikTokReturnVm.CountsUpdated += SyncSidebarKpis;
         WatchlistVm.CountsUpdated += SyncSidebarKpis;
+        ComplaintsVm.CountsUpdated += SyncSidebarKpis;
         ReturnWatchVm.CountsUpdated += SyncSidebarKpis;
 
         var uiSettings = _uiSettingsStore.Load();
@@ -531,6 +544,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _searchDeletedOrders = deletedOrderProvider.GetDeletedOrders();
             HomeVm.LoadData(_searchActiveOrders, initialNow);
             WatchlistVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
+            ComplaintsVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
             var rwEntries = _returnWatchService.LoadAsync(initialNow).GetAwaiter().GetResult();
             ReturnWatchVm.LoadEntries(rwEntries, initialNow);
             HomeVm.ReturnWatchOnTheWayCount = ReturnWatchVm.Stage2Count;
@@ -551,6 +565,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ReturnWatchViewModel ReturnWatchVm { get; }
     public NewOrdersViewModel NewOrdersVm { get; }
     public WatchlistViewModel WatchlistVm { get; }
+    public ComplaintsViewModel ComplaintsVm { get; }
     public ArchivedOrdersViewModel ArchivedOrdersVm { get; }
     public DeletedOrdersViewModel DeletedOrdersVm { get; }
     public StatisticsViewModel StatisticsVm { get; }
@@ -1390,6 +1405,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ShopeeCancelledVm.LoadRows(cancelledRowsTask.Result);
         TikTokReturnVm.LoadRows(tiktokRowsTask.Result);
         WatchlistVm.LoadOrders(returnOrders, archivedOrders, now);
+        ComplaintsVm.LoadOrders(returnOrders, archivedOrders, now);
         ArchivedOrdersVm.LoadRows(archivedRowsTask.Result);
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);
@@ -1625,6 +1641,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _returnWatchNavItem.Badge = ReturnWatchVm.TrackingCount.ToString("N0");
         _newOrdersNavItem.Badge = NewCreatedVm.TotalCount.ToString("N0");
         _watchlistNavItem.Badge = WatchlistVm.ActiveWatchlistCount.ToString("N0");
+        _complaintsNavItem.Badge = ComplaintsVm.ProcessingCount.ToString("N0");
         _archiveNavItem.Badge = ArchivedOrdersVm.TotalCount.ToString("N0");
         _deletedNavItem.Badge = DeletedOrdersVm.TotalCount.ToString("N0");
 

@@ -4,7 +4,7 @@ using QuanLyHangHoan.Core.Models;
 
 namespace QuanLyHangHoan.Data;
 
-public enum EditField { Status, Note, UserNote, BuyerNote, Carrier, Deadline, IsWatchlist, WatchlistReason }
+public enum EditField { Status, Note, UserNote, BuyerNote, Carrier, Deadline, IsWatchlist, WatchlistReason, ComplaintStatus, ComplaintNote }
 
 public enum EditKind { Saved, NoChange, Invalid, Conflict, NotEditable, NotFound, Error }
 
@@ -35,6 +35,8 @@ public static class OrderEditor
         [EditField.Deadline] = ("deadline", "Hạn xử lý"),
         [EditField.IsWatchlist] = ("is_watchlist", "Theo dõi"),
         [EditField.WatchlistReason] = ("watchlist_reason", "Lý do theo dõi"),
+        [EditField.ComplaintStatus] = ("complaint_status", "Khiếu nại"),
+        [EditField.ComplaintNote] = ("complaint_note", "Ghi chú khiếu nại"),
     };
 
     private static readonly string[] ValidStatuses =
@@ -51,6 +53,8 @@ public static class OrderEditor
             return new(EditKind.Invalid, "Trạng thái không hợp lệ.");
         if (field == EditField.IsWatchlist && newValue is not ("0" or "1"))
             return new(EditKind.Invalid, "Cờ theo dõi chỉ nhận 0 hoặc 1.");
+        if (field == EditField.ComplaintStatus && newValue.Length > 0 && !ComplaintStatuses.All.Contains(newValue))
+            return new(EditKind.Invalid, "Trạng thái khiếu nại không hợp lệ.");
 
         return Run(dbPath, (conn, tx) =>
         {
@@ -66,6 +70,15 @@ public static class OrderEditor
 
             Exec(conn, tx, $"UPDATE orders SET {col}=$v, v2_modified=1 WHERE id=$id", ("$v", field == EditField.IsWatchlist ? int.Parse(newValue) : newValue), ("$id", orderId));
             AddHistory(conn, tx, orderId, ColumnToJsonField(field), label, old, newValue, now);
+
+            // Khiếu nại: đặt lần đầu thì ghi ngày khiếu nại (giữ ngày cũ khi đổi trạng thái); bỏ khiếu nại thì xóa ngày + ghi chú.
+            if (field == EditField.ComplaintStatus)
+            {
+                if (newValue.Length == 0)
+                    Exec(conn, tx, "UPDATE orders SET complaint_at='', complaint_note='' WHERE id=$id", ("$id", orderId));
+                else if (old.Length == 0 || (Scalar(conn, tx, "SELECT complaint_at FROM orders WHERE id=$id", orderId)?.ToString() ?? "").Length == 0)
+                    Exec(conn, tx, "UPDATE orders SET complaint_at=$d WHERE id=$id", ("$d", Stamp(now)), ("$id", orderId));
+            }
 
             // Đánh dấu "đã nhận" thủ công: đặt giờ nhận nếu CHƯA có (giữ giờ nhận đầu tiên, không ghi đè).
             if (field == EditField.Status && newValue == ReceiveStatus.Received && string.IsNullOrEmpty(row.Value.RecvDate))
@@ -215,6 +228,7 @@ public static class OrderEditor
     {
         EditField.Status => "status", EditField.Note => "note", EditField.UserNote => "userNote", EditField.BuyerNote => "buyerNote",
         EditField.Carrier => "carrier", EditField.Deadline => "deadline", EditField.IsWatchlist => "isWatchlist",
+        EditField.ComplaintStatus => "complaintStatus", EditField.ComplaintNote => "complaintNote",
         _ => "watchlistReason",
     };
 }

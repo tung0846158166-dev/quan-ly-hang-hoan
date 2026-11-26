@@ -143,6 +143,42 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         BulkWatchlistCommand.NotifyCanExecuteChanged();
         BulkDeleteCommand.NotifyCanExecuteChanged();
         HandleDeleteKeyCommand.NotifyCanExecuteChanged();
+        BulkComplainCommand.NotifyCanExecuteChanged();
+        ComplainRowCommand.NotifyCanExecuteChanged();
+    }
+
+
+    /// <summary>Khiếu nại một đơn: trạng thái "Đang xử lý", đơn hiện ở bảng Khiếu nại (chủ dự án 26/11/2026).</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public async Task ComplainRowAsync(ReturnOrderRowViewModel? row = null)
+    {
+        var target = row ?? SelectedRow;
+        if (target is null) return;
+        await ComplainAsync([target]);
+    }
+
+    /// <summary>Khiếu nại TẤT CẢ các dòng đang chọn (đơn đã khiếu nại thì giữ nguyên trạng thái).</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public Task BulkComplainAsync() => ComplainAsync(GetBulkTargets());
+
+    private async Task ComplainAsync(IReadOnlyList<ReturnOrderRowViewModel> picked)
+    {
+        if (!CanWrite || _editService is null) return;
+        var targets = picked.Where(r => r.ComplaintStatus.Length == 0).ToList();
+        if (targets.Count == 0)
+        {
+            _onNotify?.Invoke(picked.Count == 0 ? "Chưa chọn đơn nào." : "Các đơn đã chọn đều đang ở bảng Khiếu nại.", false);
+            return;
+        }
+        if (targets.Count > 1 && _dialogService is not null
+            && !_dialogService.ConfirmBulkAction("Khiếu nại", targets.Count, $"Chuyển {targets.Count:N0} đơn đang chọn sang bảng Khiếu nại (trạng thái \"Đang xử lý\")."))
+            return;
+        var (saved, _, _) = await OrderEditHelper.RunBulkAsync(
+            targets,
+            r => _editService.SetFieldAsync(r.Source.Id, EditField.ComplaintStatus, ComplaintStatuses.Processing, expectedOld: ""),
+            _onDataChangedAsync,
+            _onNotify);
+        if (saved > 0) _onNotify?.Invoke($"Đã chuyển {saved:N0} đơn sang bảng ⚖️ Khiếu nại (thanh bên trái).", false);
     }
 
     [ObservableProperty]

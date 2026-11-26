@@ -53,7 +53,8 @@ public static class OrderRepository
             SELECT source_key, id, order_id, return_order_id, track, return_track, alt_track, forward_track, tracking_codes, scan_aliases,
                    platform, order_type, platform_status, pre_order, status, carrier, ship_date, return_date, recv_date, returned_at, deadline,
                    price, note, buyer_note, user_note, import_week, imported_at, is_watchlist, watchlist_reason, is_partial_return,
-                   photo_id, extra_json, is_archived, archived_at, is_deleted, deleted_at, deleted_from
+                   photo_id, extra_json, is_archived, archived_at, is_deleted, deleted_at, deleted_from,
+                   complaint_status, complaint_at, complaint_note
             FROM orders ORDER BY rowid
             """;
         using var rd = cmd.ExecuteReader();
@@ -72,6 +73,7 @@ public static class OrderRepository
                 ImportWeek = rd.GetString(25), ImportedAt = rd.GetString(26), IsWatchlist = rd.GetInt32(27) != 0,
                 WatchlistReason = rd.GetString(28), IsPartialReturn = rd.GetInt32(29) != 0, PhotoId = rd.GetString(30),
                 ExtraJson = rd.GetString(31), Items = items.GetValueOrDefault(key) ?? new(),
+                ComplaintStatus = rd.GetString(37), ComplaintAt = rd.GetString(38), ComplaintNote = rd.GetString(39),
             };
             var extraText = o.ExtraJson;
             o.SetLazyImport(() => OrderExtra.Read(extraText));

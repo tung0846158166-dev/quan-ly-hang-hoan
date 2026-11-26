@@ -387,6 +387,12 @@
                         Background="#D97706"
                         Margin="0,0,8,0"
                         ToolTip="{Binding WriteDisabledTooltip, TargetNullValue='Thêm tất cả các dòng đang chọn vào mục Đang theo dõi'}" />
+                <Button Content="⚖️ Khiếu nại"
+                        Command="{Binding BulkComplainCommand}"
+                        Style="{StaticResource PrimaryActionButtonStyle}"
+                        Background="#7C3AED"
+                        Margin="0,0,8,0"
+                        ToolTip="{Binding WriteDisabledTooltip, TargetNullValue='Chuyển các đơn đang chọn sang bảng Khiếu nại'}" />
                 <Button Content="🗑️ Xóa"
                         Command="{Binding BulkDeleteCommand}"
                         ToolTip="{Binding WriteDisabledTooltip}"
@@ -462,6 +468,11 @@
                                       ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.ToggleWatchlistCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
+                            <MenuItem Header="⚖️ Khiếu nại (chuyển sang bảng Khiếu nại)"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      Command="{Binding DataContext.ComplainRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding}" />
                             <Separator />
                             <MenuItem Header="📦 Dời sang kho lưu trữ"
                                       ToolTipService.ShowOnDisabled="True"
@@ -516,12 +527,13 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
-                        <!-- 1b. Đang theo dõi: ⭐ + lý do khi rê chuột (chủ dự án 26/11/2026) -->
-                        <DataGridTemplateColumn Header="⭐" Width="34" SortMemberPath="IsWatchlist">
+                        <!-- 1b. Nhãn: ⭐ đang theo dõi, ⚖️ đang khiếu nại (rê chuột: lý do / trạng thái) (chủ dự án 26/11/2026) -->
+                        <DataGridTemplateColumn Header="Nhãn" Width="52" SortMemberPath="IsWatchlist">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding WatchMark}" ToolTip="{Binding WatchTooltip}" FontSize="14"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent" />
+                                    <TextBlock ToolTip="{Binding WatchTooltip}" FontSize="13.5" HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
+                                        <Run Text="{Binding WatchMark, Mode=OneWay}" /><Run Text="{Binding ComplaintMark, Mode=OneWay}" />
+                                    </TextBlock>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

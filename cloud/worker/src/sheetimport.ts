@@ -1,7 +1,7 @@
 import { cleanTrackingCode } from "../../core/src/matching";
 import { blankOrder, emptyImport, type Incoming, type MOrder } from "../../core/src/merge";
 import { normalize } from "../../core/src/tracking";
-import { EXTRA_KEYS, type Parcel } from "./parcel";
+import { copyComplaint, EXTRA_KEYS, type Parcel } from "./parcel";
 
 const RAW_KEYS = ["returnReason", "returnStatus", "returnShippingStatus", "returnSuccessTime", "cancelType"];
 
@@ -30,6 +30,12 @@ export function parcelToOrder(p: Parcel): MOrder {
  * ghi chú người mua và dữ liệu thô ngoài danh sách bị BỎ (không lưu dữ liệu cá nhân lên cloud).
  */
 export function orderToParcel(o: MOrder, base: Parcel | null): Parcel {
+  const out = orderToParcelCore(o, base);
+  copyComplaint(base, out);   // khiếu nại do người dùng đặt: nhập Sheet không bao giờ xóa
+  return out;
+}
+
+function orderToParcelCore(o: MOrder, base: Parcel | null): Parcel {
   const extra: Parcel["extra"] = {};
   for (const k of RAW_KEYS) { const v = o.import.rawDetails[k]; if (v !== undefined && v !== "") extra[k] = v; }
   if (o.import.forwardCarrier) extra.forwardCarrier = o.import.forwardCarrier;

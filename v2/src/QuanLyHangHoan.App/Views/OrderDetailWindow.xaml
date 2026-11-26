@@ -136,6 +136,11 @@
                     <TextBlock Text="{Binding WatchlistBanner}" Foreground="#92400E" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap" />
                 </Border>
 
+                <Border Background="#EDE9FE" BorderBrush="#7C3AED" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,10"
+                        Visibility="{Binding HasComplaint, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding ComplaintBanner}" Foreground="#4C1D95" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap" />
+                </Border>
+
                 <!-- 1. Tổng quan -->
                 <Border Style="{StaticResource DetailSectionCardStyle}"
                         Visibility="{Binding HasOverviewGroup, Converter={StaticResource BoolToVis}}">

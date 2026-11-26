@@ -106,6 +106,9 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         ForwardCarrier = Dash(import?.ForwardCarrier);
         ReturnCarrier = Dash(import?.ReturnCarrier);
         IsWatchlist = order.IsWatchlist;
+        ComplaintBanner = order.ComplaintStatus.Length == 0 ? ""
+            : $"⚖️ KHIẾU NẠI: {order.ComplaintStatus}" + (order.ComplaintAt.Length > 0 ? $" (từ {order.ComplaintAt})" : "")
+              + (order.ComplaintNote.Length > 0 ? " — " + order.ComplaintNote : "");
         WatchlistBanner = !order.IsWatchlist ? ""
             : "⭐ ĐANG THEO DÕI" + (string.IsNullOrWhiteSpace(order.WatchlistReason) ? " (chưa ghi lý do)" : " — " + order.WatchlistReason.Trim());
         WatchlistText = order.IsWatchlist
@@ -284,6 +287,9 @@ public sealed partial class OrderDetailViewModel : ObservableObject
     public string WatchlistText { get; }
     /// <summary>Dải nổi bật đầu chi tiết khi đơn đang được theo dõi (lý do theo dõi).</summary>
     public string WatchlistBanner { get; private set; } = "";
+    /// <summary>Khiếu nại (26/11/2026): trạng thái + ngày + ghi chú; rỗng nếu không khiếu nại.</summary>
+    public string ComplaintBanner { get; private set; } = "";
+    public bool HasComplaint => ComplaintBanner.Length > 0;
 
     // Mã
     public bool HasCodesGroup { get; }

@@ -38,6 +38,7 @@ public static class ParcelMapper
             Note = S(p["note"]), UserNote = S(p["userNote"]), ImportWeek = S(p["importWeek"]), ImportedAt = S(p["importedAt"]),
             IsWatchlist = B(p["isWatchlist"]), WatchlistReason = S(p["watchlistReason"]), IsPartialReturn = B(p["isPartialReturn"]),
             PhotoId = S(p["photoId"]),
+            ComplaintStatus = S(p["complaintStatus"]), ComplaintAt = S(p["complaintAt"]), ComplaintNote = S(p["complaintNote"]),
         };
         if (p["items"] is JsonArray items)
             foreach (var i in items)
@@ -131,7 +132,7 @@ public static class ParcelMapper
             items.Add(it);
         }
         JsonArray Arr(IEnumerable<string> x) { var a = new JsonArray(); foreach (var y in x) a.Add(y); return a; }
-        return new JsonObject
+        var parcel = new JsonObject
         {
             ["id"] = o.Id, ["orderId"] = o.OrderId, ["returnOrderId"] = o.ReturnOrderId, ["track"] = o.Track, ["returnTrack"] = o.ReturnTrack,
             ["altTrack"] = o.AltTrack, ["forwardTrack"] = o.ForwardTrack, ["trackingCodes"] = Arr(o.TrackingCodes), ["scanAliases"] = Arr(o.ScanAliases),
@@ -142,5 +143,13 @@ public static class ParcelMapper
             ["isPartialReturn"] = o.IsPartialReturn, ["photoId"] = o.PhotoId, ["items"] = items, ["extra"] = extra,
             ["isArchived"] = s.IsArchived, ["archivedAt"] = s.ArchivedAt, ["isDeleted"] = s.IsDeleted, ["deletedAt"] = s.DeletedAt, ["deletedFrom"] = s.DeletedFrom,
         };
+        // khiếu nại: chỉ có khóa khi đơn đang/đã khiếu nại (đơn thường giữ nguyên băm cũ)
+        if (o.ComplaintStatus.Length > 0)
+        {
+            parcel["complaintStatus"] = o.ComplaintStatus;
+            if (o.ComplaintAt.Length > 0) parcel["complaintAt"] = o.ComplaintAt;
+            if (o.ComplaintNote.Length > 0) parcel["complaintNote"] = o.ComplaintNote;
+        }
+        return parcel;
     }
 }

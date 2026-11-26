@@ -26,7 +26,7 @@ public sealed class ReturnOrderRowViewModel
         A(o.Id); A(o.OrderId); A(o.ReturnOrderId); A(o.Track); A(o.ReturnTrack); A(o.AltTrack); A(o.ForwardTrack); A(string.Join(",", o.TrackingCodes));
         A(o.Platform); A(o.OrderType); A(o.PlatformStatus); A(o.PreOrder); A(o.Status); A(o.Carrier); A(o.ShipDate); A(o.ReturnDate); A(o.RecvDate);
         A(o.ReturnedAt); A(o.Deadline); A(o.Price.ToString(CultureInfo.InvariantCulture)); A(o.Note); A(o.BuyerNote); A(o.UserNote); A(o.ImportWeek);
-        A(o.ImportedAt); A(o.IsWatchlist ? "1" : "0"); A(o.WatchlistReason); A(o.IsPartialReturn ? "1" : "0"); A(o.PhotoId);
+        A(o.ImportedAt); A(o.IsWatchlist ? "1" : "0"); A(o.WatchlistReason); A(o.ComplaintStatus); A(o.ComplaintAt); A(o.ComplaintNote); A(o.IsPartialReturn ? "1" : "0"); A(o.PhotoId);
         foreach (var i in o.Items) { A(i.Product); A(i.Color); A(i.Size); A(i.Qty.ToString(CultureInfo.InvariantCulture)); A(i.ReturnedQty.ToString(CultureInfo.InvariantCulture)); A(i.Sku); }
         return sb.ToString();
     }
@@ -111,9 +111,19 @@ public sealed class ReturnOrderRowViewModel
     public bool IsWatchlist => Source.IsWatchlist;
     /// <summary>Nhãn cột ⭐ (trống nếu không theo dõi) và lời nhắc khi rê chuột: lý do theo dõi.</summary>
     public string WatchMark => Source.IsWatchlist ? "⭐" : "";
-    public string? WatchTooltip => Source.IsWatchlist
-        ? "Đang theo dõi" + (string.IsNullOrWhiteSpace(Source.WatchlistReason) ? "" : ": " + Source.WatchlistReason.Trim())
-        : null;
+    public string ComplaintMark => Source.ComplaintStatus.Length > 0 ? "⚖️" : "";
+    public string ComplaintStatus => Source.ComplaintStatus;
+    /// <summary>Lời nhắc khi rê chuột vào cột nhãn: lý do theo dõi + trạng thái khiếu nại.</summary>
+    public string? WatchTooltip
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Source.IsWatchlist) parts.Add("⭐ Đang theo dõi" + (string.IsNullOrWhiteSpace(Source.WatchlistReason) ? "" : ": " + Source.WatchlistReason.Trim()));
+            if (Source.ComplaintStatus.Length > 0) parts.Add("⚖️ Khiếu nại: " + Source.ComplaintStatus + (Source.ComplaintNote.Length > 0 ? " — " + Source.ComplaintNote : ""));
+            return parts.Count == 0 ? null : string.Join("\n", parts);
+        }
+    }
     public bool IsPartialReturn => Source.IsPartialReturn;
 
     public string DisplayTracking { get; }

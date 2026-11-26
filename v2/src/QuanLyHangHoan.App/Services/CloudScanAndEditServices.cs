@@ -97,6 +97,8 @@ public sealed class CloudOrderEditService : IOrderEditService
             EditField.Carrier => Cell(orderId, "carrier", newValue),
             EditField.Deadline => Cell(orderId, "deadline", newValue),
             EditField.WatchlistReason => Cell(orderId, "watchlistReason", newValue),
+            EditField.ComplaintStatus => Cell(orderId, "complaintStatus", newValue),
+            EditField.ComplaintNote => Cell(orderId, "complaintNote", newValue),
             EditField.IsWatchlist when newValue is "0" or "1" => new JsonObject { ["type"] = "setWatch", ["id"] = orderId, ["on"] = newValue == "1" },
             _ => null,
         };

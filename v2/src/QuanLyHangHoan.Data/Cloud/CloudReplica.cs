@@ -172,11 +172,11 @@ public static class CloudReplica
               INSERT INTO orders(source_key, id, order_id, return_order_id, track, return_track, alt_track, forward_track, tracking_codes, scan_aliases,
                 platform, order_type, platform_status, pre_order, status, carrier, ship_date, return_date, recv_date, returned_at, deadline,
                 price, note, buyer_note, user_note, import_week, imported_at, is_watchlist, watchlist_reason, is_partial_return, photo_id, extra_json,
-                is_archived, archived_at, is_deleted, deleted_at, deleted_from, raw_json, v2_modified)
+                is_archived, archived_at, is_deleted, deleted_at, deleted_from, raw_json, v2_modified, complaint_status, complaint_at, complaint_note)
               VALUES($k, $id, $order_id, $return_order_id, $track, $return_track, $alt_track, $forward_track, $tracking_codes, $scan_aliases,
                 $platform, $order_type, $platform_status, $pre_order, $status, $carrier, $ship_date, $return_date, $recv_date, $returned_at, $deadline,
                 $price, $note, '', $user_note, $import_week, $imported_at, $is_watchlist, $watchlist_reason, $is_partial_return, $photo_id, $extra,
-                $is_archived, $archived_at, $is_deleted, $deleted_at, $deleted_from, '', 1)
+                $is_archived, $archived_at, $is_deleted, $deleted_at, $deleted_from, '', 1, $c_status, $c_at, $c_note)
               """
             : """
               UPDATE orders SET order_id=$order_id, return_order_id=$return_order_id, track=$track, return_track=$return_track, alt_track=$alt_track,
@@ -185,7 +185,8 @@ public static class CloudReplica
                 recv_date=$recv_date, returned_at=$returned_at, deadline=$deadline, price=$price, note=$note, user_note=$user_note,
                 import_week=$import_week, imported_at=$imported_at, is_watchlist=$is_watchlist, watchlist_reason=$watchlist_reason,
                 is_partial_return=$is_partial_return, photo_id=$photo_id, extra_json=$extra, is_archived=$is_archived, archived_at=$archived_at,
-                is_deleted=$is_deleted, deleted_at=$deleted_at, deleted_from=$deleted_from, v2_modified=1
+                is_deleted=$is_deleted, deleted_at=$deleted_at, deleted_from=$deleted_from, v2_modified=1,
+                complaint_status=$c_status, complaint_at=$c_at, complaint_note=$c_note
               WHERE source_key=$k
               """;
         void P(string n, object? v) => cmd.Parameters.AddWithValue(n, v ?? DBNull.Value);
@@ -202,6 +203,7 @@ public static class CloudReplica
         P("$photo_id", S(p["photoId"])); P("$extra", extra);
         P("$is_archived", Flag(p["isArchived"])); P("$archived_at", S(p["archivedAt"]));
         P("$is_deleted", Flag(p["isDeleted"])); P("$deleted_at", S(p["deletedAt"])); P("$deleted_from", S(p["deletedFrom"]));
+        P("$c_status", S(p["complaintStatus"])); P("$c_at", S(p["complaintAt"])); P("$c_note", S(p["complaintNote"]));
         cmd.ExecuteNonQuery();
 
         using (var ph = c.CreateCommand())

@@ -177,13 +177,17 @@ final class AIChatViewModel: ObservableObject {
     var canSend: Bool { hasKey && !isBusy && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func send(_ preset: String? = nil) {
-        let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty, !isBusy, let svc = ensureService() else { return }
+        let typed = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, !isBusy, let svc = ensureService() else { return }
+        // câu tắt ("đỏ sp", "về hn"...): đổi thành câu đầy đủ ngay trên máy, hiện "Hiểu là" để người hỏi thấy máy hiểu thế nào
+        let full = AIShorthand.expand(typed)
+        let q = full ?? typed
+        let shown = full.map { typed + "\n↳ Hiểu là: " + $0 } ?? typed
         rowsBox.set(store?.rows ?? [])   // chụp danh sách đơn ngay trên luồng chính; công cụ chạy nền chỉ đọc bản chụp này
         factsBox.set(status: currentStatus(), scans: currentScans())
         input = ""
         let started = Date()
-        messages.append(AIMessage(isUser: true, text: q, time: started))
+        messages.append(AIMessage(isUser: true, text: shown, time: started))
         isBusy = true
         status = "Đang hỏi AI..."
         Task {
@@ -307,12 +311,8 @@ struct AIChatView: View {
     @State private var openRow: OrderRow?
     @FocusState private var focused: Bool
 
-    private let suggestions: [String] = [
-        "Hôm nay có bao nhiêu đơn về?",
-        "Liệt kê đơn chưa trả của Shopee",
-        "Sản phẩm nào hoàn nhiều nhất tuần này?",
-        "Tìm đơn có mã chứa 5678",
-    ]
+    /// Nút hỏi nhanh bằng chữ tắt (chủ dự án 26/11/2026); máy tự đổi thành câu đầy đủ trước khi gửi AI.
+    private let suggestions = AIShorthand.quickAsks
 
     var body: some View {
         NavigationStack {
@@ -379,28 +379,37 @@ struct AIChatView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài. Dữ liệu là bản đã đồng bộ gần nhất từ máy tính.")
+            Text("AI chỉ ĐỌC dữ liệu, không sửa gì. Tên, số điện thoại, địa chỉ người nhận được ẩn, không gửi ra ngoài. Dữ liệu lấy từ cloud (bản đồng bộ gần nhất).")
                 .font(.footnote)
                 .foregroundColor(.secondary)
-            Text("Gợi ý câu hỏi:")
+            Text("Hỏi nhanh (chạm để hỏi):")
                 .font(.footnote.bold())
                 .padding(.top, 6)
-            ForEach(suggestions, id: \.self) { s in
-                suggestionButton(s)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 8)], alignment: .leading, spacing: 8) {
+                ForEach(suggestions, id: \.self) { s in
+                    suggestionButton(s)
+                }
             }
+            Text(AIShorthand.inputHint)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.top, 4)
         }
     }
 
-    private func suggestionButton(_ s: String) -> some View {
+    private func suggestionButton(_ s: AIQuickAsk) -> some View {
         Button {
-            vm.send(s)
+            vm.send(s.short)
         } label: {
-            Text(s)
-                .font(.subheadline)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Theme.accent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(s.short).font(.subheadline.bold())
+                Text(s.meaning).font(.caption).foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Theme.accent.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .disabled(!vm.hasKey || vm.isBusy)
     }
@@ -416,7 +425,7 @@ struct AIChatView: View {
 
     private var inputBar: some View {
         HStack(spacing: 8) {
-            TextField("Hỏi về đơn hàng...", text: $vm.input)
+            TextField("Hỏi về đơn hàng... (gõ tắt: đỏ, về hn, chờ sp)", text: $vm.input)
                 .focused($focused)
                 .submitLabel(.send)
                 .onSubmit { vm.send() }

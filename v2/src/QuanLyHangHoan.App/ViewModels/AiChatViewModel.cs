@@ -88,13 +88,10 @@ public sealed partial class AiChatViewModel : ObservableObject
 
     public bool IsEmpty => Messages.Count == 0;
 
-    public IReadOnlyList<string> Suggestions { get; } =
-    [
-        "Hôm nay có bao nhiêu đơn về?",
-        "Liệt kê đơn chưa về của Shopee",
-        "Sản phẩm nào hoàn nhiều nhất tuần này?",
-        "Tìm đơn có mã vận đơn chứa 5678",
-    ];
+    /// <summary>Nút hỏi nhanh bằng chữ tắt (chủ dự án 26/11/2026); máy tự đổi thành câu đầy đủ trước khi gửi AI.</summary>
+    public IReadOnlyList<QuanLyHangHoan.Core.Ai.AiQuickAsk> Suggestions { get; } = QuanLyHangHoan.Core.Ai.AiShorthand.QuickAsks;
+
+    public string InputHint => QuanLyHangHoan.Core.Ai.AiShorthand.InputHint;
 
     [ObservableProperty] private string _input = string.Empty;
     [ObservableProperty] private string _groqModels = AiChatService.DefaultGroqModels;
@@ -140,7 +137,11 @@ public sealed partial class AiChatViewModel : ObservableObject
         if (chat is null || question.Length == 0) return;
         Input = string.Empty;
         var started = _clock();
-        Messages.Add(new AiChatMessage(true, question, Array.Empty<AiOrderRef>(), "") { Time = started });
+        // câu tắt ("đỏ sp", "về hn"...): đổi thành câu đầy đủ ngay trên máy, hiện "Hiểu là" để người hỏi thấy máy hiểu thế nào
+        var full = QuanLyHangHoan.Core.Ai.AiShorthand.Expand(question);
+        var shown = full is null ? question : question + "\n↳ Hiểu là: " + full;
+        if (full is not null) question = full;
+        Messages.Add(new AiChatMessage(true, shown, Array.Empty<AiOrderRef>(), "") { Time = started });
         IsBusy = true;
         StatusText = "Đang hỏi AI...";
         _cts = new CancellationTokenSource();

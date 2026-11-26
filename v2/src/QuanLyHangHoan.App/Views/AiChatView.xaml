@@ -132,15 +132,26 @@
                     <TextBlock Text="Bạn muốn biết gì về đơn hàng?" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"
                                Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,4,0,14" />
                     <ItemsControl ItemsSource="{Binding Suggestions}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel HorizontalAlignment="Center" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Button Command="{Binding DataContext.AskCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}" Style="{StaticResource OrderChip}">
-                                    <TextBlock Text="{Binding}" FontSize="12.5" Foreground="{DynamicResource InkPrimaryBrush}" TextWrapping="Wrap" />
+                                        CommandParameter="{Binding Short}" Style="{StaticResource OrderChip}" ToolTip="{Binding Meaning}">
+                                    <TextBlock FontSize="12.5" Foreground="{DynamicResource InkPrimaryBrush}" TextWrapping="Wrap">
+                                        <Run Text="{Binding Short, Mode=OneWay}" FontWeight="SemiBold" />
+                                        <Run Text="·" Foreground="{DynamicResource InkMutedBrush}" />
+                                        <Run Text="{Binding Meaning, Mode=OneWay}" Foreground="{DynamicResource InkMutedBrush}" />
+                                    </TextBlock>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <TextBlock Text="{Binding InputHint}" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap"
+                               HorizontalAlignment="Center" TextAlignment="Center" Margin="8,10,8,0" />
                 </StackPanel>
 
                 <ItemsControl ItemsSource="{Binding Messages}">
@@ -270,7 +281,7 @@
                 <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" Padding="16,10" FontSize="13.5"
                          BorderThickness="0" Background="Transparent" Foreground="{DynamicResource InkPrimaryBrush}" CaretBrush="{DynamicResource InkPrimaryBrush}"
                          AcceptsReturn="False" VerticalContentAlignment="Center" IsEnabled="{Binding Available}" KeyDown="InputBox_KeyDown" />
-                <TextBlock Text="Hỏi về đơn hàng..." IsHitTestVisible="False" Margin="18,0,0,0" VerticalAlignment="Center" FontSize="13.5"
+                <TextBlock Text="Hỏi về đơn hàng... (gõ tắt được: đỏ, về hn, chờ sp)" IsHitTestVisible="False" Margin="18,0,0,0" VerticalAlignment="Center" FontSize="13.5"
                            Foreground="{DynamicResource InkMutedBrush}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">

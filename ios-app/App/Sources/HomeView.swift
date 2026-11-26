@@ -113,8 +113,8 @@ struct HomeView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
-                    if summary.discrepancyCount > 0 {
-                        if !engine.cloudActive { discrepancyCard }
+                    if summary.discrepancyCount > 0 && !engine.cloudActive {
+                        discrepancyCard
                             .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)

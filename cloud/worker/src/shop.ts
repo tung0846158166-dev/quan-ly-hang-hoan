@@ -23,7 +23,9 @@ const VALID_STATUS = new Set<string>(Object.values(ReceiveStatus));
 const EDITABLE_CELLS = new Set(["platformStatus", "carrier", "shipDate", "returnDate", "recvDate", "returnedAt", "deadline", "orderType", "price", "note", "userNote", "watchlistReason"]);
 const PHOTO_ID = /^[A-Za-z0-9_-]{6,80}$/;
 const MAX_PHOTO_BYTES = 1_000_000;
-const SCAN_PHOTO_WINDOW_MS = 15 * 60_000;
+// ảnh gửi sau lượt quét: điện thoại giữ ảnh trong hàng chờ khi mất mạng rồi gửi lại (chủ dự án 26/11/2026) -> cho 3 ngày;
+// vẫn chỉ nhận ảnh của kiện mà CHÍNH thiết bị đó đã quét xác nhận đúng một kiện.
+const SCAN_PHOTO_WINDOW_MS = 3 * 86_400_000;
 
 class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); }

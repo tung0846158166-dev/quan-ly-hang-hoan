@@ -50,6 +50,10 @@ final class SyncEngine: ObservableObject {
     /// Gợi ý AI mới nhất từ cloud (hiện ở đầu tab Thông báo).
     @Published var aiDigest: CloudAIDigest?
     var digestCheckedAt = Date.distantPast
+    /// Hàng chờ ảnh quét: lưu vào máy, đẩy lên cloud xong tự xóa; mất mạng thì chờ (chủ dự án 26/11/2026).
+    lazy var photoQueue = CloudPhotoQueue(dir: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("cloud-photo-queue", isDirectory: true))
+    @Published var pendingCloudPhotos = 0
     @Published var orderActionFeedback: [String: OrderActionFeedback] = [:]
     @Published var mode: ScanKind = .returnScan
     @Published var note = ""
@@ -329,7 +333,7 @@ final class SyncEngine: ObservableObject {
     /// Gọi khi app trở lại foreground: kiểm tra lại quyền thông báo và đánh thức đồng bộ nếu cần.
     func handleForeground() {
         snapshot.refreshAuthorization()
-        if cloudActive { Task { await cloud.syncNow() }; refreshAIDigest(force: true); return }
+        if cloudActive { Task { await cloud.syncNow(); await drainCloudPhotos() }; refreshAIDigest(force: true); return }
         guard !isDemoMode, !room.isEmpty else { return }
         if !channelUp {
             sseTask?.cancel(); sseTask = nil
@@ -1203,6 +1207,13 @@ extension SyncEngine {
 
     /// Dựng danh sách dòng từ bản sao cloud (chạy nền) rồi đưa vào `snapshot` mà mọi màn hình đang đọc.
 
+    /// Gửi các ảnh đang chờ lên cloud (lên xong tự xóa khỏi máy). Gọi sau mỗi lượt quét, khi nối lại cloud, khi mở lại app.
+    func drainCloudPhotos() async {
+        defer { pendingCloudPhotos = photoQueue.pendingCount }
+        guard cloudActive, cloud.canWrite, let api = cloud.currentAPI, photoQueue.pendingCount > 0 else { return }
+        await photoQueue.drain(api: api)
+    }
+
     /// Hỏi cloud bản gợi ý mới (tối đa 5 phút/lần). Bản mới hơn bản đã báo thì hiện thông báo trên iPhone.
     func refreshAIDigest(force: Bool = false) {
         guard cloudActive, let api = cloud.currentAPI, force || Date().timeIntervalSince(digestCheckedAt) > 300 else { return }
@@ -1226,6 +1237,7 @@ extension SyncEngine {
 
     func applyCloudRows() {
         refreshAIDigest()
+        if photoQueue.pendingCount > 0 { Task { await drainCloudPhotos() } }
         let store = cloud.store
         let now = Date()
         let at = cloud.lastSyncAt ?? now
@@ -1310,11 +1322,20 @@ extension SyncEngine {
                 UINotificationFeedbackGenerator().notificationOccurred(v.tone == .success ? .success : (v.tone == .danger ? .error : .warning))
             }
             // ảnh chỉ lên cloud khi cloud xác nhận đúng MỘT kiện (quy tắc 6)
-            if CloudPhotoRules.shouldUpload(r), let data = fullPhoto, !data.isEmpty, let api = self.cloud.currentAPI {
-                do {
-                    _ = try await CloudPhotoUploader(api: api).upload(after: r, full: data, thumb: nil)
-                } catch {
-                    self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: "Chưa tải được ảnh lên cloud")
+            if CloudPhotoRules.shouldUpload(r), let data = fullPhoto, !data.isEmpty, let parcel = r.parcel,
+               data.count <= CloudPhotoRules.hardMaxBytes {
+                // lưu vào hàng chờ trên máy trước (mất mạng không mất ảnh), rồi gửi; lên cloud xong tự xóa khỏi máy
+                let photoId = CloudPhotoRules.makePhotoId(parcel: parcel)
+                if (try? self.photoQueue.enqueue(photoId: photoId, parcelId: parcel.id, full: data, thumb: nil)) != nil {
+                    // ảnh tạm của lượt quét không cần nữa (đã có bản trong hàng chờ / trên cloud)
+                    if let i = self.items.firstIndex(where: { $0.requestId == rid }), let file = self.items[i].photoFile {
+                        try? FileManager.default.removeItem(at: self.photosDir.appendingPathComponent(file))
+                        self.items[i].photoFile = nil
+                    }
+                    await self.drainCloudPhotos()
+                    if self.pendingCloudPhotos > 0 {
+                        self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: "Ảnh đang chờ mạng để gửi lên cloud")
+                    }
                 }
             }
             self.persist()

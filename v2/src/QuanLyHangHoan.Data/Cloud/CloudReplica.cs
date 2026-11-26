@@ -52,6 +52,49 @@ public static class CloudReplica
         return long.TryParse(cmd.ExecuteScalar()?.ToString(), out var s) ? s : 0;
     }
 
+    /// <summary>
+    /// Sửa một lần (ảnh 28, 26/11/2026): dữ liệu cũ có n dòng CÙNG id; lúc đẩy lên cloud dòng thứ k thành "id~k" (<see cref="ParcelMapper.ToParcels"/>),
+    /// cloud trả về "id~k" và máy đã chép thêm dòng "cloud:id~k" -> thừa dòng, trùng khóa. Chỉ sửa khi ĐỦ các dòng "cloud:id~2..n" (khớp chắc chắn):
+    /// dòng cũ thứ k (theo thứ tự rowid, đúng thứ tự lúc đẩy) nhận id "id~k", bỏ bản chép "cloud:id~k" (cloud vẫn giữ nguyên bản đó).
+    /// Không đủ dòng cloud thì không đoán, giữ nguyên. Trả số nhóm đã sửa.
+    /// </summary>
+    public static int RepairDuplicateIds(string dbPath)
+    {
+        using var c = Open(dbPath);
+        using var tx = c.BeginTransaction();
+        List<string> Strings(string sql, params (string, object)[] ps)
+        {
+            using var q = c.CreateCommand(); q.Transaction = tx; q.CommandText = sql;
+            foreach (var (n, v) in ps) q.Parameters.AddWithValue(n, v);
+            using var r = q.ExecuteReader(); var l = new List<string>(); while (r.Read()) l.Add(r.GetString(0)); return l;
+        }
+        void Exec(string sql, params (string, object)[] ps)
+        {
+            using var q = c.CreateCommand(); q.Transaction = tx; q.CommandText = sql;
+            foreach (var (n, v) in ps) q.Parameters.AddWithValue(n, v);
+            q.ExecuteNonQuery();
+        }
+
+        var fixedGroups = 0;
+        foreach (var id in Strings("SELECT id FROM orders WHERE source_key NOT LIKE 'cloud:%' GROUP BY id HAVING COUNT(*) > 1"))
+        {
+            var legacy = Strings("SELECT source_key FROM orders WHERE id = $i AND source_key NOT LIKE 'cloud:%' ORDER BY rowid", ("$i", id));
+            var allThere = Enumerable.Range(2, legacy.Count - 1)
+                .All(k => Strings("SELECT source_key FROM orders WHERE source_key = $k", ("$k", "cloud:" + id + "~" + k)).Count == 1);
+            if (!allThere) continue;
+            for (var k = 2; k <= legacy.Count; k++)
+            {
+                var newId = id + "~" + k;
+                Exec("DELETE FROM order_items WHERE source_key = $k", ("$k", "cloud:" + newId));
+                Exec("DELETE FROM orders WHERE source_key = $k", ("$k", "cloud:" + newId));
+                Exec("UPDATE orders SET id = $n WHERE source_key = $k", ("$n", newId), ("$k", legacy[k - 1]));
+            }
+            fixedGroups++;
+        }
+        tx.Commit();
+        return fixedGroups;
+    }
+
     /// <summary>Quên mốc đồng bộ (ví dụ khi ghép sang cloud khác): lần sau lấy lại toàn bộ.</summary>
     public static void ResetRev(string dbPath)
     {

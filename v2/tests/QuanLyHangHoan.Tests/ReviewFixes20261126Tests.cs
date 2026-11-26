@@ -45,6 +45,30 @@ public sealed class ReviewFixes20261126Tests : IDisposable
         Assert.Equal(2, main.Count);
     }
 
+    [Theory]
+    // quyết định chủ dự án 26/11/2026: đơn "Hủy sau chuẩn bị" có hàng về -> có mã vận đơn thì chờ nhận (máy tính phải LƯU trạng thái này để đẩy lên cloud)
+    [InlineData("Không cần nhận", "Đơn hủy", true, "Chưa trả")]
+    // mọi trường hợp khác: nhập không đổi trạng thái kho
+    [InlineData("Bị mất", "Đơn hủy", true, "Bị mất")]
+    [InlineData("Không cần nhận", "Trả hàng/Hoàn tiền", true, "Không cần nhận")]
+    [InlineData("Không cần nhận", "Đơn hủy", false, "Không cần nhận")]
+    public void Import_update_saves_status_only_for_a_cancelled_order_that_now_has_a_tracking_code(string localStatus, string orderType, bool hasCode, string expected)
+    {
+        var db = Path.Combine(_dir, "s.db"); AppDatabase.Initialize(db);
+        var o = new Order { Id = "h1", OrderId = "X1", Platform = "Shopee", OrderType = orderType, Status = localStatus, Items = { new OrderItem { Product = "Ao", Qty = 1 } } };
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={db};Pooling=False"))
+        {
+            c.Open();
+            using (var tx = c.BeginTransaction()) { OrderStore.Insert(c, tx, o, "k1"); tx.Commit(); }
+            if (hasCode) { o.Track = "SPXH1"; o.TrackingCodes = new() { "SPXH1" }; }
+            o.Status = "Chưa trả";   // ParcelMerge đã quyết định trong bộ nhớ
+            using (var tx = c.BeginTransaction()) { OrderStore.UpdateImportedFields(c, tx, o); tx.Commit(); }
+            using var q = c.CreateCommand(); q.CommandText = "SELECT status FROM orders WHERE id='h1'";
+            Assert.Equal(expected, q.ExecuteScalar() as string);
+        }
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    }
+
     [Fact]
     public void Ensure_recent_backup_skips_when_a_fresh_one_exists_and_cleans_old_tmp_files()
     {

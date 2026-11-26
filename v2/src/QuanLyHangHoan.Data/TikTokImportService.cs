@@ -168,9 +168,14 @@ internal static class OrderStore
             UPDATE orders SET v2_modified=1, order_id=$oid, return_order_id=$rid, track=$trk, return_track=$rtrk, alt_track=$alt, forward_track=$fwd,
                 tracking_codes=$codes, platform=$plat, order_type=$otype, platform_status=$pstat, pre_order=$pre, carrier=$car,
                 ship_date=$ship, return_date=$ret, returned_at=$retat, price=$price, note=$note, buyer_note=$bnote,
-                is_partial_return=$part, deadline=$dl, extra_json=$extra
+                is_partial_return=$part, deadline=$dl, extra_json=$extra,
+                -- ngoại lệ DUY NHẤT (quyết định 26/11/2026: đơn "Hủy sau chuẩn bị" có hàng về): đơn hủy đang "Không cần nhận" vì lúc nhập
+                -- chưa có mã, nay có mã -> chờ nhận. Mọi trạng thái kho khác do quét / người dùng quyết định, nhập không đụng.
+                status = CASE WHEN status = 'Không cần nhận' AND $otype = 'Đơn hủy' AND $codes <> '[]' AND $newst IN ('Chưa trả','Chưa về')
+                              THEN $newst ELSE status END
             WHERE id=$id
             """,
+            ("$newst", o.Status),
             ("$oid", o.OrderId), ("$rid", o.ReturnOrderId), ("$trk", o.Track), ("$rtrk", o.ReturnTrack), ("$alt", o.AltTrack), ("$fwd", o.ForwardTrack),
             ("$codes", JsonSerializer.Serialize(o.TrackingCodes)), ("$plat", o.Platform), ("$otype", o.OrderType), ("$pstat", o.PlatformStatus),
             ("$pre", o.PreOrder), ("$car", o.Carrier), ("$ship", o.ShipDate), ("$ret", o.ReturnDate), ("$retat", o.ReturnedAt),

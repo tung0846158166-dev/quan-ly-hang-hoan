@@ -740,7 +740,9 @@ public sealed partial class AiOrderTools
 
     private AiToolResult Rows(List<Order> rows, int limit)
     {
-        var byId = Load().ToDictionary(s => s.Order.Id, s => s, StringComparer.Ordinal);
+        // dữ liệu cũ có thể có 2 dòng cùng id (ảnh 28): lấy dòng đầu, không được lỗi "trùng khóa"
+        var byId = new Dictionary<string, StoredOrder>(StringComparer.Ordinal);
+        foreach (var s in Load()) byId.TryAdd(s.Order.Id, s);
         var arr = new JsonArray();
         var refs = new List<AiOrderRef>();
         foreach (var o in rows.Take(limit))

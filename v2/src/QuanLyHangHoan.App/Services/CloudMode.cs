@@ -74,6 +74,9 @@ public sealed class CloudMode : IDisposable
             _ = PublishAsync("reconnect");
             _ = RefreshAiAccessAsync();
         };
+        // sửa một lần dòng trùng id của dữ liệu cũ (ảnh 28); có sửa thì lấy lại toàn bộ từ cloud để dòng đã đổi id có nội dung mới nhất
+        try { if (CloudReplica.RepairDuplicateIds(_dbPath) > 0) CloudReplica.ResetRev(_dbPath); }
+        catch (Exception ex) when (ex is IOException or Microsoft.Data.Sqlite.SqliteException) { /* lần mở sau thử lại */ }
         Link.Start();
     }
 

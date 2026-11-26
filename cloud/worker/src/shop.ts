@@ -1,6 +1,7 @@
 import { fromWorkersAi, toWorkersAi, workersAiErrorStatus } from "./workersai";
 import { buildNewParcel, ownCodes, parseNewOrder } from "./neworder";
 import { answerText, buildStats, digestMessages, ruleText } from "./digest";
+import { DEFAULT_AI_CONFIG, parseAiConfig, type AiConfig } from "./aiconfig";
 import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
@@ -154,6 +155,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "POST" && path === "/admin/ai-digest") { this.requireOwner(dev); return json(await this.runDigest()); }
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
+    if (m === "PUT" && path === "/admin/ai-config") { this.requireOwner(dev); return this.putAiConfig(await this.body(req)); }
     const ai = /^\/ai\/(groq|gemini|nvidia|cloudflare)\/chat\/completions$/.exec(path);
     if (m === "POST" && ai) return this.aiProxy(req, ai[1] as AiProvider);
     if (m === "PUT" && path.startsWith("/photos/")) return this.putPhoto(req, url, decodeURIComponent(path.slice("/photos/".length)), dev);
@@ -830,7 +832,27 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   private aiStatus(): Response {
-    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, nvidia: !!this.env.NVIDIA_API_KEY, cloudflare: !!this.workersAiBinding(), usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
+    const cfg = this.aiConfig();
+    return json({
+      groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, nvidia: !!this.env.NVIDIA_API_KEY, cloudflare: !!this.workersAiBinding(),
+      usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit(),
+      // cấu hình chung: app mới làm theo (thứ tự dự phòng, mô hình, thời gian chờ); app cũ bỏ qua các trường này
+      order: cfg.order, models: cfg.models, timeoutSec: cfg.timeoutSec,
+    });
+  }
+
+  /** Cấu hình AI chung (meta "ai_config"); chưa đặt hoặc hỏng thì dùng mặc định. */
+  private aiConfig(): AiConfig {
+    const raw = this.meta("ai_config");
+    if (!raw) return DEFAULT_AI_CONFIG;
+    try { const c = parseAiConfig(JSON.parse(raw)); return typeof c === "string" ? DEFAULT_AI_CONFIG : c; } catch { return DEFAULT_AI_CONFIG; }
+  }
+
+  private putAiConfig(b: Record<string, unknown>): Response {
+    const c = parseAiConfig(b, this.aiConfig());
+    if (typeof c === "string") return fail(422, "invalid", c);
+    this.setMeta("ai_config", JSON.stringify(c));
+    return json(c);
   }
 
   /**

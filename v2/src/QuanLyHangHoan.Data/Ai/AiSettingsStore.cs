@@ -4,7 +4,8 @@ using System.Text;
 namespace QuanLyHangHoan.Data.Ai;
 
 /// <summary>Cổng AI của cloud: địa chỉ API (".../v1"), token thiết bị, nhà cung cấp nào đã có khóa trên cloud.</summary>
-public sealed record CloudAiAccess(string ApiBase, string Token, bool Groq, bool Gemini, bool Nvidia = false, bool Cloudflare = false);
+public sealed record CloudAiAccess(string ApiBase, string Token, bool Groq, bool Gemini, bool Nvidia = false, bool Cloudflare = false,
+    IReadOnlyList<string>? Order = null, IReadOnlyDictionary<string, string>? Models = null, int TimeoutSec = 0);
 
 /// <summary>
 /// Lưu khóa API và danh sách mô hình trên máy, cho từng nhà cung cấp (groq, gemini). Khóa được mã hóa bằng DPAPI
@@ -123,10 +124,16 @@ public sealed class AiSettingsStore
         if (Cloud is { } c)
         {
             var b = c.ApiBase.TrimEnd('/');
-            if (c.Groq) list.AddRange(AiChatService.BuildEndpoints("groq", b + "/ai/groq", c.Token, LoadModel(Groq), AiChatService.DefaultModel));
-            if (c.Gemini) list.AddRange(AiChatService.BuildEndpoints("gemini", b + "/ai/gemini", c.Token, LoadModel(Gemini), AiChatService.FallbackGeminiModel));
-            if (c.Nvidia) list.AddRange(AiChatService.BuildEndpoints("nvidia", b + "/ai/nvidia", c.Token, LoadModel(Nvidia), AiChatService.DefaultNvidiaModels));
-            if (c.Cloudflare) list.AddRange(AiChatService.BuildEndpoints("cloudflare", b + "/ai/cloudflare", c.Token, LoadModel(Cloudflare), AiChatService.DefaultCloudflareModels));
+            // thứ tự + mô hình do CLOUD quản lý chung (chủ dự án 26/11/2026); cloud cũ chưa có thì giữ thứ tự cũ + mô hình trên máy
+            var order = c.Order is { Count: > 0 } o ? o : new[] { Groq, Gemini, Nvidia, Cloudflare };
+            foreach (var p in order)
+            {
+                var on = p switch { Groq => c.Groq, Gemini => c.Gemini, Nvidia => c.Nvidia, Cloudflare => c.Cloudflare, _ => false };
+                if (!on) continue;
+                var models = c.Models is not null && c.Models.TryGetValue(p, out var m) && !string.IsNullOrWhiteSpace(m) ? m : LoadModel(p);
+                var fallback = p switch { Groq => AiChatService.DefaultModel, Gemini => AiChatService.FallbackGeminiModel, Nvidia => AiChatService.DefaultNvidiaModels, _ => AiChatService.DefaultCloudflareModels };
+                list.AddRange(AiChatService.BuildEndpoints(p, b + "/ai/" + p, c.Token, models, fallback));
+            }
             return list;
         }
         if (CloudMode) return list;   // chế độ cloud mà chưa hỏi được cloud: chưa có AI, KHÔNG dùng khóa trên máy

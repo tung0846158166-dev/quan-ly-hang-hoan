@@ -87,9 +87,11 @@ public protocol AIHTTPTransport {
 
 public struct URLSessionAITransport: AIHTTPTransport {
     private let session: URLSession
-    public init(session: URLSession = .shared) { self.session = session }
+    private let timeout: TimeInterval
+    /// `timeout`: thời gian chờ mỗi mô hình (cloud quản lý; mô hình chậm thì chuyển sớm sang mô hình sau).
+    public init(session: URLSession = .shared, timeout: TimeInterval = 45) { self.session = session; self.timeout = timeout }
     public func post(url: URL, headers: [String: String], body: Data) async throws -> (Int, Data, TimeInterval?) {
-        var req = URLRequest(url: url, timeoutInterval: 45)
+        var req = URLRequest(url: url, timeoutInterval: timeout)
         req.httpMethod = "POST"
         for (k, v) in headers { req.setValue(v, forHTTPHeaderField: k) }
         req.httpBody = body

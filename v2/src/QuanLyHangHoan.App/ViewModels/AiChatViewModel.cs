@@ -124,7 +124,11 @@ public sealed partial class AiChatViewModel : ObservableObject
         if (endpoints is null || endpoints.Count == 0) return null;
         _chat = _chatFactory is not null
             ? _chatFactory(endpoints)
-            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock, _activityLoader, _statusProvider, _returnWatchProvider, _notificationsProvider), _clock);
+            : new AiChatService(SharedHttp, endpoints, new AiOrderTools(_loader!, _clock, _activityLoader, _statusProvider, _returnWatchProvider, _notificationsProvider), _clock)
+            {
+                // cloud quản lý thời gian chờ mỗi mô hình (mô hình chậm thì chuyển sớm sang mô hình sau)
+                RequestTimeout = _store?.Cloud is { TimeoutSec: > 0 } c ? TimeSpan.FromSeconds(c.TimeoutSec) : TimeSpan.FromSeconds(45),
+            };
         return _chat;
     }
 
@@ -261,6 +265,7 @@ public sealed partial class AiChatViewModel : ObservableObject
         HasKey = _store.HasKey;
         OnPropertyChanged(nameof(UsesCloudKeys));
         OnPropertyChanged(nameof(ShowLocalKeys));
+        OnPropertyChanged(nameof(CloudAiSummary));
         StatusText = _store.CloudMode
             ? (HasKey ? "Sẵn sàng (AI dùng khóa trên cloud). Hãy hỏi về đơn hàng của bạn."
                 : _store.UsesCloud ? "Cloud chưa có khóa AI: chủ cửa hàng đặt khóa trên cloud." : "Đang kết nối AI trên cloud...")
@@ -270,6 +275,11 @@ public sealed partial class AiChatViewModel : ObservableObject
     /// <summary>Đang dùng khóa trên cloud (ẩn ô nhập khóa trên máy).</summary>
     public bool UsesCloudKeys => _store?.CloudMode ?? false;
     public bool ShowLocalKeys => !UsesCloudKeys;
+    /// <summary>Chế độ cloud: thứ tự + mô hình do cloud quản lý chung, chỉ hiện để xem.</summary>
+    public string CloudAiSummary => _store?.Cloud is { } c && c.Order is { Count: > 0 } o
+        ? "Thứ tự dự phòng (do cloud quản lý chung cho mọi máy): " + string.Join(" → ", o.Select(p => p switch { "groq" => "Groq", "gemini" => "Google Gemini", "nvidia" => "NVIDIA", "cloudflare" => "Cloudflare", _ => p }))
+            + (c.TimeoutSec > 0 ? $". Mỗi mô hình chờ tối đa {c.TimeoutSec} giây rồi chuyển sang mô hình sau." : ".")
+        : string.Empty;
 
     public void ForgetKeys()
     {

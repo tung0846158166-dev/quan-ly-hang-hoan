@@ -13,40 +13,30 @@
 
         <Border Visibility="{Binding UsesCloudKeys, Converter={StaticResource BoolToVis}}" Background="{DynamicResource InfoBlueBadgeBgBrush}"
                 BorderBrush="{DynamicResource InfoBlueCardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
-            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkPrimaryBrush}"
-                       Text="Máy này đang dùng cloud: AI dùng khóa Groq/Google đặt trên cloud (chung cho mọi máy), không cần nhập khóa ở đây. Khóa cũ trên máy không còn được dùng, bấm &quot;Xóa các khóa khỏi máy&quot; để xóa hẳn." />
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkPrimaryBrush}"
+                           Text="Máy này đang dùng cloud: khóa AI, thứ tự dự phòng và danh sách mô hình do cloud quản lý chung cho mọi máy, không nhập gì ở đây. Khóa cũ trên máy không còn được dùng, bấm &quot;Xóa các khóa khỏi máy&quot; để xóa hẳn." />
+                <TextBlock Text="{Binding CloudAiSummary}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" Margin="0,6,0,0" />
+            </StackPanel>
         </Border>
 
+        <!-- chỉ khi KHÔNG chạy cloud: nhập khóa + mô hình trên máy -->
         <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
         <TextBlock Text="Khóa Groq (console.groq.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
         <PasswordBox x:Name="KeyBox" Padding="6,5" FontFamily="Consolas" />
-        </StackPanel>
         <TextBlock Text="Mô hình Groq theo thứ tự ưu tiên (cách nhau dấu phẩy). Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau:"
                    FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding GroqModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
-
-        <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
         <TextBlock Text="Khóa Google Gemini (aistudio.google.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
         <PasswordBox x:Name="GeminiKeyBox" Padding="6,5" FontFamily="Consolas" />
-        </StackPanel>
-        <TextBlock Text="Mô hình Google theo thứ tự ưu tiên (dùng sau khi các mô hình Groq hết hạn mức):"
-                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
+        <TextBlock Text="Mô hình Google theo thứ tự ưu tiên:" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
-
-        <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
         <TextBlock Text="Khóa NVIDIA NIM (build.nvidia.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
         <PasswordBox x:Name="NvidiaKeyBox" Padding="6,5" FontFamily="Consolas" />
-        </StackPanel>
-        <TextBlock Text="Mô hình NVIDIA theo thứ tự ưu tiên (tuyến dự phòng cuối, dùng khi Groq và Google đều hết hạn mức):"
-                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
+        <TextBlock Text="Mô hình NVIDIA theo thứ tự ưu tiên:" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding NvidiaModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
-
-        <StackPanel Visibility="{Binding UsesCloudKeys, Converter={StaticResource BoolToVis}}">
-        <TextBlock Text="Cloudflare Workers AI (chỉ qua cloud)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
-        <TextBlock Text="Mô hình Cloudflare theo thứ tự ưu tiên (tuyến dự phòng sau NVIDIA):"
-                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,4" TextWrapping="Wrap" />
-        <TextBox Text="{Binding CloudflareModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
         </StackPanel>
+
 
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="Lưu và thử kết nối" Click="Save_Click" Padding="12,6" Margin="0,0,8,0" Cursor="Hand"

@@ -273,7 +273,9 @@ public final class CloudAPI {
         let data = try await perform("GET", "/ai/status")
         let o = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]) ?? [:]
         return CloudAIStatus(groq: o["groq"] as? Bool ?? false, gemini: o["gemini"] as? Bool ?? false,
-                             nvidia: o["nvidia"] as? Bool ?? false, cloudflare: o["cloudflare"] as? Bool ?? false)
+                             nvidia: o["nvidia"] as? Bool ?? false, cloudflare: o["cloudflare"] as? Bool ?? false,
+                             order: (o["order"] as? [String]) ?? [], models: (o["models"] as? [String: String]) ?? [:],
+                             timeoutSec: (o["timeoutSec"] as? NSNumber)?.intValue ?? 0)
     }
 
     /// Chuỗi mô hình AI đi qua cổng AI của cloud: dùng NGUYÊN logic gọi AI, chỉ đổi địa chỉ gốc và dùng token thiết bị thay khóa API.
@@ -282,11 +284,17 @@ public final class CloudAPI {
                             nvidiaModels: String = AIEndpoint.defaultNvidiaModels,
                             cloudflareModels: String = AIEndpoint.defaultCloudflareModels) -> [AIEndpoint] {
         guard let t = token, !t.isEmpty else { return [] }
+        // thứ tự + mô hình do cloud quản lý; cloud cũ chưa có thì giữ thứ tự cũ + mô hình trên máy
+        let order = st.order.isEmpty ? ["groq", "gemini", "nvidia", "cloudflare"] : st.order
+        let local = ["groq": groqModels, "gemini": geminiModels, "nvidia": nvidiaModels, "cloudflare": cloudflareModels]
+        let fallback = ["groq": "openai/gpt-oss-120b", "gemini": AIEndpoint.fallbackGeminiModel,
+                        "nvidia": AIEndpoint.defaultNvidiaModels, "cloudflare": AIEndpoint.defaultCloudflareModels]
+        let enabled = ["groq": st.groq, "gemini": st.gemini, "nvidia": st.nvidia, "cloudflare": st.cloudflare]
         var out: [AIEndpoint] = []
-        if st.groq { out += AIEndpoint.build(provider: "groq", baseURL: baseURL + "/ai/groq", apiKey: t, models: groqModels, fallbackModel: "openai/gpt-oss-120b") }
-        if st.gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel) }
-        if st.nvidia { out += AIEndpoint.build(provider: "nvidia", baseURL: baseURL + "/ai/nvidia", apiKey: t, models: nvidiaModels, fallbackModel: AIEndpoint.defaultNvidiaModels) }
-        if st.cloudflare { out += AIEndpoint.build(provider: "cloudflare", baseURL: baseURL + "/ai/cloudflare", apiKey: t, models: cloudflareModels, fallbackModel: AIEndpoint.defaultCloudflareModels) }
+        for p in order where enabled[p] == true {
+            let models = (st.models[p]?.isEmpty == false ? st.models[p] : nil) ?? local[p] ?? ""
+            out += AIEndpoint.build(provider: p, baseURL: baseURL + "/ai/" + p, apiKey: t, models: models, fallbackModel: fallback[p] ?? "")
+        }
         return out
     }
 
@@ -322,8 +330,14 @@ public final class CloudAPI {
 /// Nhà cung cấp AI nào đã có khóa trên cloud.
 public struct CloudAIStatus: Equatable {
     public let groq: Bool, gemini: Bool, nvidia: Bool, cloudflare: Bool
-    public init(groq: Bool, gemini: Bool, nvidia: Bool = false, cloudflare: Bool = false) {
+    /// Cấu hình chung do cloud quản lý (chủ dự án 26/11/2026): thứ tự dự phòng, mô hình, thời gian chờ. Cloud cũ: rỗng/0.
+    public let order: [String]
+    public let models: [String: String]
+    public let timeoutSec: Int
+    public init(groq: Bool, gemini: Bool, nvidia: Bool = false, cloudflare: Bool = false,
+                order: [String] = [], models: [String: String] = [:], timeoutSec: Int = 0) {
         self.groq = groq; self.gemini = gemini; self.nvidia = nvidia; self.cloudflare = cloudflare
+        self.order = order; self.models = models; self.timeoutSec = timeoutSec
     }
     public var any: Bool { groq || gemini || nvidia || cloudflare }
 }

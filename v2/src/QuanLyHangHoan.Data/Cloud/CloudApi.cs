@@ -146,10 +146,17 @@ public sealed class CloudApi
     }
 
     /// <summary>Cổng AI: nhà cung cấp nào đã có khóa trên cloud.</summary>
-    public async Task<(bool Groq, bool Gemini, bool Nvidia, bool Cloudflare)> AiStatusAsync(CancellationToken ct = default)
+    public async Task<CloudAiStatus> AiStatusAsync(CancellationToken ct = default) => ParseAiStatus(await JsonAsync(HttpMethod.Get, "/ai/status", null, ct));
+
+    public static CloudAiStatus ParseAiStatus(JsonNode r)
     {
-        var r = await JsonAsync(HttpMethod.Get, "/ai/status", null, ct);
-        return (r["groq"]?.GetValue<bool>() ?? false, r["gemini"]?.GetValue<bool>() ?? false, r["nvidia"]?.GetValue<bool>() ?? false, r["cloudflare"]?.GetValue<bool>() ?? false);
+        static bool B(JsonNode? n) => n is JsonValue v && v.TryGetValue<bool>(out var b) && b;
+        var order = r["order"] is JsonArray a ? a.Select(x => x?.GetValue<string>() ?? "").Where(x => x.Length > 0).ToList() : new List<string>();
+        var models = new Dictionary<string, string>();
+        if (r["models"] is JsonObject m)
+            foreach (var kv in m) if (kv.Value is JsonValue v && v.TryGetValue<string>(out var str)) models[kv.Key] = str;
+        var t = r["timeoutSec"] is JsonValue tv && tv.TryGetValue<double>(out var d) ? (int)d : 0;
+        return new CloudAiStatus(B(r["groq"]), B(r["gemini"]), B(r["nvidia"]), B(r["cloudflare"]), order, models, t);
     }
 
     // ---- đồng bộ
@@ -295,3 +302,7 @@ public sealed record CloudDeviceInfo(string DeviceId, string DeviceName, string 
 
 /// <summary>Một bản gợi ý AI theo khung giờ. At: mili giây Unix; ByAi=false: bản viết theo quy tắc (AI lỗi/hết lượt).</summary>
 public sealed record CloudAiDigest(long Id, long At, string Slot, string Text, bool ByAi);
+
+/// <summary>Trạng thái + cấu hình AI chung trên cloud (thứ tự dự phòng, mô hình, thời gian chờ; cloud cũ không có thì rỗng/0).</summary>
+public sealed record CloudAiStatus(bool Groq, bool Gemini, bool Nvidia, bool Cloudflare,
+    IReadOnlyList<string> Order, IReadOnlyDictionary<string, string> Models, int TimeoutSec);

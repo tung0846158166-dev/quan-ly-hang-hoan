@@ -686,6 +686,22 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     expect(st).toMatchObject({ groq: true, gemini: false, nvidia: true, cloudflare: false, usedToday: 5, dailyLimit: 5 });
   });
 
+  it("cấu hình AI chung trên cloud: mặc định Gemini cuối; chủ sửa được, mọi máy đọc được; nhân viên không sửa", async () => {
+    const st = (await call("GET", "/ai/status", undefined, phoneA)).data;
+    expect(st.order).toEqual(["groq", "nvidia", "cloudflare", "gemini"]);
+    expect(st.models.gemini).toContain("gemini");
+    expect(st.timeoutSec).toBe(25);
+    expect((await call("PUT", "/admin/ai-config", { order: ["nvidia"] }, phoneA)).status).toBe(403);
+    expect((await call("PUT", "/admin/ai-config", { order: ["openai"] }, owner)).status).toBe(422);
+    const ok = await call("PUT", "/admin/ai-config", { order: ["nvidia", "groq"], models: { nvidia: "nvidia/x" }, timeoutSec: 30 }, owner);
+    expect(ok.status).toBe(200);
+    const after = (await call("GET", "/ai/status", undefined, phoneB)).data;
+    expect(after.order).toEqual(["nvidia", "groq", "cloudflare", "gemini"]);   // thiếu thì nối theo mặc định
+    expect(after.models.nvidia).toBe("nvidia/x");
+    expect(after.models.groq).toContain("gpt-oss");
+    expect(after.timeoutSec).toBe(30);
+  });
+
   it("từ chối nội dung rỗng", async () => {
     stubUpstream();
     const res = await SELF.fetch(`${BASE}/ai/groq/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${phoneA}` }, body: "" });

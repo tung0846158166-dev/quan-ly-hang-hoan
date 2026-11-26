@@ -157,3 +157,31 @@ public sealed class AiRetiredModelTests
         Assert.Equal("openai/gpt-oss-120b", AiSettingsStore.CleanModels(AiSettingsStore.Groq, "openai/gpt-oss-120b"));
     }
 }
+
+/// <summary>Chủ dự án 26/11/2026: thứ tự dự phòng + mô hình AI do CLOUD quản lý chung (đổi không cần cài lại app).</summary>
+public sealed class AiCloudConfigTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "qlhh-aicfg-" + Guid.NewGuid().ToString("N"));
+    public void Dispose() { try { Directory.Delete(_dir, true); } catch (IOException) { } }
+
+    [Fact]
+    public void Cloud_order_and_models_win_over_local_settings()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.SaveModel(AiSettingsStore.Groq, "model-tren-may");
+        s.UseCloud(() => new CloudAiAccess("https://x.workers.dev/v1", "tok", true, true, true, true,
+            Order: new[] { "nvidia", "groq", "cloudflare", "gemini" },
+            Models: new Dictionary<string, string> { ["nvidia"] = "nv/a", ["groq"] = "gq/b, gq/c", ["cloudflare"] = "@cf/x", ["gemini"] = "gm/y" },
+            TimeoutSec: 25));
+        var labels = s.BuildEndpoints().Select(e => e.Label).ToArray();
+        Assert.Equal(new[] { "nvidia/nv/a", "groq/gq/b", "groq/gq/c", "cloudflare/@cf/x", "gemini/gm/y" }, labels);
+    }
+
+    [Fact]
+    public void Old_cloud_without_config_keeps_the_previous_order()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.UseCloud(() => new CloudAiAccess("https://x.workers.dev/v1", "tok", true, true, true, true));
+        Assert.Equal(new[] { "groq", "gemini", "nvidia", "cloudflare" }, s.BuildEndpoints().Select(e => e.Provider).Distinct().ToArray());
+    }
+}

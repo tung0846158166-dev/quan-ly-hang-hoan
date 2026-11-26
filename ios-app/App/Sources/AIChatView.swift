@@ -160,9 +160,18 @@ final class AIChatViewModel: ObservableObject {
         let fbox = factsBox
         let t = AIOrderTools(rows: { box.get() }, statusProvider: { fbox.status() }, scanHistory: { fbox.scans() })
         tools = t
-        let s = AIChatService(endpoints: eps, tools: t)
+        let timeout = TimeInterval((usesCloud ? cloudAI?.timeoutSec : nil).flatMap { $0 > 0 ? $0 : nil } ?? 45)
+        let s = AIChatService(transport: URLSessionAITransport(timeout: timeout), endpoints: eps, tools: t)
         service = s
         return s
+    }
+
+    /// Chế độ cloud: tóm tắt thứ tự dự phòng do cloud quản lý.
+    var cloudOrderSummary: String {
+        guard usesCloud, let c = cloudAI, !c.order.isEmpty else { return "" }
+        let names = ["groq": "Groq", "gemini": "Google", "nvidia": "NVIDIA", "cloudflare": "Cloudflare"]
+        return "Thứ tự dự phòng: " + c.order.map { names[$0] ?? $0 }.joined(separator: " → ")
+            + (c.timeoutSec > 0 ? ". Mỗi mô hình chờ tối đa \(c.timeoutSec) giây." : ".")
     }
 
     var canSend: Bool { hasKey && !isBusy && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -436,30 +445,13 @@ struct AIKeySettingsView: View {
     var body: some View {
         Form {
             Section(footer: Text("Khóa AI chỉ nằm trên cloud (chủ cửa hàng đặt), dùng chung cho mọi máy; điện thoại không lưu khóa.")) {
-                Label(cloudKeys ? "AI dùng khóa trên cloud. Thứ tự dự phòng: Groq → Google → NVIDIA → Cloudflare."
+                Label(cloudKeys ? "AI dùng khóa trên cloud. Thứ tự dự phòng và danh sách mô hình do cloud quản lý chung cho mọi máy."
                                 : "Chưa ghép cloud: vào Cài đặt → Cloud để ghép, rồi dùng trợ lý AI.",
                       systemImage: cloudKeys ? "icloud" : "icloud.slash")
                     .font(.footnote)
-            }
-            Section(header: Text("Groq")) {
-                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.groqModels, axis: .vertical)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    .font(.system(.footnote, design: .monospaced))
-            }
-            Section(header: Text("Google Gemini")) {
-                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    .font(.system(.footnote, design: .monospaced))
-            }
-            Section(header: Text("NVIDIA NIM")) {
-                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.nvidiaModels, axis: .vertical)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    .font(.system(.footnote, design: .monospaced))
-            }
-            Section(header: Text("Cloudflare Workers AI"), footer: Text("Hết hạn mức mô hình trước thì tự chuyển sang mô hình sau. Dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận.")) {
-                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.cloudflareModels, axis: .vertical)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                    .font(.system(.footnote, design: .monospaced))
+                if !vm.cloudOrderSummary.isEmpty {
+                    Text(vm.cloudOrderSummary).font(.footnote.weight(.semibold))
+                }
             }
             Section {
                 Button("Lưu và thử kết nối") {

@@ -178,6 +178,18 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(try CloudAPI(baseURL: "https://a.workers.dev", token: nil).aiEndpoints(st, groqModels: "m", geminiModels: "g").isEmpty)
     }
 
+    func testCloudAIConfigDecidesOrderAndModels() async throws {
+        let t = Transport { _ in (200, #"{"groq":true,"gemini":true,"nvidia":true,"cloudflare":true,"order":["nvidia","groq","cloudflare","gemini"],"models":{"nvidia":"nv/a","groq":"gq/b","cloudflare":"@cf/c","gemini":"gm/d"},"timeoutSec":25}"#) }
+        let api = try CloudAPI(baseURL: "https://a.workers.dev", token: "tok", transport: t)
+        let st = try await api.aiStatus()
+        XCTAssertEqual(st.order, ["nvidia", "groq", "cloudflare", "gemini"]); XCTAssertEqual(st.timeoutSec, 25)
+        let eps = api.aiEndpoints(st, groqModels: "local-groq", geminiModels: "local-gem")
+        XCTAssertEqual(eps.map { $0.label }, ["nvidia/nv/a", "groq/gq/b", "cloudflare/@cf/c", "gemini/gm/d"])   // cloud thắng cài đặt trên máy
+        // cloud cũ chưa có cấu hình: giữ thứ tự cũ
+        let old = CloudAIStatus(groq: true, gemini: true)
+        XCTAssertEqual(api.aiEndpoints(old, groqModels: "g1", geminiModels: "m1").map { $0.provider }, ["groq", "gemini"])
+    }
+
     func testRetiredNvidiaAndCloudflareModelsAreDropped() {
         XCTAssertEqual(AIEndpoint.cleanModels(provider: "nvidia", "meta/llama-3.3-70b-instruct"), AIEndpoint.defaultNvidiaModels)
         XCTAssertEqual(AIEndpoint.cleanModels(provider: "cloudflare", "@cf/meta/llama-3.3-70b-instruct-fp8-fast, @cf/openai/gpt-oss-120b"), "@cf/openai/gpt-oss-120b")

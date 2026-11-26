@@ -191,7 +191,7 @@ public class ReturnOrdersViewModelTests
     {
         var mainVm = new MainViewModel(new FakeDataService(() => FixedNow));
 
-        Assert.Equal(16, mainVm.NavigationItems.Count);   // 4 đường nạp đơn đã chuyển vào Cài đặt
+        Assert.Equal(17, mainVm.NavigationItems.Count);   // 4 đường nạp đơn đã chuyển vào Cài đặt; + Khiếu nại (26/11/2026)
         Assert.IsType<HomeViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("return_watch");
@@ -237,6 +237,9 @@ public class ReturnOrdersViewModelTests
 
         mainVm.NavigateByKey("deleted");
         Assert.IsType<DeletedOrdersViewModel>(mainVm.CurrentPage);
+
+        mainVm.NavigateByKey("complaints");
+        Assert.IsType<ComplaintsViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("legacy_import");
         Assert.IsType<LegacyImportViewModel>(mainVm.CurrentPage);

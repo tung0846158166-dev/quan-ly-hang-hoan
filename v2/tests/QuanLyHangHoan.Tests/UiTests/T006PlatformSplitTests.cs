@@ -102,6 +102,7 @@ public class T006PlatformSplitTests
             "return_watch",
             "new_orders",
             "watchlist",
+            "complaints",
             "archive",
             "deleted",
             "stats",

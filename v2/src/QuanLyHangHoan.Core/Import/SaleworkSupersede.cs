@@ -32,7 +32,8 @@ public static class SaleworkSupersede
     public static bool MergeWarehouse(Order src, Order dst)
     {
         var changed = false;
-        if (IsReceived(src) && !IsReceived(dst)) { dst.Status = src.Status; changed = true; }
+        // rà lỗi 26/11/2026: "đã nhận" mà không có ngày nhận thì KHÔNG chép (từng làm kiện thành "Hàng đã trả" không ngày, không ai quét)
+        if (IsReceived(src) && !IsReceived(dst) && src.RecvDate.Trim().Length > 0) { dst.Status = src.Status; changed = true; }
         if (dst.RecvDate.Length == 0 && src.RecvDate.Length > 0) { dst.RecvDate = src.RecvDate; changed = true; }
         if (dst.PhotoId.Length == 0 && src.PhotoId.Length > 0) { dst.PhotoId = src.PhotoId; changed = true; }
         var sn = (src.UserNote ?? "").Trim();

@@ -1,0 +1,67 @@
+using System.IO;
+using QuanLyHangHoan.Core.Import;
+using QuanLyHangHoan.Core.Models;
+using QuanLyHangHoan.Data;
+
+namespace QuanLyHangHoan.Tests;
+
+/// <summary>Rà lỗi 26/11/2026 (dữ liệu GIẢ): nhập Salework không được nhận kiện bừa; TikTok không điền mã khi nhiều kiện chưa mã; sao lưu trước khi nhập.</summary>
+public sealed class ReviewFixes20261126Tests : IDisposable
+{
+    private static readonly DateTime Now = new(2026, 11, 26, 15, 0, 0);
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "qlhh-rv-" + Guid.NewGuid().ToString("N"));
+    public ReviewFixes20261126Tests() => Directory.CreateDirectory(_dir);
+    public void Dispose() { try { Directory.Delete(_dir, true); } catch { } }
+
+    [Fact]
+    public void Supersede_never_copies_a_received_status_without_a_receive_date()
+    {
+        // chủ dự án: "sau khi nhập file có đơn tự chuyển sang Hàng đã trả và không có thời gian nhận tại kho"
+        var stale = new Order { OrderId = "A1", Status = ReceiveStatus.Received, Items = { new OrderItem { Product = "Ao" } } };
+        var keep = new Order { OrderId = "A1", ReturnTrack = "SPXVN0000000001", Status = "Chưa về", Items = { new OrderItem { Product = "Ao" } } };
+        SaleworkSupersede.Apply(new List<Order> { stale, keep }, new HashSet<string> { "A1" });
+        Assert.Equal("Chưa về", keep.Status);
+        Assert.Equal("", keep.RecvDate);
+    }
+
+    private static Order Trackless(string id, string orderId) => new()
+    {
+        Id = id, OrderId = orderId, Platform = "TikTok", OrderType = "Trả hàng", Status = ReceiveStatus.NotYetArrived,
+        Items = new() { new OrderItem { Product = "Áo", Qty = 1 } },
+    };
+
+    [Fact]
+    public void Tiktok_fill_is_ambiguous_when_two_trackless_parcels_share_the_order()
+    {
+        var main = new List<Order> { Trackless("a", "TT1"), Trackless("b", "TT1") };
+        var incoming = new ImportedParcel
+        {
+            Platform = "TikTok", OrderId = "TT1", Track = "JT0000001", ReturnTrack = "JT0000001", OrderType = "Trả hàng",
+            TrackingCodes = new() { "JT0000001" }, Items = new() { new ImportedItem { Product = "Áo", Qty = 1 } },
+        };
+        var r = TikTokMerger.Apply(main, new List<OtherEntry>(), new[] { incoming }, ImportProductMode.Supplement, Now);
+        Assert.Single(r.Ambiguous);
+        Assert.All(main, o => Assert.Equal("", o.Track));
+        Assert.Equal(2, main.Count);
+    }
+
+    [Fact]
+    public void Ensure_recent_backup_skips_when_a_fresh_one_exists_and_cleans_old_tmp_files()
+    {
+        var db = Path.Combine(_dir, "data.db");
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={db};Pooling=False")) { c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "CREATE TABLE t(x)"; cmd.ExecuteNonQuery(); }
+        var bk = Path.Combine(_dir, "backups");
+        Assert.True(BackupService.EnsureRecent(db, bk, TimeSpan.FromMinutes(30), 7, Now).Ok);
+        Assert.Single(BackupService.List(bk));
+        Assert.True(BackupService.EnsureRecent(db, bk, TimeSpan.FromMinutes(30), 7, Now.AddMinutes(10)).Ok);   // vừa có bản mới: không tạo thêm
+        Assert.Single(BackupService.List(bk));
+        BackupService.EnsureRecent(db, bk, TimeSpan.FromMinutes(30), 7, Now.AddMinutes(45));
+        Assert.Equal(2, BackupService.List(bk).Count);
+
+        var tmp = Path.Combine(bk, "data-20261120-010101.db.tmp");
+        File.WriteAllText(tmp, "dở");
+        File.SetLastWriteTime(tmp, Now.AddDays(-1));
+        BackupService.Prune(bk, 7, Now);
+        Assert.False(File.Exists(tmp));
+    }
+}

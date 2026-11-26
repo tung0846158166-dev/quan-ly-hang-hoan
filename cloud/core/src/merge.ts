@@ -469,6 +469,12 @@ export function applyImport(main: MOrder[], others: readonly OtherEntry[], parce
     }
     if (existingIdx === -1) {
       const fillIdx = findTracklessSameOrderIndex(main, incoming);
+      const tracklessCount = fillIdx === -1 ? 0 : main.filter((o) => findTracklessSameOrderIndex([o], incoming) === 0).length;
+      if (tracklessCount > 1) {
+        // rà lỗi 26/11/2026 (= TikTokMerger C#): nhiều kiện chưa có mã cùng mã đơn -> không đoán kiện nào
+        out.ambiguous.push({ platform: incoming.platform, orderId: incoming.orderId, track: incoming.track, returnOrderId: incoming.returnOrderId, candidates: tracklessCount, orderConflict: false });
+        continue;
+      }
       if (fillIdx !== -1) {
         fillTrackless(main[fillIdx]!, raw);
         out.updated.push(main[fillIdx]!);

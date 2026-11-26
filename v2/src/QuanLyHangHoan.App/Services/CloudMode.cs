@@ -69,7 +69,8 @@ public sealed class CloudMode : IDisposable
         // nạp lúc mất mạng thì chưa đẩy được: nối lại là đẩy bù ngay
         Link.Changed += () =>
         {
-            if (!_trigger.OnLinkChanged(Link.CanWrite)) return;
+            // chỉ đẩy khi đã KÉO XONG phần mới của cloud (Connected), không đẩy lúc đang Syncing: tránh gửi bản cũ ở máy đè thay đổi trên cloud
+            if (!_trigger.OnLinkChanged(Link.State == CloudState.Connected)) return;
             _ = PublishAsync("reconnect");
             _ = RefreshAiAccessAsync();
         };
@@ -77,13 +78,21 @@ public sealed class CloudMode : IDisposable
     }
 
     /// <summary>Đẩy đơn đã đổi ở máy lên cloud (sau khi nạp). Mất kết nối thì bỏ qua: lần sau đẩy tiếp (so băm nên không sót, không trùng).</summary>
+    private int _publishAgain;
+
     public async Task PublishAsync(string source)
     {
         if (!Link.CanWrite || Link.Api is not { } api) { LastPublishNote = "Chưa đẩy lên cloud (mất kết nối): sẽ đẩy ở lần nạp sau."; return; }
-        if (!await _publishGate.WaitAsync(0).ConfigureAwait(false)) return;   // đang đẩy dở: lần đẩy đó sẽ gửi luôn phần mới
+        if (!await _publishGate.WaitAsync(0).ConfigureAwait(false)) { Interlocked.Exchange(ref _publishAgain, 1); return; }   // đang đẩy dở: xong sẽ đẩy thêm một lượt
         try
         {
             var r = await CloudPublisher.PublishAsync(api, _dbPath, source).ConfigureAwait(false);
+            while (Interlocked.Exchange(ref _publishAgain, 0) == 1 && Link.CanWrite)
+            {
+                var more = await CloudPublisher.PublishAsync(api, _dbPath, source).ConfigureAwait(false);
+                r = new CloudPublishResult(r.Candidates + more.Candidates, r.Sent + more.Sent, r.Added + more.Added, r.Updated + more.Updated,
+                    r.Unchanged + more.Unchanged, r.Rejected + more.Rejected, r.ReturnWatchSent + more.ReturnWatchSent);
+            }
             if (CloudPublishTrigger.Note(r) is { } note) Published?.Invoke(note, r.Rejected > 0);
             LastPublishNote = r.Sent == 0 ? "Không có đơn mới cần đẩy lên cloud."
                 : $"Đã đẩy {r.Sent:N0} đơn lên cloud (mới {r.Added:N0}, cập nhật {r.Updated:N0}" + (r.Rejected > 0 ? $", bị từ chối {r.Rejected:N0}" : "") + ").";

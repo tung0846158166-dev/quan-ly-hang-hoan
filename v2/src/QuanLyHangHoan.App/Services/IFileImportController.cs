@@ -66,15 +66,13 @@ public sealed class RealFileImportController : IFileImportController
                 // An toàn dữ liệu thật: luôn sao lưu NGAY TRƯỚC khi nạp file. Sao lưu hỏng (mà đã có dữ liệu) thì KHÔNG nạp.
                 if (File.Exists(_dbPath))
                 {
-                    var bk = BackupService.Backup(_dbPath, BackupService.DefaultDir(_dbPath), _clock());
+                    var bk = BackupService.EnsureRecent(_dbPath, BackupService.DefaultDir(_dbPath), TimeSpan.FromMinutes(30), 7, _clock());
                     if (!bk.Ok)
                     {
                         var blocked = new FileImportResult { Ok = false, Message = "Không nạp vì chưa sao lưu được dữ liệu hiện tại: " + bk.Message };
                         blocked.Files.AddRange(readErrors);
                         return blocked;
                     }
-                    // giữ tối đa BackupService.MaxKeep bản (bản vừa tạo là mới nhất nên luôn còn)
-                    BackupService.Prune(BackupService.DefaultDir(_dbPath), 7, _clock());
                 }
                 importResult = FileImportService.Import(_dbPath, loaded, options, mode, _clock());
             }

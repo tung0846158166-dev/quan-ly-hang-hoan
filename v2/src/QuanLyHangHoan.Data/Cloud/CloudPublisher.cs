@@ -36,32 +36,42 @@ public static class CloudPublisher
         return d;
     }
 
-    private static void SavePublished(string dbPath, IEnumerable<(string Id, string Hash)> rows)
+    /// <summary>
+    /// Ghi "đã đồng bộ". `Old` = dấu băm lúc lấy danh sách đẩy: nếu trong lúc đẩy, lần kéo từ cloud đã ghi dấu khác (cloud có bản mới hơn)
+    /// thì GIỮ dấu đó (không ghi đè), để bản trên máy không bị coi là đã đồng bộ với bản cũ.
+    /// </summary>
+    private static void SavePublished(string dbPath, IEnumerable<(string Id, string Hash, string? Old)> rows)
     {
         using var c = Open(dbPath);
         using var tx = c.BeginTransaction();
-        foreach (var (id, hash) in rows)
+        foreach (var (id, hash, old) in rows)
         {
             using var cmd = c.CreateCommand();
             cmd.Transaction = tx;
-            cmd.CommandText = "INSERT INTO cloud_published(id, hash) VALUES($i,$h) ON CONFLICT(id) DO UPDATE SET hash = excluded.hash";
+            cmd.CommandText = old is null
+                ? "INSERT INTO cloud_published(id, hash) VALUES($i,$h) ON CONFLICT(id) DO NOTHING"
+                : "INSERT INTO cloud_published(id, hash) VALUES($i,$h) ON CONFLICT(id) DO UPDATE SET hash = excluded.hash WHERE cloud_published.hash = $o";
             cmd.Parameters.AddWithValue("$i", id);
             cmd.Parameters.AddWithValue("$h", hash);
+            cmd.Parameters.AddWithValue("$o", (object?)old ?? DBNull.Value);
             cmd.ExecuteNonQuery();
         }
         tx.Commit();
     }
 
     /// <summary>Các đơn cần đẩy: băm hiện tại khác băm lần cuối đồng bộ (hoặc chưa từng đồng bộ).</summary>
-    public static List<(JsonObject Parcel, string Hash)> Pending(string dbPath)
+    public static List<(JsonObject Parcel, string Hash)> Pending(string dbPath) => PendingWithOld(dbPath).Select(x => (x.Parcel, x.Hash)).ToList();
+
+    private static List<(JsonObject Parcel, string Hash, string? Old)> PendingWithOld(string dbPath)
     {
         var published = LoadPublished(dbPath);
-        var list = new List<(JsonObject, string)>();
+        var list = new List<(JsonObject, string, string?)>();
         foreach (var p in ParcelMapper.ToParcels(OrderRepository.Load(dbPath), out _, out _))
         {
             var h = ParcelMapper.Hash(p);
-            if (published.TryGetValue(p["id"]!.GetValue<string>(), out var old) && old == h) continue;
-            list.Add((p, h));
+            var had = published.TryGetValue(p["id"]!.GetValue<string>(), out var old);
+            if (had && old == h) continue;
+            list.Add((p, h, had ? old : null));
         }
         return list;
     }
@@ -69,7 +79,7 @@ public static class CloudPublisher
     /// <param name="includeReturnWatch">Gửi kèm dấu Bảng Hàng Hoàn Về cục bộ (chỉ dùng khi chuyển dữ liệu cũ lên lần đầu; cloud chỉ thêm khi chưa có).</param>
     public static async Task<CloudPublishResult> PublishAsync(CloudApi api, string dbPath, string source, bool includeReturnWatch = false, CancellationToken ct = default)
     {
-        var pending = Pending(dbPath);
+        var pending = PendingWithOld(dbPath);
         int sent = 0, added = 0, updated = 0, unchanged = 0, rejected = 0;
         var signature = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
         for (var i = 0; i < pending.Count; i += BatchSize)
@@ -79,7 +89,7 @@ public static class CloudPublisher
             var res = await api.ImportAsync(source, signature, batch.Select(b => { b.Parcel["hash"] = b.Hash; return b.Parcel; }), null, ct).ConfigureAwait(false);
             var bad = res.Rejected.Select(r => r.Id).ToHashSet(StringComparer.Ordinal);
             // chỉ ghi nhận "đã đồng bộ" cho kiện cloud đã nhận; kiện bị từ chối để lần sau thử lại
-            SavePublished(dbPath, batch.Where(b => !bad.Contains(b.Parcel["id"]!.GetValue<string>())).Select(b => (b.Parcel["id"]!.GetValue<string>(), b.Hash)));
+            SavePublished(dbPath, batch.Where(b => !bad.Contains(b.Parcel["id"]!.GetValue<string>())).Select(b => (b.Parcel["id"]!.GetValue<string>(), b.Hash, b.Old)));
             sent += batch.Count; added += res.Added; updated += res.Updated; unchanged += res.Unchanged; rejected += res.Rejected.Count;
         }
 

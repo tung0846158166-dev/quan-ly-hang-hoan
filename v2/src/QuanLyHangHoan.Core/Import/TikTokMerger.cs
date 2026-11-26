@@ -163,6 +163,13 @@ public static class TikTokMerger
             if (existingIdx == -1)
             {
                 var fillIdx = ParcelMatching.FindTracklessSameOrderIndex(main, incoming);
+                var tracklessCount = fillIdx == -1 ? 0 : main.Count(o => ParcelMatching.FindTracklessSameOrderIndex(new[] { o }, incoming) == 0);
+                if (tracklessCount > 1)
+                {
+                    // quy tắc 2-3: nhiều kiện chưa có mã cùng mã đơn -> không đoán kiện nào
+                    outcome.Ambiguous.Add(new AmbiguousParcel(incoming.Platform, incoming.OrderId, incoming.Track, incoming.ReturnOrderId, tracklessCount));
+                    continue;
+                }
                 if (fillIdx != -1)
                 {
                     ParcelMerge.FillTrackless(main[fillIdx], raw);

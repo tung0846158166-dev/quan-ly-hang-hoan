@@ -76,6 +76,10 @@ public static class BackupService
     {
         var all = List(backupDir);
         var removed = 0;
+        // bản sao lưu dở (lỗi giữa chừng, ~175 MB) quá 1 giờ: xóa
+        if (Directory.Exists(backupDir))
+            foreach (var t in Directory.EnumerateFiles(backupDir, Prefix + "*.db.tmp"))
+                if (now - File.GetLastWriteTime(t) > TimeSpan.FromHours(1)) TryDelete(t);
         for (var i = MinKeep; i < all.Count; i++)
         {
             var e = all[i];
@@ -85,6 +89,20 @@ public static class BackupService
             if (TryDelete(e.Path)) removed++;
         }
         return removed;
+    }
+
+    /// <summary>
+    /// Sao lưu trước khi nhập (file / thư mục / Salework): đã có bản mới hơn `maxAge` thì dùng luôn bản đó (không tạo thêm ~175 MB mỗi lần nhập);
+    /// chưa có thì sao lưu rồi dọn. Ok = false: không nên nhập.
+    /// </summary>
+    public static BackupResult EnsureRecent(string dbPath, string backupDir, TimeSpan maxAge, int keepDays, DateTime now)
+    {
+        var latest = List(backupDir).FirstOrDefault();
+        if (latest is not null && now - latest.Time < maxAge && now >= latest.Time)
+            return new(true, latest.Path, latest.Bytes, "Đã có bản sao lưu gần đây.");
+        var r = Backup(dbPath, backupDir, now);
+        if (r.Ok) Prune(backupDir, keepDays, now);
+        return r;
     }
 
     /// <summary>Sao lưu nếu bản mới nhất đã cũ hơn `everyHours` (hoặc chưa có); lần nào cũng dọn bản thừa/quá hạn.</summary>

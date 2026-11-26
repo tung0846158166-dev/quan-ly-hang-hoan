@@ -266,8 +266,12 @@ public partial class App : Application
                         System.IO.Path.Combine(AppPaths.BaseFolder, "ai_digest_seen.txt"));
                     _digestTimer = new System.Threading.Timer(async _ =>
                     {
-                        foreach (var d in await poller.PollAsync())
-                            _ = Dispatcher.BeginInvoke(() => notifCenter.Add(NotificationLevel.Info, "ai", $"✨ AI gợi ý lúc {d.Slot}", d.Text));
+                        try
+                        {
+                            foreach (var d in await poller.PollAsync())
+                                _ = Dispatcher.BeginInvoke(() => notifCenter.Add(NotificationLevel.Info, "ai", $"✨ AI gợi ý lúc {d.Slot}", d.Text));
+                        }
+                        catch (Exception) { /* lỗi bất ngờ (ghi tệp, mạng...): bỏ qua lượt này, 10 phút sau hỏi lại; không để tắt phần mềm */ }
                     }, null, TimeSpan.FromSeconds(20), TimeSpan.FromMinutes(10));
                 }
             }

@@ -11,11 +11,16 @@ public sealed class CloudPublishTrigger
     private bool _writable;
 
     /// <summary>true = vừa chuyển từ khóa ghi sang ghi được: nên đẩy bù.</summary>
+    private readonly object _lock = new();
+
     public bool OnLinkChanged(bool canWrite)
     {
-        var rising = canWrite && !_writable;
-        _writable = canWrite;
-        return rising;
+        lock (_lock)   // gọi từ nhiều luồng nền
+        {
+            var rising = canWrite && !_writable;
+            _writable = canWrite;
+            return rising;
+        }
     }
 
     /// <summary>Câu báo cho người dùng; null khi không gửi gì (không làm phiền).</summary>

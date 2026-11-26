@@ -863,3 +863,80 @@ describe("hạn mức và thời gian thực", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ---------------------------------------------------------------- rà lỗi 26/11/2026
+describe("nhập đơn không được làm sai dữ liệu kho (rà lỗi 26/11/2026)", () => {
+  const ops = (token: string, ...list: Record<string, unknown>[]) =>
+    call("POST", "/ops", { ops: list.map((o) => ({ opId: crypto.randomUUID(), ...o })) }, token);
+  const get = async (id: string) => {
+    const s = await call("GET", "/sync?since=0&limit=1000", undefined, owner);
+    return s.data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === id)?.parcel;
+  };
+
+  it("nhập từ máy tính KHÔNG đặt được 'Hàng đã trả' (không ai quét) và không xóa ngày nhận", async () => {
+    await importParcels([parcel("p1")]);
+    await importParcels([parcel("p1", { status: "Hàng đã trả", recvDate: "", platformStatus: "Đã về shop" })]);
+    let p = await get("p1");
+    expect(p.status).toBe("Chưa trả");             // chỉ quét / đổi trạng thái trên cloud mới nhận được kiện
+    expect(p.platformStatus).toBe("Đã về shop");   // trường của sàn vẫn cập nhật
+    await scan(phoneA, "TRK-p1");
+    const recv = (await get("p1")).recvDate;
+    await importParcels([parcel("p1", { status: "Chưa trả", recvDate: "" })]);
+    p = await get("p1");
+    expect(p.status).toBe("Hàng đã trả");
+    expect(p.recvDate).toBe(recv);
+  });
+
+  it("nhập lại bản cũ không đè trạng thái điện thoại vừa đổi (vd. Bị mất)", async () => {
+    await importParcels([parcel("p1")]);
+    await ops(owner, { type: "setStatus", id: "p1", status: "Bị mất", expectedStatus: "Chưa trả" });
+    await importParcels([parcel("p1", { platformStatus: "Đang về" })]);
+    expect((await get("p1")).status).toBe("Bị mất");
+  });
+
+  it("ô đã sửa trên cloud không bị nhập đè; mã vận đơn lịch sử được giữ (gộp, không thay)", async () => {
+    await importParcels([parcel("p1", { carrier: "SPX", note: "sàn", trackingCodes: ["OLD-1"] })]);
+    await ops(owner, { type: "editCell", id: "p1", field: "carrier", value: "GHN" }, { type: "editNote", id: "p1", note: "tôi sửa" });
+    await importParcels([parcel("p1", { carrier: "SPX Express", note: "sàn mới", price: 5, trackingCodes: ["NEW-2"] })]);
+    const p = await get("p1");
+    expect(p.carrier).toBe("GHN");
+    expect(p.note).toBe("tôi sửa");
+    expect(p.price).toBe(5);                        // ô chưa ai sửa thì vẫn cập nhật theo sàn
+    expect(p.trackingCodes).toEqual(expect.arrayContaining(["OLD-1", "NEW-2"]));
+    expect((await scan(phoneA, "OLD-1")).res.result.outcome).toBe("received");
+  });
+
+  it("lỗi hết hạn mức không bị nhớ: gửi lại cùng opId sau khi có hạn mức thì chạy được", async () => {
+    await importParcels([parcel("p1")]);
+    const s = await stub();
+    const day = new Date().toISOString().slice(0, 10);
+    await runInDurableObject(s, (_i: ShopDO, st: DurableObjectState) => { st.storage.sql.exec("INSERT OR REPLACE INTO quota(day, requests, rows_written, rows_read) VALUES (?, 0, 95000, 0)", day); });
+    const opId = crypto.randomUUID();
+    expect((await scan(phoneA, "TRK-p1", opId)).res).toMatchObject({ ok: false, error: { code: "quota_exceeded" } });
+    await runInDurableObject(s, (_i: ShopDO, st: DurableObjectState) => { st.storage.sql.exec("UPDATE quota SET rows_written = 0 WHERE day = ?", day); });
+    await (runInDurableObject as any)(s, (inst: any) => { inst.hardStopDay = "2000-01-01"; });
+    expect((await scan(phoneA, "TRK-p1", opId)).res.result.outcome).toBe("received");
+  });
+
+  it("quét mã đơn gốc: kiện cùng đơn đang ở Kho lưu trữ vẫn tính là ứng viên -> cần kiểm tra, không nhận bừa", async () => {
+    await importParcels([parcel("a", { orderId: "ORD-1", track: "TRK-A" }), parcel("b", { orderId: "ORD-1", track: "TRK-B" })]);
+    await ops(owner, { type: "archive", id: "b" });
+    expect((await scan(phoneA, "ORD-1")).res.result.outcome).toBe("ambiguous");
+    expect((await get("a")).status).toBe("Chưa trả");
+    expect((await scan(phoneA, "TRK-A")).res.result.outcome).toBe("received");   // mã riêng của kiện vẫn nhận bình thường
+  });
+
+  it("ảnh hết hạn thì kiện thôi trỏ tới ảnh đó", async () => {
+    await importParcels([parcel("p1")]);
+    await scan(phoneA, "TRK-p1");
+    const up = await SELF.fetch(`${BASE}/photos/ph_exp?parcelId=p1&mime=image/jpeg`, { method: "PUT", headers: { Authorization: `Bearer ${phoneA}` }, body: new Uint8Array([0xff, 0xd8, 1]) });
+    expect(up.status).toBe(200);
+    expect((await get("p1")).photoId).toBe("ph_exp");
+    const s = await stub();
+    await runInDurableObject(s, (_i: ShopDO, st: DurableObjectState) => { st.storage.sql.exec("UPDATE photos SET taken_at = 1 WHERE photo_id = 'ph_exp'"); });
+    await runInDurableObject(s, (inst: ShopDO) => inst.cleanup());
+    const p = await get("p1");
+    expect(p.photoId).toBe("");
+    expect(p.status).toBe("Hàng đã trả");
+  });
+});

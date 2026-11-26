@@ -4,6 +4,7 @@ import { answerText, buildStats, digestMessages, ruleText } from "./digest";
 import { DEFAULT_AI_CONFIG, parseAiConfig, type AiConfig } from "./aiconfig";
 import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
+import { resolve } from "../../core/src/tracking";
 import { Db, SCHEMA, type Row } from "./db";
 import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parcel";
 import { returnWatchEligible } from "./returnwatch";
@@ -14,7 +15,7 @@ import type { Env } from "./index";
 const DAY_MS = 86_400_000;
 const LIMITS = { requests: 100_000, rowsWritten: 100_000, rowsRead: 5_000_000 };
 /** Đổi khi SCHEMA/nâng cấp lược đồ đổi: lần khởi động sau sẽ chạy lại migrate(). */
-const SCHEMA_VERSION = "2026-11-26.4";
+const SCHEMA_VERSION = "2026-11-26.5";
 
 /** Lỗi Cloudflare khi hết lượt ghi Durable Object (gói miễn phí). */
 export function isWriteQuotaError(e: unknown): boolean {
@@ -371,6 +372,15 @@ export class ShopDO extends DurableObject<Env> {
     for (const c of codesOf(p)) this.db.run("INSERT OR IGNORE INTO parcel_codes(code, kind, parcel_id) VALUES (?,?,?)", c.code, c.kind, p.id);
   }
 
+  /** Các ô của kiện đã được người dùng sửa trên cloud (sửa ô / sửa ghi chú): nhập đơn không đè các ô này. */
+  private cloudEditedFields(parcelId: string): Set<string> {
+    const out = new Set<string>();
+    for (const r of this.db.all<Row>("SELECT after FROM audit_log WHERE parcel_id = ? AND action IN ('editCell','editNote')", parcelId)) {
+      try { for (const k of Object.keys(JSON.parse(r.after as string) ?? {})) out.add(k); } catch { /* bỏ qua dòng hỏng */ }
+    }
+    return out;
+  }
+
   private audit(deviceId: string, action: string, parcelId: string, before: unknown, after: unknown): void {
     this.db.run("INSERT INTO audit_log(at, device_id, action, parcel_id, before, after) VALUES (?,?,?,?,?,?)",
       Date.now(), deviceId, action, parcelId, JSON.stringify(before ?? null), JSON.stringify(after ?? null));
@@ -421,7 +431,8 @@ export class ShopDO extends DurableObject<Env> {
         if (!(e instanceof ApiError)) throw e;
         res = { opId, ok: false, error: { code: e.code, message: e.message } };
       }
-      this.db.run("INSERT OR REPLACE INTO ops_done(op_id, result, at) VALUES (?,?,?)", opId, JSON.stringify(res), Date.now());
+      const retryable = !res.ok && (res as { error?: { code?: string } }).error?.code === "quota_exceeded";
+      if (!retryable) this.db.run("INSERT OR REPLACE INTO ops_done(op_id, result, at) VALUES (?,?,?)", opId, JSON.stringify(res), Date.now());
       results.push(res);
     }
     if (changed) this.broadcast();
@@ -468,7 +479,14 @@ export class ShopDO extends DurableObject<Env> {
     const cands: Parcel[] = key.length === 0 ? [] : this.db.all<Row>(
       `SELECT DISTINCT p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id
        WHERE c.code = ? AND p.is_archived = 0 AND p.is_deleted = 0`, key).map((r) => JSON.parse(r.data as string) as Parcel);
-    const d = decide(cands, code);
+    let d = decide(cands, code);
+    if (d.kind === "receive" && resolve(cands, code).via === "forward-or-order") {
+      const withArchived: Parcel[] = this.db.all<Row>(
+        `SELECT DISTINCT p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id WHERE c.code = ? AND p.is_deleted = 0`, key)
+        .map((r) => JSON.parse(r.data as string) as Parcel);
+      const all = resolve(withArchived, code);
+      if (all.kind === "ambiguous") d = { kind: "ambiguous", order: null, candidates: all.candidates.length };
+    }
     switch (d.kind) {
       case "notFound": return { outcome: "notFound", ack: false, message: "Không tìm thấy kiện." };
       case "ambiguous": return { outcome: "ambiguous", ack: false, message: `${d.candidates} kiện cùng khớp mã này, cần kiểm tra thủ công.` };
@@ -594,7 +612,7 @@ export class ShopDO extends DurableObject<Env> {
         const ex = this.db.first<Row>("SELECT data, src_hash FROM parcels WHERE id = ?", p.id);
         if (!ex) { this.writeParcel(p, hash); added++; continue; }
         if (ex.src_hash === hash) { unchanged++; continue; }
-        const merged = mergeImport(JSON.parse(ex.data as string) as Parcel, p);
+        const merged = mergeImport(JSON.parse(ex.data as string) as Parcel, p, this.cloudEditedFields(p.id));
         this.writeParcel(merged, hash);
         updated++;
       }
@@ -697,6 +715,11 @@ export class ShopDO extends DurableObject<Env> {
       for (const o of touched.values()) {
         const old = base.get(o.id) ?? null;
         const p = orderToParcel(o, old);
+        if (old) {
+          p.status = old.status; p.recvDate = old.recvDate;
+          const oo = old as unknown as Record<string, unknown>, pp = p as unknown as Record<string, unknown>;
+          for (const k of this.cloudEditedFields(old.id)) if (k in oo) pp[k] = oo[k];
+        }
         if (!old) { p.importedAt = p.importedAt || vnTime(now); this.writeParcel(p, ""); }
         else if (JSON.stringify(old) !== JSON.stringify(p)) this.writeParcel(p, "");   // xóa dấu bản máy tính: bản gửi lại từ máy tính phải được áp dụng lại
         else continue;
@@ -789,13 +812,14 @@ export class ShopDO extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       if (!existing) this.db.run("INSERT INTO photos(photo_id, parcel_id, device_id, mime, size, thumb_size, taken_at, keep) VALUES (?,?,?,?,?,?,?,?)",
         photoId, parcelId, dev.deviceId, mime, kind === "full" ? bytes.byteLength : 0, kind === "thumb" ? bytes.byteLength : 0, takenAt, legacy ? 1 : 0);
-      else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ? WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ? WHERE photo_id = ?", bytes.byteLength, mime, photoId);
+      else this.db.run(kind === "full" ? "UPDATE photos SET size = ?, mime = ?, deleted_at = 0 WHERE photo_id = ?" : "UPDATE photos SET thumb_size = ?, mime = ?, deleted_at = 0 WHERE photo_id = ?", bytes.byteLength, mime, photoId);
       // ảnh cũ: chỉ gắn khi kiện chưa có ảnh HOẶC đang trỏ mã ảnh của máy tính (không có trên cloud, vd. "ph-..."); không đè ảnh cloud đang gắn
-      const attachLegacy = parcel.photoId === "" || !this.db.first<Row>("SELECT 1 AS x FROM photos WHERE photo_id = ? AND deleted_at = 0", parcel.photoId);
-      if (kind === "full" && parcel.photoId !== photoId && (!legacy || attachLegacy)) {
-        const before = parcel.photoId;
-        parcel.photoId = photoId;
-        this.writeParcel(parcel);
+      const fresh = this.loadParcel(parcelId) ?? parcel;
+      const attachLegacy = fresh.photoId === "" || !this.db.first<Row>("SELECT 1 AS x FROM photos WHERE photo_id = ? AND deleted_at = 0", fresh.photoId);
+      if (kind === "full" && fresh.photoId !== photoId && (!legacy || attachLegacy)) {
+        const before = fresh.photoId;
+        fresh.photoId = photoId;
+        this.writeParcel(fresh);
         this.audit(dev.deviceId, "photo.attach", parcelId, { photoId: before }, { photoId });
         attached = true;
       }
@@ -1032,11 +1056,15 @@ export class ShopDO extends DurableObject<Env> {
     const days = Math.max(1, Number(this.env.PHOTO_RETENTION_DAYS) || 90);
     const cutoff = Date.now() - days * DAY_MS;
     const old = this.db.all<Row>("SELECT photo_id, parcel_id FROM photos WHERE deleted_at = 0 AND keep = 0 AND taken_at < ? LIMIT 200", cutoff);
+    let expiredAttached = false;
     for (const p of old) {
       await this.env.IMAGES.delete([`p/${p.photo_id}`, `t/${p.photo_id}`]);
       this.db.run("UPDATE photos SET deleted_at = ? WHERE photo_id = ?", Date.now(), p.photo_id as string);
       this.audit("system", "photo.expire", p.parcel_id as string, { photoId: p.photo_id }, null);
+      const parcel = this.loadParcel(p.parcel_id as string);
+      if (parcel && parcel.photoId === p.photo_id) { parcel.photoId = ""; this.writeParcel(parcel); expiredAttached = true; }
     }
+    if (expiredAttached) this.broadcast();
     const purged = this.db.run("DELETE FROM ops_done WHERE at < ?", Date.now() - 7 * DAY_MS);
     this.flushQuota();
     return { photosExpired: old.length, opsPurged: purged };
@@ -1055,9 +1083,25 @@ function diffOf(before: Parcel, after: Parcel, side: "before" | "after"): Record
   return out;
 }
 
+function unionCodes(a: string[] | undefined, b: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const c of [...(a ?? []), ...(b ?? [])]) if (c && !out.includes(c)) out.push(c);
+  return out;
+}
+
 /** Trường do người dùng sửa trên cloud không bị nhập đè (cloud/API.md mục 7). */
-function mergeImport(existing: Parcel, incoming: Parcel): Parcel {
+function mergeImport(existing: Parcel, incoming: Parcel, edited: ReadonlySet<string> = new Set()): Parcel {
   const m: Parcel = { ...incoming };
+  // rà lỗi 26/11/2026: trạng thái kho + ngày nhận CHỈ đổi bằng quét / đổi trạng thái trên cloud. Nhập file không bao giờ nhận kiện
+  // (từng có kiện thành "Hàng đã trả" không ngày nhận do máy tính gộp theo mã đơn) và không trả kiện đã đổi về trạng thái cũ.
+  m.status = existing.status;
+  m.recvDate = existing.recvDate;
+  // ô người dùng đã sửa trên cloud: giữ, nhập không đè
+  const ex = existing as unknown as Record<string, unknown>, mm = m as unknown as Record<string, unknown>;
+  for (const k of edited) if (k in ex) mm[k] = ex[k];
+  // mã vận đơn lịch sử: gộp, không thay (quy tắc 4)
+  m.trackingCodes = unionCodes(existing.trackingCodes, incoming.trackingCodes);
+  m.scanAliases = unionCodes(existing.scanAliases, incoming.scanAliases);
   m.userNote = existing.userNote;
   m.isWatchlist = existing.isWatchlist;
   m.watchlistReason = existing.watchlistReason;

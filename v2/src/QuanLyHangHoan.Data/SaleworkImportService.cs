@@ -25,10 +25,20 @@ public sealed class SaleworkImportResult
 public static class SaleworkImportService
 {
     public static SaleworkImportResult Apply(string dbPath, IReadOnlyList<Dictionary<string, string>> rows, TikTokMapOptions options,
-        ImportProductMode mode, DateTime now)
+        ImportProductMode mode, DateTime now, QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null)
     {
         var clean = SpreadsheetReader.DropPersonalColumns(rows);
         var prep = PlatformImportPrep.Prepare(new[] { new SourceFile("salework_dang_cho_hoan", clean) });
+        if (cloud is not null)
+        {
+            // chế độ cloud: gửi kiện + mã đơn lên cloud; cloud gộp và thay dòng chờ cũ (cùng đường với điện thoại)
+            var oidKey = clean.SelectMany(r => r.Keys).FirstOrDefault(k => LegacyText.Key(k) is "madonhang" or "orderid");
+            var oids = new SortedSet<string>(StringComparer.Ordinal);
+            if (oidKey is not null)
+                foreach (var r in clean) if (r.TryGetValue(oidKey, out var v) && v.Trim().Length > 0) oids.Add(v.Trim().ToUpperInvariant());
+            var c = cloud.Apply(prep.Groups.Select(g => (IReadOnlyList<Dictionary<string, string>>)g).ToList(), options, mode, ImportSource.TikTok, "salework", oids);
+            return new SaleworkImportResult { Ok = c.Import.Ok, Message = c.Import.Message, Import = c.Import, SupersededMerged = c.Superseded };
+        }
         var import = TikTokImportService.ApplyGroups(dbPath, prep.Groups.Select(g => (IReadOnlyList<Dictionary<string, string>>)g).ToList(), options, mode, now);
         if (!import.Ok) return new SaleworkImportResult { Ok = false, Message = import.Message, Import = import };
 

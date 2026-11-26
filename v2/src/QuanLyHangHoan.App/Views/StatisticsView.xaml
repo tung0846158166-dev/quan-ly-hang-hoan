@@ -210,7 +210,8 @@
                         <ColumnDefinition Width="260" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                    <!-- ảnh 29 (26/11/2026): bảng bám lên trên, không bị kéo giãn theo khung Màu/size bên phải -->
+                    <Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" VerticalAlignment="Top">
                         <DataGrid x:Name="ProductGrid"
                                   ItemsSource="{Binding ProductRows}"
                                   SelectedItem="{Binding SelectedProduct, Mode=TwoWay}"
@@ -268,7 +269,8 @@
                         </DataGrid>
                     </Border>
 
-                    <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" VerticalAlignment="Top">
+                    <!-- khung Màu/size cao tối đa bằng bảng sản phẩm, danh sách dài thì cuộn bên trong (không đẩy cả trang) -->
+                    <Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" VerticalAlignment="Top" MaxHeight="520">
                         <StackPanel>
                             <TextBlock Text="🎨 Màu / size" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
                             <TextBlock Text="Chọn một sản phẩm ở bảng bên trái để xem màu và size nào bị hoàn nhiều." FontSize="12" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0">
@@ -284,6 +286,7 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <TextBlock Text="{Binding VariantTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" TextWrapping="Wrap" Margin="0,6,0,8" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="420" PanningMode="VerticalOnly">
                             <ItemsControl ItemsSource="{Binding VariantRows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -303,6 +306,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            </ScrollViewer>
                         </StackPanel>
                     </Border>
                 </Grid>

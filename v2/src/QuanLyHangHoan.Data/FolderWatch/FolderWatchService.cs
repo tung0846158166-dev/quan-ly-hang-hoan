@@ -53,6 +53,7 @@ public sealed class FolderWatchService : IDisposable
     private readonly string _dbPath, _statePath;
     private readonly Func<DateTime> _clock;
     private readonly TimeSpan _interval;
+    private readonly QuanLyHangHoan.Data.Cloud.CloudImportSink? _cloud;
     private readonly object _lock = new();
     private readonly Dictionary<string, long> _pendingSize = new();
     private CancellationTokenSource? _cts;
@@ -60,9 +61,10 @@ public sealed class FolderWatchService : IDisposable
     public FolderWatchConfig Config { get; private set; }
     public event Action<FolderWatchRunResult>? Completed;
 
-    public FolderWatchService(string dbPath, string statePath, Func<DateTime> clock, TimeSpan? interval = null)
+    /// <param name="cloud">Chế độ cloud: gửi kiện lên cloud gộp (không gộp vào máy).</param>
+    public FolderWatchService(string dbPath, string statePath, Func<DateTime> clock, TimeSpan? interval = null, QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null)
     {
-        _dbPath = dbPath; _statePath = statePath; _clock = clock; _interval = interval ?? DefaultInterval;
+        _dbPath = dbPath; _statePath = statePath; _clock = clock; _interval = interval ?? DefaultInterval; _cloud = cloud;
         Config = LoadConfig(statePath);
     }
 
@@ -204,7 +206,9 @@ public sealed class FolderWatchService : IDisposable
             PriceMode = Config.PriceMode, OnlyReturns = Config.OnlyReturns, SkipUnshippedCancel = Config.SkipUnshippedCancel, Today = now,
         };
         var mode = Config.ProductMode == "replace" ? ImportProductMode.Replace : ImportProductMode.Supplement;
-        var import = TikTokImportService.ApplyGroups(_dbPath, prep.Groups, options, mode, now);
+        var import = _cloud is not null
+            ? _cloud.Apply(prep.Groups.Select(g => (IReadOnlyList<Dictionary<string, string>>)g).ToList(), options, mode, ImportSource.TikTok, "folder").Import
+            : TikTokImportService.ApplyGroups(_dbPath, prep.Groups, options, mode, now);
 
         var names = parsed.Select(p => p.File.Name).ToList();
         if (!import.Ok)

@@ -304,6 +304,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
         if (all.Any(c => c.Length == 0)) set.Add(EmptyPlatformStatus);
         var keep = PlatformStatusFilter;
+        if (PlatformStatusOptions.SequenceEqual([AllPlatformStatuses, .. set])) return;
         PlatformStatusOptions = new ObservableCollection<string>([AllPlatformStatuses, .. set]);
         PlatformStatusFilter = PlatformStatusOptions.Contains(keep) ? keep : AllPlatformStatuses;
     }
@@ -368,6 +369,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             .Where(c => c.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
         var keep = CarrierFilter;
+        if (CarrierOptions.SequenceEqual([AllCarriers, .. set])) return;
         CarrierOptions = new ObservableCollection<string>([AllCarriers, .. set]);
         CarrierFilter = CarrierOptions.Contains(keep) ? keep : AllCarriers;
     }
@@ -533,17 +535,29 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     }
 
     /// <summary>Dựng các dòng hiển thị (phần nặng: tính ngày, chuỗi tìm kiếm...). KHÔNG đụng giao diện nên gọi được từ luồng nền; áp kết quả bằng <see cref="LoadRows"/>.</summary>
+    /// <summary>Dòng dùng lại tối đa chừng này rồi dựng mới (cảnh báo vàng/đỏ tính theo giờ).</summary>
+    public static readonly TimeSpan RowReuseWindow = TimeSpan.FromMinutes(5);
+
     public List<ReturnOrderRowViewModel> BuildRows(IReadOnlyList<Order> orders, DateTime now, AlertPolicy? policyOverride = null)
     {
         var policy = policyOverride ?? _alertPolicy;
         var scope = Scope;
         var rows = new List<ReturnOrderRowViewModel>(orders.Count);
+        // dòng của lần nạp trước (đọc bản chụp; lần nạp mới chỉ thay ở luồng giao diện)
+        var previous = new Dictionary<string, ReturnOrderRowViewModel>(StringComparer.Ordinal);
+        if (policyOverride is null) foreach (var r in _allRows) previous.TryAdd(r.Source.Id, r);
         var stt = 0;
         for (var i = 0; i < orders.Count; i++)
         {
             if (!MatchesScope(orders[i], scope)) continue;
             stt++;
-            rows.Add(new ReturnOrderRowViewModel(orders[i], stt, now, policy));
+            var fp = ReturnOrderRowViewModel.FingerprintOf(orders[i]);
+            // đơn không đổi, cùng số thứ tự, dựng chưa quá 5 phút (cảnh báo theo giờ vẫn đúng): dùng lại dòng cũ -> bảng không phải vẽ lại
+            if (previous.TryGetValue(orders[i].Id, out var old) && old.Stt == stt && old.Fingerprint == fp
+                && now >= old.BuiltAt && now - old.BuiltAt < RowReuseWindow)
+                rows.Add(old);
+            else
+                rows.Add(new ReturnOrderRowViewModel(orders[i], stt, now, policy, fp));
         }
         return rows;
     }
@@ -920,7 +934,9 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         _currentPage = Math.Clamp(_currentPage, 1, TotalPages);
         ResetScrollOnNextVisibleChange = scrollTop;
         var skip = (_currentPage - 1) * PageSize;
-        VisibleOrders = _filtered.Count <= PageSize ? _filtered : _filtered.Skip(skip).Take(PageSize).ToList();
+        var page = _filtered.Count <= PageSize ? _filtered : _filtered.Skip(skip).Take(PageSize).ToList();
+        if (!SameRows(page, VisibleOrders)) VisibleOrders = page;
+        else ResetScrollOnNextVisibleChange = false;
         PageInput = _currentPage.ToString();
         OnPropertyChanged(nameof(CurrentPage));
         OnPropertyChanged(nameof(ShowPager));
@@ -930,6 +946,13 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         PrevPageCommand.NotifyCanExecuteChanged();
         NextPageCommand.NotifyCanExecuteChanged();
         LastPageCommand.NotifyCanExecuteChanged();
+    }
+
+    private static bool SameRows(IReadOnlyList<ReturnOrderRowViewModel> a, IReadOnlyList<ReturnOrderRowViewModel> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (var i = 0; i < a.Count; i++) if (!ReferenceEquals(a[i], b[i])) return false;
+        return true;
     }
 
     private void UpdateStatusText()

@@ -176,10 +176,15 @@ public partial class App : Application
             IScanService sqliteScan = _cloud?.Scan ?? new SqliteScanService(AppPaths.DatabasePath);
             realSyncController = new RealSyncController(AppPaths.DatabasePath, AppPaths.SettingsPath);
             IOrderEditService sqliteEdit = _cloud?.Edit ?? new SqliteOrderEditService(AppPaths.DatabasePath);
+            // Cloud (26/11/2026): nạp file / thư mục / Salework gửi lên cloud gộp, cùng đường với điện thoại (không gộp vào máy -> không trùng khi 2 máy nạp cùng lúc)
+            var cloudForImport = _cloud;
+            QuanLyHangHoan.Data.Cloud.CloudImportSink? importSink = cloudForImport is null ? null
+                : new QuanLyHangHoan.Data.Cloud.CloudImportSink(() => cloudForImport.Link.Api, () => cloudForImport.Link.CanWrite);
             realFolderWatchController = new RealFolderWatchController(
                 AppPaths.DatabasePath,
                 AppPaths.FolderWatchStatePath,
-                () => DateTime.Now);
+                () => DateTime.Now,
+                cloud: importSink);
             realSheetSyncController = new RealSheetSyncController(
                 AppPaths.DatabasePath,
                 AppPaths.SheetSyncStatePath,
@@ -191,8 +196,9 @@ public partial class App : Application
                 AppPaths.DatabasePath,
                 AppPaths.SaleworkAutoStatePath,
                 AppPaths.SaleworkWebViewFolder,
-                () => DateTime.Now);
-            IFileImportController realFileImport = new RealFileImportController(AppPaths.DatabasePath, () => DateTime.Now);
+                () => DateTime.Now,
+                importSink);
+            IFileImportController realFileImport = new RealFileImportController(AppPaths.DatabasePath, () => DateTime.Now, importSink);
             IReturnWatchService sqliteReturnWatch = _cloud?.ReturnWatch ?? new SqliteReturnWatchService(AppPaths.DatabasePath);
             var aiStore = new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder);
             var notifCenter = isDemoMode ? null : new NotificationCenter(new FileNotificationStore(AppPaths.NotificationsPath));
@@ -249,6 +255,12 @@ public partial class App : Application
             if (_cloud is { } cloud)
             {
                 var vmForCloud = mainViewModel;
+                // ghi nhận lúc người dùng thao tác (nạp lại từ cloud hoãn tới lúc dừng tay)
+                System.Windows.Input.InputManager.Current.PreProcessInput += (_, ev) =>
+                {
+                    if (ev.StagingItem.Input is System.Windows.Input.MouseButtonEventArgs or System.Windows.Input.KeyEventArgs or System.Windows.Input.MouseWheelEventArgs)
+                        Services.UserActivity.Touch();
+                };
                 cloud.Start(() => vmForCloud.ReloadAllDataAsync(), a => Dispatcher.BeginInvoke(a));
                 // nạp xong ở máy này thì đẩy các đơn đã đổi lên cloud cho mọi máy
                 realFolderWatchController.Completed += r => { _ = cloud.PublishAsync("folder"); };

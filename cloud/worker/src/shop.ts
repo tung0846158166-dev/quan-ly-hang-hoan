@@ -698,13 +698,20 @@ export class ShopDO extends DurableObject<Env> {
    * `orderIds`: mã đơn có trong file (để thay dòng chờ cũ chưa có mã vận đơn).
    */
   private async importMapped(b: Record<string, unknown>, dev: Device): Promise<Response> {
-    if (b.source !== "salework") return fail(422, "invalid", "Nguồn nạp không hợp lệ.");
-    const ids = Array.isArray(b.orderIds) ? (b.orderIds as unknown[]).slice(0, 500).filter((v): v is string => typeof v === "string") : [];
-    const res = await this.importIncoming(b, "salework", "tiktok", new Set(ids.map((v) => v.trim().toUpperCase()).filter((v) => v.length > 0)), dev);
-    return res;
+    // salework: điện thoại / máy tính tự lấy từ Salework; file / folder: máy tính nạp file Excel/CSV hoặc thư mục theo dõi (26/11/2026)
+    const source = typeof b.source === "string" ? b.source : "";
+    if (!["salework", "file", "folder"].includes(source)) return fail(422, "invalid", "Nguồn nạp không hợp lệ.");
+    const kind = (b.kind ?? "tiktok") as string;
+    if (kind !== "tiktok" && kind !== "shopee") return fail(422, "invalid", "Loại file không hợp lệ.");
+    const mode = (b.mode ?? "supplement") as string;
+    if (mode !== "supplement" && mode !== "replace") return fail(422, "invalid", "Chế độ sản phẩm không hợp lệ.");
+    // thay dòng chờ cũ (supersede) CHỈ cho bảng "Đang chờ hoàn" của Salework, giống máy tính
+    const ids = source === "salework" && Array.isArray(b.orderIds) ? (b.orderIds as unknown[]).slice(0, 500).filter((v): v is string => typeof v === "string") : [];
+    return this.importIncoming(b, source, kind, new Set(ids.map((v) => v.trim().toUpperCase()).filter((v) => v.length > 0)), dev, mode);
   }
 
-  private async importIncoming(b: Record<string, unknown>, source: string, kind: NewRowKind, supersedeIds: Set<string> | null, dev?: Device): Promise<Response> {
+  private async importIncoming(b: Record<string, unknown>, source: string, kind: NewRowKind, supersedeIds: Set<string> | null, dev?: Device,
+    mode: "supplement" | "replace" = "supplement"): Promise<Response> {
     const list = Array.isArray(b.parcels) ? b.parcels : fail(422, "invalid", "Thiếu danh sách kiện.");
     if (list.length > 100) fail(422, "invalid", "Tối đa 100 kiện mỗi lần.");
     if (this.quotaSnapshot(false).level === "stop") fail(429, "quota_exceeded", "Hết hạn mức hôm nay: nạp đơn tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
@@ -729,7 +736,7 @@ export class ShopDO extends DurableObject<Env> {
       .map((p) => ({ order: parcelToOrder(p), where: p.isDeleted ? "deleted" as const : "archive" as const }));
 
     const { today, year } = vnToday(Date.now());
-    const res = applyImport(main, others, parcels, "supplement", today, year, () => (source === "sheet" ? "s_" : "w_") + crypto.randomUUID().replace(/-/g, ""), kind);
+    const res = applyImport(main, others, parcels, mode, today, year, () => (source === "sheet" ? "s_" : "w_") + crypto.randomUUID().replace(/-/g, ""), kind);
 
     const now = Date.now();
     let written = 0, superseded = 0;

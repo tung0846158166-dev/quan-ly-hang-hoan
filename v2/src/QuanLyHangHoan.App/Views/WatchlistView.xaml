@@ -106,6 +106,33 @@
             </Grid>
         </Border>
 
+        <!-- Thanh nổi khi chọn nhiều dòng (kéo chuột, Shift/Ctrl + bấm): bỏ theo dõi / xóa các đơn đã chọn -->
+        <Border Grid.Row="2"
+                Panel.ZIndex="20"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,26"
+                CornerRadius="12"
+                Background="{DynamicResource InfoBlueCardBgBrush}"
+                BorderBrush="{DynamicResource InfoBlueCardBorderBrush}"
+                BorderThickness="1"
+                Padding="16,8"
+                Visibility="{Binding HasMultipleSelected, Converter={StaticResource BoolToVis}}">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.28" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SelectedCount, StringFormat='Đã chọn {0:N0} đơn'}" FontSize="12.5" FontWeight="Bold"
+                           Foreground="{DynamicResource InfoBlueTextBrush}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                <Button Content="⭐ Bỏ theo dõi" Command="{Binding BulkRemoveFromWatchlistCommand}" ToolTip="{Binding WriteDisabledTooltip}"
+                        Style="{StaticResource PrimaryActionButtonStyle}" Background="#D97706" Margin="0,0,8,0" />
+                <Button Content="🗑️ Xóa" Command="{Binding BulkDeleteCommand}" ToolTip="{Binding WriteDisabledTooltip}"
+                        Style="{StaticResource PrimaryActionButtonStyle}" Background="#DC2626" Margin="0,0,8,0" />
+                <Button Content="✕ Bỏ chọn" Command="{Binding ClearSelectionCommand}" ToolTip="Bỏ chọn tất cả các dòng (Esc)"
+                        Style="{StaticResource PrimaryActionButtonStyle}" Background="#64748B" />
+            </StackPanel>
+        </Border>
+
         <!-- Row 2: DataGrid + Empty State -->
         <Grid Grid.Row="2" Margin="14,10,14,10">
             <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
@@ -113,6 +140,7 @@
                           ItemsSource="{Binding VisibleOrders}"
                           SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
                           PreviewKeyDown="WatchlistGrid_PreviewKeyDown"
+                          SelectionChanged="WatchlistGrid_SelectionChanged"
                           MouseDoubleClick="WatchlistGrid_MouseDoubleClick"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
@@ -129,8 +157,8 @@
                           EnableRowVirtualization="True"
                           EnableColumnVirtualization="True"
                           VirtualizingPanel.IsVirtualizing="True"
-                          VirtualizingPanel.VirtualizationMode="Standard"
-                          SelectionMode="Single"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          SelectionMode="Extended"
                           SelectionUnit="FullRow"
                           ColumnHeaderStyle="{StaticResource ModernDataGridHeaderStyle}"
                           CellStyle="{StaticResource ModernDataGridCellStyle}">
@@ -152,6 +180,15 @@
                                       ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       Command="{Binding DataContext.EditWatchlistReasonCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                       CommandParameter="{Binding}" />
+                            <MenuItem Header="⭐ Bỏ theo dõi các đơn đang chọn"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      Command="{Binding DataContext.BulkRemoveFromWatchlistCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                            <MenuItem Header="🗑️ Xóa các đơn đang chọn"
+                                      ToolTipService.ShowOnDisabled="True"
+                                      ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      Command="{Binding DataContext.BulkDeleteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                            <Separator />
                             <MenuItem Header="⭐ Bỏ theo dõi"
                                       ToolTipService.ShowOnDisabled="True"
                                       ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=DataGrid}}"

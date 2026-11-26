@@ -405,9 +405,11 @@ public sealed class T020SearchAndWatchlistUiTests : IDisposable
 
             // 4. Watchlist screen empty
             vm.SetTheme(ThemeService.LightTheme);
+            // chờ TỪNG lệnh xong (lệnh async đang chạy thì từ chối lệnh mới: gọi dồn từng làm sót dòng, test chập chờn)
             foreach (var row in vm.WatchlistVm.VisibleOrders.ToList())
             {
-                vm.WatchlistVm.RemoveFromWatchlistCommand.Execute(row);
+                var t = vm.WatchlistVm.RemoveFromWatchlistCommand.ExecuteAsync(row);
+                for (var w = 0; w < 200 && !t.IsCompleted; w++) { WpfTestHost.PumpDispatcher(window); System.Threading.Thread.Sleep(20); }
             }
             // việc nạp lại dữ liệu chạy ở luồng nền nên đợi tối đa 10 giây (không đợi cố định, tránh chập chờn khi máy tải cao)
             for (var w = 0; w < 200 && !vm.WatchlistVm.IsEmpty; w++) { WpfTestHost.PumpDispatcher(window); System.Threading.Thread.Sleep(50); }

@@ -11,6 +11,18 @@ public partial class WatchlistView : UserControl
     {
         InitializeComponent();
         ClickToCopy.Attach(WatchlistGrid);
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is WatchlistViewModel o) o.ClearSelectionRequested -= OnClearSelectionRequested;
+            if (e.NewValue is WatchlistViewModel n) n.ClearSelectionRequested += OnClearSelectionRequested;
+        };
+    }
+
+    private void OnClearSelectionRequested() => WatchlistGrid.UnselectAll();
+
+    private void WatchlistGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is WatchlistViewModel vm) vm.UpdateSelectedRows(WatchlistGrid.SelectedItems.OfType<WatchlistRowViewModel>());
     }
 
     private void WatchlistGrid_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -21,6 +33,16 @@ public partial class WatchlistView : UserControl
         {
             e.Handled = true;
             vm.OpenDetailCommand.Execute(vm.SelectedRow);
+        }
+        else if (e.Key == Key.Delete && vm.SelectedRows.Count > 0)
+        {
+            e.Handled = true;
+            if (vm.HandleDeleteKeyCommand.CanExecute(null)) vm.HandleDeleteKeyCommand.Execute(null);
+        }
+        else if (e.Key == Key.Escape && vm.SelectedRows.Count > 1)
+        {
+            e.Handled = true;
+            vm.ClearSelectionCommand.Execute(null);
         }
     }
 

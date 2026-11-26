@@ -36,9 +36,10 @@ public sealed class RealFolderWatchController : IFolderWatchController
         string dbPath,
         string statePath,
         Func<DateTime>? clock = null,
-        TimeSpan? interval = null)
+        TimeSpan? interval = null,
+        QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null)
     {
-        _service = new FolderWatchService(dbPath, statePath, clock ?? (() => DateTime.Now), interval);
+        _service = new FolderWatchService(dbPath, statePath, clock ?? (() => DateTime.Now), interval, cloud);
         _service.Completed += OnServiceCompleted;
     }
 

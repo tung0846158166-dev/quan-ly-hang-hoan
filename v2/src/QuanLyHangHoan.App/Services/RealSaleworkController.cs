@@ -55,8 +55,10 @@ public sealed class RealSaleworkController : ISaleworkController
         string dbPath,
         string statePath,
         string webViewProfileDir,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null)
     {
+        _cloud = cloud;
         _dbPath = dbPath;
         _statePath = statePath;
         _webViewProfileDir = webViewProfileDir;
@@ -80,6 +82,8 @@ public sealed class RealSaleworkController : ISaleworkController
 
     /// <summary>Trang đăng nhập Salework mặc định của cửa hàng (chủ dự án 26/11/2026).</summary>
     public const string DefaultLoginUrl = "https://salework.net/login/lavistudio";
+    /// <summary>Chế độ cloud: nạp Salework qua cloud (cùng đường với điện thoại).</summary>
+    private readonly QuanLyHangHoan.Data.Cloud.CloudImportSink? _cloud;
 
     public bool OpenLogin(string? startUrl, out string error)
     {
@@ -403,7 +407,7 @@ public sealed class RealSaleworkController : ISaleworkController
             var (rowCount, importResult) = await Task.Run(() =>
             {
                 // an toàn dữ liệu: sao lưu trước khi nạp (dùng lại bản < 30 phút nếu có); sao lưu hỏng thì không nạp
-                if (File.Exists(_dbPath))
+                if (_cloud is null && File.Exists(_dbPath))
                 {
                     var bk = BackupService.EnsureRecent(_dbPath, BackupService.DefaultDir(_dbPath), TimeSpan.FromMinutes(30), 7, now);
                     if (!bk.Ok) throw new IOException("Không nạp vì chưa sao lưu được dữ liệu hiện tại: " + bk.Message);
@@ -415,7 +419,8 @@ public sealed class RealSaleworkController : ISaleworkController
                     rows,
                     new TikTokMapOptions { Today = now },
                     ImportProductMode.Supplement,
-                    now);
+                    now,
+                    _cloud);
                 return (rows.Count, applied);
             }, linkedCt);
 

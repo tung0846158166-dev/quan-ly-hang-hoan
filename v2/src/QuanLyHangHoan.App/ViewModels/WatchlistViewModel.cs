@@ -179,7 +179,74 @@ public sealed partial class WatchlistViewModel : ObservableObject
         ChangeStatusCommand.NotifyCanExecuteChanged();
         EditWatchlistReasonCommand.NotifyCanExecuteChanged();
         RemoveFromWatchlistCommand.NotifyCanExecuteChanged();
+        BulkRemoveFromWatchlistCommand.NotifyCanExecuteChanged();
+        BulkDeleteCommand.NotifyCanExecuteChanged();
+        HandleDeleteKeyCommand.NotifyCanExecuteChanged();
     }
+
+    // ---------------- chọn nhiều (kéo chuột / Shift / Ctrl) + thao tác hàng loạt ----------------
+    private List<WatchlistRowViewModel> _selectedRows = [];
+    public IReadOnlyList<WatchlistRowViewModel> SelectedRows => _selectedRows;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMultipleSelected))]
+    private int _selectedCount;
+
+    public bool HasMultipleSelected => SelectedCount > 1;
+
+    /// <summary>Bảng báo xóa hết lựa chọn (nút "Bỏ chọn" / Esc).</summary>
+    public event Action? ClearSelectionRequested;
+
+    public void UpdateSelectedRows(IEnumerable<WatchlistRowViewModel>? rows)
+    {
+        _selectedRows = rows?.ToList() ?? [];
+        SelectedCount = _selectedRows.Count;
+    }
+
+    [RelayCommand]
+    private void ClearSelection()
+    {
+        ClearSelectionRequested?.Invoke();
+        if (ClearSelectionRequested is null) UpdateSelectedRows(null);
+    }
+
+    private IReadOnlyList<WatchlistRowViewModel> BulkTargets() =>
+        _selectedRows.Count > 0 ? _selectedRows : SelectedRow is not null ? [SelectedRow] : Array.Empty<WatchlistRowViewModel>();
+
+    /// <summary>Bỏ theo dõi tất cả các đơn đang chọn (hỏi xác nhận một lần).</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public async Task BulkRemoveFromWatchlistAsync()
+    {
+        if (!CanWrite) return;
+        var targets = BulkTargets();
+        if (targets.Count == 0 || _editService is null || _dialogService is null) return;
+        if (!_dialogService.ConfirmBulkAction("Bỏ theo dõi", targets.Count, $"Bỏ {targets.Count:N0} đơn đang chọn khỏi mục ⭐ Đang theo dõi (đơn vẫn còn ở bảng gốc).")) return;
+        var (saved, _, _) = await OrderEditHelper.RunBulkAsync(
+            targets,
+            r => _editService.SetFieldAsync(r.Source.Id, EditField.IsWatchlist, "0", expectedOld: "1"),
+            _onDataChangedAsync,
+            _onNotify);
+        if (saved > 0) _onNotify?.Invoke($"Đã bỏ theo dõi {saved:N0} đơn.", false);
+    }
+
+    /// <summary>Xóa (mềm) tất cả các đơn đang chọn; đơn vẫn khôi phục được ở màn Đã xóa.</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public async Task BulkDeleteAsync()
+    {
+        if (!CanWrite) return;
+        var targets = BulkTargets();
+        if (targets.Count == 0 || _editService is null || _dialogService is null) return;
+        if (!_dialogService.ConfirmBulkAction("Xóa đơn hàng", targets.Count, $"Xóa {targets.Count:N0} đơn đang chọn. Lưu ý: đơn vẫn khôi phục được ở màn Đã xóa.")) return;
+        await OrderEditHelper.RunBulkAsync(
+            targets,
+            r => _editService.DeleteAsync(r.Source.Id, r.IsArchived ? "Kho lưu trữ" : "Bảng chính"),
+            _onDataChangedAsync,
+            _onNotify);
+    }
+
+    /// <summary>Phím Delete: nhiều dòng thì xóa hàng loạt, một dòng thì xóa dòng đó (đều hỏi xác nhận).</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public Task HandleDeleteKeyAsync() => BulkDeleteAsync();
 
     /// <summary>Chia trang 100 kiện/trang.</summary>
     public Pager<WatchlistRowViewModel> Pager { get; private set; } = null!;

@@ -274,6 +274,27 @@ public sealed class CloudApi
     }
 
     // ---- nhập đơn
+    /// <summary>Một lô kiện đã chuyển sẵn trên máy (không có dữ liệu cá nhân) để cloud gộp; <paramref name="orderIds"/>: mã đơn để thay dòng chờ cũ (Salework).</summary>
+    public async Task<CloudMappedResult> ImportMappedAsync(string source, string kind, string mode, IEnumerable<JsonObject> parcels, IEnumerable<string> orderIds,
+        string signature, CancellationToken ct = default)
+    {
+        var body = new JsonObject
+        {
+            ["source"] = source, ["kind"] = kind, ["mode"] = mode, ["signature"] = signature,
+            ["parcels"] = new JsonArray(parcels.Select(p => (JsonNode)p.DeepClone()).ToArray()),
+            ["orderIds"] = new JsonArray(orderIds.Select(i => (JsonNode?)i).ToArray()),
+        };
+        var r = await JsonAsync(HttpMethod.Post, "/import/mapped", body, ct);
+        static int I(JsonNode? n) => n is JsonValue v && v.TryGetValue<int>(out var x) ? x : 0;
+        static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var x) ? x : "";
+        var amb = new List<QuanLyHangHoan.Core.Import.AmbiguousParcel>();
+        if (r["ambiguous"] is JsonArray a)
+            foreach (var x in a)
+                amb.Add(new(S(x?["platform"]), S(x?["orderId"]), S(x?["track"]), S(x?["returnOrderId"]), I(x?["candidates"]),
+                    x?["orderConflict"] is JsonValue oc && oc.TryGetValue<bool>(out var b) && b));
+        return new(I(r["added"]), I(r["updated"]), I(r["enrichedArchived"]), I(r["skippedDeleted"]), I(r["superseded"]), amb);
+    }
+
     public async Task<CloudImportResult> ImportAsync(string source, string signature, IEnumerable<JsonObject> parcels, IEnumerable<JsonObject>? returnWatch = null, CancellationToken ct = default)
     {
         var arr = new JsonArray();
@@ -294,6 +315,8 @@ public sealed class CloudApi
 }
 
 public sealed record CloudImportResult(int Added, int Updated, int Unchanged, IReadOnlyList<(string Id, string Reason)> Rejected, int ReturnWatchAdded);
+/// <summary>Kết quả một lô <c>/import/mapped</c> (cloud gộp kiện đã chuyển sẵn).</summary>
+public sealed record CloudMappedResult(int Added, int Updated, int EnrichedArchived, int SkippedDeleted, int Superseded, IReadOnlyList<QuanLyHangHoan.Core.Import.AmbiguousParcel> Ambiguous);
 /// <summary>Một lượt đồng bộ cloud đã nhận (các lô cùng nguồn gửi liền nhau gộp lại). Thời gian: mili giây Unix.</summary>
 public sealed record CloudImportRun(string Source, long Start, long End, int Batches, int Sent, int Added, int Updated, int Skipped, int Ambiguous);
 

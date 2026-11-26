@@ -1018,3 +1018,41 @@ describe("nạp Salework từ điện thoại (/import/mapped, 26/11/2026)", () 
     expect((await post(phoneA, { source: "bay", parcels: [tk()] })).status).toBe(422);
   });
 });
+
+describe("máy tính nạp file qua cloud (/import/mapped, nguồn file/folder, 26/11/2026)", () => {
+  const all = async () => (await call("GET", "/sync?since=0&limit=1000", undefined, owner)).data.changes.filter((c: any) => c.type === "parcel").map((c: any) => c.parcel);
+  const post = (body: unknown) => call("POST", "/import/mapped", body, pc);
+
+  it("file Shopee: dòng mới theo mặc định Shopee (Chưa trả, SPX Express); không thay dòng chờ cũ", async () => {
+    const r = await post({ source: "file", kind: "shopee", parcels: [{ platform: "Shopee", orderId: "SPF1", track: "SPXF1", orderType: "Trả hàng/Hoàn tiền", items: [{ product: "Áo", qty: 1 }] }], orderIds: ["SPF1"] });
+    expect(r.status).toBe(200);
+    const p = (await all()).find((x: any) => x.orderId === "SPF1");
+    expect(p.status).toBe("Chưa trả");
+    expect(p.carrier).toBe("SPX Express");
+    expect(r.data.superseded).toBe(0);
+    expect((await call("GET", "/import/log", undefined, owner)).data[0].source).toBe("file");
+  });
+
+  it("chế độ thay sản phẩm (replace) được áp dụng; mặc định bổ sung", async () => {
+    const base = { platform: "TikTok Shop", orderId: "TF1", returnTrack: "RTF1", orderType: "Trả hàng/Hoàn tiền" };
+    await post({ source: "file", kind: "tiktok", parcels: [{ ...base, items: [{ product: "Áo", qty: 1 }] }] });
+    await post({ source: "file", kind: "tiktok", mode: "replace", parcels: [{ ...base, items: [{ product: "Quần", qty: 2 }] }] });
+    const p = (await all()).find((x: any) => x.orderId === "TF1");
+    expect(p.items.map((i: any) => i.product)).toEqual(["Quần"]);
+  });
+
+  it("hai máy nạp cùng một đơn mới gần như cùng lúc: chỉ MỘT dòng (lô sau cập nhật, không nhân đôi)", async () => {
+    const one = { platform: "TikTok Shop", orderId: "RACE1", returnOrderId: "C9", returnTrack: "RTR1", orderType: "Trả hàng/Hoàn tiền", items: [{ product: "Áo", qty: 1 }] };
+    const [a, b] = await Promise.all([
+      call("POST", "/import/mapped", { source: "salework", parcels: [one], orderIds: ["RACE1"] }, phoneA),
+      post({ source: "salework", parcels: [one], orderIds: ["RACE1"] }),
+    ]);
+    expect(a.status).toBe(200); expect(b.status).toBe(200);
+    expect((await all()).filter((x: any) => x.orderId === "RACE1")).toHaveLength(1);
+  });
+
+  it("kind / mode lạ bị từ chối", async () => {
+    expect((await post({ source: "file", kind: "lazada", parcels: [] })).status).toBe(422);
+    expect((await post({ source: "file", kind: "shopee", mode: "xoa", parcels: [] })).status).toBe(422);
+  });
+});

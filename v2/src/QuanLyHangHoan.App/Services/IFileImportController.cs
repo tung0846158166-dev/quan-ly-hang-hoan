@@ -25,10 +25,14 @@ public sealed class RealFileImportController : IFileImportController
     private readonly string _dbPath;
     private readonly Func<DateTime> _clock;
 
-    public RealFileImportController(string dbPath, Func<DateTime>? clock = null)
+    private readonly QuanLyHangHoan.Data.Cloud.CloudImportSink? _cloud;
+
+    /// <param name="cloud">Chế độ cloud: nạp qua cloud (không gộp vào máy, không cần sao lưu máy: cloud có khôi phục theo thời điểm).</param>
+    public RealFileImportController(string dbPath, Func<DateTime>? clock = null, QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null)
     {
         _dbPath = dbPath;
         _clock = clock ?? (() => DateTime.Now);
+        _cloud = cloud;
     }
 
     public bool IsDemoMode => false;
@@ -64,7 +68,7 @@ public sealed class RealFileImportController : IFileImportController
             if (loaded.Count > 0)
             {
                 // An toàn dữ liệu thật: luôn sao lưu NGAY TRƯỚC khi nạp file. Sao lưu hỏng (mà đã có dữ liệu) thì KHÔNG nạp.
-                if (File.Exists(_dbPath))
+                if (_cloud is null && File.Exists(_dbPath))
                 {
                     var bk = BackupService.EnsureRecent(_dbPath, BackupService.DefaultDir(_dbPath), TimeSpan.FromMinutes(30), 7, _clock());
                     if (!bk.Ok)
@@ -74,7 +78,7 @@ public sealed class RealFileImportController : IFileImportController
                         return blocked;
                     }
                 }
-                importResult = FileImportService.Import(_dbPath, loaded, options, mode, _clock());
+                importResult = FileImportService.Import(_dbPath, loaded, options, mode, _clock(), _cloud);
             }
             else
             {

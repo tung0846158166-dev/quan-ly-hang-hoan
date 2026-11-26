@@ -38,8 +38,9 @@ public static class FileImportService
             ? FileKind.Shopee : FileKind.Unknown;
     }
 
+    /// <param name="cloud">Chế độ cloud: gửi kiện lên cloud gộp (không gộp vào máy). null = nạp vào máy như cũ.</param>
     public static FileImportResult Import(string dbPath, IReadOnlyList<(string Name, byte[] Bytes)> files, TikTokMapOptions options,
-        ImportProductMode mode, DateTime now)
+        ImportProductMode mode, DateTime now, QuanLyHangHoan.Data.Cloud.CloudImportSink? cloud = null, string cloudSource = "file")
     {
         var result = new FileImportResult();
         var byKind = new Dictionary<FileKind, List<SourceFile>> { [FileKind.TikTok] = new(), [FileKind.Shopee] = new() };
@@ -63,7 +64,10 @@ public static class FileImportService
             var list = byKind[kind];
             if (list.Count == 0) continue;
             var prep = PlatformImportPrep.Prepare(list);
-            var r = TikTokImportService.ApplyGroups(dbPath, prep.Groups.Select(g => (IReadOnlyList<Dictionary<string, string>>)g).ToList(), options, mode, now, source);
+            var groups = prep.Groups.Select(g => (IReadOnlyList<Dictionary<string, string>>)g).ToList();
+            var r = cloud is not null
+                ? cloud.Apply(groups, options, mode, source, cloudSource).Import
+                : TikTokImportService.ApplyGroups(dbPath, groups, options, mode, now, source);
             if (kind == FileKind.TikTok) result.TikTok = r; else result.Shopee = r;
             if (!r.Ok) return new FileImportResult { Ok = false, Message = r.Message, TikTok = result.TikTok, Shopee = result.Shopee }.WithFiles(result.Files);
         }

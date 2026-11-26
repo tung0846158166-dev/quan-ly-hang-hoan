@@ -13,10 +13,30 @@ public sealed class ReturnOrderRowViewModel
 {
     private static readonly CultureInfo ViCulture = CultureInfo.GetCultureInfo("vi-VN");
 
-    public ReturnOrderRowViewModel(Order source, int stt, DateTime now, AlertPolicy? policy = null)
+    /// <summary>Dấu nội dung đơn lúc dựng dòng: nạp lại mà đơn không đổi thì DÙNG LẠI dòng cũ (bảng không vẽ lại, giữ chỗ cuộn/dòng chọn).</summary>
+    public string Fingerprint { get; }
+    /// <summary>Lúc dựng (cảnh báo vàng/đỏ tính theo giờ: dòng dùng lại tối đa vài phút rồi dựng mới).</summary>
+    public DateTime BuiltAt { get; }
+
+    /// <summary>Dấu nội dung đơn (mọi trường bảng hiển thị/lọc).</summary>
+    public static string FingerprintOf(Order o)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        void A(string? v) { sb.Append(v).Append('\u001f'); }
+        A(o.Id); A(o.OrderId); A(o.ReturnOrderId); A(o.Track); A(o.ReturnTrack); A(o.AltTrack); A(o.ForwardTrack); A(string.Join(",", o.TrackingCodes));
+        A(o.Platform); A(o.OrderType); A(o.PlatformStatus); A(o.PreOrder); A(o.Status); A(o.Carrier); A(o.ShipDate); A(o.ReturnDate); A(o.RecvDate);
+        A(o.ReturnedAt); A(o.Deadline); A(o.Price.ToString(CultureInfo.InvariantCulture)); A(o.Note); A(o.BuyerNote); A(o.UserNote); A(o.ImportWeek);
+        A(o.ImportedAt); A(o.IsWatchlist ? "1" : "0"); A(o.WatchlistReason); A(o.IsPartialReturn ? "1" : "0"); A(o.PhotoId);
+        foreach (var i in o.Items) { A(i.Product); A(i.Color); A(i.Size); A(i.Qty.ToString(CultureInfo.InvariantCulture)); A(i.ReturnedQty.ToString(CultureInfo.InvariantCulture)); A(i.Sku); }
+        return sb.ToString();
+    }
+
+    public ReturnOrderRowViewModel(Order source, int stt, DateTime now, AlertPolicy? policy = null, string? fingerprint = null)
     {
         Source = source;
         Stt = stt;
+        Fingerprint = fingerprint ?? FingerprintOf(source);
+        BuiltAt = now;
         ArrivedAtDate = AlertThresholds.TryParseVietnamDateTime(source.ReturnedAt);
         ShipDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ShipDate);
         ReturnDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ReturnDate);

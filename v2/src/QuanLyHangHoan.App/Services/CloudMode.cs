@@ -62,6 +62,8 @@ public sealed class CloudMode : IDisposable
             _ = Task.Run(async () =>
             {
                 await Task.Delay(2000).ConfigureAwait(false);   // gom các lô /sync liên tiếp: nạp lại bảng tối đa ~2 giây/lần (đỡ nhấp nháy)
+                // đang bấm / gõ / cuộn: chờ dừng tay 1,5 giây (tối đa 10 giây) rồi mới dựng lại bảng, tránh giật giữa lúc thao tác
+                await UserActivity.WaitForIdleAsync(TimeSpan.FromMilliseconds(1500), TimeSpan.FromSeconds(10)).ConfigureAwait(false);
                 Interlocked.Exchange(ref _reloadPending, 0);
                 dispatchToUi(() => _ = reloadOnUi());
             });

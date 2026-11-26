@@ -73,6 +73,8 @@ public sealed class RealFileImportController : IFileImportController
                         blocked.Files.AddRange(readErrors);
                         return blocked;
                     }
+                    // giữ tối đa BackupService.MaxKeep bản (bản vừa tạo là mới nhất nên luôn còn)
+                    BackupService.Prune(BackupService.DefaultDir(_dbPath), 7, _clock());
                 }
                 importResult = FileImportService.Import(_dbPath, loaded, options, mode, _clock());
             }

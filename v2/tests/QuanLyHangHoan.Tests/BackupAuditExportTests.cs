@@ -97,6 +97,27 @@ public sealed class BackupAuditExportTests : IDisposable
         Assert.Equal(3, BackupService.List(Bk).Count);
     }
 
+    [Fact]
+    public void Prune_caps_automatic_backups_at_five_even_when_all_are_fresh()
+    {
+        // chủ dự án 26/11/2026: 1 ngày đã 6 GB vì mỗi lần nhập tệp + mỗi 2 giờ đều tạo bản mới, không giới hạn số bản
+        for (var h = 0; h < 8; h++) BackupService.Backup(Db, Bk, Now.AddHours(-h));
+        File.WriteAllText(Path.Combine(Bk, "truoc-chuyen-cloud-20261126.db"), "bản thủ công");
+        Assert.Equal(3, BackupService.Prune(Bk, 7, Now));
+        var left = BackupService.List(Bk);
+        Assert.Equal(BackupService.MaxKeep, left.Count);
+        Assert.Equal(Now, left[0].Time);                                              // giữ bản MỚI nhất
+        Assert.True(File.Exists(Path.Combine(Bk, "truoc-chuyen-cloud-20261126.db"))); // bản thủ công không đụng
+    }
+
+    [Fact]
+    public void Run_if_due_prunes_even_when_no_new_backup_is_needed()
+    {
+        for (var m = 0; m < 7; m++) BackupService.Backup(Db, Bk, Now.AddMinutes(-m)); // vd. sinh ra do nhiều lần nhập tệp
+        Assert.Null(BackupService.RunIfDue(Db, Bk, 2, 7, Now.AddMinutes(1)));        // chưa đến hạn sao lưu
+        Assert.Equal(BackupService.MaxKeep, BackupService.List(Bk).Count);            // nhưng vẫn dọn
+    }
+
     // ---------------- nhật ký ----------------
     [Fact]
     public void Audit_log_is_read_newest_first_with_filters_and_labels()

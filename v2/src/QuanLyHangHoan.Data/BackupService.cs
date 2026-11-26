@@ -65,24 +65,37 @@ public static class BackupService
         return list.OrderByDescending(e => e.Time).ToList();
     }
 
-    /// <summary>Xóa bản sao lưu quá `keepDays` ngày, trừ <see cref="MinKeep"/> bản mới nhất. Trả số bản đã xóa.</summary>
+    /// <summary>Số bản sao lưu tự động tối đa được giữ (chủ dự án 26/11/2026: mỗi bản ~175 MB, không giới hạn thì 1 ngày đã 6 GB).</summary>
+    public const int MaxKeep = 5;
+
+    /// <summary>
+    /// Giữ tối đa <see cref="MaxKeep"/> bản mới nhất; trong số đó bản quá `keepDays` ngày cũng bị xóa, nhưng luôn còn ít nhất
+    /// <see cref="MinKeep"/> bản. Chỉ đụng tệp `data-yyyyMMdd-HHmmss.db`. Trả số bản đã xóa.
+    /// </summary>
     public static int Prune(string backupDir, int keepDays, DateTime now)
     {
         var all = List(backupDir);
         var removed = 0;
-        foreach (var e in all.Skip(MinKeep))
+        for (var i = MinKeep; i < all.Count; i++)
         {
-            if (now - e.Time <= TimeSpan.FromDays(Math.Max(1, keepDays))) continue;
+            var e = all[i];
+            var tooMany = i >= MaxKeep;
+            var tooOld = now - e.Time > TimeSpan.FromDays(Math.Max(1, keepDays));
+            if (!tooMany && !tooOld) continue;
             if (TryDelete(e.Path)) removed++;
         }
         return removed;
     }
 
-    /// <summary>Sao lưu nếu bản mới nhất đã cũ hơn `everyHours` (hoặc chưa có), rồi dọn bản quá hạn.</summary>
+    /// <summary>Sao lưu nếu bản mới nhất đã cũ hơn `everyHours` (hoặc chưa có); lần nào cũng dọn bản thừa/quá hạn.</summary>
     public static BackupResult? RunIfDue(string dbPath, string backupDir, int everyHours, int keepDays, DateTime now)
     {
         var latest = List(backupDir).FirstOrDefault();
-        if (latest is not null && now - latest.Time < TimeSpan.FromHours(Math.Max(1, everyHours))) return null;
+        if (latest is not null && now - latest.Time < TimeSpan.FromHours(Math.Max(1, everyHours)))
+        {
+            Prune(backupDir, keepDays, now);
+            return null;
+        }
         var r = Backup(dbPath, backupDir, now);
         if (r.Ok) Prune(backupDir, keepDays, now);
         return r;

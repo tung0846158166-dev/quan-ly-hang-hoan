@@ -47,6 +47,9 @@ final class SyncEngine: ObservableObject {
     private var chunkPublishedAt = Date.distantPast
     @Published var pcLastSeen: Date?
     @Published var banner: Banner?
+    /// Gợi ý AI mới nhất từ cloud (hiện ở đầu tab Thông báo).
+    @Published var aiDigest: CloudAIDigest?
+    var digestCheckedAt = Date.distantPast
     @Published var orderActionFeedback: [String: OrderActionFeedback] = [:]
     @Published var mode: ScanKind = .returnScan
     @Published var note = ""
@@ -1197,9 +1200,6 @@ extension SyncEngine {
     }
 
     /// Dựng danh sách dòng từ bản sao cloud (chạy nền) rồi đưa vào `snapshot` mà mọi màn hình đang đọc.
-    /// Gợi ý AI mới nhất từ cloud (hiện ở đầu tab Thông báo).
-    @Published var aiDigest: CloudAIDigest?
-    private var digestCheckedAt = Date.distantPast
 
     /// Hỏi cloud bản gợi ý mới (tối đa 5 phút/lần). Bản mới hơn bản đã báo thì hiện thông báo trên iPhone.
     func refreshAIDigest(force: Bool = false) {

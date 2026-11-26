@@ -9,6 +9,9 @@ public interface IPhotoProvider
 {
     Task<PhotoData?> GetPhotoAsync(string photoId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<string>> GetMissingPhotoIdsAsync(CancellationToken cancellationToken = default);
+    /// <summary>Mã các ảnh khác của đơn (chế độ cloud: ảnh trên cloud, kể cả điện thoại chụp), mới nhất trước. Mặc định: không có.</summary>
+    Task<IReadOnlyList<string>> ListPhotoIdsAsync(string parcelId, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
 }
 
 public sealed class SqlitePhotoProvider : IPhotoProvider
@@ -59,6 +62,15 @@ public sealed class CloudPhotoProvider : IPhotoProvider
         catch (QuanLyHangHoan.Data.Cloud.CloudApiException) { return null; }
         catch (System.Net.Http.HttpRequestException) { return null; }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }   // hết giờ chờ
+    }
+
+    public async Task<IReadOnlyList<string>> ListPhotoIdsAsync(string parcelId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(parcelId) || _api() is not { } api) return Array.Empty<string>();
+        try { return await api.ParcelPhotoIdsAsync(parcelId, cancellationToken).ConfigureAwait(false); }
+        catch (QuanLyHangHoan.Data.Cloud.CloudApiException) { return Array.Empty<string>(); }
+        catch (System.Net.Http.HttpRequestException) { return Array.Empty<string>(); }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return Array.Empty<string>(); }
     }
 
     /// <summary>Ảnh gốc trong máy; máy mới chưa có bảng ảnh gốc thì coi như không có.</summary>

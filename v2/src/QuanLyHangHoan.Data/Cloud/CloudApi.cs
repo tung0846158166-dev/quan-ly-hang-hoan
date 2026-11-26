@@ -249,6 +249,17 @@ public sealed class CloudApi
         await SendRawAsync(HttpMethod.Put, $"/photos/{Uri.EscapeDataString(photoId)}?{q}", content, null, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Mã các ảnh của một kiện trên cloud (kể cả ảnh điện thoại chụp), mới nhất trước; bỏ ảnh đã hết hạn lưu.</summary>
+    public async Task<IReadOnlyList<string>> ParcelPhotoIdsAsync(string parcelId, CancellationToken ct = default)
+    {
+        if (await JsonAsync(HttpMethod.Get, $"/parcels/{Uri.EscapeDataString(parcelId)}/photos", null, ct) is not JsonArray arr) return Array.Empty<string>();
+        static long L(JsonNode? n) => n is JsonValue v && v.TryGetValue<double>(out var d) ? (long)d : 0;
+        return arr.OfType<JsonObject>()
+            .Where(x => !(x["expired"] is JsonValue e && e.TryGetValue<bool>(out var b) && b))
+            .Select(x => (Id: x["photoId"]?.GetValue<string>() ?? "", At: L(x["takenAt"])))
+            .Where(x => x.Id.Length > 0).OrderByDescending(x => x.At).Select(x => x.Id).ToList();
+    }
+
     public async Task<byte[]> GetPhotoAsync(string photoId, bool thumb, CancellationToken ct = default)
     {
         var (_, body, _) = await SendRawAsync(HttpMethod.Get, $"/photos/{Uri.EscapeDataString(photoId)}" + (thumb ? "?size=thumb" : ""), null, null, ct).ConfigureAwait(false);

@@ -474,8 +474,8 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 6. Ảnh -->
-                <Border Style="{StaticResource DetailSectionCardStyle}" Visibility="Collapsed">
+                <!-- 6. Ảnh (chủ dự án 26/11/2026: hiện lại trong chi tiết đơn, gồm cả ảnh trên cloud/điện thoại chụp) -->
+                <Border Style="{StaticResource DetailSectionCardStyle}">
                     <StackPanel>
                         <DockPanel Margin="0,0,0,8">
                             <Button DockPanel.Dock="Right"
@@ -506,6 +506,23 @@
                                    MaxWidth="360"
                                    Stretch="Uniform" />
                         </Button>
+
+                        <TextBlock Text="{Binding PhotoCountText}" FontSize="12" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" />
+                        <ItemsControl ItemsSource="{Binding ExtraPhotos}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.OpenExtraPhotoCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding}" Background="Transparent" BorderThickness="1"
+                                            BorderBrush="{DynamicResource BorderBrushLight}" Padding="2" Margin="0,0,6,6" Cursor="Hand"
+                                            ToolTip="Bấm để xem ảnh lớn">
+                                        <Image Source="{Binding Image}" Height="72" MaxWidth="110" Stretch="Uniform" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
 

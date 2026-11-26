@@ -231,8 +231,8 @@ public sealed partial class OrderDetailViewModel : ObservableObject
 
         // 6. Ảnh
         PhotoId = order.PhotoId?.Trim() ?? string.Empty;
-        HasPhotoId = !string.IsNullOrWhiteSpace(PhotoId);
-        PhotoStatusText = HasPhotoId ? "Đang tải ảnh..." : "Chưa có ảnh";
+        _mainPhotoId = PhotoId;
+        PhotoStatusText = "Đang tải ảnh...";
 
         // 7. Dữ liệu từ file sàn
         ImportPriceBasis = Dash(import?.ImportPriceBasis);
@@ -315,8 +315,17 @@ public sealed partial class OrderDetailViewModel : ObservableObject
     public string UserNote { get; }
 
     // Ảnh
+    /// <summary>Ảnh gắn sẵn trong đơn (có thể trống).</summary>
     public string PhotoId { get; }
-    public bool HasPhotoId { get; }
+    /// <summary>Ảnh đang hiện to: ảnh của đơn, không có thì ảnh mới nhất trên cloud (cả ảnh điện thoại chụp).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPhotoId))]
+    private string _mainPhotoId = string.Empty;
+    public bool HasPhotoId => !string.IsNullOrWhiteSpace(MainPhotoId);
+    /// <summary>Các ảnh còn lại (ảnh nhỏ bên dưới, bấm để xem to).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<DetailPhotoThumb> ExtraPhotos { get; } = new();
+    [ObservableProperty]
+    private string _photoCountText = string.Empty;
 
     [ObservableProperty]
     private BitmapImage? _thumbnailImage;
@@ -393,7 +402,14 @@ public sealed partial class OrderDetailViewModel : ObservableObject
     public void OpenPhotoViewer()
     {
         if (!HasPhotoId) return;
-        _photoViewerService?.ShowPhoto(PhotoId, _order.OrderId, PrimaryTracking);
+        _photoViewerService?.ShowPhoto(MainPhotoId, _order.OrderId, PrimaryTracking);
+    }
+
+    [RelayCommand]
+    public void OpenExtraPhoto(DetailPhotoThumb? thumb)
+    {
+        if (thumb is null) return;
+        _photoViewerService?.ShowPhoto(thumb.PhotoId, _order.OrderId, PrimaryTracking);
     }
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -405,13 +421,6 @@ public sealed partial class OrderDetailViewModel : ObservableObject
 
     private async Task LoadPhotoAsync(CancellationToken cancellationToken)
     {
-        if (!HasPhotoId)
-        {
-            HasPhotoLoaded = false;
-            PhotoStatusText = "Chưa có ảnh";
-            return;
-        }
-
         if (_photoProvider is null)
         {
             HasPhotoLoaded = false;
@@ -419,10 +428,32 @@ public sealed partial class OrderDetailViewModel : ObservableObject
             return;
         }
 
+        // ảnh của đơn + ảnh trên cloud (kể cả điện thoại chụp), bỏ trùng; ảnh của đơn đứng đầu
+        var ids = new List<string>();
+        if (!string.IsNullOrWhiteSpace(PhotoId)) ids.Add(PhotoId);
+        try
+        {
+            foreach (var id in await _photoProvider.ListPhotoIdsAsync(_order.Id, cancellationToken))
+                if (!ids.Contains(id, StringComparer.Ordinal)) ids.Add(id);
+        }
+        catch (OperationCanceledException) { return; }
+        catch { /* không lấy được danh sách: vẫn hiện ảnh của đơn nếu có */ }
+
+        if (ids.Count == 0)
+        {
+            MainPhotoId = string.Empty;
+            HasPhotoLoaded = false;
+            PhotoStatusText = "Chưa có ảnh";
+            return;
+        }
+        MainPhotoId = ids[0];
+        PhotoCountText = ids.Count > 1 ? $"{ids.Count} ảnh (cả ảnh trên cloud)" : string.Empty;
+        _ = LoadExtraPhotosAsync(ids.Skip(1).Take(12).ToList(), cancellationToken);
+
         IsPhotoLoading = true;
         try
         {
-            var data = await _photoProvider.GetPhotoAsync(PhotoId, cancellationToken);
+            var data = await _photoProvider.GetPhotoAsync(MainPhotoId, cancellationToken);
             if (data is null || data.Bytes is null || data.Bytes.Length == 0)
             {
                 HasPhotoLoaded = false;
@@ -514,6 +545,22 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         return $"{Math.Max(1, elapsed.Minutes)} phút";
     }
 
+    private async Task LoadExtraPhotosAsync(IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        foreach (var id in ids)
+        {
+            try
+            {
+                var data = await _photoProvider!.GetPhotoAsync(id, cancellationToken);
+                if (data?.Bytes is not { Length: > 0 } bytes) continue;
+                var bmp = await Task.Run(() => DecodeFrozenThumbnail(bytes), cancellationToken);
+                if (bmp is not null) ExtraPhotos.Add(new DetailPhotoThumb(id, bmp));
+            }
+            catch (OperationCanceledException) { return; }
+            catch { /* bỏ ảnh lỗi */ }
+        }
+    }
+
     private static BitmapImage? DecodeFrozenThumbnail(byte[] bytes)
     {
         try
@@ -534,3 +581,6 @@ public sealed partial class OrderDetailViewModel : ObservableObject
         }
     }
 }
+
+/// <summary>Một ảnh nhỏ trong chi tiết đơn.</summary>
+public sealed record DetailPhotoThumb(string PhotoId, System.Windows.Media.ImageSource Image);

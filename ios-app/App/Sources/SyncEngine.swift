@@ -1223,11 +1223,6 @@ extension SyncEngine {
     // MARK: quét qua cloud
 
     fileprivate func submitCloud(code: String, kind: ScanKind, photo: Data?, useSnapshot: Bool) -> Bool {
-        guard kind == .returnScan else {
-            banner = Banner(code: code, text: "Tạo đơn mới bằng điện thoại chưa hỗ trợ khi dùng cloud", color: Theme.warning,
-                            sub: "Tạo đơn trên máy tính")
-            return false
-        }
         guard cloud.canWrite else {
             banner = Banner(code: code, text: "MẤT KẾT NỐI CLOUD: chưa quét được", color: Theme.danger,
                             sub: CloudStatusText.lockReason(cloud.state) ?? "Kiểm tra mạng rồi thử lại")
@@ -1252,6 +1247,24 @@ extension SyncEngine {
         if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
 
         let fullPhoto = photoData
+        if kind != .returnScan {
+            // chế độ "Đơn mới": tạo đơn qua cloud (mã đã có ở bất kỳ đâu thì không tạo lại)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let r = await self.cloud.newOrder(code: code)
+                if let i = self.items.firstIndex(where: { $0.requestId == rid }) {
+                    self.items[i].status = r.status
+                    self.items[i].scanConfirmed = true
+                    self.items[i].reviewRequired = r.status == .error
+                    self.items[i].detail = r.message
+                    if !r.orderId.isEmpty { self.items[i].orderNum = r.orderId }
+                }
+                self.banner = Banner(code: code, text: r.message.isEmpty ? "Không tạo được đơn" : r.message, color: Self.color(r.tone), sub: r.platform)
+                if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(r.status == .success ? .success : .error) }
+                self.persist()
+            }
+            return true
+        }
         Task { @MainActor [weak self] in
             guard let self else { return }
             let r = await self.cloud.scan(code: code)

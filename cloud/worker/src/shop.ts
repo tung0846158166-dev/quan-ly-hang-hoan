@@ -1,4 +1,5 @@
 import { fromWorkersAi, toWorkersAi, workersAiErrorStatus } from "./workersai";
+import { buildNewParcel, ownCodes, parseNewOrder } from "./neworder";
 import { DurableObject } from "cloudflare:workers";
 import { decide, ReceiveStatus } from "../../core/src/scan";
 import { Db, SCHEMA, type Row } from "./db";
@@ -428,6 +429,7 @@ export class ShopDO extends DurableObject<Env> {
       case "delete": return this.opMutate(op, dev, "delete", (p) => { p.deletedFrom = p.isArchived ? "Kho lưu trữ" : "Bảng chính"; p.isDeleted = true; p.deletedAt = vnTime(Date.now()); });
       case "restore": return this.opMutate(op, dev, "restore", (p) => { p.isDeleted = false; p.deletedAt = ""; p.deletedFrom = ""; });
       case "editCell": return this.opEditCell(op, dev);
+      case "newOrder": return this.opNewOrder(op, dev);
       case "rwRemove": return this.opReturnWatch(op, dev, true);
       case "rwRestore": return this.opReturnWatch(op, dev, false);
       default: return fail(422, "invalid", `Loại thao tác không hỗ trợ: ${String(op.type)}`);
@@ -529,6 +531,30 @@ export class ShopDO extends DurableObject<Env> {
     const rev = this.writeParcel(p);
     this.audit(dev.deviceId, action, p.id, diffOf(before, p, "before"), diffOf(before, p, "after"));
     return { parcel: this.toWire(p, rev, Date.now()) };
+  }
+
+  /**
+   * Tạo đơn mới (máy tính nhập tay / điện thoại quét "Đơn mới"), cùng quy tắc NewOrderService của máy tính:
+   * mã đã có ở bất kỳ đâu (kể cả lưu trữ, đã xóa) -> KHÔNG tạo lại; không hồi sinh đơn đã xóa.
+   */
+  private opNewOrder(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
+    const input = parseNewOrder(op);
+    const code = normalizeForLookup(input.code);
+    if (!code) return { outcome: "invalid", message: "Mã vận đơn trống", code: input.code };
+    const oid = normalizeForLookup(input.orderId);
+    const keys = [code, ...(oid ? [oid] : [])];
+    const rows = this.db.all<Row>(
+      `SELECT DISTINCT p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id WHERE c.code IN (${keys.map(() => "?").join(",")})`, ...keys);
+    const hit = rows.map((r) => JSON.parse(r.data as string) as Parcel)
+      .find((p) => ownCodes(p).has(code) || (!!oid && normalizeForLookup(p.orderId) === oid && !p.track));
+    if (hit) {
+      const where = hit.isDeleted ? "mục Đã xóa" : hit.isArchived ? "Kho lưu trữ" : "Bảng chính";
+      return { outcome: "duplicate", message: `ĐƠN ĐÃ CÓ Ở ${where.toUpperCase()}, KHÔNG TẠO LẠI`, code, orderId: hit.orderId, where };
+    }
+    const p = buildNewParcel("n_" + crypto.randomUUID().replace(/-/g, ""), input, vnTime(Date.now()));
+    const rev = this.writeParcel(p, "");
+    this.audit(dev.deviceId, input.origin === "phone" ? "phone_new_order" : "manual_new_order", p.id, {}, { track: p.track, platform: p.platform });
+    return { outcome: "success", message: `ĐÃ TẠO ĐƠN MỚI Ở BẢNG CHÍNH (${p.platform})`, code, platform: p.platform, orderId: p.orderId, parcel: this.toWire(p, rev, Date.now()) };
   }
 
   // ===================================================== nhập đơn

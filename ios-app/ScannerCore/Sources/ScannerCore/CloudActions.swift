@@ -12,6 +12,8 @@ public enum CloudOps {
     /// Theo dõi đơn + lý do (ở app là "ghi chú theo dõi").
     public static func setWatch(id: String, on: Bool, reason: String) -> [String: Any] { ["type": "setWatch", "id": id, "on": on, "reason": reason] }
     public static func delete(id: String) -> [String: Any] { ["type": "delete", "id": id] }
+    /// Tạo đơn mới (quét chế độ "Đơn mới"): cloud tự nhận sàn/hãng; mã đã có ở bất kỳ đâu thì KHÔNG tạo lại.
+    public static func newOrder(code: String) -> [String: Any] { ["type": "newOrder", "code": code, "origin": "phone"] }
     /// Đơn hủy: đánh dấu đã nhận / chưa nhận.
     public static func cancelReceive(id: String, received: Bool) -> [String: Any] { setStatus(id: id, status: received ? Self.received : Self.notReturned) }
 }
@@ -38,6 +40,48 @@ extension CloudSyncClient {
             return e.isNetwork ? "Mất kết nối cloud giữa chừng: chưa chắc đã lưu. Kiểm tra lại đơn rồi thử lại." : e.message
         } catch {
             return "Không lưu được. Thử lại."
+        }
+    }
+}
+
+/// Kết quả tạo đơn mới qua cloud.
+public struct CloudNewOrderResult: Equatable {
+    public let outcome: String      // success | duplicate | invalid | error
+    public let message: String
+    public let platform: String
+    public let orderId: String
+    public init(outcome: String, message: String, platform: String = "", orderId: String = "") {
+        self.outcome = outcome; self.message = message; self.platform = platform; self.orderId = orderId
+    }
+    /// Lượt quét: thành công = đã tạo; đã có = trùng (không tạo lại); còn lại = lỗi cần kiểm tra.
+    public var status: ScanStatus { outcome == "success" ? .success : outcome == "duplicate" ? .duplicate : .error }
+    public var tone: CloudTone { outcome == "success" ? .success : .danger }
+}
+
+extension CloudSyncClient {
+    /// Tạo đơn mới qua cloud. Mất kết nối thì từ chối ngay (không hàng đợi ngoại tuyến).
+    public func newOrder(code: String) async -> CloudNewOrderResult {
+        guard canWrite, let a = currentAPI else { return CloudNewOrderResult(outcome: "error", message: "Mất kết nối cloud: chưa tạo được đơn. Kiểm tra mạng rồi thử lại.") }
+        return await CloudSyncClient.performNewOrder(code: code, api: a, refresh: { [weak self] in
+            guard let self else { return }
+            try await self.pull(a)
+        })
+    }
+
+    /// Phần lõi của `newOrder` (tách ra để test không cần WebSocket).
+    public static func performNewOrder(code: String, api: CloudAPI, refresh: () async throws -> Void) async -> CloudNewOrderResult {
+        do {
+            let r = try await api.op(CloudOps.newOrder(code: code))
+            guard r.ok else { return CloudNewOrderResult(outcome: "error", message: r.errorMessage ?? "Cloud từ chối tạo đơn.") }
+            let x = r.result ?? [:]
+            let res = CloudNewOrderResult(outcome: x["outcome"] as? String ?? "error", message: x["message"] as? String ?? "",
+                                          platform: x["platform"] as? String ?? "", orderId: x["orderId"] as? String ?? "")
+            if res.outcome == "success" { try? await refresh() }
+            return res
+        } catch let e as CloudAPIError {
+            return CloudNewOrderResult(outcome: "error", message: e.isNetwork ? "Mất kết nối cloud giữa chừng: chưa chắc đã tạo. Tìm lại mã trước khi quét lại." : e.message)
+        } catch {
+            return CloudNewOrderResult(outcome: "error", message: "Không tạo được đơn. Thử lại.")
         }
     }
 }

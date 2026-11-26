@@ -693,6 +693,36 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
   });
 });
 
+describe("tạo đơn mới qua cloud (máy tính nhập tay, điện thoại quét Đơn mới)", () => {
+  const op = (token: string, o: Record<string, unknown>) => call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "newOrder", ...o }] }, token);
+
+  it("tạo đơn mới theo đúng hình dạng máy tính; mọi máy thấy qua /sync", async () => {
+    const r = await op(phoneA, { code: " spxvn0000009991 ", origin: "phone" });
+    const res = r.data.results[0].result;
+    expect(res.outcome).toBe("success");
+    expect(res.platform).toBe("Shopee");
+    expect(res.parcel).toMatchObject({ track: "SPXVN0000009991", orderId: "SPXVN0000009991", status: "Chưa trả", carrier: "SPX Express",
+      orderType: "Trả hàng/Hoàn tiền", platformStatus: "Đang chuyển hoàn", importWeek: "Đơn mới tạo", note: "Đơn mới tạo từ máy quét điện thoại" });
+    expect(res.parcel.items[0].product).toBe("Sản phẩm mới (Quét điện thoại)");
+    const sync = await call("GET", "/sync?since=0", undefined, pc);
+    expect(JSON.stringify(sync.data)).toContain("SPXVN0000009991");
+    // quét nhận được ngay
+    const scan = await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "scan", code: "SPXVN0000009991" }] }, phoneB);
+    expect(scan.data.results[0].result.outcome).toBe("received");
+  });
+
+  it("mã đã có ở bảng chính / lưu trữ / đã xóa thì KHÔNG tạo lại, báo đúng nơi", async () => {
+    const a = (await op(owner, { code: "840000000001", product: "Áo", qty: 2 })).data.results[0].result;
+    expect(a.outcome).toBe("success");
+    expect(a.parcel.carrier).toBe("J&T Express");
+    expect(a.parcel.note).toBe("Đơn tạo tay trên máy tính");
+    expect((await op(phoneA, { code: "840000000001" })).data.results[0].result).toMatchObject({ outcome: "duplicate", where: "Bảng chính" });
+    await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "delete", id: a.parcel.id }] }, owner);
+    expect((await op(phoneA, { code: "840000000001" })).data.results[0].result).toMatchObject({ outcome: "duplicate", where: "mục Đã xóa" });
+    expect((await op(phoneA, { code: "  " })).data.results[0].result.outcome).toBe("invalid");
+  });
+});
+
 describe("hết lượt ghi của Cloudflare (gói miễn phí)", () => {
   it("lỗi chặn ghi thành 429 'hết hạn mức', đọc vẫn được, hạn mức báo stop; ngày sau hết chặn", async () => {
     await importParcels([parcel("p1")]);

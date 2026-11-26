@@ -57,6 +57,28 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(t.requests.isEmpty)
     }
 
+    // MARK: tạo đơn mới qua cloud
+
+    func testNewOrderSendsTheCodeAndMapsOutcomes() async throws {
+        let ok = Transport { _ in (200, #"{"results":[{"opId":"x","ok":true,"rev":5,"result":{"outcome":"success","message":"ĐÃ TẠO ĐƠN MỚI Ở BẢNG CHÍNH (Shopee)","platform":"Shopee","orderId":"SPXVN01"}}]}"#) }
+        var refreshed = 0
+        let r = await CloudSyncClient.performNewOrder(code: "SPXVN01", api: try CloudAPI(baseURL: "https://a.workers.dev", token: "t", transport: ok), refresh: { refreshed += 1 })
+        XCTAssertEqual(r.status, .success); XCTAssertEqual(r.platform, "Shopee"); XCTAssertEqual(refreshed, 1)
+        let op = (ok.bodies.first?["ops"] as? [[String: Any]])?.first
+        XCTAssertEqual(op?["type"] as? String, "newOrder"); XCTAssertEqual(op?["code"] as? String, "SPXVN01"); XCTAssertEqual(op?["origin"] as? String, "phone")
+
+        let dup = Transport { _ in (200, #"{"results":[{"opId":"x","ok":true,"rev":5,"result":{"outcome":"duplicate","message":"ĐƠN ĐÃ CÓ Ở KHO LƯU TRỮ, KHÔNG TẠO LẠI"}}]}"#) }
+        let d = await CloudSyncClient.performNewOrder(code: "A", api: try CloudAPI(baseURL: "https://a.workers.dev", token: "t", transport: dup), refresh: { refreshed += 1 })
+        XCTAssertEqual(d.status, .duplicate); XCTAssertTrue(d.message.contains("KHO LƯU TRỮ")); XCTAssertEqual(refreshed, 1)
+    }
+
+    func testNewOrderIsRefusedOfflineWithoutNetwork() async {
+        let t = Transport { _ in XCTFail("không được gọi mạng"); return (200, "{}") }
+        let client = CloudSyncClient(store: CloudParcelStore(), sessions: InMemoryCloudSessionStore(), transport: t)
+        let r = await client.newOrder(code: "SPXVN01")
+        XCTAssertEqual(r.status, .error); XCTAssertTrue(r.message.contains("Mất kết nối")); XCTAssertTrue(t.requests.isEmpty)
+    }
+
     // MARK: kết quả quét
 
     func testScanOutcomesMapToStatusesAndOnlyReceivedIsAConfirmedSuccess() {

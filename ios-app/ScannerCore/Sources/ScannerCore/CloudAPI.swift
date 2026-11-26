@@ -274,7 +274,7 @@ public final class CloudAPI {
         guard let t = token, !t.isEmpty else { return [] }
         var out: [AIEndpoint] = []
         if groq { out += AIEndpoint.build(provider: "groq", baseURL: baseURL + "/ai/groq", apiKey: t, models: groqModels, fallbackModel: "openai/gpt-oss-120b") }
-        if gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: "gemini-2.5-flash") }
+        if gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel) }
         return out
     }
 

@@ -137,13 +137,13 @@ public sealed class AiFallbackTests
             var s = new AiSettingsStore(dir);
             Assert.Empty(s.BuildEndpoints());
             s.SaveKey(AiSettingsStore.Gemini, "gem-secret");
-            Assert.Equal(new[] { "gemini/gemini-2.5-flash", "gemini/gemini-2.5-flash-lite" }, s.BuildEndpoints().Select(e => e.Label).ToArray());
+            Assert.Equal(new[] { "gemini/gemini-4-hydrogen", "gemini/gemini-3.8-flash", "gemini/gemini-3.5-flash-lite" }, s.BuildEndpoints().Select(e => e.Label).ToArray());
             s.SaveKey(AiSettingsStore.Groq, "groq-secret");
             var labels = s.BuildEndpoints().Select(e => e.Label).ToArray();
             Assert.Equal("groq/openai/gpt-oss-120b", labels[0]);
             Assert.Equal("groq/qwen/qwen3.8-27b", labels[1]);
             Assert.Equal("groq/openai/gpt-oss-20b", labels[2]);
-            Assert.Equal("gemini/gemini-2.5-flash", labels[3]);
+            Assert.Equal("gemini/gemini-4-hydrogen", labels[3]);
             Assert.Equal("groq-secret", s.LoadKey(AiSettingsStore.Groq));
             Assert.Equal("gem-secret", s.LoadKey(AiSettingsStore.Gemini));
             s.ClearKey(AiSettingsStore.Groq);

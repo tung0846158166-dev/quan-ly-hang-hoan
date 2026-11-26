@@ -36,6 +36,11 @@ public sealed class CloudMode : IDisposable
 
     private readonly CloudPublishTrigger _trigger = new();
 
+    /// <summary>Cổng AI của cloud (null = chưa nối / chưa hỏi được). Cập nhật mỗi lần nối được cloud.</summary>
+    public QuanLyHangHoan.Data.Ai.CloudAiAccess? AiAccess { get; private set; }
+    /// <summary>Phát khi <see cref="AiAccess"/> đổi (có thể từ luồng nền).</summary>
+    public event Action? AiAccessChanged;
+
     /// <summary>Kết quả lần đẩy đơn gần nhất (để hiển thị/chẩn đoán).</summary>
     public string LastPublishNote { get; private set; } = "";
 
@@ -62,7 +67,12 @@ public sealed class CloudMode : IDisposable
             });
         };
         // nạp lúc mất mạng thì chưa đẩy được: nối lại là đẩy bù ngay
-        Link.Changed += () => { if (_trigger.OnLinkChanged(Link.CanWrite)) _ = PublishAsync("reconnect"); };
+        Link.Changed += () =>
+        {
+            if (!_trigger.OnLinkChanged(Link.CanWrite)) return;
+            _ = PublishAsync("reconnect");
+            _ = RefreshAiAccessAsync();
+        };
         Link.Start();
     }
 
@@ -81,6 +91,21 @@ public sealed class CloudMode : IDisposable
         catch (CloudApiException ex) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message + " (sẽ đẩy lại khi nối lại / lần nạp sau)"; Published?.Invoke(LastPublishNote, true); }
         catch (Exception ex) when (ex is IOException or Microsoft.Data.Sqlite.SqliteException) { LastPublishNote = "Đẩy lên cloud lỗi: " + ex.Message; Published?.Invoke(LastPublishNote, true); }
         finally { _publishGate.Release(); }
+    }
+
+    /// <summary>Hỏi cloud có khóa AI nào. Lỗi mạng thì giữ trạng thái cũ (lần nối sau hỏi lại).</summary>
+    public async Task RefreshAiAccessAsync()
+    {
+        if (Link.Api is not { Token: { } token } api) return;
+        try
+        {
+            var (groq, gemini) = await api.AiStatusAsync().ConfigureAwait(false);
+            AiAccess = new QuanLyHangHoan.Data.Ai.CloudAiAccess(api.BaseUrl, token, groq, gemini);
+            AiAccessChanged?.Invoke();
+        }
+        catch (CloudApiException) { }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) { }
     }
 
     public void Dispose()

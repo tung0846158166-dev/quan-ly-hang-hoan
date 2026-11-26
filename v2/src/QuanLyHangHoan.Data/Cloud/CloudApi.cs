@@ -129,6 +129,13 @@ public sealed class CloudApi
         return (r["deviceId"]?.GetValue<string>() ?? "", r["deviceName"]?.GetValue<string>() ?? "", r["role"]?.GetValue<string>() ?? "");
     }
 
+    /// <summary>Cổng AI: nhà cung cấp nào đã có khóa trên cloud.</summary>
+    public async Task<(bool Groq, bool Gemini)> AiStatusAsync(CancellationToken ct = default)
+    {
+        var r = await JsonAsync(HttpMethod.Get, "/ai/status", null, ct);
+        return (r["groq"]?.GetValue<bool>() ?? false, r["gemini"]?.GetValue<bool>() ?? false);
+    }
+
     // ---- đồng bộ
     public async Task<CloudSyncPage> SyncAsync(long since, int limit = 500, CancellationToken ct = default)
     {

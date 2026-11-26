@@ -134,7 +134,11 @@ struct ScanView: View {
             ModePicker(mode: $engine.mode)
 
             HStack(spacing: 8) {
-                if engine.pendingCount > 0 && !engine.isDemoMode {
+                // kết quả lượt quét: dòng gọn trên camera, bên trái "Hôm nay" (chỗ chủ dự án vạch ở ảnh 21), không che camera
+                if let b = statusBanner {
+                    ScanStatusLine(banner: b, icon: bannerIcon(for: b.color))
+                        .layoutPriority(1)
+                } else if engine.pendingCount > 0 && !engine.isDemoMode {
                     StatusPill(text: "Chờ gửi \(engine.pendingCount)", color: Theme.warning)
                 }
                 Spacer(minLength: 4)
@@ -166,11 +170,6 @@ struct ScanView: View {
                     .transition(.identity)
                 }
 
-                // đang giữ nhãn đã quét: dấu lớn trên camera cho biết đã quét + kết quả (không phải mở Lịch sử)
-                if let b = heldBanner {
-                    HeldScanBadge(banner: b, icon: bannerIcon(for: b.color))
-                        .allowsHitTesting(false)
-                }
 
                 if engine.cloudLocked {
                     CloudScanLockOverlay()   // T042: mất kết nối cloud = không quét
@@ -237,13 +236,13 @@ struct ScanView: View {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                     .stroke(Theme.modeColor(engine.mode).opacity(0.65), lineWidth: 1.8)
             )
-
-            if showBannerCard, let b = engine.banner {
-                resultBottomCard(b)
-                    .padding(8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
+    }
+
+    /// Dòng trạng thái quét: nhãn đang giữ trước camera (kể cả "Đang xử lý"), không thì kết quả gần nhất trong vài giây.
+    private var statusBanner: Banner? {
+        if let h = heldBanner { return h }
+        return showBannerCard ? engine.banner : nil
     }
 
     /// Kết quả của nhãn đang giữ trước camera (banner đúng mã đó). Chưa có kết quả thì "Đang xử lý".
@@ -509,33 +508,30 @@ struct ScanGuide: Shape {
 }
 
 
-/// Dấu lớn giữa khung camera khi đang giữ nhãn đã quét: biểu tượng + câu kết quả + mã, màu theo kết quả.
-private struct HeldScanBadge: View {
+/// Một dòng kết quả quét phía trên camera (chỗ chủ dự án vạch ở ảnh 21): biểu tượng + câu kết quả (màu) + đuôi mã. Không che camera.
+private struct ScanStatusLine: View {
     let banner: Banner
     let icon: String
 
     var body: some View {
-        VStack(spacing: 6) {
+        HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 44, weight: .bold))
-            Text(banner.text.uppercased())
-                .font(.system(size: 17, weight: .heavy))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .font(.system(size: 13, weight: .bold))
+            Text(banner.text)
+                .font(Theme.Typography.captionBold)
+                .lineLimit(1)
+                .truncationMode(.tail)
             if !banner.code.isEmpty {
-                Text(banner.code)
-                    .font(Theme.Typography.code)
+                Text(String(banner.code.suffix(6)))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Text("Đã quét · đưa nhãn ra khỏi khung để quét lại")
-                .font(Theme.Typography.micro)
-                .opacity(0.85)
         }
-        .foregroundColor(.white)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(banner.color.opacity(0.88), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(radius: 6)
-        .padding(16)
+        .foregroundColor(banner.color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(banner.color.opacity(0.14), in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 }

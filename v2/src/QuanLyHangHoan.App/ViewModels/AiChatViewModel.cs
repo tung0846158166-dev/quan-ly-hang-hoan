@@ -244,6 +244,23 @@ public sealed partial class AiChatViewModel : ObservableObject
         finally { IsBusy = false; }
     }
 
+    /// <summary>Chế độ cloud: đã biết cloud có khóa nào (hoặc mất/nối lại) thì cập nhật trạng thái; phiên chat dựng lại với cổng mới.</summary>
+    public void RefreshKeyState()
+    {
+        if (_store is null || !Available) return;
+        _chat = null;
+        HasKey = _store.HasKey;
+        OnPropertyChanged(nameof(UsesCloudKeys));
+        OnPropertyChanged(nameof(ShowLocalKeys));
+        StatusText = _store.UsesCloud
+            ? (HasKey ? "Sẵn sàng (AI dùng khóa trên cloud). Hãy hỏi về đơn hàng của bạn." : "Cloud chưa có khóa AI: chủ cửa hàng đặt khóa Groq/Google trên cloud.")
+            : (HasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Bấm ⚙ Khóa API để nhập khóa Groq và/hoặc Google.");
+    }
+
+    /// <summary>Đang dùng khóa trên cloud (ẩn ô nhập khóa trên máy).</summary>
+    public bool UsesCloudKeys => _store?.UsesCloud ?? false;
+    public bool ShowLocalKeys => !UsesCloudKeys;
+
     public void ForgetKeys()
     {
         _store?.ClearAllKeys();

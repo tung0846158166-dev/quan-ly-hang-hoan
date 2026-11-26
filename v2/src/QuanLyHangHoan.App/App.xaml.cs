@@ -189,6 +189,7 @@ public partial class App : Application
                 () => DateTime.Now);
             IFileImportController realFileImport = new RealFileImportController(AppPaths.DatabasePath, () => DateTime.Now);
             IReturnWatchService sqliteReturnWatch = _cloud?.ReturnWatch ?? new SqliteReturnWatchService(AppPaths.DatabasePath);
+            var aiStore = new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder);
             mainViewModel = new MainViewModel(
                 sqliteProvider,
                 sqliteProvider,
@@ -220,7 +221,7 @@ public partial class App : Application
                 notificationService: notificationService,
                 alertNotifyStateStore: alertStateStore,
                 backupController: new SqliteBackupController(AppPaths.DatabasePath),
-                aiSettingsStore: new QuanLyHangHoan.Data.Ai.AiSettingsStore(AppPaths.BaseFolder),
+                aiSettingsStore: aiStore,
                 aiOrderLoader: () => QuanLyHangHoan.Data.OrderRepository.Load(AppPaths.DatabasePath),
                 aiActivityLoader: (limit, type, text) => QuanLyHangHoan.Data.AuditLogReader.Read(AppPaths.DatabasePath, limit, 0, type, text),
                 aiReturnWatch: all => QuanLyHangHoan.Data.ReturnWatchService.ActiveMarks(AppPaths.DatabasePath, all),
@@ -241,6 +242,9 @@ public partial class App : Application
                 realSaleworkController.Completed += r => { _ = cloud.PublishAsync("salework"); };
                 realFileImport.Completed += r => { _ = cloud.PublishAsync("file"); };
                 cloud.Published += (note, isError) => Dispatcher.BeginInvoke(() => vmForCloud.ShowToast(note, isError));
+                // AI dùng khóa trên cloud (token thiết bị); khóa trên máy không dùng nữa
+                aiStore.UseCloud(() => cloud.AiAccess);
+                cloud.AiAccessChanged += () => Dispatcher.BeginInvoke(() => vmForCloud.AiChatVm.RefreshKeyState());
             }
         }
 

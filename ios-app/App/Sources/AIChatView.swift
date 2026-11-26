@@ -109,7 +109,7 @@ final class AIChatViewModel: ObservableObject {
 
     init() {
         groqModels = UserDefaults.standard.string(forKey: "ai.models.groq") ?? AIEndpoint.defaultGroqModels
-        geminiModels = UserDefaults.standard.string(forKey: "ai.models.gemini") ?? AIEndpoint.defaultGeminiModels
+        geminiModels = AIEndpoint.cleanGeminiModels(UserDefaults.standard.string(forKey: "ai.models.gemini") ?? AIEndpoint.defaultGeminiModels)
         refreshKeys()
         status = hasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Chạm ⚙ để nhập khóa Groq và/hoặc Google."
     }
@@ -149,7 +149,7 @@ final class AIChatViewModel: ObservableObject {
             out += AIEndpoint.build(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: k, models: groqModels, fallbackModel: "openai/gpt-oss-120b")
         }
         if let k = AIKeychain.load("gemini") {
-            out += AIEndpoint.build(provider: "gemini", baseURL: AIEndpoint.geminiBaseURL, apiKey: k, models: geminiModels, fallbackModel: "gemini-2.5-flash")
+            out += AIEndpoint.build(provider: "gemini", baseURL: AIEndpoint.geminiBaseURL, apiKey: k, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel)
         }
         return out
     }
@@ -425,33 +425,39 @@ struct AIChatView: View {
 /// Cấu hình trợ lý AI nằm trong Cài đặt: khóa API (Keychain) và danh sách mô hình theo thứ tự ưu tiên.
 struct AIKeySettingsView: View {
     @EnvironmentObject var vm: AIChatViewModel
+    @EnvironmentObject var engine: SyncEngine
+    /// Đã ghép cloud: AI dùng khóa trên cloud, ẩn ô nhập khóa ngay (không đợi hỏi được cloud).
+    private var cloudKeys: Bool { vm.usesCloud || engine.cloudActive }
     @State private var groqKey = ""
     @State private var geminiKey = ""
 
     var body: some View {
         Form {
-            if vm.usesCloud {
+            if cloudKeys {
                 Section(footer: Text("Khóa cũ trên điện thoại không còn được dùng; bấm \"Xóa các khóa khỏi điện thoại\" để xóa hẳn.")) {
                     Label("Điện thoại đang dùng cloud: AI dùng khóa Groq/Google đặt trên cloud (chung cho mọi máy), không cần nhập khóa ở đây.",
                           systemImage: "icloud")
                         .font(.footnote)
                 }
-            } else {
+            }
             Section(header: Text("Groq (console.groq.com)")) {
+                if !cloudKeys {
                 SecureField("Khóa API Groq (để trống = giữ khóa đã lưu)", text: $groqKey)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                }
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.groqModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
             }
             Section(header: Text("Google Gemini (aistudio.google.com)"),
                     footer: Text("Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau, rồi sang Google. Khóa lưu trong Keychain của điện thoại và không hiện lại. Dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận.")) {
+                if !cloudKeys {
                 SecureField("Khóa API Google (để trống = giữ khóa đã lưu)", text: $geminiKey)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                }
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
-            }
             }
             Section {
                 Button("Lưu và thử kết nối") {
@@ -467,6 +473,7 @@ struct AIKeySettingsView: View {
                 }
             }
         }
+        .task { await vm.refreshCloudAI() }
         .navigationTitle("Trợ lý AI")
         .navigationBarTitleDisplayMode(.inline)
     }

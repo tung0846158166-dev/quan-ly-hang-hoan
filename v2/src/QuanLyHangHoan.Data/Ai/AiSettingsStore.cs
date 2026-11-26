@@ -3,6 +3,9 @@ using System.Text;
 
 namespace QuanLyHangHoan.Data.Ai;
 
+/// <summary>Cổng AI của cloud: địa chỉ API (".../v1"), token thiết bị, nhà cung cấp nào đã có khóa trên cloud.</summary>
+public sealed record CloudAiAccess(string ApiBase, string Token, bool Groq, bool Gemini);
+
 /// <summary>
 /// Lưu khóa API và danh sách mô hình trên máy, cho từng nhà cung cấp (groq, gemini). Khóa được mã hóa bằng DPAPI
 /// (chỉ tài khoản Windows này giải mã được), không bao giờ ghi dạng chữ thường, không nằm trong settings.json hay bản sao lưu dạng chữ.
@@ -15,7 +18,15 @@ public sealed class AiSettingsStore
 
     private readonly string _dir;
 
+    private Func<CloudAiAccess?>? _cloud;
+
     public AiSettingsStore(string directory) => _dir = directory;
+
+    /// <summary>Chế độ cloud: AI đi qua cổng AI của cloud bằng token thiết bị (khóa chỉ nằm trên cloud). Trả null = chưa nối / chưa biết: dùng khóa trên máy.</summary>
+    public void UseCloud(Func<CloudAiAccess?> cloud) => _cloud = cloud;
+
+    public CloudAiAccess? Cloud => _cloud?.Invoke();
+    public bool UsesCloud => Cloud is not null;
 
     private string KeyPath(string provider) => Path.Combine(_dir, provider == Groq ? "ai-key.dat" : $"ai-key-{provider}.dat");
     private string ModelPath(string provider) => Path.Combine(_dir, provider == Groq ? "ai-model.txt" : $"ai-model-{provider}.txt");
@@ -34,7 +45,7 @@ public sealed class AiSettingsStore
         catch { return null; }
     }
 
-    public bool HasKey => LoadKey(Groq) is not null || LoadKey(Gemini) is not null;
+    public bool HasKey => Cloud is { } c ? c.Groq || c.Gemini : LoadKey(Groq) is not null || LoadKey(Gemini) is not null;
     public bool HasKeyFor(string provider) => LoadKey(provider) is not null;
 
     public void SaveKey(string key) => SaveKey(Groq, key);
@@ -64,10 +75,18 @@ public sealed class AiSettingsStore
         try
         {
             var p = ModelPath(provider);
-            if (File.Exists(p) && File.ReadAllText(p).Trim() is { Length: > 0 } m) return m;
+            if (File.Exists(p) && File.ReadAllText(p).Trim() is { Length: > 0 } m) return provider == Gemini ? CleanGeminiModels(m) : m;
         }
         catch { /* dùng mặc định */ }
         return DefaultModels(provider);
+    }
+
+    /// <summary>Bỏ mô hình Google đã ngừng (gemini-1.x, gemini-2.x); bỏ hết thì dùng danh sách mặc định.</summary>
+    public static string CleanGeminiModels(string models)
+    {
+        var kept = (models ?? "").Split(',').Select(x => x.Trim()).Where(x => x.Length > 0)
+            .Where(x => !System.Text.RegularExpressions.Regex.IsMatch(x, @"^gemini-[12]\.", System.Text.RegularExpressions.RegexOptions.IgnoreCase)).ToList();
+        return kept.Count == 0 ? AiChatService.DefaultGeminiModels : string.Join(", ", kept);
     }
 
     public void SaveModel(string model) => SaveModel(Groq, model);
@@ -83,10 +102,17 @@ public sealed class AiSettingsStore
     public List<AiEndpoint> BuildEndpoints()
     {
         var list = new List<AiEndpoint>();
+        if (Cloud is { } c)
+        {
+            var b = c.ApiBase.TrimEnd('/');
+            if (c.Groq) list.AddRange(AiChatService.BuildEndpoints("groq", b + "/ai/groq", c.Token, LoadModel(Groq), AiChatService.DefaultModel));
+            if (c.Gemini) list.AddRange(AiChatService.BuildEndpoints("gemini", b + "/ai/gemini", c.Token, LoadModel(Gemini), AiChatService.FallbackGeminiModel));
+            return list;
+        }
         if (LoadKey(Groq) is { } gk)
             list.AddRange(AiChatService.BuildEndpoints("groq", AiChatService.GroqBaseUrl, gk, LoadModel(Groq), AiChatService.DefaultModel));
         if (LoadKey(Gemini) is { } mk)
-            list.AddRange(AiChatService.BuildEndpoints("gemini", AiChatService.GeminiBaseUrl, mk, LoadModel(Gemini), "gemini-2.5-flash"));
+            list.AddRange(AiChatService.BuildEndpoints("gemini", AiChatService.GeminiBaseUrl, mk, LoadModel(Gemini), AiChatService.FallbackGeminiModel));
         return list;
     }
 

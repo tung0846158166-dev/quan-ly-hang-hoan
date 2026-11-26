@@ -14,7 +14,16 @@ public struct AIEndpoint: Equatable {
     public static let groqBaseURL = "https://api.groq.com/openai/v1"
     public static let geminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
     public static let defaultGroqModels = "openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b"
-    public static let defaultGeminiModels = "gemini-2.5-flash, gemini-2.5-flash-lite"
+    public static let defaultGeminiModels = "gemini-4-hydrogen, gemini-3.8-flash, gemini-3.5-flash-lite"
+    /// Mô hình Google dự phòng cuối (gemini-2.x đã bị Google ngừng, thử thật 26/11/2026).
+    public static let fallbackGeminiModel = "gemini-3.5-flash-lite"
+
+    /// Bỏ mô hình Google đã ngừng (gemini-1.x, gemini-2.x); bỏ hết thì dùng danh sách mặc định.
+    public static func cleanGeminiModels(_ models: String) -> String {
+        let kept = models.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.lowercased().hasPrefix("gemini-1.") && !$0.lowercased().hasPrefix("gemini-2.") }
+        return kept.isEmpty ? defaultGeminiModels : kept.joined(separator: ", ")
+    }
 
     /// Tách danh sách mô hình (dấu phẩy, chấm phẩy, xuống dòng) theo thứ tự ưu tiên, bỏ trùng.
     public static func splitModels(_ text: String, fallback: String) -> [String] {

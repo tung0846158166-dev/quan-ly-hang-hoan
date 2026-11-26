@@ -11,14 +11,24 @@
         <TextBlock Text="Nút ✨ ở góc phải dưới của mọi màn hình mở cửa sổ hỏi đáp về đơn hàng. Nhập khóa của nhà cung cấp nào bạn có (một hoặc cả hai). Khóa lưu mã hóa trên máy này, không hiện lại sau khi lưu. Để trống ô khóa = giữ khóa đã lưu."
                    TextWrapping="Wrap" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,10" />
 
+        <Border Visibility="{Binding UsesCloudKeys, Converter={StaticResource BoolToVis}}" Background="{DynamicResource InfoBlueBadgeBgBrush}"
+                BorderBrush="{DynamicResource InfoBlueCardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,10">
+            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource InkPrimaryBrush}"
+                       Text="Máy này đang dùng cloud: AI dùng khóa Groq/Google đặt trên cloud (chung cho mọi máy), không cần nhập khóa ở đây. Khóa cũ trên máy không còn được dùng, bấm &quot;Xóa các khóa khỏi máy&quot; để xóa hẳn." />
+        </Border>
+
+        <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
         <TextBlock Text="Khóa Groq (console.groq.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,0,4" />
         <PasswordBox x:Name="KeyBox" Padding="6,5" FontFamily="Consolas" />
+        </StackPanel>
         <TextBlock Text="Mô hình Groq theo thứ tự ưu tiên (cách nhau dấu phẩy). Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau:"
                    FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding GroqModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
 
+        <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
         <TextBlock Text="Khóa Google Gemini (aistudio.google.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
         <PasswordBox x:Name="GeminiKeyBox" Padding="6,5" FontFamily="Consolas" />
+        </StackPanel>
         <TextBlock Text="Mô hình Google theo thứ tự ưu tiên (dùng sau khi các mô hình Groq hết hạn mức):"
                    FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />

@@ -140,6 +140,12 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertTrue(try CloudAPI(baseURL: "https://a.workers.dev", token: nil).aiEndpoints(groq: true, gemini: true, groqModels: "m", geminiModels: "g").isEmpty)
     }
 
+    func testRetiredGeminiModelsAreDropped() {
+        XCTAssertEqual(AIEndpoint.cleanGeminiModels("gemini-2.5-flash, gemini-4-hydrogen, gemini-3.5-flash-lite"), "gemini-4-hydrogen, gemini-3.5-flash-lite")
+        XCTAssertEqual(AIEndpoint.cleanGeminiModels("gemini-2.5-flash, gemini-2.5-flash-lite"), AIEndpoint.defaultGeminiModels)
+        XCTAssertFalse(AIEndpoint.defaultGeminiModels.contains("gemini-2."))
+    }
+
     // MARK: mã QR ghép
 
     func testPairLinkParsesAndRoundTrips() {

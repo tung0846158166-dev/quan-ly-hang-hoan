@@ -47,7 +47,9 @@ public sealed class AiChatService : IAiChat
     public const string DefaultBaseUrl = GroqBaseUrl;
     public const string DefaultModel = "openai/gpt-oss-120b";
     public const string DefaultGroqModels = "openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b";
-    public const string DefaultGeminiModels = "gemini-2.5-flash, gemini-2.5-flash-lite";
+    public const string DefaultGeminiModels = "gemini-4-hydrogen, gemini-3.8-flash, gemini-3.5-flash-lite";
+    /// <summary>Mô hình Google dự phòng cuối (gemini-2.x đã bị Google ngừng, thử thật 26/11/2026).</summary>
+    public const string FallbackGeminiModel = "gemini-3.5-flash-lite";
     private const int MaxRounds = 6;
     private const int MaxToolChars = 6000;
     private const int MaxHistoryMessages = 6;

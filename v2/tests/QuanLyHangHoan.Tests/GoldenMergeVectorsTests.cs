@@ -101,7 +101,7 @@ public sealed class GoldenMergeVectorsTests
         },
     };
 
-    private static JsonObject IncomingJson(ImportedParcel p) => new()
+    internal static JsonObject IncomingJson(ImportedParcel p) => new()
     {
         ["shipDate"] = p.ShipDate, ["returnDate"] = p.ReturnDate, ["recvDate"] = p.RecvDate, ["platform"] = p.Platform, ["orderType"] = p.OrderType,
         ["isPartialReturn"] = p.IsPartialReturn, ["platformStatus"] = p.PlatformStatus, ["returnedAt"] = p.ReturnedAt, ["preOrder"] = p.PreOrder,

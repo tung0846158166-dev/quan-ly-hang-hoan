@@ -372,6 +372,11 @@ export class ShopDO extends DurableObject<Env> {
     for (const c of codesOf(p)) this.db.run("INSERT OR IGNORE INTO parcel_codes(code, kind, parcel_id) VALUES (?,?,?)", c.code, c.kind, p.id);
   }
 
+  /** Người dùng đã từng tự đổi trạng thái kho của kiện trên cloud (máy tính / điện thoại). */
+  private userSetStatus(parcelId: string): boolean {
+    return !!this.db.first<Row>("SELECT 1 AS x FROM audit_log WHERE parcel_id = ? AND action = 'setStatus' LIMIT 1", parcelId);
+  }
+
   /** Các ô của kiện đã được người dùng sửa trên cloud (sửa ô / sửa ghi chú): nhập đơn không đè các ô này. */
   private cloudEditedFields(parcelId: string): Set<string> {
     const out = new Set<string>();
@@ -612,7 +617,7 @@ export class ShopDO extends DurableObject<Env> {
         const ex = this.db.first<Row>("SELECT data, src_hash FROM parcels WHERE id = ?", p.id);
         if (!ex) { this.writeParcel(p, hash); added++; continue; }
         if (ex.src_hash === hash) { unchanged++; continue; }
-        const merged = mergeImport(JSON.parse(ex.data as string) as Parcel, p, this.cloudEditedFields(p.id));
+        const merged = mergeImport(JSON.parse(ex.data as string) as Parcel, p, this.cloudEditedFields(p.id), this.userSetStatus(p.id));
         this.writeParcel(merged, hash);
         updated++;
       }
@@ -716,7 +721,8 @@ export class ShopDO extends DurableObject<Env> {
         const old = base.get(o.id) ?? null;
         const p = orderToParcel(o, old);
         if (old) {
-          p.status = old.status; p.recvDate = old.recvDate;
+          if (!cancelledNowTracked(old, p, this.userSetStatus(old.id))) p.status = old.status;
+          p.recvDate = old.recvDate;
           const oo = old as unknown as Record<string, unknown>, pp = p as unknown as Record<string, unknown>;
           for (const k of this.cloudEditedFields(old.id)) if (k in oo) pp[k] = oo[k];
         }
@@ -1083,6 +1089,16 @@ function diffOf(before: Parcel, after: Parcel, side: "before" | "after"): Record
   return out;
 }
 
+/**
+ * Ngoại lệ DUY NHẤT nhập được đổi trạng thái kho (quyết định chủ dự án 26/11/2026: đơn "Hủy sau chuẩn bị" có hàng về):
+ * đơn hủy đang "Không cần nhận" chỉ vì lúc nhập chưa có mã vận đơn, nay có mã -> chuyển sang chờ nhận. Người dùng đã tự đặt trạng thái thì không đụng.
+ */
+function cancelledNowTracked(existing: Parcel, incoming: Parcel, userSetStatus: boolean): boolean {
+  return !userSetStatus && existing.status === ReceiveStatus.notNeeded && incoming.orderType === "Đơn hủy" &&
+    (incoming.status === "Chưa trả" || incoming.status === "Chưa về") &&
+    ((incoming.trackingCodes ?? []).length > 0 || !!incoming.track || !!incoming.returnTrack);
+}
+
 function unionCodes(a: string[] | undefined, b: string[] | undefined): string[] {
   const out: string[] = [];
   for (const c of [...(a ?? []), ...(b ?? [])]) if (c && !out.includes(c)) out.push(c);
@@ -1090,11 +1106,12 @@ function unionCodes(a: string[] | undefined, b: string[] | undefined): string[] 
 }
 
 /** Trường do người dùng sửa trên cloud không bị nhập đè (cloud/API.md mục 7). */
-function mergeImport(existing: Parcel, incoming: Parcel, edited: ReadonlySet<string> = new Set()): Parcel {
+function mergeImport(existing: Parcel, incoming: Parcel, edited: ReadonlySet<string> = new Set(), userSetStatus = false): Parcel {
   const m: Parcel = { ...incoming };
+  const cancelReady = cancelledNowTracked(existing, incoming, userSetStatus);
   // rà lỗi 26/11/2026: trạng thái kho + ngày nhận CHỈ đổi bằng quét / đổi trạng thái trên cloud. Nhập file không bao giờ nhận kiện
   // (từng có kiện thành "Hàng đã trả" không ngày nhận do máy tính gộp theo mã đơn) và không trả kiện đã đổi về trạng thái cũ.
-  m.status = existing.status;
+  m.status = cancelReady ? incoming.status : existing.status;
   m.recvDate = existing.recvDate;
   // ô người dùng đã sửa trên cloud: giữ, nhập không đè
   const ex = existing as unknown as Record<string, unknown>, mm = m as unknown as Record<string, unknown>;

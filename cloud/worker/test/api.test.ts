@@ -940,3 +940,31 @@ describe("nhập đơn không được làm sai dữ liệu kho (rà lỗi 26/11
     expect(p.status).toBe("Hàng đã trả");
   });
 });
+
+describe("đơn hủy sau chuẩn bị (quyết định 26/11/2026: có hàng về)", () => {
+  const get = async (id: string) => {
+    const s = await call("GET", "/sync?since=0&limit=1000", undefined, owner);
+    return s.data.changes.find((c: any) => c.type === "parcel" && c.parcel.id === id)?.parcel;
+  };
+
+  it("đơn hủy chưa có mã -> 'Không cần nhận'; nhập lại có mã vận đơn -> chuyển sang chờ nhận", async () => {
+    await importParcels([parcel("h1", { orderType: "Đơn hủy", track: "", status: "Không cần nhận" })]);
+    expect((await get("h1")).status).toBe("Không cần nhận");
+    await importParcels([parcel("h1", { orderType: "Đơn hủy", track: "SPXH1", trackingCodes: ["SPXH1"], status: "Chưa trả" })]);
+    expect((await get("h1")).status).toBe("Chưa trả");
+    expect((await scan(phoneA, "SPXH1")).res.result.outcome).toBe("received");
+  });
+
+  it("người dùng tự đặt 'Không cần nhận' thì nhập lại không đổi", async () => {
+    await importParcels([parcel("h2", { orderType: "Đơn hủy", track: "SPXH2", trackingCodes: ["SPXH2"], status: "Chưa trả" })]);
+    await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "setStatus", id: "h2", status: "Không cần nhận" }] }, owner);
+    await importParcels([parcel("h2", { orderType: "Đơn hủy", track: "SPXH2", trackingCodes: ["SPXH2"], status: "Chưa trả", note: "x" })]);
+    expect((await get("h2")).status).toBe("Không cần nhận");
+  });
+
+  it("đơn thường: nhập vẫn không đổi được trạng thái", async () => {
+    await importParcels([parcel("h3", { status: "Không cần nhận" })]);
+    await importParcels([parcel("h3", { status: "Chưa trả", note: "y" })]);
+    expect((await get("h3")).status).toBe("Không cần nhận");
+  });
+});

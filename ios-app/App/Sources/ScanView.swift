@@ -166,6 +166,12 @@ struct ScanView: View {
                     .transition(.identity)
                 }
 
+                // đang giữ nhãn đã quét: dấu lớn trên camera cho biết đã quét + kết quả (không phải mở Lịch sử)
+                if let b = heldBanner {
+                    HeldScanBadge(banner: b, icon: bannerIcon(for: b.color))
+                        .allowsHitTesting(false)
+                }
+
                 if engine.cloudLocked {
                     CloudScanLockOverlay()   // T042: mất kết nối cloud = không quét
                 }
@@ -238,6 +244,14 @@ struct ScanView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+    }
+
+    /// Kết quả của nhãn đang giữ trước camera (banner đúng mã đó). Chưa có kết quả thì "Đang xử lý".
+    private var heldBanner: Banner? {
+        let held = Set(camera.heldCodes.map { TrackingCode.clean($0) })
+        guard !held.isEmpty else { return nil }
+        if let b = engine.banner, held.contains(TrackingCode.clean(b.code)) { return b }
+        return Banner(code: held.sorted().first ?? "", text: "Đang xử lý...", color: Theme.info)
     }
 
     private func resultBottomCard(_ b: Banner) -> some View {
@@ -491,5 +505,37 @@ struct ScanGuide: Shape {
             p.addLine(to: CGPoint(x: pt.x, y: pt.y + dy * l))
         }
         return p
+    }
+}
+
+
+/// Dấu lớn giữa khung camera khi đang giữ nhãn đã quét: biểu tượng + câu kết quả + mã, màu theo kết quả.
+private struct HeldScanBadge: View {
+    let banner: Banner
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 44, weight: .bold))
+            Text(banner.text.uppercased())
+                .font(.system(size: 17, weight: .heavy))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            if !banner.code.isEmpty {
+                Text(banner.code)
+                    .font(Theme.Typography.code)
+                    .lineLimit(1)
+            }
+            Text("Đã quét · đưa nhãn ra khỏi khung để quét lại")
+                .font(Theme.Typography.micro)
+                .opacity(0.85)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(banner.color.opacity(0.88), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(radius: 6)
+        .padding(16)
     }
 }

@@ -17,9 +17,12 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     @Published var restReason: String?
     /// Khung hình "đứng" ngay lúc nhận mã (phủ lên khung xem trước ~0,2 giây rồi camera chạy tiếp). nil = đang chạy bình thường.
     @Published var frozenFrame: UIImage?
-    /// Thời gian đứng (giây), đổi được qua UserDefaults "scanFreezeSec"; 0 = tắt. CHỈ dùng trên main thread.
-    private var freezeGate = ScanFreezeGate(duration: UserDefaults.standard.object(forKey: "scanFreezeSec") as? Double ?? ScanFreezeGate.defaultDuration)
+    /// Mã của nhãn đang giữ trước camera (đã quét). Rỗng = không giữ nhãn nào. Màn quét dùng để hiện dấu "ĐÃ QUÉT" lớn trên camera.
+    @Published var heldCodes: Set<String> = []
+    /// Cùng một nhãn đang giữ = MỘT lượt quét; khung chỉ đứng một lần (UserDefaults "scanFreezeSec", mặc định 0,2; 0 = tắt). CHỈ dùng trên main thread.
+    private var hold = ScanHoldTracker(freeze: UserDefaults.standard.object(forKey: "scanFreezeSec") as? Double ?? ScanFreezeGate.defaultDuration, release: 1.0)
     private var unfreezeWork: DispatchWorkItem?
+    private var releaseWork: DispatchWorkItem?
 
     // ---- Chống nóng máy ----
     // Bình thường 24 hình/giây (đủ nhanh để nhận mã); 15 giây không thấy mã nào thì 15 hình/giây;
@@ -195,6 +198,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         lastRegion = .zero
         unfreezeWork?.cancel()
         frozenFrame = nil
+        releaseWork?.cancel()
+        heldCodes = []
         frameLock.lock()
         latestBuffer = nil
         frameLock.unlock()
@@ -340,8 +345,11 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         let candidates = found
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.running, self.wantsRunning else { return }
-            // khung đang đứng sau mã trước: bỏ (không kéo dài thời gian đứng)
-            guard self.freezeGate.accept() else { return }
+            let event = self.hold.observe(candidates)
+            if event != .ignored { self.scheduleRelease() }
+            // cùng nhãn vẫn đang giữ: không quét lại, không đứng lại; đang đứng sau nhãn khác: bỏ
+            guard event == .newScan else { return }
+            self.heldCodes = self.hold.heldCodes
             self.freezeFrame()
             let wasIdle = Date().timeIntervalSince(self.lastCodeAt) > 15
             self.lastCodeAt = Date()
@@ -354,9 +362,20 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         }
     }
 
-    /// Phủ khung hình hiện tại lên khung xem trước trong `freezeGate.duration` giây (camera vẫn chạy bên dưới).
+    /// Nhãn rời khung quá 1 giây: thôi giữ (lần sau thấy lại là lượt quét mới, dấu "ĐÃ QUÉT" trên camera tắt).
+    private func scheduleRelease() {
+        releaseWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self, !self.hold.isHolding() else { return }
+            self.heldCodes = []
+        }
+        releaseWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.05, execute: work)
+    }
+
+    /// Phủ khung hình hiện tại lên khung xem trước trong thời gian đứng (camera vẫn chạy bên dưới).
     private func freezeFrame() {
-        let d = freezeGate.duration
+        let d = hold.freezeDuration
         guard d > 0 else { return }
         frameLock.lock()
         let px = latestBuffer

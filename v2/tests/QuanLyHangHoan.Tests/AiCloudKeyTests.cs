@@ -74,3 +74,64 @@ public sealed class AiGeminiModelTests
         finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }
 }
+
+/// <summary>NVIDIA NIM = tuyến AI dự phòng cuối (chủ dự án 26/11/2026): Groq -> Google -> NVIDIA.</summary>
+public sealed class AiNvidiaFallbackTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "qlhh-nv-" + Guid.NewGuid().ToString("N"));
+    public void Dispose() { try { Directory.Delete(_dir, true); } catch (IOException) { } }
+
+    [Fact]
+    public void Cloud_chain_puts_nvidia_last()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.UseCloud(() => new CloudAiAccess("https://x.workers.dev/v1", "tok", Groq: true, Gemini: true, Nvidia: true));
+        var eps = s.BuildEndpoints();
+        Assert.Equal("nvidia", eps[^1].Provider);
+        Assert.Equal("https://x.workers.dev/v1/ai/nvidia", eps[^1].BaseUrl);
+        Assert.Equal("tok", eps[^1].ApiKey);
+        Assert.True(eps.FindLastIndex(e => e.Provider == "gemini") < eps.FindIndex(e => e.Provider == "nvidia"));
+    }
+
+    [Fact]
+    public void Nvidia_alone_is_enough_and_local_nvidia_key_works_without_cloud()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.UseCloud(() => new CloudAiAccess("https://x.workers.dev/v1", "tok", Groq: false, Gemini: false, Nvidia: true));
+        Assert.True(s.HasKey);
+        Assert.All(s.BuildEndpoints(), e => Assert.Equal("nvidia", e.Provider));
+
+        var local = new AiSettingsStore(Path.Combine(_dir, "local"));
+        local.SaveKey(AiSettingsStore.Nvidia, "nv-key");
+        Assert.True(local.HasKey);
+        var ep = Assert.Single(local.BuildEndpoints().Where(e => e.Model == "meta/llama-3.3-70b-instruct"));
+        Assert.Equal(AiChatService.NvidiaBaseUrl, ep.BaseUrl);
+        Assert.Equal("nv-key", ep.ApiKey);
+    }
+}
+
+public sealed class AiCloudflareFallbackTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "qlhh-cf-" + Guid.NewGuid().ToString("N"));
+    public void Dispose() { try { Directory.Delete(_dir, true); } catch (IOException) { } }
+
+    [Fact]
+    public void Chain_order_is_groq_google_nvidia_then_cloudflare()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.UseCloud(() => new CloudAiAccess("https://x.workers.dev/v1", "tok", true, true, true, true));
+        var providers = s.BuildEndpoints().Select(e => e.Provider).Distinct().ToArray();
+        Assert.Equal(new[] { "groq", "gemini", "nvidia", "cloudflare" }, providers);
+        var cf = s.BuildEndpoints().Last();
+        Assert.Equal("https://x.workers.dev/v1/ai/cloudflare", cf.BaseUrl);
+        Assert.Equal("@cf/meta/llama-3.3-70b-instruct-fp8-fast", cf.Model);
+    }
+
+    [Fact]
+    public void Cloudflare_is_only_used_through_the_cloud()
+    {
+        var s = new AiSettingsStore(_dir);
+        s.SaveKey(AiSettingsStore.Groq, "g");
+        Assert.DoesNotContain(s.BuildEndpoints(), e => e.Provider == "cloudflare");
+    }
+}

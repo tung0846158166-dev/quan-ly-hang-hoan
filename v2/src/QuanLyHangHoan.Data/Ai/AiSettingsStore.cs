@@ -4,7 +4,7 @@ using System.Text;
 namespace QuanLyHangHoan.Data.Ai;
 
 /// <summary>Cổng AI của cloud: địa chỉ API (".../v1"), token thiết bị, nhà cung cấp nào đã có khóa trên cloud.</summary>
-public sealed record CloudAiAccess(string ApiBase, string Token, bool Groq, bool Gemini);
+public sealed record CloudAiAccess(string ApiBase, string Token, bool Groq, bool Gemini, bool Nvidia = false, bool Cloudflare = false);
 
 /// <summary>
 /// Lưu khóa API và danh sách mô hình trên máy, cho từng nhà cung cấp (groq, gemini). Khóa được mã hóa bằng DPAPI
@@ -15,6 +15,8 @@ public sealed class AiSettingsStore
 {
     public const string Groq = "groq";
     public const string Gemini = "gemini";
+    public const string Nvidia = "nvidia";
+    public const string Cloudflare = "cloudflare";
 
     private readonly string _dir;
 
@@ -30,7 +32,8 @@ public sealed class AiSettingsStore
 
     private string KeyPath(string provider) => Path.Combine(_dir, provider == Groq ? "ai-key.dat" : $"ai-key-{provider}.dat");
     private string ModelPath(string provider) => Path.Combine(_dir, provider == Groq ? "ai-model.txt" : $"ai-model-{provider}.txt");
-    private static string DefaultModels(string provider) => provider == Gemini ? AiChatService.DefaultGeminiModels : AiChatService.DefaultGroqModels;
+    private static string DefaultModels(string provider) => provider == Gemini ? AiChatService.DefaultGeminiModels
+        : provider == Nvidia ? AiChatService.DefaultNvidiaModels : provider == Cloudflare ? AiChatService.DefaultCloudflareModels : AiChatService.DefaultGroqModels;
 
     public string? LoadKey(string provider = Groq)
     {
@@ -45,7 +48,8 @@ public sealed class AiSettingsStore
         catch { return null; }
     }
 
-    public bool HasKey => Cloud is { } c ? c.Groq || c.Gemini : LoadKey(Groq) is not null || LoadKey(Gemini) is not null;
+    public bool HasKey => Cloud is { } c ? c.Groq || c.Gemini || c.Nvidia || c.Cloudflare
+        : LoadKey(Groq) is not null || LoadKey(Gemini) is not null || LoadKey(Nvidia) is not null;
     public bool HasKeyFor(string provider) => LoadKey(provider) is not null;
 
     public void SaveKey(string key) => SaveKey(Groq, key);
@@ -67,7 +71,7 @@ public sealed class AiSettingsStore
         try { var p = KeyPath(provider); if (File.Exists(p)) File.Delete(p); } catch { /* bỏ qua */ }
     }
 
-    public void ClearAllKeys() { ClearKey(Groq); ClearKey(Gemini); }
+    public void ClearAllKeys() { ClearKey(Groq); ClearKey(Gemini); ClearKey(Nvidia); }
 
     /// <summary>Danh sách mô hình theo thứ tự ưu tiên, cách nhau bằng dấu phẩy.</summary>
     public string LoadModel(string provider = Groq)
@@ -107,12 +111,16 @@ public sealed class AiSettingsStore
             var b = c.ApiBase.TrimEnd('/');
             if (c.Groq) list.AddRange(AiChatService.BuildEndpoints("groq", b + "/ai/groq", c.Token, LoadModel(Groq), AiChatService.DefaultModel));
             if (c.Gemini) list.AddRange(AiChatService.BuildEndpoints("gemini", b + "/ai/gemini", c.Token, LoadModel(Gemini), AiChatService.FallbackGeminiModel));
+            if (c.Nvidia) list.AddRange(AiChatService.BuildEndpoints("nvidia", b + "/ai/nvidia", c.Token, LoadModel(Nvidia), AiChatService.DefaultNvidiaModels));
+            if (c.Cloudflare) list.AddRange(AiChatService.BuildEndpoints("cloudflare", b + "/ai/cloudflare", c.Token, LoadModel(Cloudflare), AiChatService.DefaultCloudflareModels));
             return list;
         }
         if (LoadKey(Groq) is { } gk)
             list.AddRange(AiChatService.BuildEndpoints("groq", AiChatService.GroqBaseUrl, gk, LoadModel(Groq), AiChatService.DefaultModel));
         if (LoadKey(Gemini) is { } mk)
             list.AddRange(AiChatService.BuildEndpoints("gemini", AiChatService.GeminiBaseUrl, mk, LoadModel(Gemini), AiChatService.FallbackGeminiModel));
+        if (LoadKey(Nvidia) is { } nk)
+            list.AddRange(AiChatService.BuildEndpoints("nvidia", AiChatService.NvidiaBaseUrl, nk, LoadModel(Nvidia), AiChatService.DefaultNvidiaModels));
         return list;
     }
 

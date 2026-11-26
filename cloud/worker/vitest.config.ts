@@ -6,7 +6,7 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
-        bindings: { BOOTSTRAP_KEY: "test-bootstrap-key", IMPORT_KEY: "test-import-key", JOIN_KEY: "mat-khau-cua-hang-gia", GROQ_API_KEY: "test-groq-key", AI_DAILY_LIMIT: "5" },
+        bindings: { BOOTSTRAP_KEY: "test-bootstrap-key", IMPORT_KEY: "test-import-key", JOIN_KEY: "mat-khau-cua-hang-gia", GROQ_API_KEY: "test-groq-key", NVIDIA_API_KEY: "test-nvidia-key", CF_ACCOUNT_ID: "acc123", CF_AI_TOKEN: "test-cf-token", AI_DAILY_LIMIT: "5" },
       },
     }),
   ],

@@ -269,18 +269,24 @@ public final class CloudAPI {
     }
 
     /// Cổng AI: nhà cung cấp nào đã có khóa trên cloud (khóa Groq/Gemini chỉ nằm trên cloud).
-    public func aiStatus() async throws -> (groq: Bool, gemini: Bool) {
+    public func aiStatus() async throws -> CloudAIStatus {
         let data = try await perform("GET", "/ai/status")
         let o = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]) ?? [:]
-        return (o["groq"] as? Bool ?? false, o["gemini"] as? Bool ?? false)
+        return CloudAIStatus(groq: o["groq"] as? Bool ?? false, gemini: o["gemini"] as? Bool ?? false,
+                             nvidia: o["nvidia"] as? Bool ?? false, cloudflare: o["cloudflare"] as? Bool ?? false)
     }
 
     /// Chuỗi mô hình AI đi qua cổng AI của cloud: dùng NGUYÊN logic gọi AI, chỉ đổi địa chỉ gốc và dùng token thiết bị thay khóa API.
-    public func aiEndpoints(groq: Bool, gemini: Bool, groqModels: String, geminiModels: String) -> [AIEndpoint] {
+    /// Thứ tự dự phòng: Groq -> Google -> NVIDIA NIM -> Cloudflare Workers AI (chủ dự án 26/11/2026).
+    public func aiEndpoints(_ st: CloudAIStatus, groqModels: String, geminiModels: String,
+                            nvidiaModels: String = AIEndpoint.defaultNvidiaModels,
+                            cloudflareModels: String = AIEndpoint.defaultCloudflareModels) -> [AIEndpoint] {
         guard let t = token, !t.isEmpty else { return [] }
         var out: [AIEndpoint] = []
-        if groq { out += AIEndpoint.build(provider: "groq", baseURL: baseURL + "/ai/groq", apiKey: t, models: groqModels, fallbackModel: "openai/gpt-oss-120b") }
-        if gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel) }
+        if st.groq { out += AIEndpoint.build(provider: "groq", baseURL: baseURL + "/ai/groq", apiKey: t, models: groqModels, fallbackModel: "openai/gpt-oss-120b") }
+        if st.gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel) }
+        if st.nvidia { out += AIEndpoint.build(provider: "nvidia", baseURL: baseURL + "/ai/nvidia", apiKey: t, models: nvidiaModels, fallbackModel: AIEndpoint.defaultNvidiaModels) }
+        if st.cloudflare { out += AIEndpoint.build(provider: "cloudflare", baseURL: baseURL + "/ai/cloudflare", apiKey: t, models: cloudflareModels, fallbackModel: AIEndpoint.defaultCloudflareModels) }
         return out
     }
 
@@ -301,4 +307,13 @@ public final class CloudAPI {
         let data = try await perform("GET", "/parcels/\(id)/history")
         return ((try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]]) ?? []
     }
+}
+
+/// Nhà cung cấp AI nào đã có khóa trên cloud.
+public struct CloudAIStatus: Equatable {
+    public let groq: Bool, gemini: Bool, nvidia: Bool, cloudflare: Bool
+    public init(groq: Bool, gemini: Bool, nvidia: Bool = false, cloudflare: Bool = false) {
+        self.groq = groq; self.gemini = gemini; self.nvidia = nvidia; self.cloudflare = cloudflare
+    }
+    public var any: Bool { groq || gemini || nvidia || cloudflare }
 }

@@ -15,6 +15,11 @@ public struct AIEndpoint: Equatable {
     public static let geminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
     public static let defaultGroqModels = "openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b"
     public static let defaultGeminiModels = "gemini-4-hydrogen, gemini-3.8-flash, gemini-3.5-flash-lite"
+    /// NVIDIA NIM (build.nvidia.com), chuẩn OpenAI: tuyến dự phòng sau Groq và Google.
+    public static let nvidiaBaseURL = "https://integrate.api.nvidia.com/v1"
+    public static let defaultNvidiaModels = "meta/llama-3.3-70b-instruct"
+    /// Cloudflare Workers AI: chỉ dùng qua cổng AI của cloud. Tuyến dự phòng cuối.
+    public static let defaultCloudflareModels = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     /// Mô hình Google dự phòng cuối (gemini-2.x đã bị Google ngừng, thử thật 26/11/2026).
     public static let fallbackGeminiModel = "gemini-3.5-flash-lite"
 

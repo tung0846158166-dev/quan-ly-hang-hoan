@@ -33,6 +33,21 @@
                    FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
         <TextBox Text="{Binding GeminiModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
 
+        <StackPanel Visibility="{Binding ShowLocalKeys, Converter={StaticResource BoolToVis}}">
+        <TextBlock Text="Khóa NVIDIA NIM (build.nvidia.com)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
+        <PasswordBox x:Name="NvidiaKeyBox" Padding="6,5" FontFamily="Consolas" />
+        </StackPanel>
+        <TextBlock Text="Mô hình NVIDIA theo thứ tự ưu tiên (tuyến dự phòng cuối, dùng khi Groq và Google đều hết hạn mức):"
+                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,8,0,4" TextWrapping="Wrap" />
+        <TextBox Text="{Binding NvidiaModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
+
+        <StackPanel Visibility="{Binding UsesCloudKeys, Converter={StaticResource BoolToVis}}">
+        <TextBlock Text="Cloudflare Workers AI (chỉ qua cloud)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,14,0,4" />
+        <TextBlock Text="Mô hình Cloudflare theo thứ tự ưu tiên (tuyến dự phòng sau NVIDIA):"
+                   FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,0,4" TextWrapping="Wrap" />
+        <TextBox Text="{Binding CloudflareModels, UpdateSourceTrigger=PropertyChanged}" Padding="6,5" FontFamily="Consolas" />
+        </StackPanel>
+
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <Button Content="Lưu và thử kết nối" Click="Save_Click" Padding="12,6" Margin="0,0,8,0" Cursor="Hand"
                     IsEnabled="{Binding IsNotBusy}" />

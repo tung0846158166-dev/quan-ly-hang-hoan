@@ -602,7 +602,7 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     seen = [];
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      if (!url.startsWith("https://api.groq.com") && !url.startsWith("https://generativelanguage.googleapis.com")) return realFetch(input, init);
+      if (!url.startsWith("https://api.groq.com") && !url.startsWith("https://generativelanguage.googleapis.com") && !url.startsWith("https://integrate.api.nvidia.com") && !url.startsWith("https://api.cloudflare.com")) return realFetch(input, init);
       seen.push({ url, auth: new Headers(init?.headers).get("Authorization"), body: new TextDecoder().decode(init?.body as ArrayBuffer) });
       return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
     });
@@ -626,6 +626,25 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     expect(seen[0]!.auth).toBe("Bearer test-groq-key");     // khóa của cloud, KHÔNG phải token thiết bị
     expect(seen[0]!.auth).not.toContain(phoneA);
     expect(JSON.parse(seen[0]!.body).messages[0].content).toBe("hi");
+  });
+
+  it("NVIDIA NIM (tuyến dự phòng cuối): chuyển tiếp tới integrate.api.nvidia.com bằng khóa NVIDIA của cloud", async () => {
+    stubUpstream();
+    const res = await ask(phoneA, "nvidia");
+    expect(res.status).toBe(200);
+    expect(seen[0]!.url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+    expect(seen[0]!.auth).toBe("Bearer test-nvidia-key");
+    expect(await res.text()).not.toContain("test-nvidia-key");
+    expect((await ask(phoneA, "openai")).status).toBe(404);   // nhà cung cấp lạ: không chuyển tiếp
+  });
+
+  it("Cloudflare Workers AI: chuyển tiếp tới cổng chuẩn OpenAI của tài khoản bằng token AI của cloud", async () => {
+    stubUpstream();
+    const res = await ask(phoneA, "cloudflare");
+    expect(res.status).toBe(200);
+    expect(seen[0]!.url).toBe("https://api.cloudflare.com/client/v4/accounts/acc123/ai/v1/chat/completions");
+    expect(seen[0]!.auth).toBe("Bearer test-cf-token");
+    expect(await res.text()).not.toContain("test-cf-token");
   });
 
   it("cần token thiết bị; chưa cấu hình khóa nhà cung cấp thì báo rõ", async () => {
@@ -652,7 +671,7 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
     expect(over.status).toBe(429);
     expect((await over.json() as any).error.code).toBe("ai_quota");
     const st = (await call("GET", "/ai/status", undefined, owner)).data;
-    expect(st).toMatchObject({ groq: true, gemini: false, usedToday: 5, dailyLimit: 5 });
+    expect(st).toMatchObject({ groq: true, gemini: false, nvidia: true, cloudflare: true, usedToday: 5, dailyLimit: 5 });
   });
 
   it("từ chối nội dung rỗng", async () => {

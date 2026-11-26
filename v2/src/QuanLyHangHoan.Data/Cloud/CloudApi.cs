@@ -130,10 +130,10 @@ public sealed class CloudApi
     }
 
     /// <summary>Cổng AI: nhà cung cấp nào đã có khóa trên cloud.</summary>
-    public async Task<(bool Groq, bool Gemini)> AiStatusAsync(CancellationToken ct = default)
+    public async Task<(bool Groq, bool Gemini, bool Nvidia, bool Cloudflare)> AiStatusAsync(CancellationToken ct = default)
     {
         var r = await JsonAsync(HttpMethod.Get, "/ai/status", null, ct);
-        return (r["groq"]?.GetValue<bool>() ?? false, r["gemini"]?.GetValue<bool>() ?? false);
+        return (r["groq"]?.GetValue<bool>() ?? false, r["gemini"]?.GetValue<bool>() ?? false, r["nvidia"]?.GetValue<bool>() ?? false, r["cloudflare"]?.GetValue<bool>() ?? false);
     }
 
     // ---- đồng bộ

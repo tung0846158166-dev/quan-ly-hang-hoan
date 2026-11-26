@@ -73,6 +73,8 @@ public sealed partial class AiChatViewModel : ObservableObject
         Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
         GroqModels = store?.LoadModel(AiSettingsStore.Groq) ?? AiChatService.DefaultGroqModels;
         GeminiModels = store?.LoadModel(AiSettingsStore.Gemini) ?? AiChatService.DefaultGeminiModels;
+        NvidiaModels = store?.LoadModel(AiSettingsStore.Nvidia) ?? AiChatService.DefaultNvidiaModels;
+        CloudflareModels = store?.LoadModel(AiSettingsStore.Cloudflare) ?? AiChatService.DefaultCloudflareModels;
         HasKey = store?.HasKey ?? false;
         Available = store is not null && (loader is not null || chatFactory is not null);
         StatusText = Available
@@ -97,6 +99,8 @@ public sealed partial class AiChatViewModel : ObservableObject
     [ObservableProperty] private string _input = string.Empty;
     [ObservableProperty] private string _groqModels = AiChatService.DefaultGroqModels;
     [ObservableProperty] private string _geminiModels = AiChatService.DefaultGeminiModels;
+    [ObservableProperty] private string _nvidiaModels = AiChatService.DefaultNvidiaModels;
+    [ObservableProperty] private string _cloudflareModels = AiChatService.DefaultCloudflareModels;
     [ObservableProperty] private string _statusText = string.Empty;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _hasKey;
@@ -209,20 +213,25 @@ public sealed partial class AiChatViewModel : ObservableObject
     }
 
     /// <summary>Lưu khóa (nếu nhập) và danh sách mô hình, rồi thử kết nối thật từng mô hình. Khóa không bao giờ hiện lại trên màn hình.</summary>
-    public async Task SaveSettingsAsync(string? groqKey, string? geminiKey)
+    public async Task SaveSettingsAsync(string? groqKey, string? geminiKey, string? nvidiaKey = null)
     {
         if (_store is null) return;
         if (!string.IsNullOrWhiteSpace(groqKey)) _store.SaveKey(AiSettingsStore.Groq, groqKey);
         if (!string.IsNullOrWhiteSpace(geminiKey)) _store.SaveKey(AiSettingsStore.Gemini, geminiKey);
+        if (!string.IsNullOrWhiteSpace(nvidiaKey)) _store.SaveKey(AiSettingsStore.Nvidia, nvidiaKey);
         _store.SaveModel(AiSettingsStore.Groq, GroqModels);
         _store.SaveModel(AiSettingsStore.Gemini, GeminiModels);
+        _store.SaveModel(AiSettingsStore.Nvidia, NvidiaModels);
+        _store.SaveModel(AiSettingsStore.Cloudflare, CloudflareModels);
         GroqModels = _store.LoadModel(AiSettingsStore.Groq);
         GeminiModels = _store.LoadModel(AiSettingsStore.Gemini);
+        NvidiaModels = _store.LoadModel(AiSettingsStore.Nvidia);
+        CloudflareModels = _store.LoadModel(AiSettingsStore.Cloudflare);
         _chat = null;
         HasKey = _store.HasKey;
         if (!HasKey) { StatusText = "Chưa có khóa API."; return; }
         IsBusy = true;
-        var usedSaved = string.IsNullOrWhiteSpace(groqKey) && string.IsNullOrWhiteSpace(geminiKey) ? "Dùng khóa đã lưu. " : "";
+        var usedSaved = string.IsNullOrWhiteSpace(groqKey) && string.IsNullOrWhiteSpace(geminiKey) && string.IsNullOrWhiteSpace(nvidiaKey) ? "Dùng khóa đã lưu. " : "";
         var endpoints = _store.BuildEndpoints();
         StatusText = $"{usedSaved}Đang thử {endpoints.Count} mô hình cùng lúc (mỗi mô hình tối đa 20 giây)...";
         try

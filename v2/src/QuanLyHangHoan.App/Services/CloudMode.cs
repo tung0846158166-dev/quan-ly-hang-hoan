@@ -99,8 +99,8 @@ public sealed class CloudMode : IDisposable
         if (Link.Api is not { Token: { } token } api) return;
         try
         {
-            var (groq, gemini) = await api.AiStatusAsync().ConfigureAwait(false);
-            AiAccess = new QuanLyHangHoan.Data.Ai.CloudAiAccess(api.BaseUrl, token, groq, gemini);
+            var (groq, gemini, nvidia, cloudflare) = await api.AiStatusAsync().ConfigureAwait(false);
+            AiAccess = new QuanLyHangHoan.Data.Ai.CloudAiAccess(api.BaseUrl, token, groq, gemini, nvidia, cloudflare);
             AiAccessChanged?.Invoke();
         }
         catch (CloudApiException) { }

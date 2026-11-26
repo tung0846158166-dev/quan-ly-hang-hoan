@@ -14,9 +14,11 @@ public partial class AiSettingsCard : UserControl
         if (DataContext is not AiChatViewModel vm) return;
         var groq = KeyBox.Password;
         var gemini = GeminiKeyBox.Password;
+        var nvidia = NvidiaKeyBox.Password;
         KeyBox.Clear();
         GeminiKeyBox.Clear();
-        await vm.SaveSettingsAsync(groq, gemini);
+        NvidiaKeyBox.Clear();
+        await vm.SaveSettingsAsync(groq, gemini, nvidia);
     }
 
     private void Forget_Click(object sender, RoutedEventArgs e)

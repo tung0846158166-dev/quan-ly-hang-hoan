@@ -146,8 +146,8 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
-    const ai = /^\/ai\/(groq|gemini)\/chat\/completions$/.exec(path);
-    if (m === "POST" && ai) return this.aiProxy(req, ai[1] as "groq" | "gemini");
+    const ai = /^\/ai\/(groq|gemini|nvidia|cloudflare)\/chat\/completions$/.exec(path);
+    if (m === "POST" && ai) return this.aiProxy(req, ai[1] as AiProvider);
     if (m === "PUT" && path.startsWith("/photos/")) return this.putPhoto(req, url, decodeURIComponent(path.slice("/photos/".length)), dev);
     if (m === "GET" && path.startsWith("/photos/")) return this.getPhoto(url, decodeURIComponent(path.slice("/photos/".length)));
     const pp = /^\/parcels\/([^/]+)\/photos$/.exec(path);
@@ -769,15 +769,16 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   private aiStatus(): Response {
-    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
+    return json({ groq: !!this.env.GROQ_API_KEY, gemini: !!this.env.GEMINI_API_KEY, nvidia: !!this.env.NVIDIA_API_KEY, cloudflare: !!(this.env.CF_AI_TOKEN && this.env.CF_ACCOUNT_ID), usedToday: this.aiUsedToday(), dailyLimit: this.aiLimit() });
   }
 
   /**
    * Chuyển tiếp yêu cầu kiểu OpenAI tới Groq/Gemini bằng khóa của cloud. Máy khách dùng NGUYÊN logic gọi AI hiện có, chỉ đổi địa chỉ gốc
    * sang `/v1/ai/<nhà-cung-cấp>` và dùng token thiết bị thay cho khóa API. Không ghi lại nội dung hỏi/đáp (chỉ đếm số lần gọi trong ngày).
    */
-  private async aiProxy(req: Request, provider: "groq" | "gemini"): Promise<Response> {
-    const key = provider === "groq" ? this.env.GROQ_API_KEY : this.env.GEMINI_API_KEY;
+  private async aiProxy(req: Request, provider: AiProvider): Promise<Response> {
+    const key = provider === "groq" ? this.env.GROQ_API_KEY : provider === "gemini" ? this.env.GEMINI_API_KEY
+      : provider === "nvidia" ? this.env.NVIDIA_API_KEY : (this.env.CF_ACCOUNT_ID ? this.env.CF_AI_TOKEN : undefined);
     if (!key) return fail(503, "ai_not_configured", "Chưa cấu hình khóa AI trên cloud (chủ cửa hàng đặt khóa bằng wrangler secret put).");
     if (this.aiUsedToday() >= this.aiLimit())
       return fail(429, "ai_quota", "Hôm nay đã dùng hết số lượt hỏi AI cho cả cửa hàng. Thử lại sau 07:00 sáng mai (giờ Việt Nam).");
@@ -786,7 +787,8 @@ export class ShopDO extends DurableObject<Env> {
     if (body.byteLength === 0 || body.byteLength > 1_000_000) return fail(422, "invalid", "Nội dung gửi AI rỗng hoặc quá lớn.");
     this.setMeta("ai_day", this.dayKey());
     this.setMeta("ai_n", String(this.aiUsedToday() + 1));
-    const base = provider === "groq" ? "https://api.groq.com/openai/v1" : "https://generativelanguage.googleapis.com/v1beta/openai";
+    const base = provider === "cloudflare"
+      ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(this.env.CF_ACCOUNT_ID ?? "")}/ai/v1` : AI_BASE[provider];
     let up: Response;
     try {
       up = await fetch(`${base}/chat/completions`, {
@@ -902,3 +904,11 @@ function mergeImport(existing: Parcel, incoming: Parcel): Parcel {
   if (existing.status === ReceiveStatus.received) { m.status = existing.status; m.recvDate = existing.recvDate; }
   return m;
 }
+
+/** Nhà cung cấp AI của cổng AI (đều theo chuẩn OpenAI). Dự phòng: Groq -> Google -> NVIDIA NIM -> Cloudflare Workers AI (chủ dự án 26/11/2026). */
+type AiProvider = "groq" | "gemini" | "nvidia" | "cloudflare";
+const AI_BASE: Record<Exclude<AiProvider, "cloudflare">, string> = {
+  groq: "https://api.groq.com/openai/v1",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
+  nvidia: "https://integrate.api.nvidia.com/v1",
+};

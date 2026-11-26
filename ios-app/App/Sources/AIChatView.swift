@@ -95,10 +95,12 @@ final class AIChatViewModel: ObservableObject {
     @Published var hasKey = false
     /// Đã ghép cloud và đã hỏi được cloud: AI đi qua cổng AI của cloud (khóa chỉ nằm trên cloud), khóa trên điện thoại không dùng.
     @Published var usesCloud = false
-    private var cloudAI: (groq: Bool, gemini: Bool)?
+    private var cloudAI: CloudAIStatus?
 
     @Published var groqModels: String
     @Published var geminiModels: String
+    @Published var nvidiaModels: String
+    @Published var cloudflareModels: String
 
     private var service: AIChatService?
     private var tools: AIOrderTools?
@@ -110,6 +112,8 @@ final class AIChatViewModel: ObservableObject {
     init() {
         groqModels = UserDefaults.standard.string(forKey: "ai.models.groq") ?? AIEndpoint.defaultGroqModels
         geminiModels = AIEndpoint.cleanGeminiModels(UserDefaults.standard.string(forKey: "ai.models.gemini") ?? AIEndpoint.defaultGeminiModels)
+        nvidiaModels = UserDefaults.standard.string(forKey: "ai.models.nvidia") ?? AIEndpoint.defaultNvidiaModels
+        cloudflareModels = UserDefaults.standard.string(forKey: "ai.models.cloudflare") ?? AIEndpoint.defaultCloudflareModels
         refreshKeys()
         status = hasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Chạm ⚙ để nhập khóa Groq và/hoặc Google."
     }
@@ -136,13 +140,14 @@ final class AIChatViewModel: ObservableObject {
     }
 
     private func refreshKeys() {
-        if usesCloud, let c = cloudAI { hasKey = c.groq || c.gemini; return }
-        hasKey = AIKeychain.load("groq") != nil || AIKeychain.load("gemini") != nil
+        if usesCloud, let c = cloudAI { hasKey = c.any; return }
+        hasKey = AIKeychain.load("groq") != nil || AIKeychain.load("gemini") != nil || AIKeychain.load("nvidia") != nil
     }
 
     private func endpoints() -> [AIEndpoint] {
         if usesCloud, let c = cloudAI {
-            return engine?.cloud.currentAPI?.aiEndpoints(groq: c.groq, gemini: c.gemini, groqModels: groqModels, geminiModels: geminiModels) ?? []
+            return engine?.cloud.currentAPI?.aiEndpoints(c, groqModels: groqModels, geminiModels: geminiModels,
+                                                          nvidiaModels: nvidiaModels, cloudflareModels: cloudflareModels) ?? []
         }
         var out: [AIEndpoint] = []
         if let k = AIKeychain.load("groq") {
@@ -150,6 +155,9 @@ final class AIChatViewModel: ObservableObject {
         }
         if let k = AIKeychain.load("gemini") {
             out += AIEndpoint.build(provider: "gemini", baseURL: AIEndpoint.geminiBaseURL, apiKey: k, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel)
+        }
+        if let k = AIKeychain.load("nvidia") {
+            out += AIEndpoint.build(provider: "nvidia", baseURL: AIEndpoint.nvidiaBaseURL, apiKey: k, models: nvidiaModels, fallbackModel: AIEndpoint.defaultNvidiaModels)
         }
         return out
     }
@@ -247,9 +255,14 @@ final class AIChatViewModel: ObservableObject {
     }
 
     /// Lưu khóa (nếu nhập) và danh sách mô hình, rồi thử kết nối thật từng mô hình.
-    func saveSettings(groqKey: String, geminiKey: String) {
+    func saveSettings(groqKey: String, geminiKey: String, nvidiaKey: String = "") {
         if !groqKey.trimmingCharacters(in: .whitespaces).isEmpty { AIKeychain.save("groq", groqKey) }
         if !geminiKey.trimmingCharacters(in: .whitespaces).isEmpty { AIKeychain.save("gemini", geminiKey) }
+        if !nvidiaKey.trimmingCharacters(in: .whitespaces).isEmpty { AIKeychain.save("nvidia", nvidiaKey) }
+        if nvidiaModels.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { nvidiaModels = AIEndpoint.defaultNvidiaModels }
+        if cloudflareModels.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { cloudflareModels = AIEndpoint.defaultCloudflareModels }
+        UserDefaults.standard.set(nvidiaModels, forKey: "ai.models.nvidia")
+        UserDefaults.standard.set(cloudflareModels, forKey: "ai.models.cloudflare")
         if groqModels.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { groqModels = AIEndpoint.defaultGroqModels }
         if geminiModels.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { geminiModels = AIEndpoint.defaultGeminiModels }
         UserDefaults.standard.set(groqModels, forKey: "ai.models.groq")
@@ -274,6 +287,7 @@ final class AIChatViewModel: ObservableObject {
     func forgetKeys() {
         AIKeychain.delete("groq")
         AIKeychain.delete("gemini")
+        AIKeychain.delete("nvidia")
         service = nil
         refreshKeys()
         status = "Đã xóa các khóa API khỏi điện thoại này."
@@ -430,6 +444,7 @@ struct AIKeySettingsView: View {
     private var cloudKeys: Bool { vm.usesCloud || engine.cloudActive }
     @State private var groqKey = ""
     @State private var geminiKey = ""
+    @State private var nvidiaKey = ""
 
     var body: some View {
         Form {
@@ -459,10 +474,26 @@ struct AIKeySettingsView: View {
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
             }
+            Section(header: Text("NVIDIA NIM (build.nvidia.com)"), footer: Text("Tuyến dự phòng khi Groq và Google đều hết hạn mức.")) {
+                if !cloudKeys {
+                SecureField("Khóa API NVIDIA (để trống = giữ khóa đã lưu)", text: $nvidiaKey)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                }
+                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.nvidiaModels, axis: .vertical)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                    .font(.system(.footnote, design: .monospaced))
+            }
+            if cloudKeys {
+                Section(header: Text("Cloudflare Workers AI"), footer: Text("Tuyến dự phòng cuối, chỉ dùng qua cloud.")) {
+                    TextField("Mô hình theo thứ tự ưu tiên", text: $vm.cloudflareModels, axis: .vertical)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                        .font(.system(.footnote, design: .monospaced))
+                }
+            }
             Section {
                 Button("Lưu và thử kết nối") {
-                    vm.saveSettings(groqKey: groqKey, geminiKey: geminiKey)
-                    groqKey = ""; geminiKey = ""
+                    vm.saveSettings(groqKey: groqKey, geminiKey: geminiKey, nvidiaKey: nvidiaKey)
+                    groqKey = ""; geminiKey = ""; nvidiaKey = ""
                 }
                 .disabled(vm.isBusy)
                 Button("Xóa các khóa khỏi điện thoại", role: .destructive) { vm.forgetKeys() }

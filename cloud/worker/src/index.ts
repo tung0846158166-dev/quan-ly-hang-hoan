@@ -15,6 +15,11 @@ export interface Env {
   /** Khóa AI (đặt bằng `wrangler secret put GROQ_API_KEY` / `GEMINI_API_KEY`); không có thì cổng AI báo chưa cấu hình. */
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  /** Khóa NVIDIA NIM (build.nvidia.com), tuyến AI dự phòng cuối: `wrangler secret put NVIDIA_API_KEY`. */
+  NVIDIA_API_KEY?: string;
+  /** Cloudflare Workers AI (cổng chuẩn OpenAI): mã tài khoản + token có quyền Workers AI (`wrangler secret put CF_ACCOUNT_ID` / `CF_AI_TOKEN`). */
+  CF_ACCOUNT_ID?: string;
+  CF_AI_TOKEN?: string;
   /** Số lượt hỏi AI tối đa mỗi ngày cho cả cửa hàng (bảo vệ hạn mức yêu cầu của gói miễn phí). */
   AI_DAILY_LIMIT?: string;
 }

@@ -15,8 +15,8 @@ namespace QuanLyHangHoan.Tests;
 /// </summary>
 public sealed class GoldenMergeVectorsTests
 {
-    private static string VectorFile([CallerFilePath] string here = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "..", "cloud", "golden", "merge-vectors.json"));
+    private static string VectorFile(string name = "merge-vectors.json", [CallerFilePath] string here = "") =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "..", "cloud", "golden", name));
 
     private static readonly JsonSerializerOptions Opt = new() { WriteIndented = false, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -118,18 +118,21 @@ public sealed class GoldenMergeVectorsTests
         ["deadline"] = p.Deadline, ["importPriceBasis"] = p.ImportPriceBasis, ["rawDetails"] = p.RawDetails is null ? null : JsonSerializer.SerializeToNode(p.RawDetails),
     };
 
-    private static JsonArray Build()
+    /// <param name="tiktok">Nhánh TikTok/Salework (TikTokMapper.ForNewRow, kiện TikTok) cho nạp Salework trên cloud (26/11/2026); false = nhánh Shopee/Google Sheet.</param>
+    private static JsonArray Build(bool tiktok = false)
     {
-        var r = new Random(20261126);
+        var r = new Random(tiktok ? 20261128 : 20261126);
         var today = new DateTime(2026, 11, 26);
         var cases = new JsonArray();
         var r2 = new Random(20261127);
-        for (var n = 0; n < 1000; n++)
+        for (var n = 0; n < (tiktok ? 600 : 1000); n++)
         {
             var main = Enumerable.Range(0, r.Next(0, 4)).Select(i => MakeOrder(r, i)).ToList();
             var others = Enumerable.Range(0, r.Next(0, 3)).Select(i => new OtherEntry(MakeOrder(r, 100 + i), r.Next(2) == 0 ? OtherWhere.Archive : OtherWhere.Deleted)).ToList();
             var incoming = Enumerable.Range(0, r.Next(1, 4)).Select(_ => MakeIncoming(r)).ToList();
-            if (n >= 800)
+            if (tiktok)
+                foreach (var p in incoming) { p.Platform = Pick(r2, "TikTok Shop", "TikTok", "TikTok Shop"); p.Status = "Chưa về"; if (r2.Next(4) == 0) p.Track = p.ReturnTrack = p.ForwardTrack = ""; }
+            else if (n >= 800)
             {
                 // 200 ca dồn vào nhánh "Shopee chưa có mã vận đơn cùng mã đơn" (quyết định 26/11/2026); bộ sinh riêng để 800 ca đầu không đổi
                 foreach (var o in main) { o.Platform = Pick(r2, "Shopee", "Shopee", "TikTok"); if (r2.Next(3) != 0) { o.Track = o.ReturnTrack = o.ForwardTrack = o.AltTrack = ""; o.TrackingCodes = new(); } if (r2.Next(3) != 0) o.ReturnOrderId = ""; o.OrderId = Pick(r2, "O1", "O2"); }
@@ -146,7 +149,7 @@ public sealed class GoldenMergeVectorsTests
                 ["today"] = today.ToString("dd/MM/yyyy"), ["year"] = today.Year,
             };
 
-            var res = TikTokMerger.Apply(main, others, incoming, mode, today, ShopeeMapper.ForNewRow);
+            var res = TikTokMerger.Apply(main, others, incoming, mode, today, tiktok ? null : ShopeeMapper.ForNewRow);
             var addedSet = res.Added.ToHashSet();
             var k = 0;
             foreach (var o in res.Added) o.Id = "new" + (k++);   // id mới: đánh số theo thứ tự thêm (TS dùng cùng bộ sinh)
@@ -186,5 +189,18 @@ public sealed class GoldenMergeVectorsTests
             File.WriteAllText(path, text);
         }
         Assert.True(File.ReadAllText(path) == text, "cloud/golden/merge-vectors.json lệch với C#: chạy lại với QLHH_REGEN_GOLDEN=1 nếu đổi quy tắc có chủ ý");
+    }
+
+    [Fact]
+    public void Tiktok_merge_vectors_file_matches_what_the_csharp_merger_produces()
+    {
+        var text = new JsonObject
+        {
+            ["description"] = "Bộ ca thử CHUNG cho bước gộp kiện nhập nhánh TikTok/Salework (TikTokMerger.Apply + TikTokMapper.ForNewRow). Do C# sinh (GoldenMergeVectorsTests). Dữ liệu GIẢ.",
+            ["cases"] = Build(tiktok: true),
+        }.ToJsonString(Opt);
+        var path = VectorFile("merge-vectors-tiktok.json");
+        if (Environment.GetEnvironmentVariable("QLHH_REGEN_GOLDEN") == "1" || !File.Exists(path)) File.WriteAllText(path, text);
+        Assert.True(File.ReadAllText(path) == text, "cloud/golden/merge-vectors-tiktok.json lệch với C#: chạy lại với QLHH_REGEN_GOLDEN=1 nếu đổi quy tắc có chủ ý");
     }
 }

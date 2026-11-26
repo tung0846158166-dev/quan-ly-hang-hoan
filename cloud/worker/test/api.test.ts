@@ -968,3 +968,53 @@ describe("đơn hủy sau chuẩn bị (quyết định 26/11/2026: có hàng v�
     expect((await get("h3")).status).toBe("Không cần nhận");
   });
 });
+
+describe("nạp Salework từ điện thoại (/import/mapped, 26/11/2026)", () => {
+  const get = async (id: string) => {
+    const s = await call("GET", "/sync?since=0&limit=1000", undefined, owner);
+    return s.data.changes.filter((c: any) => c.type === "parcel").map((c: any) => c.parcel).find((p: any) => p.id === id);
+  };
+  const all = async () => (await call("GET", "/sync?since=0&limit=1000", undefined, owner)).data.changes.filter((c: any) => c.type === "parcel").map((c: any) => c.parcel);
+  const tk = (over: Record<string, unknown> = {}) => ({ platform: "TikTok Shop", orderId: "SW1", returnOrderId: "C1", orderType: "Trả hàng/Hoàn tiền",
+    items: [{ product: "Áo", color: "Đen", size: "M", qty: 1, returnedQty: 1 }], ...over });
+  const post = (token: string | undefined, body: unknown) => call("POST", "/import/mapped", body, token);
+
+  it("điện thoại đã ghép gửi kiện đã chuyển sẵn: thêm dòng mới theo mặc định TikTok/Salework", async () => {
+    const r = await post(phoneA, { source: "salework", parcels: [tk({ returnTrack: "RT1" })], orderIds: ["SW1"] });
+    expect(r.status).toBe(200);
+    expect(r.data.added).toBe(1);
+    const p = (await all()).find((x: any) => x.orderId === "SW1");
+    expect(p.status).toBe("Chưa về");
+    expect(p.carrier).toBe("J&T Express");
+    expect(p.trackingCodes).toContain("RT1");
+    expect((await call("GET", "/import/log", undefined, owner)).data[0].source).toBe("salework");
+  });
+
+  it("nạp lại cùng kiện thì cập nhật, không nhân đôi; không đụng trạng thái kho", async () => {
+    await post(phoneA, { source: "salework", parcels: [tk({ returnTrack: "RT1" })], orderIds: ["SW1"] });
+    await scan(phoneA, "RT1");
+    const r = await post(phoneA, { source: "salework", parcels: [tk({ returnTrack: "RT1", platformStatus: "Đã hoàn tiền", status: "Chưa về" })], orderIds: ["SW1"] });
+    expect(r.data.added).toBe(0);
+    const rows = (await all()).filter((x: any) => x.orderId === "SW1");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("Hàng đã trả");
+    expect(rows[0].platformStatus).toBe("Đã hoàn tiền");
+  });
+
+  it("dòng chờ cũ chưa có mã (cùng mã đơn) được thay bằng dòng Salework có mã: chuyển dữ liệu kho, dòng cũ xóa MỀM", async () => {
+    await importParcels([parcel("old1", { orderId: "SW1", track: "", platform: "TikTok", status: "Chưa về", userNote: "kho ghi" })]);
+    const r = await post(phoneA, { source: "salework", parcels: [tk({ returnOrderId: "C2", returnTrack: "RT7" })], orderIds: ["SW1"] });
+    expect(r.data.superseded).toBe(1);
+    const old = await get("old1");
+    expect(old.isDeleted).toBe(true);
+    expect(old.deletedFrom).toBe("Salework thay thế");
+    const keep = (await all()).find((x: any) => x.returnTrack === "RT7");
+    expect(keep.isDeleted).toBe(false);
+  });
+
+  it("chưa ghép / quá 100 kiện / nguồn lạ bị từ chối", async () => {
+    expect((await post(undefined, { source: "salework", parcels: [tk()] })).status).toBe(401);
+    expect((await post(phoneA, { source: "salework", parcels: Array.from({ length: 101 }, (_, i) => tk({ orderId: "X" + i })) })).status).toBe(422);
+    expect((await post(phoneA, { source: "bay", parcels: [tk()] })).status).toBe(422);
+  });
+});

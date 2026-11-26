@@ -173,9 +173,28 @@ export function shopeeForNewRow(raw: Incoming, today: string): Incoming {
   return p;
 }
 
+/**
+ * TikTokMapper.ForNewRow (nạp Salework / file TikTok; 26/11/2026). Dòng mới: ngày hoàn = ngày gửi hoặc hôm nay, trạng thái sàn "Chờ xử lý",
+ * mã đơn = mã yêu cầu hoàn nếu trống, hãng "J&T Express", "Không cần nhận" cho đơn hủy chưa có mã, còn lại "Chưa về".
+ */
+export function tiktokForNewRow(raw: Incoming, today: string): Incoming {
+  const p: Incoming = JSON.parse(JSON.stringify(raw));
+  const cleanTrack = cleanTrackingCode(p.track);
+  if (!p.returnDate) p.returnDate = p.shipDate ? p.shipDate : today;
+  if (!p.platformStatus) p.platformStatus = "Chờ xử lý";
+  if (!p.orderId) p.orderId = p.returnOrderId;
+  p.trackingCodes = trackingCodesOf(p);
+  if (cleanTrack) p.track = cleanTrack;
+  if (!p.carrier) p.carrier = "J&T Express";
+  p.status = p.orderType === "Đơn hủy" && !cleanTrack && !p.track ? "Không cần nhận" : "Chưa về";
+  return p;
+}
+
+export type NewRowKind = "shopee" | "tiktok";
+
 /** ParcelMerge.NewRow */
-export function newRow(raw: Incoming, today: string, id: string): MOrder {
-  const o = toOrder(shopeeForNewRow(raw, today), id);
+export function newRow(raw: Incoming, today: string, id: string, kind: NewRowKind = "shopee"): MOrder {
+  const o = toOrder(kind === "tiktok" ? tiktokForNewRow(raw, today) : shopeeForNewRow(raw, today), id);
   o.import.priceHasValue = null;
   return o;
 }
@@ -452,7 +471,7 @@ function enrichArchived(others: readonly OtherEntry[], incoming: MOrder): { entr
  * `today` dạng "dd/MM/yyyy", `year` = năm hiện tại.
  */
 export function applyImport(main: MOrder[], others: readonly OtherEntry[], parcels: readonly Incoming[], mode: ProductMode,
-  today: string, year: number, newId: () => string): MergeOutcome {
+  today: string, year: number, newId: () => string, kind: NewRowKind = "shopee"): MergeOutcome {
   const out: MergeOutcome = { added: [], updated: [], enrichedArchived: [], ambiguous: [], skippedArchivedUnchanged: 0, skippedDeleted: 0, enriched: 0 };
   const index = buildIndex(others);
   for (const raw of parcels) {
@@ -510,7 +529,7 @@ export function applyImport(main: MOrder[], others: readonly OtherEntry[], parce
       if (r.changed && r.entry) out.enrichedArchived.push(r.entry); else out.skippedArchivedUnchanged++;
       continue;
     }
-    const row = newRow(raw, today, newId());
+    const row = newRow(raw, today, newId(), kind);
     main.push(row);
     out.added.push(row);
   }

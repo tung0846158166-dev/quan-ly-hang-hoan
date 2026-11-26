@@ -10,6 +10,8 @@ import { canonical, codesOf, parseParcel, sha256Hex, type Parcel } from "./parce
 import { returnWatchEligible } from "./returnwatch";
 import { applyImport, type MOrder, type OtherEntry } from "../../core/src/merge";
 import { lookupKeys, orderToParcel, parcelToOrder, parseIncoming, vnToday } from "./sheetimport";
+import { applySupersede } from "./supersede";
+import type { NewRowKind } from "../../core/src/merge";
 import type { Env } from "./index";
 
 const DAY_MS = 86_400_000;
@@ -158,6 +160,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "POST" && path === "/ops") return this.ops(await this.body(req), dev);
     if (m === "GET" && path === "/quota") return json(this.quotaSnapshot(true));
     if (m === "GET" && path === "/import/log") return this.importLog();
+    if (m === "POST" && path === "/import/mapped") return this.importMapped(await this.body(req), dev);
     if (m === "GET" && path === "/ai/digests") return this.listDigests(url);
     if (m === "POST" && path === "/admin/ai-digest") { this.requireOwner(dev); return json(await this.runDigest()); }
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
@@ -686,9 +689,25 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   private async importSheet(b: Record<string, unknown>): Promise<Response> {
+    return this.importIncoming(b, "sheet", "shopee", null);
+  }
+
+  /**
+   * NẠP SALEWORK TỪ ĐIỆN THOẠI (26/11/2026): điện thoại tự xuất file Salework, đọc + bỏ cột cá nhân + chuyển dòng thành kiện (cùng bộ chuyển với
+   * máy tính, kiểm bằng bộ ca thử chung), gửi lên theo lô <= 100 kiện. Cloud gộp bằng nhánh TikTok/Salework rồi thay dòng chờ cũ (supersede).
+   * `orderIds`: mã đơn có trong file (để thay dòng chờ cũ chưa có mã vận đơn).
+   */
+  private async importMapped(b: Record<string, unknown>, dev: Device): Promise<Response> {
+    if (b.source !== "salework") return fail(422, "invalid", "Nguồn nạp không hợp lệ.");
+    const ids = Array.isArray(b.orderIds) ? (b.orderIds as unknown[]).slice(0, 500).filter((v): v is string => typeof v === "string") : [];
+    const res = await this.importIncoming(b, "salework", "tiktok", new Set(ids.map((v) => v.trim().toUpperCase()).filter((v) => v.length > 0)), dev);
+    return res;
+  }
+
+  private async importIncoming(b: Record<string, unknown>, source: string, kind: NewRowKind, supersedeIds: Set<string> | null, dev?: Device): Promise<Response> {
     const list = Array.isArray(b.parcels) ? b.parcels : fail(422, "invalid", "Thiếu danh sách kiện.");
     if (list.length > 100) fail(422, "invalid", "Tối đa 100 kiện mỗi lần.");
-    if (this.quotaSnapshot(false).level === "stop") fail(429, "quota_exceeded", "Hết hạn mức hôm nay: nhập Sheet tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
+    if (this.quotaSnapshot(false).level === "stop") fail(429, "quota_exceeded", "Hết hạn mức hôm nay: nạp đơn tạm dừng tới 07:00 sáng mai (giờ Việt Nam).");
     const incoming = list.map(parseIncoming);
     const rejected = incoming.filter((x) => x === null).length;
     const parcels = incoming.filter((x): x is NonNullable<typeof x> => x !== null);
@@ -710,10 +729,10 @@ export class ShopDO extends DurableObject<Env> {
       .map((p) => ({ order: parcelToOrder(p), where: p.isDeleted ? "deleted" as const : "archive" as const }));
 
     const { today, year } = vnToday(Date.now());
-    const res = applyImport(main, others, parcels, "supplement", today, year, () => "s_" + crypto.randomUUID().replace(/-/g, ""));
+    const res = applyImport(main, others, parcels, "supplement", today, year, () => (source === "sheet" ? "s_" : "w_") + crypto.randomUUID().replace(/-/g, ""), kind);
 
     const now = Date.now();
-    let written = 0;
+    let written = 0, superseded = 0;
     this.ctx.storage.transactionSync(() => {
       const touched = new Map<string, MOrder>();
       for (const o of [...res.updated, ...res.enrichedArchived, ...res.added]) touched.set(o.id, o);
@@ -731,16 +750,36 @@ export class ShopDO extends DurableObject<Env> {
         else continue;
         written++;
       }
+      // Salework: thay dòng chờ cũ chưa có mã vận đơn của cùng mã đơn (xóa MỀM, chuyển dữ liệu kho sang dòng mới)
+      if (supersedeIds && supersedeIds.size > 0) {
+        const active = new Map<string, Parcel>();
+        for (const oid of supersedeIds)
+          for (const r of this.db.all<Row>("SELECT DISTINCT p.data FROM parcel_codes c JOIN parcels p ON p.id = c.parcel_id WHERE c.code = ? AND p.is_archived = 0 AND p.is_deleted = 0", normalizeForLookup(oid))) {
+            const p = JSON.parse(r.data as string) as Parcel;
+            active.set(p.id, p);
+          }
+        const sup = applySupersede([...active.values()], supersedeIds);
+        const who = dev?.deviceId ?? "system";
+        for (const k of sup.keepersChanged) { this.writeParcel(k); this.audit(who, "salework.supersedeKeep", k.id, null, { status: k.status, recvDate: k.recvDate }); }
+        for (const o of sup.filled) { this.writeParcel(o); this.audit(who, "salework.fillTrack", o.id, null, { forwardTrack: o.forwardTrack, returnTrack: o.returnTrack }); }
+        for (const { stale, keeper } of sup.merged) {
+          stale.isDeleted = true; stale.deletedAt = vnTime(now); stale.deletedFrom = "Salework thay thế";
+          this.writeParcel(stale);
+          this.audit(who, "salework.supersede", stale.id, null, { replacedBy: keeper.id });
+        }
+        superseded = sup.merged.length;
+        written += sup.keepersChanged.length + sup.filled.length + sup.merged.length;
+      }
       for (const a of res.ambiguous)
-        this.db.run("INSERT INTO import_issues(at, source, data) VALUES (?,?,?)", now, "sheet", JSON.stringify(a));
+        this.db.run("INSERT INTO import_issues(at, source, data) VALUES (?,?,?)", now, source, JSON.stringify(a));
       this.db.run("DELETE FROM import_issues WHERE id NOT IN (SELECT id FROM import_issues ORDER BY id DESC LIMIT 500)");
-      this.logImport("sheet", list.length, res.added.length, res.updated.length, res.skippedDeleted, res.ambiguous.length);
+      this.logImport(source, list.length, res.added.length, res.updated.length, res.skippedDeleted, res.ambiguous.length);
       const sig = typeof b.signature === "string" ? b.signature.slice(0, 200) : "";
-      this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES ('sheet',?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at", sig, now);
+      this.db.run("INSERT INTO import_state(source, signature, last_run_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET signature = excluded.signature, last_run_at = excluded.last_run_at", source, sig, now);
     });
     if (written > 0) this.broadcast();
     return json({
-      added: res.added.length, updated: res.updated.length, enrichedArchived: res.enrichedArchived.length, written,
+      added: res.added.length, updated: res.updated.length, enrichedArchived: res.enrichedArchived.length, written, superseded,
       skippedDeleted: res.skippedDeleted, skippedArchivedUnchanged: res.skippedArchivedUnchanged, ambiguous: res.ambiguous, rejected,
     });
   }

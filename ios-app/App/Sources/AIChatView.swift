@@ -207,9 +207,14 @@ final class AIChatViewModel: ObservableObject {
     private func currentStatus() -> [String: Any] {
         var d: [String: Any] = [:]
         if let e = engine {
-            d["pcConnection"] = e.channelUp ? "đang kết nối" : "chưa kết nối"
-            d["mqttConnected"] = e.mqttConnected
-            d["ntfyConnected"] = e.sseConnected
+            if e.cloudActive {
+                d["cloudConnection"] = CloudStatusText.label(e.cloudState)
+                d["note"] = "Dữ liệu lấy trực tiếp từ cloud; không cần kết nối máy tính."
+            } else {
+                d["pcConnection"] = e.channelUp ? "đang kết nối" : "chưa kết nối"
+                d["mqttConnected"] = e.mqttConnected
+                d["ntfyConnected"] = e.sseConnected
+            }
             d["pendingScans"] = e.pendingCount
         }
         if let s = store {

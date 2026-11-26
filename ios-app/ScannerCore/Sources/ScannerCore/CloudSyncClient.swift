@@ -85,13 +85,13 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         runTask?.cancel()
         session = s
         api = a
-        lock.unlock()
-        set(.connecting)
-        let t = Task<Void, Never> { [weak self] in
+        _state = .connecting; _error = nil
+        runTask = Task<Void, Never> { [weak self] in
             guard let me = self else { return }
             await me.run()
         }
-        lock.lock(); runTask = t; lock.unlock()
+        lock.unlock()
+        onChange?()
     }
 
     public func pair(baseURL: String, code: String, deviceName: String) async -> String? {
@@ -140,6 +140,7 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
     public func unpair() {
         lock.lock()
         runTask?.cancel(); runTask = nil
+        saveTask?.cancel(); saveTask = nil
         session = nil; api = nil; _quota = nil; _lastSync = nil
         lock.unlock()
         sessions.clear()
@@ -210,7 +211,9 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
             let ws = URLSession.shared.webSocketTask(with: url)
             ws.resume()
             do {
-                let first = try await ws.receive()        // máy chủ gửi ngay {"t":"rev"} khi nối thành công; token sai thì lỗi ở đây
+                // máy chủ gửi ngay {"t":"rev"} khi nối thành công; token sai thì lỗi ở đây. Chờ tối đa 20 giây (tránh kẹt "Đang kết nối")
+                let first = try await Self.receive(ws, timeout: 20)
+                if Task.isCancelled { ws.cancel(with: .goingAway, reason: nil); return }
                 seen.touch()
                 set(.syncing)
                 try await pull(a)
@@ -228,10 +231,13 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
             } catch {
                 ws.cancel(with: .goingAway, reason: nil)
                 if Task.isCancelled { return }
+                // không còn chắc kết nối: thôi báo "Đã kết nối" ngay (hỏi thu hồi có thể mất tới 30 giây)
+                if state == .connected || state == .syncing { set(.connecting) }
                 if let revoked = await isRevoked(a), revoked {
                     set(.revoked, error: "Thiết bị đã bị thu hồi khỏi cloud.")
                     return
                 }
+                if Task.isCancelled { return }
                 if quickRetry {
                     quickRetry = false
                     set(.connecting)
@@ -243,6 +249,25 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
             }
             try? await Task.sleep(nanoseconds: backoff * 1_000_000_000)
             backoff = min(30, backoff * 2)
+        }
+    }
+
+    /// Nhận một tin; hủy tác vụ thì đóng socket để `receive()` thoát ngay (bản gốc không tự dừng khi bị hủy).
+    private static func receive(_ ws: URLSessionWebSocketTask, timeout: TimeInterval?) async throws -> URLSessionWebSocketTask.Message {
+        try await withTaskCancellationHandler {
+            guard let timeout else { return try await ws.receive() }
+            return try await withThrowingTaskGroup(of: URLSessionWebSocketTask.Message.self) { g in
+                g.addTask { try await ws.receive() }
+                g.addTask {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    ws.cancel(with: .goingAway, reason: nil)
+                    throw CloudAPIError(code: "timeout", message: "Mất kết nối cloud. Đang thử nối lại...", status: 0)
+                }
+                defer { g.cancelAll() }
+                return try await g.next()!
+            }
+        } onCancel: {
+            ws.cancel(with: .goingAway, reason: nil)
         }
     }
 
@@ -275,7 +300,8 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask { [self] in
                 while !Task.isCancelled {
-                    let m = try await ws.receive()
+                    let m = try await Self.receive(ws, timeout: nil)
+                    if Task.isCancelled { return }
                     seen.touch()
                     try await handle(m, api: a)
                 }

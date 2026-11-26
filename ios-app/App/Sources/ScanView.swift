@@ -104,6 +104,8 @@ struct ScanView: View {
         }
         .onChange(of: scenePhase) { _ in syncCameraLifecycle() }
         .onChange(of: router.tab) { _ in syncCameraLifecycle() }
+        // camera nghỉ (lâu không quét / máy nóng): cho màn hình tự tắt như thường
+        .onChange(of: camera.running) { r in UIApplication.shared.isIdleTimerDisabled = r && isVisible && scenePhase != .background }
         .task(id: engine.banner) {
             guard engine.banner != nil else {
                 showBannerCard = false

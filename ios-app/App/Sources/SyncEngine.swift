@@ -322,6 +322,22 @@ final class SyncEngine: ObservableObject {
         if !cloudActive {
             startSSE()
             startMQTT()
+        } else {
+            // app bị tắt khi đang gửi quét lên cloud: không biết cloud đã nhận chưa -> báo cần kiểm tra (quét lại để biết chắc), không treo mãi
+            var fixed = false
+            for i in items.indices where !items[i].scanConfirmed && items[i].detail == "Đang gửi lên cloud..." {
+                items[i].status = .error
+                items[i].scanConfirmed = true
+                items[i].reviewRequired = true
+                items[i].detail = "Chưa rõ đã lên cloud chưa (app bị tắt khi đang gửi). Quét lại mã để kiểm tra."
+                fixed = true
+            }
+            if fixed { persist() }
+            photoQueue.onDropped = { [weak self] _, why in
+                Task { @MainActor in
+                    self?.banner = Banner(code: "", text: "1 ảnh không lên được cloud", color: Theme.warning, sub: why)
+                }
+            }
         }
         tickTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -523,6 +539,7 @@ final class SyncEngine: ObservableObject {
     }
 
     private func dispatch(_ msg: PcMessage) {
+        if cloudActive { return }   // chế độ cloud: kênh PC cũ không được đổi dữ liệu
         switch msg {
         case .pong(let id):
             markPcSeen()
@@ -1202,7 +1219,11 @@ extension SyncEngine {
 
     private func cloudStatusChanged() {
         let was = cloudActive
+        let wasConnected = cloudState == .connected
         cloudState = cloud.state
+        if !wasConnected && cloudState == .connected && photoQueue.pendingCount > 0 {
+            Task { @MainActor [weak self] in await self?.drainCloudPhotos() }   // có mạng lại: gửi ảnh đang chờ ngay, không đợi lượt quét sau
+        }
         if !was && cloudActive {
             // vừa ghép: tắt kênh MQTT/ntfy cũ, chuyển hẳn sang cloud
             sseTask?.cancel(); sseTask = nil
@@ -1362,7 +1383,7 @@ extension SyncEngine {
                         self.items[i].photoFile = nil
                     }
                     await self.drainCloudPhotos()
-                    if self.pendingCloudPhotos > 0 {
+                    if self.pendingCloudPhotos > 0 && !self.photoQueue.isDraining && !self.cloud.canWrite {
                         self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: "Ảnh đang chờ mạng để gửi lên cloud")
                     }
                 }

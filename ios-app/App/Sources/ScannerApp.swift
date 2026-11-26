@@ -6,6 +6,7 @@ struct ScannerApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var engine = SyncEngine()
     @StateObject private var router = NotificationRouter.shared
+    @State private var wasInBackground = false
 
     var body: some Scene {
         WindowGroup {
@@ -17,10 +18,12 @@ struct ScannerApp: App {
                 .task { router.store = engine.snapshot; engine.start(); engine.snapshot.refreshAuthorization() }
                 .onChange(of: scenePhase) { phase in
                     if phase == .background {
+                        wasInBackground = true
                         engine.handleBackground()
                     } else if phase == .inactive {
                         engine.flushPersist(background: true)
-                    } else {
+                    } else if wasInBackground {
+                        wasInBackground = false
                         engine.handleForeground()
                     }
                 }

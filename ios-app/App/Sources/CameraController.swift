@@ -199,6 +199,10 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                             guard let self = self, self.wantsRunning, !self.running else { return }
                             self.begin()
                         }
+                    } else {
+                        self.idleTimer?.invalidate(); self.idleTimer = nil
+                        self.restReason = "Chưa mở được camera. Chạm để thử lại."
+                        self.restBySystem = false
                     }
                     return
                 }

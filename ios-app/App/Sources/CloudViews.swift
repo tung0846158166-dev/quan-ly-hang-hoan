@@ -308,7 +308,8 @@ struct CloudPhotosCard: View {
         do {
             photos = try await api.parcelPhotos(parcelId: parcelId)
             error = nil
-            CloudPhotoFiles.prune(dir: Self.cacheDir, olderThanDays: 90)
+            let cache = Self.cacheDir
+            Task.detached(priority: .utility) { CloudPhotoFiles.prune(dir: cache, olderThanDays: 90) }
             for p in photos where !p.expired {
                 if let u = try? await CloudPhotoFiles.fetch(api: api, dir: Self.cacheDir, photoId: p.photoId, thumb: true) {
                     thumbs[p.photoId] = u

@@ -25,6 +25,10 @@ public final class CloudPhotoQueue {
     }
 
     public var pendingCount: Int { lock.lock(); defer { lock.unlock() }; return entries.count }
+    /// Đang gửi dở (lần gọi `drain` khác đang chạy).
+    public var isDraining: Bool { lock.lock(); defer { lock.unlock() }; return draining }
+    /// Ảnh bị bỏ vì cloud từ chối hẳn (vd. quá 3 ngày sau lượt quét): (mã ảnh, lý do). Không im lặng bỏ ảnh.
+    public var onDropped: ((String, String) -> Void)?
 
     private func fullURL(_ id: String) -> URL { dir.appendingPathComponent("f_\(id).jpg") }
     private func thumbURL(_ id: String) -> URL { dir.appendingPathComponent("t_\(id).jpg") }
@@ -76,6 +80,7 @@ public final class CloudPhotoQueue {
                 // mất mạng, hết hạn mức, máy chủ lỗi tạm thời, chưa đăng nhập: giữ lại, lần sau gửi tiếp
                 if err.isNetwork || err.isQuota || err.isUnauthorized || err.status >= 500 { break }
                 remove(e)   // lỗi cố định (kiện không còn, ảnh hỏng/quá lớn, sai quyền): bỏ ảnh, không kẹt hàng chờ
+                onDropped?(e.photoId, err.message)
             } catch {
                 break
             }

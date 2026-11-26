@@ -44,6 +44,8 @@ public final class CloudParcelStore {
     }
 
     private func put(_ p: CloudParcel) {
+        // hai lần kéo chạy song song: bản về sau mà CŨ hơn thì bỏ, không đè trạng thái mới (rà lỗi 26/11/2026)
+        if let old = map[p.id], p.rev > 0, old.rev > p.rev { return }
         if map[p.id] == nil { order.append(p.id) }
         map[p.id] = p
     }

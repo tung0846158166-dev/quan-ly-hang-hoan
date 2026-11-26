@@ -359,4 +359,15 @@ final class CloudTests: XCTestCase {
         XCTAssertFalse(CloudResumePolicy.shouldReconnect(state: .revoked, lastHeard: .distantPast, now: now, pingEvery: 10))
         XCTAssertFalse(CloudResumePolicy.shouldReconnect(state: .unpaired, lastHeard: .distantPast, now: now, pingEvery: 10))
     }
+
+    // rà lỗi 26/11/2026: lần kéo về sau mang bản CŨ hơn không được đè bản mới
+    func testOlderParcelRevisionNeverOverwritesNewer() {
+        let s = CloudParcelStore()
+        s.apply([parcel(#"{"id":"a","track":"A","status":"Hàng đã trả","rev":21}"#)], rev: 21)
+        s.apply([parcel(#"{"id":"a","track":"A","status":"Chưa trả","rev":15}"#)], rev: 15)
+        XCTAssertEqual(s.parcel(id: "a")?.status, "Hàng đã trả")
+        s.upsertLocal(parcel(#"{"id":"a","track":"A","status":"Bị mất","rev":22}"#))
+        XCTAssertEqual(s.parcel(id: "a")?.status, "Bị mất")
+        XCTAssertEqual(s.rev, 21)
+    }
 }

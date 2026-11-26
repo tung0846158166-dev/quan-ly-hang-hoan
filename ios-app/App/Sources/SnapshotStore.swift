@@ -241,7 +241,7 @@ final class SnapshotStore: ObservableObject {
 
     /// Chế độ cloud: danh sách lấy thẳng từ bản sao cloud trên máy (`CloudParcelStore.rows`). Cloud đã là nguồn gốc nên
     /// không phủ thao tác "chờ PC xác nhận"; mọi màn hình đọc `rows` như cũ.
-    func applyCloud(rows newRows: [OrderRow], at: Date) {
+    func applyCloud(rows newRows: [OrderRow], index prebuilt: SnapshotIndex? = nil, at: Date) {
         if isDemoMode {
             savedRealRows = newRows
             savedRealUpdatedAt = at
@@ -249,7 +249,7 @@ final class SnapshotStore: ObservableObject {
         }
         rows = newRows
         updatedAt = at
-        index = SnapshotIndex(rows: newRows)
+        index = prebuilt ?? SnapshotIndex(rows: newRows)
         recount()
         revision += 1
         scheduleNotifications()

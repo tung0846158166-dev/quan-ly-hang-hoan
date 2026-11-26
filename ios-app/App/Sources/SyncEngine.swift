@@ -287,7 +287,8 @@ final class SyncEngine: ObservableObject {
     // MARK: vòng đời
     func start() {
         snapshot.onNeedFull = { [weak self] in self?.requestFullIfNeeded() }
-        snapshot.onRowsUpdated = { [weak self] in self?.reconcileScanPhotos() }
+        // ảnh tạm chờ PC xác nhận chỉ có ở luồng cũ; chế độ cloud không cần rà lại mỗi lần danh sách đổi
+        snapshot.onRowsUpdated = { [weak self] in if self?.cloudActive != true { self?.reconcileScanPhotos() } }
         snapshot.unconfirmedReturnCodes = { [weak self] in
             Set((self?.items ?? []).filter { $0.kind == .returnScan && !$0.scanConfirmed }.map { $0.code.uppercased() })
         }
@@ -1198,7 +1199,8 @@ extension SyncEngine {
         guard !cloudReloadScheduled else { return }
         cloudReloadScheduled = true
         Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            // gom nhiều lô thay đổi liên tiếp (vd. đang chuyển ảnh hàng loạt) thành MỘT lần dựng lại
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard let self else { return }
             self.cloudReloadScheduled = false
             self.applyCloudRows()
@@ -1241,9 +1243,13 @@ extension SyncEngine {
         let store = cloud.store
         let now = Date()
         let at = cloud.lastSyncAt ?? now
+        let current = snapshot.rows
         Task.detached(priority: .userInitiated) { [weak self] in
+            // dựng danh sách + chỉ mục tra cứu ở luồng nền; danh sách không đổi thì không làm mọi màn hình vẽ lại
             let rows = store.rows(now: now)
-            await MainActor.run { self?.snapshot.applyCloud(rows: rows, at: at) }
+            if rows == current { return }
+            let index = SnapshotIndex(rows: rows)
+            await MainActor.run { self?.snapshot.applyCloud(rows: rows, index: index, at: at) }
         }
     }
 

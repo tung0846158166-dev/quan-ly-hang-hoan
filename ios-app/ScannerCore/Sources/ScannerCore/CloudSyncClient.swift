@@ -145,7 +145,7 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
         }
         do {
             let r = try await a.scan(code: code)
-            if let p = r.parcel { store.upsertLocal(p); store.save(); onDataChanged?() }
+            if let p = r.parcel { store.upsertLocal(p); scheduleSave(); onDataChanged?() }
             return r
         } catch let e as CloudAPIError {
             // không biết cloud đã nhận hay chưa: KHÔNG ack, yêu cầu kiểm tra lại đơn trước khi quét lại
@@ -158,6 +158,21 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
 
     // ---- đồng bộ
     /// Lấy toàn bộ phần thay đổi từ mốc đã lưu cho tới khi bắt kịp.
+    private var saveTask: Task<Void, Never>?
+    /// Ghi bản sao ra tệp sau ~3 giây yên lặng (nhiều lần kéo liên tiếp chỉ ghi một lần). Mất tệp chưa ghi cũng an toàn:
+    /// mốc `rev` trong tệp cũ hơn nên lần mở sau tự kéo lại phần còn thiếu từ cloud.
+    func scheduleSave() {
+        lock.lock()
+        saveTask?.cancel()
+        let st = store
+        saveTask = Task.detached(priority: .utility) {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if Task.isCancelled { return }
+            st.save()
+        }
+        lock.unlock()
+    }
+
     func pull(_ a: CloudAPI) async throws {
         var changed = false
         while true {
@@ -168,7 +183,7 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
             }
             if !page.more { break }
         }
-        store.save()
+        if changed { scheduleSave() }
         lock.lock(); _lastSync = Date(); lock.unlock()
         if changed { onDataChanged?() }
         onChange?()

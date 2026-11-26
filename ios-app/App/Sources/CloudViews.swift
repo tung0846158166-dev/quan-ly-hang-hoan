@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 import UIKit
 import ScannerCore
@@ -246,6 +247,7 @@ struct CloudPhotosCard: View {
     let parcelId: String
     @State private var photos: [CloudPhotoInfo] = []
     @State private var thumbs: [String: URL] = [:]
+    @State private var images: [String: UIImage] = [:]
     @State private var loading = false
     @State private var error: String?
     @State private var viewer: PhotoViewerSession?
@@ -270,7 +272,7 @@ struct CloudPhotosCard: View {
                         ForEach(Array(photos.enumerated()), id: \.element.photoId) { idx, p in
                             Button { Task { await open(at: idx) } } label: {
                                 ZStack(alignment: .bottomLeading) {
-                                    if let u = thumbs[p.photoId], let img = UIImage(contentsOfFile: u.path) {
+                                    if let img = images[p.photoId] {
                                         Image(uiImage: img).resizable().scaledToFill()
                                     } else {
                                         Color.gray.opacity(0.15)
@@ -308,7 +310,13 @@ struct CloudPhotosCard: View {
             error = nil
             CloudPhotoFiles.prune(dir: Self.cacheDir, olderThanDays: 90)
             for p in photos where !p.expired {
-                if let u = try? await CloudPhotoFiles.fetch(api: api, dir: Self.cacheDir, photoId: p.photoId, thumb: true) { thumbs[p.photoId] = u }
+                if let u = try? await CloudPhotoFiles.fetch(api: api, dir: Self.cacheDir, photoId: p.photoId, thumb: true) {
+                    thumbs[p.photoId] = u
+                    // giải mã + thu nhỏ ở luồng nền, một lần; vẽ lại màn hình chỉ dùng ảnh đã có sẵn
+                    if let img = await Task.detached(priority: .userInitiated, operation: { CloudThumb.decode(u, maxPixel: 240) }).value {
+                        images[p.photoId] = img
+                    }
+                }
             }
         } catch let e as CloudAPIError {
             error = e.isNetwork ? "Mất kết nối cloud: chưa tải được ảnh." : e.message
@@ -329,5 +337,19 @@ struct CloudPhotosCard: View {
         guard !items.isEmpty else { error = "Không tải được ảnh."; return }
         let wanted = photos.indices.contains(index) ? photos[index].photoId : ""
         viewer = PhotoViewerSession(items: items, initialIndex: items.firstIndex(where: { $0.id == wanted }) ?? 0)
+    }
+}
+
+/// Giải mã ảnh nhỏ bằng ImageIO, thu về cạnh dài `maxPixel` (nhẹ bộ nhớ, không chặn luồng giao diện).
+enum CloudThumb {
+    static func decode(_ url: URL, maxPixel: Int) -> UIImage? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        return UIImage(cgImage: cg)
     }
 }

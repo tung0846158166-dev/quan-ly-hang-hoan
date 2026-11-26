@@ -74,13 +74,10 @@ struct HomeView: View {
         if store.isDemoMode {
             return ("Mẫu", Theme.accent)
         }
-        if engine.room.isEmpty || !engine.channelUp {
-            return ("Chưa nối", .secondary)
+        if engine.cloudActive {
+            return (CloudStatusText.label(engine.cloudState), CloudStatusText.tone(engine.cloudState).color)
         }
-        if engine.pcOnline {
-            return ("PC online", Theme.success)
-        }
-        return ("PC offline", Theme.warning)
+        return ("Chưa ghép cloud", .secondary)
     }
 
     private var formattedToday: String {
@@ -117,7 +114,7 @@ struct HomeView: View {
                         .listRowSeparator(.hidden)
 
                     if summary.discrepancyCount > 0 {
-                        discrepancyCard
+                        if !engine.cloudActive { discrepancyCard }
                             .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
@@ -231,12 +228,12 @@ struct HomeView: View {
                     if !store.isDemoMode {
                         Button {
                             Haptics.tap()
-                            engine.requestSnapshot()
+                            Task { await engine.cloud.syncNow() }
                         } label: {
                             Image(systemName: "arrow.clockwise")
                                 .font(.subheadline.weight(.semibold))
                         }
-                        .accessibilityLabel("Cập nhật dữ liệu từ máy tính")
+                        .accessibilityLabel("Đồng bộ lại từ cloud")
                     }
 
                     Button {
@@ -916,11 +913,9 @@ struct HomeView: View {
             HStack(spacing: 12) {
                 IconTile(systemName: "shippingbox.fill", color: Theme.accent, size: 40, cornerRadius: 11)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(engine.room.isEmpty ? "Chưa nối với máy tính" : "Đang chờ dữ liệu đơn")
+                    Text(engine.cloudActive ? "Đang tải dữ liệu từ cloud" : "Chưa ghép cloud")
                         .font(Theme.Typography.navTitle)
-                    Text(engine.room.isEmpty
-                         ? "Nhập mã phòng từ PC v2 hoặc xem thử ngay với dữ liệu mẫu."
-                         : (store.assembleInfo.isEmpty ? "Mở app PC v2 để gửi danh sách đơn sang iPhone." : store.assembleInfo))
+                    Text(engine.cloudActive ? "Danh sách đơn sẽ hiện sau vài giây." : "Ghép cloud bằng mật khẩu cửa hàng hoặc xem thử ngay với dữ liệu mẫu.")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -938,10 +933,10 @@ struct HomeView: View {
             .tint(Theme.accent)
             .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
 
-            if engine.room.isEmpty {
+            if !engine.cloudActive {
                 VStack(alignment: .leading, spacing: 6) {
-                    stepRow("1", "Mở app Quản lý hàng hoàn v2 trên máy tính → Đồng bộ điện thoại → sao chép mã phòng.")
-                    stepRow("2", "Vào Cài đặt trên iPhone, dán mã phòng và bấm Lưu.")
+                    stepRow("1", "Vào Cài đặt → Cloud trên iPhone.")
+                    stepRow("2", "Nhập mật khẩu cửa hàng và tên máy, bấm Ghép thiết bị.")
                 }
 
                 Button {

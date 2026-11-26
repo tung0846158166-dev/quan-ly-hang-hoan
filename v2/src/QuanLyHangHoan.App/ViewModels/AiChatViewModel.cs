@@ -261,13 +261,14 @@ public sealed partial class AiChatViewModel : ObservableObject
         HasKey = _store.HasKey;
         OnPropertyChanged(nameof(UsesCloudKeys));
         OnPropertyChanged(nameof(ShowLocalKeys));
-        StatusText = _store.UsesCloud
-            ? (HasKey ? "Sẵn sàng (AI dùng khóa trên cloud). Hãy hỏi về đơn hàng của bạn." : "Cloud chưa có khóa AI: chủ cửa hàng đặt khóa Groq/Google trên cloud.")
+        StatusText = _store.CloudMode
+            ? (HasKey ? "Sẵn sàng (AI dùng khóa trên cloud). Hãy hỏi về đơn hàng của bạn."
+                : _store.UsesCloud ? "Cloud chưa có khóa AI: chủ cửa hàng đặt khóa trên cloud." : "Đang kết nối AI trên cloud...")
             : (HasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Bấm ⚙ Khóa API để nhập khóa Groq và/hoặc Google.");
     }
 
     /// <summary>Đang dùng khóa trên cloud (ẩn ô nhập khóa trên máy).</summary>
-    public bool UsesCloudKeys => _store?.UsesCloud ?? false;
+    public bool UsesCloudKeys => _store?.CloudMode ?? false;
     public bool ShowLocalKeys => !UsesCloudKeys;
 
     public void ForgetKeys()

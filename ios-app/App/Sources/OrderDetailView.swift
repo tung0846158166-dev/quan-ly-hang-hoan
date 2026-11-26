@@ -669,7 +669,7 @@ struct DetailView: View {
                     .foregroundStyle(.secondary)
             } else {
                 if parcelPhotos.isEmpty {
-                    Text("Chưa có ảnh cho kiện này. Ảnh chụp lúc quét (khi PC xác nhận khớp đúng kiện) hoặc thêm thủ công sẽ lưu trực tiếp trên iPhone.")
+                    Text("Chưa có ảnh cho kiện này. Ảnh chụp lúc quét (khi cloud xác nhận khớp đúng kiện) hoặc thêm thủ công sẽ được lưu.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1254,7 +1254,7 @@ struct DetailView: View {
 
             if hasOrderNote {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Ghi chú khách / đơn trên PC")
+                    Text("Ghi chú khách / đơn")
                         .font(.caption2.bold())
                         .foregroundStyle(.secondary)
                     Text(live.nt)
@@ -1276,7 +1276,7 @@ struct DetailView: View {
             }
 
             if live.k != "m" {
-                Text("Chỉ đơn ở bảng chính mới đồng bộ theo dõi/ghi chú với máy tính.")
+                Text("Chỉ đơn ở bảng chính mới sửa được theo dõi/ghi chú.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -1323,7 +1323,7 @@ struct DetailView: View {
                     engine.sendOrderNote(live, note: trimmed, watch: effectiveWatch)
                     showNoteSheet = false
                 } label: {
-                    Text(store.isDemoMode ? "Lưu cục bộ (dữ liệu mẫu)" : "Lưu & đồng bộ sang máy tính")
+                    Text(store.isDemoMode ? "Lưu cục bộ (dữ liệu mẫu)" : "Lưu lên cloud")
                         .font(.subheadline.bold())
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }

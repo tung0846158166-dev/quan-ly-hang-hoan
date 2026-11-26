@@ -8,7 +8,7 @@ private enum HistoryFilter: String, CaseIterable {
     case valid = "Thành công"
     case duplicate = "Quét trùng"
     case missing = "Không có"
-    case pending = "Chờ PC"
+    case pending = "Đang gửi"
 
     var accentColor: Color {
         switch self {
@@ -179,7 +179,7 @@ struct HistoryView: View {
                     .padding(.horizontal, Theme.screenPadding)
                 }
 
-                if waiting > 0 && !engine.isDemoMode {
+                if waiting > 0 && !engine.isDemoMode && !engine.cloudActive {
                     VStack(spacing: 4) {
                         Button {
                             let n = engine.resendAllPending(kind: kind)

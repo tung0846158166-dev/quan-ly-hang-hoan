@@ -51,69 +51,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Chế độ xem thử")
                 } footer: {
-                    Text("Hiển thị ~60 đơn mẫu đầy đủ các trường hợp để xem trước giao diện. Không gửi bất kỳ lệnh nào lên máy tính và giữ nguyên dữ liệu thật khi tắt.")
-                }
-
-                // MARK: - Mã phòng (thẻ riêng có Dán / Sao chép)
-                Section {
-                    VStack(alignment: .leading, spacing: Theme.cardSpacing) {
-                        TextField("Dán mã phòng từ app PC v2", text: $roomText)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .font(.system(.subheadline, design: .monospaced))
-                            .padding(10)
-                            .background(Theme.subtleFill)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.smallRadius, style: .continuous))
-                            .onSubmit { saveRoom() }
-
-                        HStack(spacing: Theme.cardSpacing) {
-                            Button {
-                                Haptics.tap()
-                                if let pasted = UIPasteboard.general.string {
-                                    roomText = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
-                                }
-                            } label: {
-                                Label("Dán", systemImage: "doc.on.clipboard")
-                                    .font(Theme.Typography.secondaryBold)
-                                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                Haptics.tap()
-                                UIPasteboard.general.string = engine.room.isEmpty ? roomText : engine.room
-                                savedToast = "Đã sao chép mã phòng"
-                            } label: {
-                                Label("Sao chép", systemImage: "doc.on.doc")
-                                    .font(Theme.Typography.secondaryBold)
-                                    .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
-                            }
-                            .buttonStyle(.bordered)
-                            .disabled(engine.room.isEmpty && roomText.isEmpty)
-                        }
-
-                        Button { saveRoom() } label: {
-                            Text("Lưu mã phòng")
-                                .font(Theme.Typography.secondaryBold)
-                                .frame(maxWidth: .infinity, minHeight: Theme.minTapTarget)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.accent)
-                        .disabled(!SyncProtocol.isValidRoom(roomText))
-
-                        if !roomText.isEmpty && !SyncProtocol.isValidRoom(roomText) {
-                            Text("Mã phòng cần ít nhất 12 ký tự (lấy ở mục Đồng bộ điện thoại trên app PC v2).")
-                                .font(Theme.Typography.caption)
-                                .foregroundColor(Theme.danger)
-                        } else if !savedToast.isEmpty {
-                            Text(savedToast)
-                                .font(Theme.Typography.captionBold)
-                                .foregroundColor(Theme.success)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                } header: {
-                    Text("Mã phòng đồng bộ")
+                    Text("Hiển thị ~60 đơn mẫu đầy đủ các trường hợp để xem trước giao diện. Không gửi bất kỳ lệnh nào lên cloud và giữ nguyên dữ liệu thật khi tắt.")
                 }
 
                 // MARK: - Cloud (T042)
@@ -129,68 +67,8 @@ struct SettingsView: View {
                         }
                     }
                 } footer: {
-                    if engine.cloudActive {
-                        Text("Đang dùng cloud: mã phòng và kết nối máy tính bên dưới không còn dùng cho điện thoại này.")
-                    }
-                }
-
-                // MARK: - Kết nối
-                Section("Kết nối") {
-                    let conn = overallConnection
-                    settingsRow(icon: "desktopcomputer", color: conn.color, title: "Máy tính") {
-                        HStack(spacing: 6) {
-                            Circle().fill(conn.color).frame(width: 8, height: 8)
-                            Text(conn.text)
-                                .font(.subheadline.bold())
-                                .foregroundColor(conn.color)
-                        }
-                    }
-
-                    settingsRow(icon: "antenna.radiowaves.left.and.right", color: Theme.info, title: "Kênh ntfy") {
-                        Text(engine.sseConnected ? "Đã nối" : "Chưa nối")
-                            .font(.subheadline)
-                            .foregroundColor(engine.sseConnected ? Theme.success : .secondary)
-                    }
-
-                    settingsRow(icon: "network", color: Theme.teal, title: "MQTT dự phòng") {
-                        Text(engine.brokerUp.isEmpty ? "Chưa nối" : "\(engine.brokerUp.count)/\(SyncProtocol.mqttBrokers.count) máy chủ")
-                            .font(.subheadline)
-                            .foregroundColor(engine.brokerUp.isEmpty ? .secondary : Theme.success)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Máy chủ MQTT riêng (để trống = công cộng)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("wss://tên:mật-khẩu@may-chu/mqtt", text: $brokerText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                            .keyboardType(.URL)
-                            .font(.system(.footnote, design: .monospaced))
-                            .onSubmit { engine.setPrivateBroker(brokerText) }
-                        Button("Lưu máy chủ và nối lại") { engine.setPrivateBroker(brokerText) }
-                            .font(.footnote.bold())
-                    }
-
-                    settingsRow(icon: "speedometer", color: Theme.info, title: "Tốc độ phản hồi") {
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Button("Đo ngay") { engine.pingPC() }
-                                .font(.subheadline.bold())
-                            if !engine.pingResult.isEmpty {
-                                Text(engine.pingResult)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.trailing)
-                            }
-                        }
-                    }
-
-                    settingsRow(icon: "tray.and.arrow.up.fill", color: Theme.warning, title: "Hàng chờ gửi PC") {
-                        Text("\(engine.pendingCount)")
-                            .font(.subheadline.bold())
-                            .monospacedDigit()
-                            .foregroundColor(engine.pendingCount > 0 ? Theme.warning : .secondary)
-                    }
+                    Text(engine.cloudActive ? "Điện thoại đồng bộ thẳng với cloud, không cần máy tính bật."
+                                            : "Ghép cloud bằng mật khẩu cửa hàng để nhận danh sách đơn và quét nhận.")
                 }
 
                 // MARK: - Dữ liệu
@@ -201,37 +79,21 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    NavigationLink {
-                        ReconcileDetailView()
-                    } label: {
-                        HStack(spacing: 10) {
-                            IconTile(systemName: "checkmark.shield.fill", color: Theme.success, size: 28, cornerRadius: 7)
-                            Text("Đối chiếu số đơn với PC")
-                                .font(Theme.Typography.primary)
-                            Spacer()
-                            if !store.stats.isEmpty {
-                                Text("\(store.rows.count)")
-                                    .font(Theme.Typography.captionBold)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-
                     Button {
                         Haptics.tap()
-                        engine.requestSnapshot()
+                        Task { await engine.cloud.syncNow() }
                     } label: {
                         HStack(spacing: 10) {
                             IconTile(systemName: "arrow.clockwise", color: Theme.info, size: 28, cornerRadius: 7)
-                            Text("Cập nhật danh sách từ PC")
+                            Text("Đồng bộ lại từ cloud")
                                 .font(Theme.Typography.primary)
-                                .foregroundColor(engine.isDemoMode ? .secondary : Theme.accent)
+                                .foregroundColor(engine.cloudActive ? Theme.accent : .secondary)
                         }
                     }
-                    .disabled(engine.isDemoMode)
+                    .disabled(!engine.cloudActive || engine.isDemoMode)
                 }
 
-                // MARK: - Ảnh cục bộ (T039/T040: chỉ lưu ảnh khi PC xác nhận đúng 1 kiện, không gửi sang PC, không tự xóa ảnh đã gắn)
+                // MARK: - Ảnh cục bộ (T039/T040: chỉ lưu ảnh khi cloud xác nhận đúng 1 kiện, không gửi sang PC, không tự xóa ảnh đã gắn)
                 Section {
                     let tempSummary = engine.tempPhotoSummary
                     let staleSummary = engine.stalePendingTempPhotoSummary
@@ -244,7 +106,7 @@ struct SettingsView: View {
                     }
 
                     if tempSummary.photoCount > 0 {
-                        settingsRow(icon: "clock.fill", color: Theme.info, title: "Ảnh tạm chờ PC xác nhận") {
+                        settingsRow(icon: "clock.fill", color: Theme.info, title: "Ảnh tạm chờ cloud xác nhận") {
                             Text("\(tempSummary.photoCount) ảnh, \(tempSummary.formattedMB)")
                                 .font(.subheadline.bold())
                                 .monospacedDigit()
@@ -299,7 +161,7 @@ struct SettingsView: View {
                     Text("Ảnh cục bộ trên iPhone")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Ảnh chụp lúc quét chỉ được lưu vào Chi tiết đơn khi PC xác nhận khớp đúng 1 kiện; lượt quét không tìm thấy, mơ hồ, lỗi hoặc trùng sẽ tự xóa ảnh ngay. Ảnh đã lưu vào đơn chỉ bị xóa khi bạn chủ động xóa.")
+                        Text("Ảnh chụp lúc quét chỉ được lưu vào Chi tiết đơn khi cloud xác nhận khớp đúng 1 kiện; lượt quét không tìm thấy, mơ hồ, lỗi hoặc trùng sẽ tự xóa ảnh ngay. Ảnh đã lưu vào đơn chỉ bị xóa khi bạn chủ động xóa.")
                         if let log = photoManager.lastOrphanCleanupLog, !log.isEmpty {
                             Text(log)
                         }
@@ -350,7 +212,7 @@ struct SettingsView: View {
                                 .font(Theme.Typography.primary)
                                 .tint(Theme.accent)
                         }
-                        Text("Ảnh chụp lúc quét được nén gọn; chỉ lưu vào Chi tiết đơn trên iPhone khi PC xác nhận đúng kiện (quét sai/mơ hồ/trùng tự bỏ ảnh), không gửi sang máy tính.")
+                        Text("Ảnh chụp lúc quét được nén gọn; chỉ lưu vào Chi tiết đơn trên iPhone khi cloud xác nhận đúng kiện (quét sai/mơ hồ/trùng tự bỏ ảnh), ảnh cũng được lưu lên cloud cho máy khác xem.")
                             .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -377,7 +239,7 @@ struct SettingsView: View {
                     } label: {
                         HStack(spacing: 10) {
                             IconTile(systemName: "sparkles", color: Theme.purple, size: 28, cornerRadius: 7)
-                            Text("Khóa API và mô hình AI")
+                            Text("Mô hình AI")
                                 .font(Theme.Typography.primary)
                             Spacer()
                         }

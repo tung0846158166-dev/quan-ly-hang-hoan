@@ -115,7 +115,7 @@ final class AIChatViewModel: ObservableObject {
         nvidiaModels = AIEndpoint.cleanModels(provider: "nvidia", UserDefaults.standard.string(forKey: "ai.models.nvidia") ?? AIEndpoint.defaultNvidiaModels)
         cloudflareModels = AIEndpoint.cleanModels(provider: "cloudflare", UserDefaults.standard.string(forKey: "ai.models.cloudflare") ?? AIEndpoint.defaultCloudflareModels)
         refreshKeys()
-        status = hasKey ? "Sẵn sàng. Hãy hỏi về đơn hàng của bạn." : "Chưa có khóa API. Chạm ⚙ để nhập khóa Groq và/hoặc Google."
+        status = "Ghép cloud (Cài đặt → Cloud) để dùng trợ lý AI."
     }
 
     func bind(_ store: SnapshotStore) { self.store = store }
@@ -140,8 +140,8 @@ final class AIChatViewModel: ObservableObject {
     }
 
     private func refreshKeys() {
-        if usesCloud, let c = cloudAI { hasKey = c.any; return }
-        hasKey = AIKeychain.load("groq") != nil || AIKeychain.load("gemini") != nil || AIKeychain.load("nvidia") != nil
+        // chỉ dùng AI qua cloud (khóa nằm trên cloud); khóa cũ trên máy không dùng nữa
+        hasKey = usesCloud && (cloudAI?.any ?? false)
     }
 
     private func endpoints() -> [AIEndpoint] {
@@ -149,17 +149,7 @@ final class AIChatViewModel: ObservableObject {
             return engine?.cloud.currentAPI?.aiEndpoints(c, groqModels: groqModels, geminiModels: geminiModels,
                                                           nvidiaModels: nvidiaModels, cloudflareModels: cloudflareModels) ?? []
         }
-        var out: [AIEndpoint] = []
-        if let k = AIKeychain.load("groq") {
-            out += AIEndpoint.build(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: k, models: groqModels, fallbackModel: "openai/gpt-oss-120b")
-        }
-        if let k = AIKeychain.load("gemini") {
-            out += AIEndpoint.build(provider: "gemini", baseURL: AIEndpoint.geminiBaseURL, apiKey: k, models: geminiModels, fallbackModel: AIEndpoint.fallbackGeminiModel)
-        }
-        if let k = AIKeychain.load("nvidia") {
-            out += AIEndpoint.build(provider: "nvidia", baseURL: AIEndpoint.nvidiaBaseURL, apiKey: k, models: nvidiaModels, fallbackModel: AIEndpoint.defaultNvidiaModels)
-        }
-        return out
+        return []   // chưa ghép / chưa hỏi được cloud: không có AI
     }
 
     private func ensureService() -> AIChatService? {
@@ -442,61 +432,41 @@ struct AIKeySettingsView: View {
     @EnvironmentObject var engine: SyncEngine
     /// Đã ghép cloud: AI dùng khóa trên cloud, ẩn ô nhập khóa ngay (không đợi hỏi được cloud).
     private var cloudKeys: Bool { vm.usesCloud || engine.cloudActive }
-    @State private var groqKey = ""
-    @State private var geminiKey = ""
-    @State private var nvidiaKey = ""
 
     var body: some View {
         Form {
-            if cloudKeys {
-                Section(footer: Text("Khóa cũ trên điện thoại không còn được dùng; bấm \"Xóa các khóa khỏi điện thoại\" để xóa hẳn.")) {
-                    Label("Điện thoại đang dùng cloud: AI dùng khóa Groq/Google đặt trên cloud (chung cho mọi máy), không cần nhập khóa ở đây.",
-                          systemImage: "icloud")
-                        .font(.footnote)
-                }
+            Section(footer: Text("Khóa AI chỉ nằm trên cloud (chủ cửa hàng đặt), dùng chung cho mọi máy; điện thoại không lưu khóa.")) {
+                Label(cloudKeys ? "AI dùng khóa trên cloud. Thứ tự dự phòng: Groq → Google → NVIDIA → Cloudflare."
+                                : "Chưa ghép cloud: vào Cài đặt → Cloud để ghép, rồi dùng trợ lý AI.",
+                      systemImage: cloudKeys ? "icloud" : "icloud.slash")
+                    .font(.footnote)
             }
-            Section(header: Text("Groq (console.groq.com)")) {
-                if !cloudKeys {
-                SecureField("Khóa API Groq (để trống = giữ khóa đã lưu)", text: $groqKey)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                }
+            Section(header: Text("Groq")) {
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.groqModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
             }
-            Section(header: Text("Google Gemini (aistudio.google.com)"),
-                    footer: Text("Hết hạn mức mô hình đầu thì tự chuyển sang mô hình sau, rồi sang Google. Khóa lưu trong Keychain của điện thoại và không hiện lại. Dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận.")) {
-                if !cloudKeys {
-                SecureField("Khóa API Google (để trống = giữ khóa đã lưu)", text: $geminiKey)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                }
+            Section(header: Text("Google Gemini")) {
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
             }
-            Section(header: Text("NVIDIA NIM (build.nvidia.com)"), footer: Text("Tuyến dự phòng khi Groq và Google đều hết hạn mức.")) {
-                if !cloudKeys {
-                SecureField("Khóa API NVIDIA (để trống = giữ khóa đã lưu)", text: $nvidiaKey)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                }
+            Section(header: Text("NVIDIA NIM")) {
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.nvidiaModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
             }
-            if cloudKeys {
-                Section(header: Text("Cloudflare Workers AI"), footer: Text("Tuyến dự phòng cuối, chỉ dùng qua cloud.")) {
-                    TextField("Mô hình theo thứ tự ưu tiên", text: $vm.cloudflareModels, axis: .vertical)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled(true)
-                        .font(.system(.footnote, design: .monospaced))
-                }
+            Section(header: Text("Cloudflare Workers AI"), footer: Text("Hết hạn mức mô hình trước thì tự chuyển sang mô hình sau. Dữ liệu gửi đi không có tên, số điện thoại, địa chỉ người nhận.")) {
+                TextField("Mô hình theo thứ tự ưu tiên", text: $vm.cloudflareModels, axis: .vertical)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled(true)
+                    .font(.system(.footnote, design: .monospaced))
             }
             Section {
                 Button("Lưu và thử kết nối") {
-                    vm.saveSettings(groqKey: groqKey, geminiKey: geminiKey, nvidiaKey: nvidiaKey)
-                    groqKey = ""; geminiKey = ""; nvidiaKey = ""
+                    vm.saveSettings(groqKey: "", geminiKey: "", nvidiaKey: "")
                 }
-                .disabled(vm.isBusy)
-                Button("Xóa các khóa khỏi điện thoại", role: .destructive) { vm.forgetKeys() }
+                .disabled(vm.isBusy || !cloudKeys)
+                Button("Xóa khóa cũ còn lưu trên điện thoại", role: .destructive) { vm.forgetKeys() }
             }
             if !vm.status.isEmpty {
                 Section(header: Text("Trạng thái")) {

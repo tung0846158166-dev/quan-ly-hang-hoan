@@ -27,6 +27,9 @@ public sealed class AiSettingsStore
     /// <summary>Chế độ cloud: AI đi qua cổng AI của cloud bằng token thiết bị (khóa chỉ nằm trên cloud). Trả null = chưa nối / chưa biết: dùng khóa trên máy.</summary>
     public void UseCloud(Func<CloudAiAccess?> cloud) => _cloud = cloud;
 
+    /// <summary>Đang chạy chế độ cloud: AI CHỈ đi qua cloud, không bao giờ dùng/nhập khóa trên máy (kể cả lúc chưa hỏi được cloud).</summary>
+    public bool CloudMode => _cloud is not null;
+
     public CloudAiAccess? Cloud => _cloud?.Invoke();
     public bool UsesCloud => Cloud is not null;
 
@@ -48,7 +51,8 @@ public sealed class AiSettingsStore
         catch { return null; }
     }
 
-    public bool HasKey => Cloud is { } c ? c.Groq || c.Gemini || c.Nvidia || c.Cloudflare
+    public bool HasKey => CloudMode
+        ? Cloud is { } c && (c.Groq || c.Gemini || c.Nvidia || c.Cloudflare)
         : LoadKey(Groq) is not null || LoadKey(Gemini) is not null || LoadKey(Nvidia) is not null;
     public bool HasKeyFor(string provider) => LoadKey(provider) is not null;
 
@@ -125,6 +129,7 @@ public sealed class AiSettingsStore
             if (c.Cloudflare) list.AddRange(AiChatService.BuildEndpoints("cloudflare", b + "/ai/cloudflare", c.Token, LoadModel(Cloudflare), AiChatService.DefaultCloudflareModels));
             return list;
         }
+        if (CloudMode) return list;   // chế độ cloud mà chưa hỏi được cloud: chưa có AI, KHÔNG dùng khóa trên máy
         if (LoadKey(Groq) is { } gk)
             list.AddRange(AiChatService.BuildEndpoints("groq", AiChatService.GroqBaseUrl, gk, LoadModel(Groq), AiChatService.DefaultModel));
         if (LoadKey(Gemini) is { } mk)

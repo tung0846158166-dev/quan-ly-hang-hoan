@@ -39,15 +39,26 @@ public sealed class AiCloudKeyTests : IDisposable
     }
 
     [Fact]
-    public void Without_cloud_the_local_keys_work_as_before()
+    public void Without_cloud_mode_the_local_keys_work_as_before()
     {
         var s = new AiSettingsStore(_dir);
-        s.UseCloud(() => null);   // chưa nối cloud / chưa biết trạng thái
-        Assert.False(s.UsesCloud);
-        Assert.False(s.HasKey);
+        Assert.False(s.CloudMode);
         s.SaveKey(AiSettingsStore.Groq, "khoa-may");
         Assert.True(s.HasKey);
         Assert.All(s.BuildEndpoints(), e => Assert.Equal("khoa-may", e.ApiKey));
+    }
+
+    [Fact]
+    public void Cloud_mode_never_uses_local_keys_even_before_the_cloud_answered()
+    {
+        // chủ dự án 26/11/2026: chế độ cloud không cho nhập/dùng khóa trên máy, kể cả lúc chưa hỏi được cloud
+        var s = new AiSettingsStore(_dir);
+        s.SaveKey(AiSettingsStore.Groq, "khoa-may-cu");
+        s.UseCloud(() => null);
+        Assert.True(s.CloudMode);
+        Assert.False(s.UsesCloud);
+        Assert.False(s.HasKey);
+        Assert.Empty(s.BuildEndpoints());
     }
 }
 

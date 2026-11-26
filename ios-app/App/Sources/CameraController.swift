@@ -70,11 +70,10 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             self.restBySystem = true
         })
         observers.append(nc.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: .main) { [weak self] _ in
-            guard let self = self, self.pausedBySystem else { return }
+            guard let self = self else { return }
             self.pausedBySystem = false
-            if self.wantsRunning {
-                self.start()
-            }
+            if self.restBySystem { self.restReason = nil; self.restBySystem = false }
+            if self.wantsRunning && !self.running { self.begin() }
         })
         observers.append(nc.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: .main) { [weak self] _ in
             guard let self = self else { return }
@@ -90,6 +89,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
             if status == .authorized && self.denied {
                 self.denied = false
                 if self.wantsRunning { self.begin() }
+            } else if status == .authorized && self.wantsRunning && !self.running {
+                self.begin()
             }
         })
     }
@@ -138,6 +139,7 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
     }
 
     func start() {
+        startRetries = 0
         wantsRunning = true
         pausedBySystem = false
         restReason = nil
@@ -168,6 +170,8 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
         }
     }
 
+    private var startRetries = 0                // CHỈ đọc/ghi trên main thread
+
     private func begin() {
         idleTimer?.invalidate()
         idleTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
@@ -187,6 +191,18 @@ final class CameraController: NSObject, ObservableObject, AVCaptureMetadataOutpu
                     return
                 }
                 self.running = isRunning
+                if !isRunning {
+                    // vừa quay lại app, iOS có thể chưa trả camera: thử lại sau 0,4 giây (tối đa ~4 giây)
+                    if self.startRetries < 10 {
+                        self.startRetries += 1
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                            guard let self = self, self.wantsRunning, !self.running else { return }
+                            self.begin()
+                        }
+                    }
+                    return
+                }
+                self.startRetries = 0
                 self.lastRegion = .zero
                 if let layer = self.attachedPreviewLayer {
                     self.updateScanRegion(layer)

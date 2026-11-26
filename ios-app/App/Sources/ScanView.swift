@@ -36,7 +36,7 @@ struct ScanView: View {
 
     @MainActor
     private func syncCameraLifecycle() {
-        let shouldRun = isVisible && scenePhase == .active && router.tab == NotificationRouter.scanTab
+        let shouldRun = isVisible && scenePhase != .background && router.tab == NotificationRouter.scanTab
         if shouldRun {
             let eng = engine
             let cam = camera

@@ -192,14 +192,14 @@ struct CloudSettingsView: View {
                 Section {
                     TextField("Địa chỉ cloud", text: $baseURL)
                         .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                    TextField("Mã ghép 6 số", text: $code)
-                        .keyboardType(.numberPad)
+                    SecureField("Mật khẩu cửa hàng", text: $code)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .font(.system(.title3, design: .monospaced))
                     TextField("Tên thiết bị (vd: iPhone kho 1)", text: $deviceName)
                 } header: {
                     Text("Ghép với cloud")
                 } footer: {
-                    Text("Chủ cửa hàng tạo mã ghép trên máy tính. Mã dùng một lần, hết hạn sau 10 phút. Sau khi ghép, điện thoại lấy dữ liệu từ cloud và KHÔNG dùng mã phòng MQTT nữa.")
+                    Text("Nhập mật khẩu cửa hàng do chủ cửa hàng đặt trên cloud (không cần máy tính). Mỗi điện thoại chỉ ghép một lần; cập nhật app vẫn giữ ghép. Cũng nhận mã ghép 6 số tạo trên máy tính. Sau khi ghép, điện thoại lấy dữ liệu từ cloud và KHÔNG dùng mã phòng MQTT nữa.")
                 }
                 Section {
                     TextField("Hoặc dán nội dung mã QR (qlhh://pair?...)", text: $pairLink)
@@ -214,7 +214,7 @@ struct CloudSettingsView: View {
                     } label: {
                         HStack { Text("Ghép thiết bị").bold(); if busy { Spacer(); ProgressView() } }
                     }
-                    .disabled(busy || code.count != 6)
+                    .disabled(busy || code.trimmingCharacters(in: .whitespacesAndNewlines).count < 6)
                     if let error {
                         Text(error).font(.footnote).foregroundColor(Theme.danger)
                     }

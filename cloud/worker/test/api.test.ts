@@ -86,6 +86,28 @@ describe("ghép thiết bị và quyền", () => {
     expect(me.data).toMatchObject({ deviceName: "Máy mới", role: "staff" });
   });
 
+  it("mật khẩu cửa hàng: điện thoại tự ghép không cần máy tính, mỗi máy một token riêng, vai trò nhân viên", async () => {
+    const a1 = await call("POST", "/pair/join", { joinKey: "mat-khau-cua-hang-gia", deviceName: "iPhone kho 1", kind: "phone" });
+    expect(a1.status).toBe(200);
+    expect(a1.data.role).toBe("staff");
+    const a2 = await call("POST", "/pair/join", { joinKey: "mat-khau-cua-hang-gia", deviceName: "iPhone kho 2", kind: "phone" });
+    expect(a2.data.token).not.toBe(a1.data.token);
+    expect((await call("GET", "/me", undefined, a1.data.token)).data).toMatchObject({ deviceName: "iPhone kho 1", role: "staff" });
+    // thu hồi một máy không ảnh hưởng máy kia
+    await call("DELETE", "/devices/" + encodeURIComponent(a1.data.deviceId), undefined, owner);
+    expect((await call("GET", "/me", undefined, a1.data.token)).status).toBe(401);
+    expect((await call("GET", "/me", undefined, a2.data.token)).status).toBe(200);
+  });
+
+  it("mật khẩu cửa hàng sai bị từ chối và sai nhiều lần thì khóa tạm (kể cả khi nhập đúng)", async () => {
+    const bad = await call("POST", "/pair/join", { joinKey: "sai", deviceName: "Lạ", kind: "phone" });
+    expect(bad.status).toBe(401);
+    expect(JSON.stringify(bad.data)).not.toContain("mat-khau");
+    for (let i = 0; i < 9; i++) await call("POST", "/pair/join", { joinKey: "sai" + i, deviceName: "Lạ", kind: "phone" });
+    const locked = await call("POST", "/pair/join", { joinKey: "mat-khau-cua-hang-gia", deviceName: "Lạ", kind: "phone" });
+    expect(locked.status).toBe(429);
+  });
+
   it("nhân viên không tạo mã ghép, không xem/thu hồi thiết bị", async () => {
     expect((await call("POST", "/pair/start", {}, phoneA)).status).toBe(403);
     expect((await call("GET", "/devices", undefined, phoneA)).status).toBe(403);

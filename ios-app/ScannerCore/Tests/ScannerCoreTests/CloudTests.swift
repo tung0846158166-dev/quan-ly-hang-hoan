@@ -318,12 +318,32 @@ final class CloudTests: XCTestCase {
         let t = FakeTransport { _ in (200, "{}") }
         let client = CloudSyncClient(store: CloudParcelStore(), sessions: InMemoryCloudSessionStore(), transport: t)
         let a = await client.pair(baseURL: "https://a.workers.dev", code: "12ab", deviceName: "Máy")
-        XCTAssertEqual(a, "Mã ghép gồm 6 chữ số.")
+        XCTAssertEqual(a, "Nhập mật khẩu cửa hàng (ít nhất 8 ký tự) hoặc mã ghép 6 số.")
         let b = await client.pair(baseURL: "https://a.workers.dev", code: "123456", deviceName: "  ")
         XCTAssertEqual(b, "Hãy đặt tên cho thiết bị này.")
         let c = await client.pair(baseURL: "http://khong-an-toan.com", code: "123456", deviceName: "Máy")
         XCTAssertNotNil(c)
         XCTAssertTrue(t.requests.isEmpty)
+        XCTAssertEqual(client.state, .unpaired)
+    }
+
+    /// Chủ dự án 26/11/2026: điện thoại tự ghép bằng MẬT KHẨU CỬA HÀNG, không cần máy tính tạo mã. Mã 6 số vẫn dùng được.
+    func testShopPasswordGoesToJoinAndSixDigitsStillUsePairCode() async {
+        var paths: [String] = []
+        var bodies: [[String: Any]] = []
+        let t = FakeTransport { r in
+            paths.append(r.url!.path)
+            if let b = r.httpBody, let o = (try? JSONSerialization.jsonObject(with: b)) as? [String: Any] { bodies.append(o) }
+            return (401, #"{"error":{"code":"unauthorized","message":"Mật khẩu cửa hàng không đúng."}}"#)
+        }
+        let client = CloudSyncClient(store: CloudParcelStore(), sessions: InMemoryCloudSessionStore(), transport: t)
+        let e1 = await client.pair(baseURL: "https://a.workers.dev", code: " matkhau-cuahang ", deviceName: "iPhone kho 1")
+        XCTAssertEqual(e1, "Mật khẩu cửa hàng không đúng.")
+        XCTAssertEqual(paths.last, "/v1/pair/join")
+        XCTAssertEqual(bodies.last?["joinKey"] as? String, "matkhau-cuahang")
+        XCTAssertEqual(bodies.last?["kind"] as? String, "phone")
+        _ = await client.pair(baseURL: "https://a.workers.dev", code: "123456", deviceName: "iPhone kho 1")
+        XCTAssertEqual(paths.last, "/v1/pair/complete")
         XCTAssertEqual(client.state, .unpaired)
     }
 }

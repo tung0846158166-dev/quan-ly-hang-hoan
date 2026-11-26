@@ -7,6 +7,8 @@ export interface Env {
   IMAGES: R2Bucket;
   /** Khóa tạo thiết bị chủ đầu tiên (đặt bằng `wrangler secret put BOOTSTRAP_KEY`). */
   BOOTSTRAP_KEY: string;
+  /** Mật khẩu cửa hàng để điện thoại tự ghép (`wrangler secret put JOIN_KEY`, tối thiểu 8 ký tự); không đặt = tắt cách ghép này. */
+  JOIN_KEY?: string;
   /** Khóa riêng cho Apps Script đẩy đơn (`wrangler secret put IMPORT_KEY`). */
   IMPORT_KEY: string;
   PHOTO_RETENTION_DAYS: string;

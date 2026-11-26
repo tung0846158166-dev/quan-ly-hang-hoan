@@ -38,6 +38,7 @@ Trên máy chủ mỗi kiện có thêm: `rev` (số nguyên tăng dần theo m�
 Vai trò: `owner` (chủ) | `staff` (nhân viên). Điện thoại là ứng dụng đầy đủ nên cả hai vai trò dùng được mọi chức năng xem/quét; chỉ `owner` được quản lý thiết bị, thu hồi, xem hạn mức chi tiết, nhập dữ liệu hàng loạt.
 - `POST /pair/start` (owner) → `{ "code": "483920", "expiresAt": 1764000000000 }` — mã 6 số, sống 10 phút, dùng một lần.
 - `POST /pair/complete` (không cần token) `{ "code": "483920", "deviceName": "Điện thoại kho 1", "kind": "phone"|"pc" }` → `{ "deviceId": "...", "token": "...", "role": "staff" }`. Token chỉ trả MỘT lần; máy chủ lưu băm.
+- `POST /pair/join` (không cần token) `{ "joinKey": "...", "deviceName": "iPhone kho 1", "kind": "phone"|"pc" }` → giống `/pair/complete` (vai trò `staff`, token riêng mỗi máy). **Mật khẩu cửa hàng** do chủ tự đặt (`wrangler secret put JOIN_KEY`, ≥ 8 ký tự; không đặt = tắt, trả `503`). Sai → `401`; 10 lần sai / 15 phút → `429` khóa tạm. Không bao giờ đặt mật khẩu vào tệp cài (IPA công khai). Quyết định chủ dự án 26/11/2026: điện thoại tự ghép không cần máy tính.
 - Thiết bị đầu tiên (chủ) được tạo bằng **khóa khởi tạo** do chủ đặt trong Worker secrets (`BOOTSTRAP_KEY`): `POST /pair/bootstrap {bootstrapKey, deviceName, kind}` → role `owner`; chỉ dùng được khi chưa có thiết bị nào.
 - `GET /devices` (owner) → `[{deviceId, deviceName, kind, role, lastSeenAt, revoked}]`; `DELETE /devices/{deviceId}` (owner) thu hồi.
 - `GET /me` → `{deviceId, deviceName, role}` (kiểm tra token còn dùng được).

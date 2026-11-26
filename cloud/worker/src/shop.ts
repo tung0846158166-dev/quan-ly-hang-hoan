@@ -125,6 +125,7 @@ export class ShopDO extends DurableObject<Env> {
     // ---- không cần token
     if (m === "POST" && path === "/pair/bootstrap") return this.pairBootstrap(await this.body(req));
     if (m === "POST" && path === "/pair/complete") return this.pairComplete(await this.body(req));
+    if (m === "POST" && path === "/pair/join") return this.pairJoin(await this.body(req));
     if (path === "/import" || path === "/import/state" || path === "/import/sheet" || path === "/import/issues") {
       const dev = this.authImport(req);
       if (m === "POST" && path === "/import") return this.importParcels(await this.body(req), dev);
@@ -258,6 +259,25 @@ export class ShopDO extends DurableObject<Env> {
     const name = this.cleanName(b.deviceName), kind = this.cleanKind(b.kind);
     this.db.run("UPDATE pair_codes SET used = 1 WHERE code = ?", code);
     return json(await this.createDevice(name, kind, "staff"));
+  }
+
+  /**
+   * Ghép bằng MẬT KHẨU CỬA HÀNG (chủ tự đặt: `wrangler secret put JOIN_KEY`): điện thoại tự ghép, không cần máy tính tạo mã.
+   * Mỗi máy vẫn có token riêng (vai trò nhân viên, thu hồi được từng máy). Chống dò: 10 lần sai / 15 phút thì khóa tạm.
+   */
+  private async pairJoin(b: Record<string, unknown>): Promise<Response> {
+    const want = this.env.JOIN_KEY ?? "";
+    if (want.length < 8) return fail(503, "unavailable", "Chủ cửa hàng chưa đặt mật khẩu cửa hàng trên cloud.");
+    const now = Date.now();
+    const failN = Number(this.meta("joinfail_n") ?? 0), failAt = Number(this.meta("joinfail_at") ?? 0);
+    if (now - failAt < 900_000 && failN >= 10) return fail(429, "quota_exceeded", "Nhập sai mật khẩu quá nhiều lần. Thử lại sau 15 phút.");
+    const key = typeof b.joinKey === "string" ? b.joinKey.trim() : "";
+    if (!timingSafeEqual(key, want)) {
+      if (now - failAt >= 900_000) { this.setMeta("joinfail_n", "1"); this.setMeta("joinfail_at", String(now)); }
+      else this.setMeta("joinfail_n", String(failN + 1));
+      return fail(401, "unauthorized", "Mật khẩu cửa hàng không đúng.");
+    }
+    return json(await this.createDevice(this.cleanName(b.deviceName), this.cleanKind(b.kind), "staff"));
   }
 
   private pairStart(dev: Device): Response {

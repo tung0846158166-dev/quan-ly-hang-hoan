@@ -177,6 +177,12 @@ public final class CloudAPI {
         return CloudPaired(deviceId: r["deviceId"] as? String ?? "", token: r["token"] as? String ?? "", role: r["role"] as? String ?? "staff")
     }
 
+    /// Ghép bằng mật khẩu cửa hàng (chủ đặt trên cloud): điện thoại tự ghép, không cần máy tính tạo mã.
+    public func pairJoin(joinKey: String, deviceName: String, kind: String = "phone") async throws -> CloudPaired {
+        let r = try await json("POST", "/pair/join", body: ["joinKey": joinKey, "deviceName": deviceName, "kind": kind])
+        return CloudPaired(deviceId: r["deviceId"] as? String ?? "", token: r["token"] as? String ?? "", role: r["role"] as? String ?? "staff")
+    }
+
     public func me() async throws -> (deviceId: String, deviceName: String, role: String) {
         let r = try await json("GET", "/me")
         return (r["deviceId"] as? String ?? "", r["deviceName"] as? String ?? "", r["role"] as? String ?? "")

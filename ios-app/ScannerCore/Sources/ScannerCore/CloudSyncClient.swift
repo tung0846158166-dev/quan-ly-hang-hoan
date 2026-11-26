@@ -93,13 +93,16 @@ public final class CloudSyncClient: CloudLink, @unchecked Sendable {
     }
 
     public func pair(baseURL: String, code: String, deviceName: String) async -> String? {
+        // `code`: mã ghép 6 số (máy chủ tạo) HOẶC mật khẩu cửa hàng (>= 8 ký tự, chủ đặt trên cloud)
         let c = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard c.count == 6, c.allSatisfy({ $0.isNumber }) else { return "Mã ghép gồm 6 chữ số." }
+        let isPairCode = c.count == 6 && c.allSatisfy({ $0.isNumber })
+        guard isPairCode || c.count >= 8 else { return "Nhập mật khẩu cửa hàng (ít nhất 8 ký tự) hoặc mã ghép 6 số." }
         let name = deviceName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return "Hãy đặt tên cho thiết bị này." }
         do {
             let anon = try CloudAPI(baseURL: baseURL, token: nil, transport: transport)
-            let p = try await anon.pairComplete(code: c, deviceName: name, kind: "phone")
+            let p = isPairCode ? try await anon.pairComplete(code: c, deviceName: name, kind: "phone")
+                               : try await anon.pairJoin(joinKey: c, deviceName: name, kind: "phone")
             let root = String(anon.baseURL.dropLast(3))   // bỏ "/v1"
             if let old = baseURLValue(), old.lowercased() != root.lowercased() { store.reset() }
             let s = CloudSavedSession(baseURL: root, token: p.token, deviceId: p.deviceId, deviceName: name, role: p.role)

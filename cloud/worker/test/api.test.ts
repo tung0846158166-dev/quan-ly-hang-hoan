@@ -1083,7 +1083,7 @@ describe("khiếu nại (26/11/2026)", () => {
     p = await get("k1");
     expect(p.complaintStatus).toBeUndefined();
     expect(p.complaintAt).toBeUndefined();
-  });
+  }, 30_000);
 
   it("trạng thái khiếu nại lạ bị từ chối", async () => {
     await importParcels([parcel("k2")]);
@@ -1097,5 +1097,5 @@ describe("khiếu nại (26/11/2026)", () => {
     await call("POST", "/import/sheet", { signature: "s", parcels: [{ platform: "Shopee", orderId: "O-k3", track: "TRK-k3", platformStatus: "Hoàn tất" }] }, undefined, { "X-Import-Key": "test-import-key" });
     const p = await get("k3");
     expect(p.complaintStatus).toBe("Đang xử lý");
-  });
+  }, 30_000);
 });

@@ -78,11 +78,13 @@ public sealed class RealSaleworkController : ISaleworkController
     public event Action<SaleworkRunResult>? Completed;
     public event Action? StateChanged;
 
+    /// <summary>Trang đăng nhập Salework mặc định của cửa hàng (chủ dự án 26/11/2026).</summary>
+    public const string DefaultLoginUrl = "https://salework.net/login/lavistudio";
+
     public bool OpenLogin(string? startUrl, out string error)
     {
-        var candidate = string.IsNullOrWhiteSpace(startUrl)
-            ? (_state.Url ?? "https://salework.net")
-            : startUrl.Trim();
+        // nút "Đăng nhập": luôn mở trang đăng nhập của cửa hàng (đã đăng nhập thì Salework tự chuyển vào trong)
+        var candidate = string.IsNullOrWhiteSpace(startUrl) ? DefaultLoginUrl : startUrl.Trim();
         if (!SaleworkPageScript.ValidateOpenUrl(candidate, out error))
         {
             return false;

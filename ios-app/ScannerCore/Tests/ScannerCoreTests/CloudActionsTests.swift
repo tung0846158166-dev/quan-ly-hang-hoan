@@ -123,6 +123,23 @@ final class CloudActionsTests: XCTestCase {
         XCTAssertEqual(CloudPhotoFiles.prune(dir: dir, olderThanDays: 90, now: Date().addingTimeInterval(100 * 86_400)), 1)
     }
 
+    // MARK: AI qua cổng cloud (khóa chỉ nằm trên cloud)
+
+    func testAIGoesThroughTheCloudGatewayWithTheDeviceToken() async throws {
+        let t = Transport { r in
+            XCTAssertTrue(r.url!.path.hasSuffix("/v1/ai/status"))
+            XCTAssertEqual(r.value(forHTTPHeaderField: "Authorization"), "Bearer tok")
+            return (200, #"{"groq":false,"gemini":true,"usedToday":3,"dailyLimit":3000}"#)
+        }
+        let api = try CloudAPI(baseURL: "https://a.workers.dev", token: "tok", transport: t)
+        let st = try await api.aiStatus()
+        XCTAssertFalse(st.groq); XCTAssertTrue(st.gemini)
+        let eps = api.aiEndpoints(groq: st.groq, gemini: st.gemini, groqModels: "m1", geminiModels: "g1, g2")
+        XCTAssertEqual(eps.map { $0.model }, ["g1", "g2"])
+        XCTAssertTrue(eps.allSatisfy { $0.baseURL == "https://a.workers.dev/v1/ai/gemini" && $0.apiKey == "tok" })
+        XCTAssertTrue(try CloudAPI(baseURL: "https://a.workers.dev", token: nil).aiEndpoints(groq: true, gemini: true, groqModels: "m", geminiModels: "g").isEmpty)
+    }
+
     // MARK: mã QR ghép
 
     func testPairLinkParsesAndRoundTrips() {

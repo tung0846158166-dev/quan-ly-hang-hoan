@@ -262,6 +262,22 @@ public final class CloudAPI {
         return try await perform("GET", "/photos/\(id)" + (thumb ? "?size=thumb" : ""))
     }
 
+    /// Cổng AI: nhà cung cấp nào đã có khóa trên cloud (khóa Groq/Gemini chỉ nằm trên cloud).
+    public func aiStatus() async throws -> (groq: Bool, gemini: Bool) {
+        let data = try await perform("GET", "/ai/status")
+        let o = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any]) ?? [:]
+        return (o["groq"] as? Bool ?? false, o["gemini"] as? Bool ?? false)
+    }
+
+    /// Chuỗi mô hình AI đi qua cổng AI của cloud: dùng NGUYÊN logic gọi AI, chỉ đổi địa chỉ gốc và dùng token thiết bị thay khóa API.
+    public func aiEndpoints(groq: Bool, gemini: Bool, groqModels: String, geminiModels: String) -> [AIEndpoint] {
+        guard let t = token, !t.isEmpty else { return [] }
+        var out: [AIEndpoint] = []
+        if groq { out += AIEndpoint.build(provider: "groq", baseURL: baseURL + "/ai/groq", apiKey: t, models: groqModels, fallbackModel: "openai/gpt-oss-120b") }
+        if gemini { out += AIEndpoint.build(provider: "gemini", baseURL: baseURL + "/ai/gemini", apiKey: t, models: geminiModels, fallbackModel: "gemini-2.5-flash") }
+        return out
+    }
+
     /// Danh sách ảnh của một kiện trên cloud (mới nhất trước), kể cả ảnh do máy khác chụp.
     public func parcelPhotos(parcelId: String) async throws -> [CloudPhotoInfo] {
         let id = parcelId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? parcelId

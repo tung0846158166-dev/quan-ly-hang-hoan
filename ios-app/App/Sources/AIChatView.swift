@@ -93,6 +93,9 @@ final class AIChatViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var status = ""
     @Published var hasKey = false
+    /// Đã ghép cloud và đã hỏi được cloud: AI đi qua cổng AI của cloud (khóa chỉ nằm trên cloud), khóa trên điện thoại không dùng.
+    @Published var usesCloud = false
+    private var cloudAI: (groq: Bool, gemini: Bool)?
 
     @Published var groqModels: String
     @Published var geminiModels: String
@@ -112,13 +115,35 @@ final class AIChatViewModel: ObservableObject {
     }
 
     func bind(_ store: SnapshotStore) { self.store = store }
-    func bindEngine(_ engine: SyncEngine) { self.engine = engine }
+    func bindEngine(_ engine: SyncEngine) {
+        self.engine = engine
+        Task { await refreshCloudAI() }
+    }
+
+    /// Hỏi cloud có khóa AI nào (khi đã ghép). Lỗi mạng thì giữ trạng thái cũ.
+    func refreshCloudAI() async {
+        guard let e = engine, e.cloudActive, let api = e.cloud.currentAPI else {
+            if usesCloud { usesCloud = false; cloudAI = nil; service = nil; refreshKeys() }
+            return
+        }
+        guard let st = try? await api.aiStatus() else { return }
+        cloudAI = st
+        usesCloud = true
+        service = nil
+        refreshKeys()
+        status = hasKey ? "Sẵn sàng (AI dùng khóa trên cloud). Hãy hỏi về đơn hàng của bạn."
+                        : "Cloud chưa có khóa AI: chủ cửa hàng đặt khóa Groq/Google trên cloud."
+    }
 
     private func refreshKeys() {
+        if usesCloud, let c = cloudAI { hasKey = c.groq || c.gemini; return }
         hasKey = AIKeychain.load("groq") != nil || AIKeychain.load("gemini") != nil
     }
 
     private func endpoints() -> [AIEndpoint] {
+        if usesCloud, let c = cloudAI {
+            return engine?.cloud.currentAPI?.aiEndpoints(groq: c.groq, gemini: c.gemini, groqModels: groqModels, geminiModels: geminiModels) ?? []
+        }
         var out: [AIEndpoint] = []
         if let k = AIKeychain.load("groq") {
             out += AIEndpoint.build(provider: "groq", baseURL: AIEndpoint.groqBaseURL, apiKey: k, models: groqModels, fallbackModel: "openai/gpt-oss-120b")
@@ -289,7 +314,7 @@ struct AIChatView: View {
                 }
             }
             .sheet(item: $openRow) { row in DetailView(row: row) }
-            .onAppear { vm.bind(store) }
+            .onAppear { vm.bind(store); Task { await vm.refreshCloudAI() } }
         }
     }
 
@@ -405,6 +430,13 @@ struct AIKeySettingsView: View {
 
     var body: some View {
         Form {
+            if vm.usesCloud {
+                Section(footer: Text("Khóa cũ trên điện thoại không còn được dùng; bấm \"Xóa các khóa khỏi điện thoại\" để xóa hẳn.")) {
+                    Label("Điện thoại đang dùng cloud: AI dùng khóa Groq/Google đặt trên cloud (chung cho mọi máy), không cần nhập khóa ở đây.",
+                          systemImage: "icloud")
+                        .font(.footnote)
+                }
+            } else {
             Section(header: Text("Groq (console.groq.com)")) {
                 SecureField("Khóa API Groq (để trống = giữ khóa đã lưu)", text: $groqKey)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
@@ -419,6 +451,7 @@ struct AIKeySettingsView: View {
                 TextField("Mô hình theo thứ tự ưu tiên", text: $vm.geminiModels, axis: .vertical)
                     .textInputAutocapitalization(.never).autocorrectionDisabled(true)
                     .font(.system(.footnote, design: .monospaced))
+            }
             }
             Section {
                 Button("Lưu và thử kết nối") {

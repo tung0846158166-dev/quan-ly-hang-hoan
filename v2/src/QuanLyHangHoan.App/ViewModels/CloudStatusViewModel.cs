@@ -116,6 +116,7 @@ public sealed partial class CloudStatusViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RoleDisplayText))]
     [NotifyPropertyChangedFor(nameof(IsOwner))]
+    [NotifyPropertyChangedFor(nameof(ShowOwnerTools))]
     [NotifyCanExecuteChangedFor(nameof(StartPairingCommand))]
     private string _role = string.Empty;
 
@@ -190,6 +191,9 @@ public sealed partial class CloudStatusViewModel : ObservableObject, IDisposable
     public bool IsRevoked => State == CloudState.Revoked;
     public bool ShowPairedInfo => IsEnabled && State != CloudState.Unpaired;
     public bool ShowPairForm => IsEnabled && State is CloudState.Unpaired or CloudState.Revoked;
+    /// <summary>Thẻ "Tạo mã ghép" + "Thiết bị đã ghép": chỉ chủ cửa hàng trên bản máy CHÍNH (bản máy phụ không bao giờ hiện).</summary>
+    public bool ShowOwnerTools => IsOwner && !AppEdition.IsSecondary;
+
     public bool IsOwner => IsEnabled
         && State is not (CloudState.Unpaired or CloudState.Revoked)
         && string.Equals(Role, "owner", StringComparison.OrdinalIgnoreCase);

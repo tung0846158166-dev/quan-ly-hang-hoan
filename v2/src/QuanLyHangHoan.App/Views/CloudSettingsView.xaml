@@ -355,7 +355,7 @@
 
             <!-- Thẻ 4: Tạo mã ghép cho máy khác (chỉ vai trò owner) -->
             <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
-                    Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding ShowOwnerTools, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <TextBlock Text="🔑 Tạo mã ghép cho máy khác (Chủ cửa hàng)" Style="{StaticResource CloudCardTitleStyle}" />
                     <TextBlock Text="Mã ghép 6 số dùng một lần và tự hết hạn sau 10 phút. Nhập mã này lên máy tính hoặc iPhone nhân viên để ghép vào cửa hàng."
@@ -417,7 +417,7 @@
 
             <!-- Thẻ 5: Thiết bị đã ghép (chỉ chủ cửa hàng): thu hồi máy mất -->
             <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,14"
-                    Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
+                    Visibility="{Binding ShowOwnerTools, Converter={StaticResource BoolToVis}}">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,8">
                         <Button DockPanel.Dock="Right" Content="Tải danh sách" Command="{Binding RefreshDevicesCommand}" Padding="12,5" Cursor="Hand" />

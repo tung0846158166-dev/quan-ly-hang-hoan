@@ -8,6 +8,9 @@
 #ifndef SourceDir
   #define SourceDir "..\dist\self-contained"
 #endif
+#ifndef EditionTag
+  #define EditionTag "may-chinh"
+#endif
 #ifndef OutDir
   #define OutDir "..\dist\release"
 #endif
@@ -15,7 +18,12 @@
 [Setup]
 ; AppId co dinh: cai de len ban cu = cap nhat tai cho, giu nguyen du lieu.
 AppId={{6F3B9A52-7D41-4E0C-9B1A-2C5E8D7A4F10}
+; Cung AppId cho ca hai ban: cai ban nay len may dang co ban kia = doi loai ban, giu nguyen du lieu.
+#if EditionTag == "may-phu"
+AppName=Quản Lý Hàng Hoàn (máy phụ)
+#else
 AppName=Quản Lý Hàng Hoàn
+#endif
 AppVersion={#AppVersion}
 AppPublisher=Quản Lý Hàng Hoàn
 DefaultDirName={localappdata}\Programs\QuanLyHangHoan
@@ -25,7 +33,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutDir}
-OutputBaseFilename=QuanLyHangHoan-v2-{#AppVersion}-setup
+OutputBaseFilename=QuanLyHangHoan-v2-{#AppVersion}-{#EditionTag}-setup
 SetupIconFile=app.ico
 UninstallDisplayIcon={app}\QuanLyHangHoan.App.exe
 Compression=lzma2

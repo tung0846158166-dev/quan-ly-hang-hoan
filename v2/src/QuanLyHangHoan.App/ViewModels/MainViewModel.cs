@@ -877,7 +877,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public string ThemeToggleText => IsDarkTheme ? "☀️ Giao diện sáng" : "🌙 Giao diện tối";
 
-    public string WindowTitle => "Quản Lý Hàng Hoàn v2 — Native WPF (.NET 8)";
+    public string WindowTitle => "Quản Lý Hàng Hoàn v2 — Native WPF (.NET 8)" + AppEdition.TitleSuffix;
 
     [RelayCommand]
     public void ToggleTheme()

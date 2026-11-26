@@ -26,4 +26,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- Bản máy PHỤ (26/11/2026): dotnet publish -p:Edition=Secondary -> bỏ "Tạo mã ghép" + "Thiết bị đã ghép" (AppEdition.cs) -->
+  <PropertyGroup Condition="'$(Edition)' == 'Secondary'">
+    <DefineConstants>$(DefineConstants);SECONDARY</DefineConstants>
+  </PropertyGroup>
+
 </Project>

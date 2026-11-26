@@ -39,7 +39,10 @@ struct ContentView: View {
                 DemoModeBanner { engine.setDemoMode(false) }
             }
             if engine.cloudActive {
-                CloudStatusBar()
+                // kết nối bình thường: không hiện thanh (Tổng quan đã có nhãn trạng thái); có vấn đề thì cảnh báo ở mọi tab
+                if engine.cloudState != .connected && engine.cloudState != .syncing {
+                    CloudStatusBar()
+                }
                 CloudReadOnlyBanner()
             }
 

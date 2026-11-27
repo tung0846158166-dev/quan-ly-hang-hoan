@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Đo tốc độ quét mã (thử nghiệm)</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: #0b1120; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  main { max-width: 600px; margin: 0 auto; padding: 10px; }
+  h1 { font-size: 17px; margin: 4px 0 8px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .modes button { padding: 10px 6px; border-radius: 10px; border: 1.5px solid #334155; background: #111827; color: #cbd5e1; font-size: 13px; font-weight: 700; }
+  .modes button.on { border-color: #38bdf8; color: #fff; background: #0c4a6e; }
+  #cam { position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; }
+  #cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #box { position: absolute; left: 10%; right: 10%; top: 20%; bottom: 20%; border: 2px solid rgba(56,189,248,.8); border-radius: 10px; pointer-events: none; }
+  #flash { position: absolute; inset: 0; background: rgba(34,197,94,.35); opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #state { position: absolute; left: 8px; top: 8px; right: 8px; font-size: 13px; font-weight: 700; background: rgba(15,23,42,.8); padding: 6px 9px; border-radius: 8px; }
+  #timer { position: absolute; right: 10px; bottom: 8px; font: 700 26px ui-monospace, Menlo, monospace; text-shadow: 0 1px 4px #000; }
+  .row { display: flex; gap: 6px; margin-top: 8px; }
+  .row button { flex: 1; padding: 13px 6px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 700; background: #1e293b; color: #e2e8f0; }
+  .row button.pri { background: #0284c7; color: #fff; }
+  .row button.warn { background: #7f1d1d; color: #fecaca; }
+  .row button:disabled { opacity: .45; }
+  #last { margin-top: 8px; background: #111827; border-radius: 10px; padding: 10px; font-size: 14px; min-height: 44px; word-break: break-all; }
+  #last b { font-size: 18px; color: #4ade80; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; background: #111827; border-radius: 10px; overflow: hidden; }
+  th, td { padding: 7px 6px; text-align: right; border-bottom: 1px solid #1f2937; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #94a3b8; font-weight: 600; }
+  .zoom { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: #94a3b8; }
+  .zoom input { flex: 1; }
+  #info { margin-top: 8px; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+  ol { font-size: 13px; color: #cbd5e1; line-height: 1.55; padding-left: 20px; }
+  #log { font: 12px ui-monospace, Menlo, monospace; color: #94a3b8; max-height: 180px; overflow: auto; background: #111827; border-radius: 10px; padding: 8px; margin-top: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>⏱ Đo tốc độ quét mã vạch (trang thử nghiệm)</h1>
+  <div class="modes">
+    <button id="modeA" data-mode="A">A · Như trang quét hiện tại</button>
+    <button id="modeB" data-mode="B">B · Bản tối ưu</button>
+  </div>
+  <div id="cam">
+    <video id="video" playsinline muted autoplay></video>
+    <div id="box"></div><div id="flash"></div>
+    <div id="state">Bấm "Bật camera" để bắt đầu</div>
+    <div id="timer"></div>
+  </div>
+  <div class="row">
+    <button id="btnCam" class="pri">📷 Bật camera</button>
+    <button id="btnTorch" disabled>⚡ Flash</button>
+  </div>
+  <div class="zoom" id="zoomRow" style="display:none">🔍 Zoom <input id="zoom" type="range" min="1" max="1" step="0.1" value="1"><span id="zoomVal">1×</span></div>
+  <div class="row">
+    <button id="btnStart" class="pri" disabled>▶ Bắt đầu đo</button>
+    <button id="btnMiss" class="warn" disabled>✗ Không đọc được</button>
+  </div>
+  <div id="last">Chưa có kết quả.</div>
+  <table>
+    <thead><tr><th>Chế độ</th><th>Số lần</th><th>Đọc được</th><th>Trung vị</th><th>TB</th><th>Chậm (90%)</th></tr></thead>
+    <tbody id="stats"></tbody>
+  </table>
+  <div class="row">
+    <button id="btnCopy">📋 Chép kết quả</button>
+    <button id="btnReset">🗑 Xoá kết quả</button>
+  </div>
+  <div id="info"></div>
+  <ol>
+    <li>Chọn chế độ <b>A</b>, bật camera, bấm <b>Bắt đầu đo</b>.</li>
+    <li>Đưa lần lượt từng nhãn vào khung xanh. Đọc được thì máy kêu "bíp", ghi thời gian, 1 giây sau tự sẵn sàng cho nhãn tiếp theo.</li>
+    <li>Nhãn nào loay hoay mãi không đọc được thì bấm <b>Không đọc được</b> (quá 10 giây tự tính là trượt).</li>
+    <li>Làm hết 30 nhãn, rồi chọn chế độ <b>B</b> và quét lại đúng 30 nhãn đó.</li>
+    <li>Bấm <b>Chép kết quả</b> rồi dán gửi lại.</li>
+  </ol>
+  <div id="log"></div>
+</main>
+<canvas id="work" style="display:none"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// Bộ đọc Code 128 nhanh: chép nguyên từ mobile_scanner.html (giống hệt trang quét hiện tại)
+    const CODE128_PATTERNS = [
+      '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312',
+      '132212', '221213', '221312', '231212', '112232', '122132', '122231', '113222',
+      '123122', '123221', '223211', '221132', '221231', '213212', '223112', '312131',
+      '311222', '321122', '321221', '312212', '322112', '322211', '212123', '212321',
+      '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+      '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121',
+      '313121', '211331', '231131', '213113', '213311', '213131', '311123', '311321',
+      '331121', '312113', '312311', '332111', '314111', '221411', '431111', '111224',
+      '111422', '121124', '121421', '141122', '141221', '112214', '112412', '122114',
+      '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+      '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112',
+      '421211', '212141', '214121', '412121', '111143', '111341', '131141', '114113',
+      '114311', '411113', '411311', '113141', '114131', '311141', '411131', '211412',
+      '211214', '211232', '233111'
+    ];
+
+    function matchCode128Symbol(w) {
+      const total = w[0] + w[1] + w[2] + w[3] + w[4] + w[5];
+      if (!(total > 0)) return null;
+      const pairs = matchCode128Symbol.pairs || (matchCode128Symbol.pairs = CODE128_PATTERNS.map(p => {
+        const e = p.split('').map(Number);
+        return [e[0] + e[1], e[1] + e[2], e[2] + e[3], e[3] + e[4], e[4] + e[5]];
+      }));
+      // Dùng tổng từng cặp vạch+khoảng trắng (cạnh lên → cạnh lên) nên không bị lệch khi ảnh mờ làm vạch dày/mỏng.
+      const unit = total / 11;
+      const t0 = (w[0] + w[1]) / unit, t1 = (w[1] + w[2]) / unit, t2 = (w[2] + w[3]) / unit,
+        t3 = (w[3] + w[4]) / unit, t4 = (w[4] + w[5]) / unit;
+      let best = -1, bestErr = Infinity;
+      for (let v = 0; v < 107; v++) {
+        const p = pairs[v];
+        const d0 = t0 - p[0], d1 = t1 - p[1], d2 = t2 - p[2], d3 = t3 - p[3], d4 = t4 - p[4];
+        const err = d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3 + d4 * d4;
+        if (err < bestErr) { bestErr = err; best = v; }
+      }
+      return best < 0 ? null : { value: best, error: bestErr, unit };
+    }
+
+    // Chuyển một dòng độ sáng thành danh sách điểm chuyển sáng/tối (nội suy dưới điểm ảnh).
+    function code128Edges(lum) {
+      const n = lum.length;
+      const sm = new Float32Array(n);
+      for (let i = 0; i < n; i++) sm[i] = (lum[Math.max(0, i - 1)] + 2 * lum[i] + lum[Math.min(n - 1, i + 1)]) / 4;
+      const BLOCK = 16, blocks = Math.ceil(n / BLOCK);
+      const bmin = new Float32Array(blocks).fill(255), bmax = new Float32Array(blocks);
+      for (let i = 0; i < n; i++) {
+        const b = (i / BLOCK) | 0;
+        if (sm[i] < bmin[b]) bmin[b] = sm[i];
+        if (sm[i] > bmax[b]) bmax[b] = sm[i];
+      }
+      const thr = new Float32Array(blocks);
+      for (let b = 0; b < blocks; b++) {
+        let lo = 255, hi = 0;
+        for (let j = Math.max(0, b - 3); j <= Math.min(blocks - 1, b + 3); j++) {
+          if (bmin[j] < lo) lo = bmin[j];
+          if (bmax[j] > hi) hi = bmax[j];
+        }
+        thr[b] = hi - lo < 40 ? -1 : (lo + hi) / 2; // ít tương phản: coi là nền trắng
+      }
+      const pos = [], dark = [];
+      let prevDark = false;
+      for (let i = 0; i < n; i++) {
+        const t = thr[(i / BLOCK) | 0];
+        const isDark = t >= 0 && sm[i] < t;
+        if (i > 0 && isDark !== prevDark) {
+          const a = sm[i - 1], b = sm[i];
+          const tt = t >= 0 ? t : thr[((i - 1) / BLOCK) | 0];
+          const frac = a === b ? 0.5 : Math.max(0, Math.min(1, (tt - a) / (b - a)));
+          pos.push(i - 1 + frac);
+          dark.push(isDark);
+        }
+        prevDark = isDark;
+      }
+      return { pos, dark };
+    }
+
+    function code128ToText(values) {
+      let set = values[0] === 103 ? 'A' : values[0] === 104 ? 'B' : 'C';
+      let out = '', shift = false;
+      for (let i = 1; i < values.length - 1; i++) {
+        const v = values[i];
+        if (set === 'C') {
+          if (v < 100) out += (v < 10 ? '0' : '') + v;
+          else if (v === 100) set = 'B';
+          else if (v === 101) set = 'A';
+          else if (v !== 102) return null;
+          continue;
+        }
+        const active = shift ? (set === 'A' ? 'B' : 'A') : set;
+        shift = false;
+        if (v === 99) set = 'C';
+        else if (v === 98) shift = true;
+        else if (v === 100) { if (active === 'A') set = 'B'; }
+        else if (v === 101) { if (active === 'B') set = 'A'; }
+        else if (v >= 96) continue; // FNC1-4: không thuộc nội dung
+        else if (active === 'A') out += String.fromCharCode(v < 64 ? 32 + v : v - 64);
+        else out += String.fromCharCode(32 + v);
+      }
+      return out;
+    }
+
+    function decodeCode128Forward(lum) {
+      const { pos, dark } = code128Edges(lum);
+      const n = pos.length;
+      const MAX_ERR = 0.9;
+      for (let k = 0; k + 7 < n; k++) {
+        if (!dark[k]) continue;
+        const w = [pos[k + 1] - pos[k], pos[k + 2] - pos[k + 1], pos[k + 3] - pos[k + 2], pos[k + 4] - pos[k + 3], pos[k + 5] - pos[k + 4], pos[k + 6] - pos[k + 5]];
+        if (w[0] < 1) continue;
+        const start = matchCode128Symbol(w);
+        if (!start || start.value < 103 || start.value > 105 || start.error > MAX_ERR) continue;
+        const quiet = k > 0 ? pos[k] - pos[k - 1] : pos[0];
+        if (quiet < start.unit * 3) continue;
+        const values = [start.value];
+        let idx = k + 6, ended = false;
+        while (idx + 6 < n && values.length < 64) {
+          const sym = matchCode128Symbol([pos[idx + 1] - pos[idx], pos[idx + 2] - pos[idx + 1], pos[idx + 3] - pos[idx + 2],
+            pos[idx + 4] - pos[idx + 3], pos[idx + 5] - pos[idx + 4], pos[idx + 6] - pos[idx + 5]]);
+          if (!sym || sym.error > MAX_ERR || !dark[idx]) break;
+          if (sym.value >= 103 && sym.value <= 105) break;
+          values.push(sym.value);
+          idx += 6;
+          if (sym.value === 106) { ended = idx + 1 < n && dark[idx]; break; }
+        }
+        if (!ended || values.length < 4) continue;
+        values.pop(); // bỏ ký hiệu Stop
+        let sum = values[0];
+        for (let i = 1; i < values.length - 1; i++) sum += i * values[i];
+        if (sum % 103 !== values[values.length - 1]) continue;
+        const text = code128ToText(values);
+        if (text) return text;
+      }
+      return null;
+    }
+
+    function decodeCode128Line(lum) {
+      const forward = decodeCode128Forward(lum);
+      if (forward) return forward;
+      return decodeCode128Forward(Array.prototype.slice.call(lum).reverse()); // mã bị lộn ngược
+    }
+
+    // =========================================================================
+    // v1.8.36: ĐỌC TEM KHÓ — nghiêng, mờ, nhạt (chạy ở lượt "sâu", không chạy mọi khung hình)
+    // - findBarcodeOrientations: tìm vùng có nhiều vạch song song và hướng vuông góc với vạch (tem xoay bất kỳ góc).
+    // - sampleScanLine: lấy một dòng điểm ảnh theo hướng đó (nội suy), rồi giải mã như dòng ngang thường.
+    // - stretchLine / sharpenLine: kéo giãn độ tương phản (tem in nhạt) và làm nét (ảnh mờ).
+    // Mọi lần đọc vẫn qua checksum Code 128 và cần 2 lần khớp nhau nên không tăng nguy cơ đọc sai.
+    // =========================================================================
+    function code128GrayFrame(data, w, h) {
+      const gray = new Uint8Array(w * h);
+      for (let i = 0, p = 0; i < gray.length; i++, p += 4) gray[i] = (data[p] * 77 + data[p + 1] * 150 + data[p + 2] * 29) >> 8;
+      return gray;
+    }
+
+    function findBarcodeOrientations(gray, w, h, maxSpots) {
+      const gw = w >> 1, gh = h >> 1;
+      if (gw < 48 || gh < 32) return [];
+      const small = new Uint8Array(gw * gh);
+      for (let y = 0; y < gh; y++) {
+        const r0 = (y * 2) * w, r1 = r0 + w;
+        for (let x = 0; x < gw; x++) { const i = r0 + x * 2; small[y * gw + x] = (gray[i] + gray[i + 1] + gray[r1 + x * 2] + gray[r1 + x * 2 + 1]) >> 2; }
+      }
+      const B = 10, bw = Math.floor(gw / B), bh = Math.floor(gh / B);
+      if (bw < 3 || bh < 3) return [];
+      const jxx = new Float32Array(bw * bh), jyy = new Float32Array(bw * bh), jxy = new Float32Array(bw * bh);
+      for (let y = 1; y < gh - 1; y++) {
+        const by = Math.min(bh - 1, (y / B) | 0) * bw;
+        for (let x = 1; x < gw - 1; x++) {
+          const gx = small[y * gw + x + 1] - small[y * gw + x - 1];
+          const gy = small[(y + 1) * gw + x] - small[(y - 1) * gw + x];
+          const bi = by + Math.min(bw - 1, (x / B) | 0);
+          jxx[bi] += gx * gx; jyy[bi] += gy * gy; jxy[bi] += gx * gy;
+        }
+      }
+      let maxEnergy = 0;
+      const energy = new Float32Array(bw * bh), coh = new Float32Array(bw * bh);
+      for (let i = 0; i < bw * bh; i++) {
+        energy[i] = jxx[i] + jyy[i];
+        if (energy[i] > maxEnergy) maxEnergy = energy[i];
+        coh[i] = energy[i] > 0 ? Math.sqrt((jxx[i] - jyy[i]) * (jxx[i] - jyy[i]) + 4 * jxy[i] * jxy[i]) / energy[i] : 0;
+      }
+      if (maxEnergy <= 0) return [];
+      const cands = [];
+      for (let i = 0; i < bw * bh; i++) {
+        if (coh[i] < 0.7 || energy[i] < maxEnergy * 0.2) continue;
+        cands.push({ i, score: energy[i] * coh[i] * coh[i] * coh[i] });
+      }
+      cands.sort((a, b) => b.score - a.score);
+      const spots = [];
+      for (const c of cands) {
+        const bx = c.i % bw, by = (c.i / bw) | 0;
+        const theta = 0.5 * Math.atan2(2 * jxy[c.i], jxx[c.i] - jyy[c.i]);
+        const dx = Math.cos(theta), dy = Math.sin(theta);
+        let dup = false;
+        for (const s of spots) {
+          const far = Math.abs(s.bx - bx) + Math.abs(s.by - by) > 12;
+          const dTheta = Math.abs(Math.atan2(Math.sin(2 * (theta - s.theta)), Math.cos(2 * (theta - s.theta)))) / 2;
+          if (!far && dTheta < 0.35) { dup = true; break; }
+        }
+        if (dup) continue;
+        spots.push({ bx, by, theta, x: (bx + 0.5) * B * 2, y: (by + 0.5) * B * 2, dx, dy });
+        if (spots.length >= (maxSpots || 3)) break;
+      }
+      return spots;
+    }
+
+    function sampleScanLine(gray, w, h, cx, cy, dx, dy) {
+      let tmin = -Infinity, tmax = Infinity;
+      const clip = (p, d, size) => {
+        if (Math.abs(d) < 1e-6) return p >= 1 && p <= size - 2;
+        const a = (1 - p) / d, b = (size - 2 - p) / d;
+        tmin = Math.max(tmin, Math.min(a, b)); tmax = Math.min(tmax, Math.max(a, b));
+        return true;
+      };
+      if (!clip(cx, dx, w) || !clip(cy, dy, h)) return null;
+      const n = Math.floor(tmax - tmin);
+      if (!(n >= 80)) return null;
+      const line = new Uint8Array(n);
+      for (let k = 0; k < n; k++) {
+        const t = tmin + k, x = cx + dx * t, y = cy + dy * t;
+        const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0, i = y0 * w + x0;
+        line[k] = (gray[i] * (1 - fx) + gray[i + 1] * fx) * (1 - fy) + (gray[i + w] * (1 - fx) + gray[i + w + 1] * fx) * fy;
+      }
+      return line;
+    }
+
+    function stretchLine(lum) {
+      const hist = new Uint16Array(256);
+      for (let i = 0; i < lum.length; i++) hist[lum[i]]++;
+      const cut = Math.max(1, Math.floor(lum.length * 0.02));
+      let lo = 0, hi = 255, acc = 0;
+      for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= cut) { lo = v; break; } }
+      acc = 0;
+      for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= cut) { hi = v; break; } }
+      if (hi - lo < 8) return null;
+      const out = new Uint8Array(lum.length), k = 255 / (hi - lo);
+      for (let i = 0; i < lum.length; i++) { const v = (lum[i] - lo) * k; out[i] = v < 0 ? 0 : v > 255 ? 255 : v; }
+      return out;
+    }
+
+    function sharpenLine(lum) {
+      const n = lum.length, out = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        const a = lum[Math.max(0, i - 2)], b = lum[Math.max(0, i - 1)], c = lum[i], d = lum[Math.min(n - 1, i + 1)], e = lum[Math.min(n - 1, i + 2)];
+        const blur = (a + 4 * b + 6 * c + 4 * d + e) / 16;
+        const v = c + 2.2 * (c - blur);
+        out[i] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+      return out;
+    }
+
+    function decodeCode128LineDeep(lum) {
+      if (!lum) return null;
+      let text = decodeCode128Line(lum);
+      if (text) return text;
+      const stretched = stretchLine(lum);
+      if (stretched) {
+        text = decodeCode128Line(stretched);
+        if (text) return text;
+        text = decodeCode128Line(sharpenLine(stretched));
+        if (text) return text;
+      }
+      return decodeCode128Line(sharpenLine(lum));
+    }
+
+    // Quét vài dòng ngang rồi dọc (nhãn xoay 90°). Cần 2 lần đọc khớp (cùng khung hoặc 2 khung liền nhau) mới nhận.
+    function fastDecodeCode128Canvas(canvas, options = {}) {
+      const w = canvas && canvas.width, h = canvas && canvas.height;
+      if (!w || !h || w < 80 || h < 40) return null;
+      let data;
+      try { data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data; } catch (eRead) { return null; }
+      const hits = new Map();
+      const note = text => {
+        if (!text || text.length < 6) return null;
+        const count = (hits.get(text) || 0) + 1;
+        hits.set(text, count);
+        return count;
+      };
+      const rows = [0.5, 0.38, 0.62, 0.26, 0.74, 0.14, 0.86];
+      const line = new Uint8Array(w);
+      for (const r of rows) {
+        const y = Math.round(r * (h - 1)), base = y * w * 4;
+        for (let x = 0; x < w; x++) { const i = base + x * 4; line[x] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8; }
+        const text = decodeCode128Line(line);
+        if (note(text) && (options.single || hits.get(text) >= 2)) return text;
+      }
+      if (!hits.size && !options.skipVertical) {
+        const col = new Uint8Array(h);
+        for (const r of rows) {
+          const x = Math.round(r * (w - 1));
+          for (let y = 0; y < h; y++) { const i = (y * w + x) * 4; col[y] = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8; }
+          const text = decodeCode128Line(col);
+          if (note(text) && (options.single || hits.get(text) >= 2)) return text;
+        }
+      }
+      if (options.deep && !hits.size) {
+        // Lượt sâu: tem nghiêng bất kỳ góc, mờ hoặc in nhạt. Tìm hướng vạch rồi quét dọc theo hướng đó.
+        const gray = code128GrayFrame(data, w, h);
+        const spots = findBarcodeOrientations(gray, w, h, 3);
+        deepSearch:
+        for (const s of spots) {
+          for (const k of [0, 5, -5, 10, -10]) {
+            const line = sampleScanLine(gray, w, h, s.x - s.dy * k, s.y + s.dx * k, s.dx, s.dy);
+            const text = decodeCode128LineDeep(line);
+            if (note(text) && (options.single || hits.get(text) >= 2)) return text;
+          }
+        }
+        if (!hits.size) {
+          // Không thấy hướng rõ: thử dòng ngang với tương phản được kéo giãn / làm nét
+          for (const r of rows) {
+            const y = Math.round(r * (h - 1)), base = y * w;
+            const text = decodeCode128LineDeep(gray.subarray(base, base + w));
+            if (note(text) && (options.single || hits.get(text) >= 2)) return text;
+          }
+        }
+      }
+      let best = null, bestCount = 0;
+      hits.forEach((count, text) => { if (count > bestCount) { best = text; bestCount = count; } });
+      const now = Date.now();
+      const last = fastDecodeCode128Canvas.last;
+      if (best && last && last.text === best && now - last.time < 800) return best;
+      fastDecodeCode128Canvas.last = best ? { text: best, time: now } : last;
+      return null;
+    }
+
+    // Quét các dải ở trên / giữa / dưới theo cả hai hướng khi bộ dò vị trí bỏ sót.
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var ZXING_URLS = ['https://cdn.jsdelivr.net/npm/barcode-detector@3.2.1/dist/iife/polyfill.min.js', 'https://unpkg.com/barcode-detector@3.2.1/dist/iife/polyfill.min.js'];
+  var FORMATS = ['code_128', 'qr_code', 'code_39', 'ean_13'];
+  var MISS_AFTER_MS = 10000, COOLDOWN_MS = 1000, SAME_CODE_BLOCK_MS = 3000;
+
+  var mode = 'A';
+  try { mode = localStorage.getItem('scanlab_mode') || 'A'; } catch (e) {}
+  var results = [];
+  try { results = JSON.parse(localStorage.getItem('scanlab_results') || '[]') || []; } catch (e) {}
+
+  var stream = null, track = null, torchOn = false, running = false;
+  var measuring = false, readyAt = 0, cooldownUntil = 0, lastCode = '', lastCodeAt = 0;
+  var nativeDetector = null, nativeKind = '';          // detector trên luồng chính
+  var worker = null, workerReady = false, workerBusy = false, workerFailed = false, workerErrors = 0;
+  var frames = 0, fpsAt = performance.now(), fps = 0, frameNo = 0, mainBusy = false;
+  var video = $('video'), work = $('work'), wctx = work.getContext('2d', { willReadFrequently: true });
+
+  function log(m) { var d = new Date(); var el = $('log'); el.textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2) + ' ' + m + '\n' + el.textContent; }
+  function save() { try { localStorage.setItem('scanlab_results', JSON.stringify(results)); localStorage.setItem('scanlab_mode', mode); } catch (e) {} }
+  function clean(raw) {
+    var s = String(raw || '').trim();
+    var m = s.match(/(SPXVN[0-9A-Za-z]{6,18})/i); if (m) return m[1].toUpperCase();
+    if (/^https?:\/\//i.test(s)) { var t = s.match(/[A-Za-z0-9]{8,30}(?=[^A-Za-z0-9]*$)/); return t ? t[0].toUpperCase() : ''; }
+    return s.replace(/\s+/g, '').toUpperCase();
+  }
+
+  // ---------- Bộ đọc ----------
+  function loadScript(url) {
+    return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error(url)); }; document.head.appendChild(s); });
+  }
+  async function setupNative() {
+    var hadNative = 'BarcodeDetector' in window;
+    if (!hadNative) {
+      for (var i = 0; i < ZXING_URLS.length && !('BarcodeDetector' in window); i++) { try { await loadScript(ZXING_URLS[i]); } catch (e) {} }
+    }
+    if (!('BarcodeDetector' in window)) { log('Không nạp được bộ đọc ZXing'); return; }
+    try {
+      var fm = FORMATS;
+      if (typeof BarcodeDetector.getSupportedFormats === 'function') { var sup = await BarcodeDetector.getSupportedFormats(); fm = FORMATS.filter(function (f) { return sup.indexOf(f) >= 0; }); }
+      nativeDetector = new BarcodeDetector({ formats: fm.length ? fm : FORMATS });
+      nativeKind = hadNative ? 'bộ đọc gốc của máy' : 'ZXing';
+      log('Luồng chính: ' + nativeKind);
+    } catch (e) { log('Lỗi tạo bộ đọc: ' + e.message); }
+  }
+  function setupWorker() {
+    if (worker || workerFailed || typeof Worker === 'undefined') return;
+    var src = [
+      'var det = null, fmts = ' + JSON.stringify(FORMATS) + ';',
+      'var urls = ' + JSON.stringify(ZXING_URLS) + ';',
+      'for (var i = 0; i < urls.length && typeof BarcodeDetector === "undefined"; i++) { try { importScripts(urls[i]); } catch (e) {} }',
+      'try { det = new BarcodeDetector({ formats: fmts }); postMessage({ ready: true }); } catch (e) { postMessage({ fail: String(e && e.message || e) }); }',
+      'onmessage = function (ev) {',
+      '  var t0 = Date.now();',
+      '  det.detect(ev.data.img).then(function (r) {',
+      '    var v = (r && r.length) ? r[0].rawValue : "";',
+      '    postMessage({ id: ev.data.id, code: v, ms: Date.now() - t0 });',
+      '  }, function (e) { postMessage({ id: ev.data.id, code: "", err: String(e && e.message || e) }); });',
+      '};'
+    ].join('\n');
+    try {
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      worker.onmessage = function (ev) {
+        var d = ev.data || {};
+        if (d.ready) { workerReady = true; log('Luồng phụ (Worker): ZXing sẵn sàng'); updateInfo(); return; }
+        if (d.fail) { workerFailed = true; worker = null; log('Worker không dùng được: ' + d.fail + ' → đọc trên luồng chính'); updateInfo(); return; }
+        workerBusy = false;
+        if (d.err) { workerErrors++; if (workerErrors >= 5 && !workerFailed) { workerFailed = true; try { worker.terminate(); } catch (e) {} worker = null; log('Worker đọc lỗi liên tục (' + d.err + ') → đọc trên luồng chính'); updateInfo(); } return; }
+        workerErrors = 0;
+        if (d.code) accept(d.code, 'ZXing (luồng phụ)');
+      };
+      worker.onerror = function (e) { workerFailed = true; workerBusy = false; worker = null; log('Worker lỗi → đọc trên luồng chính'); updateInfo(); };
+    } catch (e) { workerFailed = true; log('Không tạo được Worker'); }
+  }
+
+  function grab(fullFrame, maxSide, roiW, roiH) {
+    var vw = video.videoWidth, vh = video.videoHeight; if (!vw || !vh) return null;
+    var sw = fullFrame ? vw : Math.round(vw * roiW), sh = fullFrame ? vh : Math.round(vh * roiH);
+    var sx = Math.round((vw - sw) / 2), sy = Math.round((vh - sh) / 2);
+    var k = Math.min(1, maxSide / Math.max(sw, sh));
+    var w = Math.round(sw * k), h = Math.round(sh * k);
+    if (work.width !== w || work.height !== h) { work.width = w; work.height = h; }
+    wctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    return work;
+  }
+  async function detectMain(canvas) {
+    if (!nativeDetector) return '';
+    try { var r = await nativeDetector.detect(canvas); return r && r.length ? r[0].rawValue : ''; } catch (e) { return ''; }
+  }
+  function readQr(canvas) {
+    if (typeof jsQR === 'undefined') return '';
+    try { var px = wctx.getImageData(0, 0, canvas.width, canvas.height); var q = jsQR(px.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' }); return q && q.data ? q.data : ''; } catch (e) { return ''; }
+  }
+
+  // Chế độ A: giống trang quét hiện tại (vùng giữa 80%×60% thu về 1024 px, ~14 khung/giây, mọi bộ đọc trên luồng chính)
+  async function frameA() {
+    var c = grab(frameNo % 4 === 0, 1024, 0.8, 0.6); if (!c) return;
+    var code = fastDecodeCode128Canvas(c, {});
+    if (code) return accept(code, 'Code128 nhanh');
+    if (frameNo % 2 === 0) { code = readQr(c); if (code) return accept(code, 'jsQR'); }
+    code = await detectMain(c);
+    if (code) accept(code, nativeKind);
+  }
+  // Chế độ B: vùng giữa cắt sát ở độ phân giải cao hơn, ZXing chạy luồng phụ (giao diện không bị khựng), không giảm tốc
+  async function frameB() {
+    var full = frameNo % 6 === 0;
+    var c = grab(full, full ? 1280 : 1600, 0.8, 0.6); if (!c) return;
+    var code = fastDecodeCode128Canvas(c, { single: false });
+    if (code) return accept(code, 'Code128 nhanh');
+    if (worker && workerReady && !workerBusy) {
+      try { var img = wctx.getImageData(0, 0, c.width, c.height); workerBusy = true; worker.postMessage({ id: frameNo, img: img }); } catch (e) { workerBusy = false; }
+      if (frameNo % 3 === 0) { code = readQr(c); if (code) return accept(code, 'jsQR'); }
+      return;
+    }
+    if (!worker || workerFailed) {
+      if (frameNo % 2 === 0) { code = readQr(c); if (code) return accept(code, 'jsQR'); }
+      code = await detectMain(c);
+      if (code) accept(code, nativeKind);
+    }
+  }
+
+  function loop() {
+    if (!running) return;
+    var gap = mode === 'A' ? 70 : 33;
+    setTimeout(async function () {
+      if (!running) return;
+      if (!mainBusy && video.readyState >= 2) {
+        mainBusy = true; frameNo++; frames++;
+        try { await (mode === 'A' ? frameA() : frameB()); } catch (e) {}
+        mainBusy = false;
+      }
+      var now = performance.now();
+      if (now - fpsAt >= 1000) { fps = Math.round(frames * 1000 / (now - fpsAt)); frames = 0; fpsAt = now; updateInfo(); }
+      loop();
+    }, gap);
+  }
+
+  // ---------- Đo ----------
+  function beep() {
+    try {
+      var A = window.AudioContext || window.webkitAudioContext; if (!A) return;
+      beep.ctx = beep.ctx || new A(); var o = beep.ctx.createOscillator(), g = beep.ctx.createGain();
+      o.frequency.value = 1800; g.gain.value = 0.15; o.connect(g); g.connect(beep.ctx.destination); o.start(); o.stop(beep.ctx.currentTime + 0.08);
+    } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {}
+  }
+  function accept(raw, engine) {
+    var code = clean(raw); if (!code || code.length < 6) return;
+    var now = performance.now();
+    if (code === lastCode && now - lastCodeAt < SAME_CODE_BLOCK_MS) { lastCodeAt = now; return; }
+    if (now < cooldownUntil) return;
+    if (measuring && now < readyAt) return;      // mã đã nằm trong khung trước lúc bắt đầu tính giờ: bỏ qua
+    lastCode = code; lastCodeAt = now;
+    var f = $('flash'); f.style.opacity = '1'; setTimeout(function () { f.style.opacity = '0'; }, 250);
+    beep();
+    if (measuring) {
+      var ms = Math.round(now - readyAt);
+      results.push({ mode: mode, ok: true, ms: ms, code: code, engine: engine, t: Date.now() });
+      save(); renderStats();
+      $('last').innerHTML = '✓ <b>' + code + '</b><br>' + ms + ' ms · ' + engine + ' · chế độ ' + mode;
+      cooldownUntil = now + COOLDOWN_MS; readyAt = now + COOLDOWN_MS;
+      setState('Đã đọc ✓ — chờ 1 giây rồi đưa nhãn tiếp theo');
+    } else {
+      $('last').innerHTML = '✓ <b>' + code + '</b><br>' + engine + ' (chưa bấm Bắt đầu đo nên không tính)';
+    }
+  }
+  function miss(auto) {
+    if (!measuring) return;
+    var now = performance.now(); if (now < readyAt) return;
+    results.push({ mode: mode, ok: false, ms: Math.round(now - readyAt), code: '', engine: auto ? 'quá 10 giây' : 'bấm trượt', t: Date.now() });
+    save(); renderStats();
+    $('last').innerHTML = '✗ Không đọc được (' + (auto ? 'quá 10 giây' : 'bấm tay') + ') · chế độ ' + mode;
+    readyAt = now + COOLDOWN_MS; cooldownUntil = now + COOLDOWN_MS;
+  }
+  function tick() {
+    if (measuring) {
+      var now = performance.now();
+      if (now < readyAt) $('timer').textContent = '…';
+      else {
+        var el = now - readyAt; $('timer').textContent = (el / 1000).toFixed(1) + 's';
+        if (now - (readyAt) > 0 && $('state').dataset.s !== 'ready') setState('Sẵn sàng — đưa nhãn vào khung');
+        if (el > MISS_AFTER_MS) miss(true);
+      }
+    } else $('timer').textContent = '';
+    requestAnimationFrame(tick);
+  }
+  function setState(t) { var s = $('state'); s.textContent = t; s.dataset.s = /Sẵn sàng/.test(t) ? 'ready' : ''; }
+  function pct(a, p) { if (!a.length) return 0; var s = a.slice().sort(function (x, y) { return x - y; }); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1) + 0.5))]; }
+  function summary(m) {
+    var r = results.filter(function (x) { return x.mode === m; }), ok = r.filter(function (x) { return x.ok; }).map(function (x) { return x.ms; });
+    var avg = ok.length ? Math.round(ok.reduce(function (a, b) { return a + b; }, 0) / ok.length) : 0;
+    return { n: r.length, ok: ok.length, rate: r.length ? Math.round(ok.length * 100 / r.length) : 0, med: pct(ok, 0.5), avg: avg, p90: pct(ok, 0.9) };
+  }
+  function renderStats() {
+    $('stats').innerHTML = ['A', 'B'].map(function (m) {
+      var s = summary(m);
+      return '<tr><td>' + m + (m === 'A' ? ' · hiện tại' : ' · tối ưu') + '</td><td>' + s.n + '</td><td>' + s.ok + ' (' + s.rate + '%)</td><td>' + (s.ok ? s.med + ' ms' : '—') + '</td><td>' + (s.ok ? s.avg + ' ms' : '—') + '</td><td>' + (s.ok ? s.p90 + ' ms' : '—') + '</td></tr>';
+    }).join('');
+  }
+  function updateInfo() {
+    var st = track && track.getSettings ? track.getSettings() : {};
+    $('info').textContent = 'Camera ' + (video.videoWidth || '?') + '×' + (video.videoHeight || '?') +
+      ' · ' + fps + ' khung/giây được xử lý · Bộ đọc: Code128 nhanh + jsQR + ' + (nativeKind || 'chưa có') +
+      (mode === 'B' ? (workerReady ? ' · ZXing chạy luồng phụ' : workerFailed ? ' · luồng phụ không dùng được' : ' · đang nạp luồng phụ') : '') +
+      (st.focusMode ? ' · lấy nét: ' + st.focusMode : '') + ' · ' + navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1');
+  }
+
+  // ---------- Camera ----------
+  async function startCam() {
+    if (running) return;
+    $('btnCam').disabled = true; setState('Đang mở camera…');
+    try {
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } }); }
+      catch (e1) { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'environment' } }); }
+    } catch (e) {
+      setState('Không mở được camera: ' + (e && e.name || e) + '. Kiểm tra quyền camera của Safari.'); $('btnCam').disabled = false; return;
+    }
+    track = stream.getVideoTracks()[0];
+    video.srcObject = stream; try { await video.play(); } catch (e) {}
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    try { if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) {}
+    $('btnTorch').disabled = !caps.torch;
+    if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+      var z = $('zoom'); z.min = caps.zoom.min; z.max = Math.min(caps.zoom.max, 4); z.step = caps.zoom.step || 0.1; z.value = caps.zoom.min;
+      $('zoomRow').style.display = 'flex';
+    }
+    running = true; $('btnCam').textContent = '📷 Camera đang bật'; $('btnStart').disabled = false;
+    setState('Camera đã bật — bấm "Bắt đầu đo"');
+    updateInfo(); loop();
+  }
+
+  function setMode(m) {
+    mode = m; save();
+    $('modeA').classList.toggle('on', m === 'A'); $('modeB').classList.toggle('on', m === 'B');
+    if (m === 'B') setupWorker();
+    if (measuring) { readyAt = performance.now() + COOLDOWN_MS; }
+    updateInfo();
+    log('Chế độ ' + m);
+  }
+
+  $('modeA').onclick = function () { setMode('A'); };
+  $('modeB').onclick = function () { setMode('B'); };
+  $('btnCam').onclick = startCam;
+  $('btnTorch').onclick = async function () {
+    if (!track) return; torchOn = !torchOn;
+    try { await track.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (e) { torchOn = false; }
+    this.textContent = torchOn ? '⚡ Tắt flash' : '⚡ Flash';
+  };
+  $('zoom').oninput = function () {
+    $('zoomVal').textContent = Number(this.value).toFixed(1) + '×';
+    if (track) track.applyConstraints({ advanced: [{ zoom: Number(this.value) }] }).catch(function () {});
+  };
+  $('btnStart').onclick = function () {
+    beep(); // mở khoá âm thanh trên iPhone
+    measuring = !measuring;
+    if (measuring) { readyAt = performance.now() + 300; lastCode = ''; this.textContent = '⏸ Dừng đo'; $('btnMiss').disabled = false; }
+    else { this.textContent = '▶ Bắt đầu đo'; $('btnMiss').disabled = true; setState('Đã dừng đo'); }
+  };
+  $('btnMiss').onclick = function () { miss(false); };
+  $('btnReset').onclick = function () {
+    if (this.dataset.confirm !== '1') { this.dataset.confirm = '1'; this.textContent = 'Bấm lần nữa để xoá'; var b = this; setTimeout(function () { b.dataset.confirm = ''; b.textContent = '🗑 Xoá kết quả'; }, 3000); return; }
+    results = []; save(); renderStats(); this.dataset.confirm = ''; this.textContent = '🗑 Xoá kết quả'; $('last').textContent = 'Đã xoá kết quả.';
+  };
+  $('btnCopy').onclick = function () {
+    var lines = ['KẾT QUẢ ĐO QUÉT MÃ', navigator.userAgent, 'Camera ' + video.videoWidth + '×' + video.videoHeight];
+    ['A', 'B'].forEach(function (m) { var s = summary(m); lines.push(m + ': ' + s.n + ' lần, đọc được ' + s.ok + ' (' + s.rate + '%), trung vị ' + s.med + ' ms, TB ' + s.avg + ' ms, 90% ' + s.p90 + ' ms'); });
+    lines.push('--- chi tiết ---');
+    results.forEach(function (r) { lines.push(r.mode + '\t' + (r.ok ? 'OK' : 'TRƯỢT') + '\t' + r.ms + '\t' + r.engine + '\t' + r.code); });
+    var text = lines.join('\n'), btn = this;
+    var done = function () { btn.textContent = '✓ Đã chép'; setTimeout(function () { btn.textContent = '📋 Chép kết quả'; }, 2000); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+    else { fallbackCopy(text); done(); }
+  };
+  function fallbackCopy(t) { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); }
+
+  setupNative();          // nạp ZXing ngay khi mở trang, không chờ
+  setMode(mode);
+  renderStats();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

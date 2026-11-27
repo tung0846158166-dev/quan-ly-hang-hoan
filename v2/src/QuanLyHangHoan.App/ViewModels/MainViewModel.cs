@@ -509,6 +509,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TikTokReturnVm.CountsUpdated += SyncSidebarKpis;
         WatchlistVm.CountsUpdated += SyncSidebarKpis;
         ComplaintsVm.CountsUpdated += SyncSidebarKpis;
+        // trang chủ: 3 khiếu nại gần nhất (27/11/2026)
+        HomeVm.OpenComplaintsTable = () => NavigateByKey("complaints");
+        HomeVm.OpenOrderDetail = OpenOrderDetail;
+        ComplaintsVm.CountsUpdated += () => HomeVm.SetRecentComplaints(ComplaintsVm.Recent(3), ComplaintsVm.ProcessingCount, ComplaintsVm.TotalCount);
         ReturnWatchVm.CountsUpdated += SyncSidebarKpis;
 
         var uiSettings = _uiSettingsStore.Load();

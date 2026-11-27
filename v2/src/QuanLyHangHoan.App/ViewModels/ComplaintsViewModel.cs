@@ -40,6 +40,10 @@ public sealed class ComplaintRowViewModel
     public string ComplaintStatus => Source.ComplaintStatus;
     public string ComplaintAt => Source.ComplaintAt;
     public string ComplaintNote => Source.ComplaintNote;
+    /// <summary>Ghi chú khiếu nại trên một dòng (bảng): các dòng lý do nối bằng " | ".</summary>
+    public string ComplaintNoteOneLine => string.Join("  |  ", Source.ComplaintNote.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    /// <summary>Dòng lý do / ghi chú mới nhất.</summary>
+    public string LastReason => Source.ComplaintNote.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault() ?? "";
     public string ComplaintDoneAt => Source.ComplaintDoneAt;
     /// <summary>Khiếu nại Thành công: ngày sẽ tự vào Kho lưu trữ (30 ngày sau khi xong).</summary>
     public string AutoArchiveText
@@ -141,6 +145,9 @@ public sealed partial class ComplaintsViewModel : ObservableObject
         CountsUpdated?.Invoke();
     }
 
+    /// <summary>n đơn khiếu nại mới nhất (mọi trạng thái, cả kho lưu trữ) cho trang chủ.</summary>
+    public IReadOnlyList<ComplaintRowViewModel> Recent(int n) => _allRows.Take(n).ToList();
+
     private static int Compare(string a, string b)
     {
         var da = AlertThresholds.TryParseVietnamDateTime(a);
@@ -165,12 +172,29 @@ public sealed partial class ComplaintsViewModel : ObservableObject
         StatusBarText = $"Đang hiển thị {VisibleRows.Count:N0} / {TotalCount:N0} đơn khiếu nại  •  Đang xử lý {ProcessingCount:N0} • Thành công {SuccessCount:N0} • Thất bại {FailedCount:N0}";
     }
 
-    /// <summary>Đổi trạng thái khiếu nại của một đơn (chọn ở ô trạng thái).</summary>
-    public async Task SetStatusAsync(ComplaintRowViewModel row, string status)
+    /// <summary>
+    /// Đổi trạng thái khiếu nại của một đơn (chọn ở ô trạng thái). Chủ dự án 27/11/2026: BẮT BUỘC ghi lý do; Hủy / bỏ trống thì không đổi.
+    /// Trả true nếu đã gửi thay đổi (ô chọn dùng để quay về trạng thái cũ khi không đổi).
+    /// </summary>
+    public async Task<bool> SetStatusAsync(ComplaintRowViewModel row, string status)
     {
-        if (!CanWrite || _editService is null || status == row.ComplaintStatus || !ComplaintStatuses.All.Contains(status)) return;
-        var r = await _editService.SetFieldAsync(row.Source.Id, EditField.ComplaintStatus, status, expectedOld: row.ComplaintStatus);
+        if (!CanWrite || _editService is null || status == row.ComplaintStatus || !ComplaintStatuses.All.Contains(status)) return false;
+        var reason = AskReason(_dialogService, $"Lý do: {row.ComplaintStatus} → {status}", $"Mã đơn: {row.OrderId}  •  MVĐ: {row.DisplayTracking}",
+            "Lý do đổi trạng thái (sàn trả lời gì, được đền bao nhiêu...):", _onNotify);
+        if (reason is null) return false;
+        var r = await _editService.SetComplaintAsync(row.Source.Id, status, reason, expectedOld: row.ComplaintStatus);
         await OrderEditHelper.HandleResultAsync(r, _onDataChangedAsync, _onNotify);
+        return true;
+    }
+
+    /// <summary>Hỏi lý do (bắt buộc). null = Hủy hoặc bỏ trống (đã báo).</summary>
+    internal static string? AskReason(IOrderActionDialogService? dialogs, string title, string subtitle, string label, Action<string, bool>? notify)
+    {
+        if (dialogs is null) return null;
+        var text = dialogs.PromptMultilineText(title, subtitle, label, "");
+        if (text is null) return null;
+        if (string.IsNullOrWhiteSpace(text)) { notify?.Invoke("Chưa nhập lý do nên chưa lưu. Hãy ghi lý do.", true); return null; }
+        return text.Trim();
     }
 
     [RelayCommand]

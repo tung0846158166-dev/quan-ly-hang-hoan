@@ -17,7 +17,8 @@ public partial class ComplaintsView : UserControl
     {
         if (sender is not ComboBox cb || cb.DataContext is not ComplaintRowViewModel row || DataContext is not ComplaintsViewModel vm) return;
         if (cb.SelectedItem is not string status || status == row.ComplaintStatus) return;
-        await vm.SetStatusAsync(row, status);
+        // phải ghi lý do (27/11/2026): Hủy / bỏ trống thì ô chọn quay về trạng thái cũ
+        if (!await vm.SetStatusAsync(row, status)) cb.SelectedItem = row.ComplaintStatus;
     }
 
     private void ComplaintsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)

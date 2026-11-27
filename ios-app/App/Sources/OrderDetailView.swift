@@ -19,6 +19,9 @@ struct DetailView: View {
     @State private var showComplaintNote = false
     @State private var complaintNoteDraft = ""
     @State private var askRemoveComplaint = false
+    @State private var complaintTarget = ""          // trạng thái đang chờ nhập lý do
+    @State private var complaintReason = ""
+    @State private var showComplaintReason = false
     @State private var showStatusSheet = false
     @State private var noteDraft = ""
     @State private var watchDraft = false
@@ -1213,7 +1216,7 @@ struct DetailView: View {
                 if engine.cloudActive {
                     Menu {
                         ForEach(CloudOps.complaintStatuses, id: \.self) { st in
-                            Button(st) { Haptics.tap(); engine.sendComplaint(live, status: st) }
+                            Button(st) { Haptics.tap(); complaintTarget = st; complaintReason = ""; showComplaintReason = true }
                                 .disabled(st == live.kn)
                         }
                         if live.isComplaint {
@@ -1261,6 +1264,14 @@ struct DetailView: View {
             TextField("Đã gửi gì, sàn trả lời gì, được đền bao nhiêu…", text: $complaintNoteDraft)
             Button("Lưu") { engine.sendComplaintNote(live, note: complaintNoteDraft) }
             Button("Hủy", role: .cancel) {}
+        }
+        .alert(live.isComplaint ? "Lý do đổi sang \"\(complaintTarget)\"" : "Lý do khiếu nại", isPresented: $showComplaintReason) {
+            TextField(live.isComplaint ? "Sàn trả lời gì, được đền bao nhiêu…" : "Thiếu hàng, sai hàng, hàng hỏng, mất kiện…", text: $complaintReason)
+            Button("Lưu") { engine.sendComplaint(live, status: complaintTarget, reason: complaintReason) }
+                .disabled(complaintReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button("Hủy", role: .cancel) {}
+        } message: {
+            Text("Bắt buộc ghi lý do. Lý do được lưu kèm ngày giờ trong ghi chú khiếu nại.")
         }
         .confirmationDialog("Bỏ khiếu nại đơn này?", isPresented: $askRemoveComplaint, titleVisibility: .visible) {
             Button("Bỏ khiếu nại", role: .destructive) { engine.sendComplaint(live, status: "") }

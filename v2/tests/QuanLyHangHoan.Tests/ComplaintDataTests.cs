@@ -67,6 +67,17 @@ public sealed class ComplaintDataTests : IDisposable
         Assert.Equal(60, CloudReplica.GetRev(Db));
     }
 
+    /// <summary>Chủ dự án 27/11/2026: lý do khiếu nại / đổi trạng thái thêm một dòng có ngày giờ vào ghi chú khiếu nại (giống cloud).</summary>
+    [Fact]
+    public void Local_mode_reason_appends_a_dated_line_to_the_complaint_note()
+    {
+        CloudReplica.Apply(Db, new[] { Parcel("a") }, 1);
+        var now = new DateTime(2026, 11, 27, 9, 5, 0);
+        Assert.Equal(EditKind.Saved, OrderEditor.SetField(Db, "a", EditField.ComplaintStatus, "Đang xử lý", now, reason: " thiếu  áo ").Kind);
+        Assert.Equal(EditKind.Saved, OrderEditor.SetField(Db, "a", EditField.ComplaintStatus, "Thất bại", now.AddHours(1), reason: "sàn từ chối").Kind);
+        Assert.Equal("27/11/2026 09:05 · Đang xử lý: thiếu áo\n27/11/2026 10:05 · Thất bại: sàn từ chối", OrderRepository.Load(Db).Single().Order.ComplaintNote);
+    }
+
     [Fact]
     public void Local_mode_complaint_edit_stamps_the_date_and_clearing_removes_everything()
     {

@@ -145,7 +145,13 @@
                         <DataGridTextColumn Header="Trạng thái kiện" Binding="{Binding PlatformStatus}" Width="130" />
                         <DataGridTextColumn Header="Sản phẩm" Binding="{Binding ItemsSummary}" Width="220" />
                         <DataGridTextColumn Header="Giá trị" Binding="{Binding PriceFormatted}" Width="100" />
-                        <DataGridTextColumn Header="Ghi chú khiếu nại" Binding="{Binding ComplaintNote}" Width="*" MinWidth="200" />
+                        <DataGridTextColumn Header="Lý do / ghi chú khiếu nại" Binding="{Binding ComplaintNoteOneLine}" Width="*" MinWidth="200">
+                            <DataGridTextColumn.CellStyle>
+                                <Style TargetType="DataGridCell" BasedOn="{StaticResource ModernDataGridCellStyle}">
+                                    <Setter Property="ToolTip" Value="{Binding ComplaintNote}" />
+                                </Style>
+                            </DataGridTextColumn.CellStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Header="Nằm ở" Binding="{Binding Location}" Width="100" />
                     </DataGrid.Columns>
                 </DataGrid>

@@ -170,12 +170,15 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             _onNotify?.Invoke(picked.Count == 0 ? "Chưa chọn đơn nào." : "Các đơn đã chọn đều đang ở bảng Khiếu nại.", false);
             return;
         }
-        if (targets.Count > 1 && _dialogService is not null
-            && !_dialogService.ConfirmBulkAction("Khiếu nại", targets.Count, $"Chuyển {targets.Count:N0} đơn đang chọn sang bảng Khiếu nại (trạng thái \"Đang xử lý\")."))
-            return;
+        // chủ dự án 27/11/2026: khiếu nại phải có lý do (nhiều đơn: một lý do cho tất cả)
+        var first = targets[0];
+        var reason = ComplaintsViewModel.AskReason(_dialogService, "⚖️ Lý do khiếu nại",
+            targets.Count == 1 ? $"Mã đơn: {first.Source.OrderId}  •  MVĐ: {first.Source.Track}" : $"{targets.Count:N0} đơn đang chọn (cùng một lý do) • trạng thái \"Đang xử lý\"",
+            "Lý do khiếu nại (thiếu hàng, sai hàng, hàng hỏng, mất kiện...):", _onNotify);
+        if (reason is null) return;
         var (saved, _, _) = await OrderEditHelper.RunBulkAsync(
             targets,
-            r => _editService.SetFieldAsync(r.Source.Id, EditField.ComplaintStatus, ComplaintStatuses.Processing, expectedOld: ""),
+            r => _editService.SetComplaintAsync(r.Source.Id, ComplaintStatuses.Processing, reason, expectedOld: ""),
             _onDataChangedAsync,
             _onNotify);
         if (saved > 0) _onNotify?.Invoke($"Đã chuyển {saved:N0} đơn sang bảng ⚖️ Khiếu nại (thanh bên trái).", false);

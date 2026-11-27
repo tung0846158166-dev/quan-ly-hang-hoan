@@ -350,6 +350,79 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Khiếu nại gần nhất (chủ dự án 27/11/2026): 3 đơn mới nhất, bấm để xem chi tiết; nút mở bảng Khiếu nại -->
+                <Border Style="{StaticResource DashboardCardStyle}" Margin="0,0,0,12">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="Mở bảng Khiếu nại →" Command="{Binding OpenComplaintsCommand}"
+                                    Style="{StaticResource FilterPillButtonStyle}" Margin="0" Padding="12,5" FontWeight="SemiBold" />
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding ComplaintSummaryText}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <TextBlock Text="⚖️ Khiếu nại gần nhất" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <TextBlock Text="Chưa có đơn khiếu nại. Chuột phải một đơn ở bảng đơn → ⚖️ Khiếu nại (cần ghi lý do)."
+                                   Visibility="{Binding HasRecentComplaints, Converter={StaticResource BoolToVis}, ConverterParameter=Invert}"
+                                   Foreground="{DynamicResource InkMutedBrush}" FontSize="12.5" Padding="8,8" />
+                        <ItemsControl ItemsSource="{Binding RecentComplaints}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.OpenComplaintCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" ToolTip="{Binding ComplaintNote}"
+                                            HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0" Margin="0,0,0,6" Cursor="Hand">
+                                        <Border Background="{DynamicResource SurfaceMutedBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ComplaintAt}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Chi tiết →" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource AccentBlueBrush}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                        <Border CornerRadius="4" Padding="6,1" Margin="0,0,8,0">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding ComplaintStatus}" Value="Thành công">
+                                                                            <Setter Property="Background" Value="{DynamicResource AlertGreenCardBgBrush}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding ComplaintStatus}" Value="Thất bại">
+                                                                            <Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock Text="{Binding ComplaintStatus}" FontSize="10.5" FontWeight="Bold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding ComplaintStatus}" Value="Thành công">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding ComplaintStatus}" Value="Thất bại">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+                                                        <Border Background="{Binding Platform, Converter={StaticResource PlatformBrushConverter}}" CornerRadius="4" Padding="6,1" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding Platform}" Foreground="{Binding Platform, Converter={StaticResource PlatformBrushConverter}, ConverterParameter=Foreground}" FontSize="10.5" FontWeight="Bold" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding OrderId}" FontFamily="Consolas" FontWeight="Bold" FontSize="12" Foreground="{DynamicResource InkPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding ItemsSummary}" FontSize="11.5" Foreground="{DynamicResource InkSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding LastReason, TargetNullValue='', FallbackValue=''}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <!-- Section 3: Urgent Action List & Quick Report Export -->
                 <Grid>
                     <Grid.ColumnDefinitions>

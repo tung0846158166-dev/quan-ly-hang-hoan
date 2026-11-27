@@ -323,6 +323,34 @@ public sealed partial class HomeViewModel : ObservableObject
         _onOpenOrder?.Invoke(item);
     }
 
+    // ---- Khiếu nại gần nhất (chủ dự án 27/11/2026): 3 đơn mới nhất + nút mở bảng Khiếu nại; bấm từng đơn để xem chi tiết
+    [ObservableProperty]
+    private IReadOnlyList<ComplaintRowViewModel> _recentComplaints = Array.Empty<ComplaintRowViewModel>();
+    [ObservableProperty]
+    private string _complaintSummaryText = "";
+    public bool HasRecentComplaints => RecentComplaints.Count > 0;
+    partial void OnRecentComplaintsChanged(IReadOnlyList<ComplaintRowViewModel> value) => OnPropertyChanged(nameof(HasRecentComplaints));
+
+    /// <summary>Mở bảng Khiếu nại (MainViewModel gắn).</summary>
+    public Action? OpenComplaintsTable { get; set; }
+    /// <summary>Mở chi tiết một đơn (MainViewModel gắn).</summary>
+    public Action<Order>? OpenOrderDetail { get; set; }
+
+    public void SetRecentComplaints(IReadOnlyList<ComplaintRowViewModel> recent, int processing, int total)
+    {
+        RecentComplaints = recent;
+        ComplaintSummaryText = total == 0 ? "" : $"{processing:N0} đang xử lý / {total:N0} đơn";
+    }
+
+    [RelayCommand]
+    private void OpenComplaints() => OpenComplaintsTable?.Invoke();
+
+    [RelayCommand]
+    private void OpenComplaint(ComplaintRowViewModel? row)
+    {
+        if (row is not null) OpenOrderDetail?.Invoke(row.Source);
+    }
+
     [RelayCommand]
     private void NavigateToLegacyImport()
     {

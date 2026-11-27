@@ -24,6 +24,9 @@ public sealed class SqliteOrderEditService : IOrderEditService
         CancellationToken cancellationToken = default)
         => Task.Run(() => OrderEditor.SetField(_dbPath, orderId, field, newValue, _clock(), expectedOld), cancellationToken);
 
+    public Task<EditResult> SetComplaintAsync(string orderId, string status, string reason, string? expectedOld = null, CancellationToken cancellationToken = default)
+        => Task.Run(() => OrderEditor.SetField(_dbPath, orderId, EditField.ComplaintStatus, status, _clock(), expectedOld, reason), cancellationToken);
+
     public Task<EditResult> DeleteAsync(
         string orderId,
         string from,

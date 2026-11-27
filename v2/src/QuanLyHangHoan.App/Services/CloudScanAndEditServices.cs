@@ -108,6 +108,13 @@ public sealed class CloudOrderEditService : IOrderEditService
         return RunAsync(op, cancellationToken);
     }
 
+    public Task<EditResult> SetComplaintAsync(string orderId, string status, string reason, string? expectedOld = null, CancellationToken cancellationToken = default)
+    {
+        var op = Cell(orderId, "complaintStatus", status ?? "");
+        if (!string.IsNullOrWhiteSpace(reason)) op["reason"] = reason.Trim();
+        return RunAsync(op, cancellationToken);
+    }
+
     private static JsonObject Cell(string id, string field, string value) => new() { ["type"] = "editCell", ["id"] = id, ["field"] = field, ["value"] = value };
 
     public Task<EditResult> DeleteAsync(string orderId, string from, CancellationToken cancellationToken = default) =>

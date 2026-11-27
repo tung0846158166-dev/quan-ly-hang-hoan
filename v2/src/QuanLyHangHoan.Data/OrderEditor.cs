@@ -44,11 +44,20 @@ public static class OrderEditor
         ReceiveStatus.Received, ReceiveStatus.NotReturned, ReceiveStatus.NotNeeded, ReceiveStatus.Lost, ReceiveStatus.NotYetArrived,
     };
 
+    /// <summary>Dòng lý do khiếu nại (cùng định dạng cloud); rỗng nếu không có lý do.</summary>
+    public static string ComplaintReasonLine(string status, string? reason, DateTime now)
+    {
+        var r = System.Text.RegularExpressions.Regex.Replace(reason ?? "", @"\s+", " ").Trim();
+        return r.Length == 0 ? "" : $"{now.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)} · {status}: {r}";
+    }
+
     private static string Stamp(DateTime t) => t.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture);
 
-    public static EditResult SetField(string dbPath, string orderId, EditField field, string newValue, DateTime now, string? expectedOld = null)
+    public static EditResult SetField(string dbPath, string orderId, EditField field, string newValue, DateTime now, string? expectedOld = null, string? reason = null)
     {
         newValue ??= "";
+        // lý do khiếu nại / đổi trạng thái (27/11/2026): một dòng "dd/MM/yyyy HH:mm · trạng thái: lý do" thêm vào ghi chú khiếu nại
+        var reasonLine = field == EditField.ComplaintStatus && newValue.Length > 0 ? ComplaintReasonLine(newValue, reason, now) : "";
         if (field == EditField.Status && !ValidStatuses.Contains(newValue))
             return new(EditKind.Invalid, "Trạng thái không hợp lệ.");
         if (field == EditField.IsWatchlist && newValue is not ("0" or "1"))
@@ -83,6 +92,11 @@ public static class OrderEditor
                     // ngày xong: ghi khi sang Thành công / Thất bại, xóa khi quay lại Đang xử lý
                     Exec(conn, tx, "UPDATE orders SET complaint_done_at=$d WHERE id=$id",
                         ("$d", newValue == ComplaintStatuses.Processing ? "" : Stamp(now)), ("$id", orderId));
+                    if (reasonLine.Length > 0)
+                    {
+                        var note = Scalar(conn, tx, "SELECT complaint_note FROM orders WHERE id=$id", orderId)?.ToString() ?? "";
+                        Exec(conn, tx, "UPDATE orders SET complaint_note=$n WHERE id=$id", ("$n", note.Length > 0 ? note + "\n" + reasonLine : reasonLine), ("$id", orderId));
+                    }
                 }
             }
 

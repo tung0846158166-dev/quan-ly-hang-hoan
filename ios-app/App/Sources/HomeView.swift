@@ -130,6 +130,11 @@ struct HomeView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
 
+                    complaintsCard
+                        .listRowInsets(EdgeInsets(top: 4, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+
                     urgentHeader
                         .listRowInsets(EdgeInsets(top: 6, leading: Theme.screenPadding, bottom: 4, trailing: Theme.screenPadding))
                         .listRowBackground(Color.clear)
@@ -631,6 +636,67 @@ struct HomeView: View {
             .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Khiếu nại gần nhất (chủ dự án 27/11/2026): 3 đơn mới nhất, bấm để xem chi tiết; nút mở bảng Khiếu nại
+    private var complaintsCard: some View {
+        let recent = CloudOps.recentComplaints(store.rows, limit: 3)
+        let processing = store.rows.filter { $0.kn == "Đang xử lý" }.count
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                SectionTitleRow(
+                    title: "Khiếu nại gần nhất",
+                    icon: "exclamationmark.bubble.fill",
+                    iconColor: Theme.purple,
+                    subtitle: processing > 0 ? "\(processing) đang xử lý" : nil
+                )
+                Button("Mở bảng") {
+                    Haptics.tap()
+                    router.openOrders(filter: .complaint)
+                }
+                .font(Theme.Typography.captionBold)
+                .foregroundColor(Theme.purple)
+                .buttonStyle(.plain)
+            }
+            if recent.isEmpty {
+                Text("Chưa có đơn khiếu nại. Mở một đơn → Khiếu nại (cần ghi lý do).")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(recent) { r in
+                    Button {
+                        Haptics.tap()
+                        selectedRow = r
+                    } label: {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 5) {
+                                    PlatformBadge(platform: r.p)
+                                    Text(r.c.isEmpty ? r.o : r.c)
+                                        .font(Theme.Typography.code)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                }
+                                let last = CloudOps.lastComplaintLine(r.knn)
+                                Text(last.isEmpty ? (r.n.isEmpty ? "Chưa có lý do" : r.n) : last)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                            StatusPill(text: r.kn, color: r.kn == "Thành công" ? Theme.success : (r.kn == "Thất bại" ? Theme.danger : Theme.purple))
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .frame(minHeight: Theme.minTapTarget)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .card(padding: Theme.cardPadding, radius: Theme.cardRadius)
     }
 
     private func stageMini(_ title: String, _ count: Int, _ color: Color) -> some View {

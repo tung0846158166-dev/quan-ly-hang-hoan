@@ -11,6 +11,13 @@ public interface IOrderEditService
         string? expectedOld = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Khiếu nại / đổi trạng thái khiếu nại kèm lý do (chủ dự án 27/11/2026): lý do thành một dòng có ngày giờ trong ghi chú khiếu nại.
+    /// Mặc định (dịch vụ giả): bỏ qua lý do.
+    /// </summary>
+    Task<EditResult> SetComplaintAsync(string orderId, string status, string reason, string? expectedOld = null, CancellationToken cancellationToken = default)
+        => SetFieldAsync(orderId, EditField.ComplaintStatus, status, expectedOld, cancellationToken);
+
     Task<EditResult> DeleteAsync(
         string orderId,
         string from,

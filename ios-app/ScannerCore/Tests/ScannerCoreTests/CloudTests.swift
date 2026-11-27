@@ -410,4 +410,23 @@ final class CloudTests: XCTestCase {
         XCTAssertEqual(CloudOps.complaintNote(id: "a", note: "x")["field"] as? String, "complaintNote")
         XCTAssertEqual(CloudOps.complaintStatuses, ["Đang xử lý", "Thành công", "Thất bại"])
     }
+
+    // Chủ dự án 27/11/2026: khiếu nại / đổi trạng thái kèm lý do; trang chủ có 3 khiếu nại gần nhất
+    func testComplaintReasonOpAndRecentComplaints() {
+        let op = CloudOps.complaint(id: "a", status: "Thất bại", reason: "  sàn từ chối ")
+        XCTAssertEqual(op["reason"] as? String, "sàn từ chối")
+        XCTAssertEqual(op["value"] as? String, "Thất bại")
+        XCTAssertNil(CloudOps.complaint(id: "a", status: "", reason: " ")["reason"])
+        let now = Date()
+        func r(_ id: String, _ kn: String, _ at: String) -> OrderRow {
+            CloudRowMapper.row(parcel("{\"id\":\"\(id)\",\"track\":\"T\(id)\",\"complaintStatus\":\"\(kn)\",\"complaintAt\":\"\(at)\"}"), now: now)!
+        }
+        let plain = CloudRowMapper.row(parcel(#"{"id":"z","track":"TZ"}"#), now: now)!
+        let rows = [r("a", "Đang xử lý", "20/11/2026 10:00:00"), plain, r("b", "Thất bại", "25/11/2026 10:00:00"),
+                    r("c", "Thành công", "27/11/2026 08:00:00"), r("d", "Đang xử lý", "26/11/2026 10:00:00")]
+        XCTAssertEqual(CloudOps.recentComplaints(rows).map { $0.id }, ["c", "d", "b"])
+        XCTAssertEqual(CloudOps.lastComplaintLine("27/11/2026 09:00 · Đang xử lý: thiếu áo\n27/11/2026 10:00 · Thất bại: sàn từ chối\n"), "27/11/2026 10:00 · Thất bại: sàn từ chối")
+        let long = String(repeating: "x", count: 700) + "\nMỚI"
+        XCTAssertTrue(CloudRowMapper.row(parcel("{\"id\":\"l\",\"track\":\"TL\",\"complaintStatus\":\"Đang xử lý\",\"complaintNote\":\"\(long.replacingOccurrences(of: "\n", with: "\\n"))\"}"), now: now)!.knn.hasSuffix("MỚI"))
+    }
 }

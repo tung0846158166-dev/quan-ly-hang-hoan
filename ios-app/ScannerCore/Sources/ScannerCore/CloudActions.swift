@@ -15,6 +15,28 @@ public enum CloudOps {
     /// Khiếu nại: "" = bỏ khiếu nại (cloud xóa cả ngày + ghi chú); đặt lần đầu cloud tự ghi ngày khiếu nại.
     public static let complaintStatuses = ["Đang xử lý", "Thành công", "Thất bại"]
     public static func complaint(id: String, status: String) -> [String: Any] { ["type": "editCell", "id": id, "field": "complaintStatus", "value": status] }
+    /// Khiếu nại / đổi trạng thái kèm lý do (chủ dự án 27/11/2026): cloud thêm dòng "ngày giờ · trạng thái: lý do" vào ghi chú khiếu nại.
+    public static func complaint(id: String, status: String, reason: String) -> [String: Any] {
+        var op = complaint(id: id, status: status)
+        let r = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !r.isEmpty { op["reason"] = r }
+        return op
+    }
+
+    /// n đơn khiếu nại mới nhất (theo ngày khiếu nại) cho trang chủ.
+    public static func recentComplaints(_ rows: [OrderRow], limit: Int = 3) -> [OrderRow] {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")
+        f.dateFormat = "dd/MM/yyyy HH:mm:ss"
+        func t(_ r: OrderRow) -> Double { f.date(from: r.kna)?.timeIntervalSince1970 ?? 0 }
+        return Array(rows.filter { $0.isComplaint }.map { ($0, t($0)) }.sorted { $0.1 > $1.1 }.map { $0.0 }.prefix(limit))
+    }
+
+    /// Dòng lý do / ghi chú khiếu nại mới nhất.
+    public static func lastComplaintLine(_ note: String) -> String {
+        note.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.last { !$0.isEmpty } ?? ""
+    }
     public static func complaintNote(id: String, note: String) -> [String: Any] { ["type": "editCell", "id": id, "field": "complaintNote", "value": note] }
     /// Tạo đơn mới (quét chế độ "Đơn mới"): cloud tự nhận sàn/hãng; mã đã có ở bất kỳ đâu thì KHÔNG tạo lại.
     public static func newOrder(code: String) -> [String: Any] { ["type": "newOrder", "code": code, "origin": "phone"] }

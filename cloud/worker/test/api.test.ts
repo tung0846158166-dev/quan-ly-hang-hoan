@@ -1085,6 +1085,23 @@ describe("khiếu nại (26/11/2026)", () => {
     expect(p.complaintAt).toBeUndefined();
   }, 30_000);
 
+  it("lý do khiếu nại / đổi trạng thái (27/11/2026): ghi thêm một dòng có ngày giờ vào ghi chú khiếu nại", async () => {
+    await importParcels([parcel("k4")]);
+    const send = (value: string, reason?: string) =>
+      call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "editCell", id: "k4", field: "complaintStatus", value, reason }] }, pc).then((r) => r.data.results[0]);
+    expect((await send("Đang xử lý", "  Thiếu 1 áo  ")).ok).toBe(true);
+    let lines = String((await get("k4")).complaintNote).split("\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} · Đang xử lý: Thiếu 1 áo$/);
+    expect((await send("Thất bại", "Sàn từ chối")).ok).toBe(true);
+    lines = String((await get("k4")).complaintNote).split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toMatch(/· Thất bại: Sàn từ chối$/);
+    // không có lý do (app cũ): không ghi thêm dòng
+    await send("Đang xử lý");
+    expect(String((await get("k4")).complaintNote).split("\n")).toHaveLength(2);
+  }, 30_000);
+
   it("trạng thái khiếu nại lạ bị từ chối", async () => {
     await importParcels([parcel("k2")]);
     expect((await edit("k2", "complaintStatus", "Bậy")).ok).toBe(false);

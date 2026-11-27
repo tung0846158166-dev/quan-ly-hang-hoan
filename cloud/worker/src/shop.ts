@@ -646,8 +646,15 @@ export class ShopDO extends DurableObject<Env> {
       // khiếu nại (26/11/2026): "" = bỏ khiếu nại (xóa cả ngày + ghi chú); đặt lần đầu thì ghi ngày khiếu nại
       const v = this.text(op.value, 50).trim();
       if (v && !COMPLAINT_STATUS.has(v)) return fail(422, "invalid", "Trạng thái khiếu nại không hợp lệ.");
+      // lý do (27/11/2026): khiếu nại / đổi trạng thái kèm lý do -> thêm một dòng "ngày giờ · trạng thái: lý do" vào ghi chú khiếu nại
+      const reason = this.text(op.reason, 500).replace(/\s+/g, " ").trim();
       return this.opMutate(op, dev, "editCell", (p) => {
         if (!v) { delete p.complaintStatus; delete p.complaintAt; delete p.complaintNote; delete p.complaintDoneAt; return; }
+        if (reason) {
+          const line = `${vnTime(Date.now()).slice(0, 16)} · ${v}: ${reason}`;
+          const all = p.complaintNote ? `${p.complaintNote}\n${line}` : line;
+          p.complaintNote = all.length > 4000 ? all.slice(-4000) : all;   // quá dài: bỏ phần cũ nhất
+        }
         if (!p.complaintStatus || !p.complaintAt) p.complaintAt = vnTime(Date.now());
         // ngày khiếu nại xong: ghi khi chuyển sang Thành công / Thất bại; quay lại Đang xử lý thì xóa
         if (v === "Đang xử lý") delete p.complaintDoneAt;
@@ -658,7 +665,7 @@ export class ShopDO extends DurableObject<Env> {
     if (field === "complaintNote") {
       return this.opMutate(op, dev, "editCell", (p) => {
         if (!p.complaintStatus) fail(409, "conflict", "Đơn chưa khiếu nại.");
-        const v = this.text(op.value, 2000);
+        const v = this.text(op.value, 4000);
         if (v) p.complaintNote = v; else delete p.complaintNote;
       });
     }

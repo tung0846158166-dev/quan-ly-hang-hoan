@@ -843,10 +843,11 @@ final class SyncEngine: ObservableObject {
     }
 
     /// Khiếu nại (chỉ chế độ cloud): đặt / đổi trạng thái; "" = bỏ khiếu nại.
-    func sendComplaint(_ row: OrderRow, status: String) {
+    /// Chủ dự án 27/11/2026: khiếu nại / đổi trạng thái phải kèm lý do (thành một dòng trong ghi chú khiếu nại).
+    func sendComplaint(_ row: OrderRow, status: String, reason: String = "") {
         guard cloudActive else { banner = Banner(code: row.c, text: "Khiếu nại cần kết nối cloud", color: Theme.warning); return }
         let done = status.isEmpty ? "Đã bỏ khiếu nại" : (row.kn.isEmpty ? "Đã khiếu nại (Đang xử lý)" : "Khiếu nại: \(status)")
-        cloudWrite(rows: [row], ops: [CloudOps.complaint(id: row.cloudId, status: status)], done: done)
+        cloudWrite(rows: [row], ops: [CloudOps.complaint(id: row.cloudId, status: status, reason: reason)], done: done)
     }
 
     func sendComplaintNote(_ row: OrderRow, note: String) {

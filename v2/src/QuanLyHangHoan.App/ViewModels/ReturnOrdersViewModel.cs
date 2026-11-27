@@ -366,6 +366,17 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
     // lọc theo ngày nhận tại kho (chủ dự án 27/11/2026)
     [ObservableProperty] private DateTime? _recvDateFrom;
     [ObservableProperty] private DateTime? _recvDateTo;
+    // lọc theo giờ hàng về shop (cột "Giờ hàng về shop", chủ dự án 28/11/2026)
+    [ObservableProperty] private DateTime? _arrivedFrom;
+    [ObservableProperty] private DateTime? _arrivedTo;
+    public const string ArrivedAll = "Giờ về: tất cả";
+    public const string ArrivedYes = "Đã về shop";
+    public const string ArrivedNo = "Chưa về shop";
+    public IReadOnlyList<string> ArrivedOptions { get; } = [ArrivedAll, ArrivedYes, ArrivedNo];
+    [ObservableProperty] private string _arrivedOption = ArrivedAll;
+    partial void OnArrivedFromChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnArrivedToChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnArrivedOptionChanged(string value) => AdvancedFilterChanged();
     [ObservableProperty] private ObservableCollection<string> _carrierOptions = [AllCarriers];
 
     public const string AllCarriers = "Tất cả ĐVVC";
@@ -399,7 +410,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
         + (PlatformStatusFilter != AllPlatformStatuses ? 1 : 0)
         + (PhotoFilter != "all" ? 1 : 0)
         + (DateFrom.HasValue || DateTo.HasValue ? 1 : 0)
-        + (RecvDateFrom.HasValue || RecvDateTo.HasValue ? 1 : 0);
+        + (RecvDateFrom.HasValue || RecvDateTo.HasValue ? 1 : 0)
+        + (ArrivedFrom.HasValue || ArrivedTo.HasValue || ArrivedOption != ArrivedAll ? 1 : 0);
 
     public string AdvancedFilterButtonText => AdvancedFilterCount == 0 ? "🔎 Bộ lọc" : $"🔎 Bộ lọc ({AdvancedFilterCount})";
 
@@ -440,6 +452,15 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
             if (d is null) return false;
             if (DateFrom.HasValue && d.Value.Date < DateFrom.Value.Date) return false;
             if (DateTo.HasValue && d.Value.Date > DateTo.Value.Date) return false;
+        }
+        if (ArrivedOption == ArrivedYes && row.ArrivedAtDate is null) return false;
+        if (ArrivedOption == ArrivedNo && row.ArrivedAtDate is not null) return false;
+        if (ArrivedFrom.HasValue || ArrivedTo.HasValue)
+        {
+            var a = row.ArrivedAtDate;
+            if (a is null) return false;
+            if (ArrivedFrom.HasValue && a.Value.Date < ArrivedFrom.Value.Date) return false;
+            if (ArrivedTo.HasValue && a.Value.Date > ArrivedTo.Value.Date) return false;
         }
         if (RecvDateFrom.HasValue || RecvDateTo.HasValue)
         {
@@ -759,6 +780,9 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
             DateTo = null;
             RecvDateFrom = null;
             RecvDateTo = null;
+            ArrivedFrom = null;
+            ArrivedTo = null;
+            ArrivedOption = ArrivedAll;
             _colSortMember = null;
             SelectedSortOption = SortOptions[0];
         }

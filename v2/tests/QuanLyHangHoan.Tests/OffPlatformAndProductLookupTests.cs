@@ -243,6 +243,26 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         Assert.Equal(4, ProductStatistics.Compute(orders).Products.Count);
     }
 
+    // chủ dự án 28/11/2026: lọc theo cột "Giờ hàng về shop"
+    [Fact]
+    public void Main_table_filters_by_arrival_at_shop()
+    {
+        Order A(string id, string arrived) { var o = O(id, "Áo", 1); o.ReturnedAt = arrived; o.ReturnDate = "20/11/2026 08:00:00"; return o; }
+        var orders = new[] { A("a", "26/11/2026 09:00:00"), A("b", "10:15:22 27/11/2026"), A("c", ""), A("d", "20/11/2026 09:00:00") };
+        var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now), loadInitialData: false);
+        vm.LoadOrders(orders, Now);
+        Assert.Equal(4, vm.VisibleOrders.Count);
+        vm.ArrivedOption = ReturnOrdersViewModel.ArrivedNo;
+        Assert.Equal("c", Assert.Single(vm.VisibleOrders).Source.Id);
+        vm.ArrivedOption = ReturnOrdersViewModel.ArrivedYes;
+        Assert.Equal(3, vm.VisibleOrders.Count);
+        vm.ArrivedFrom = new DateTime(2026, 11, 26);
+        Assert.Equal(new[] { "a", "b" }, vm.VisibleOrders.Select(r => r.Source.Id).OrderBy(x => x));
+        vm.ArrivedTo = new DateTime(2026, 11, 26);
+        Assert.Equal("a", Assert.Single(vm.VisibleOrders).Source.Id);
+        Assert.Contains("(1)", vm.AdvancedFilterButtonText);
+    }
+
     private const string ReceivedStatus = ReceiveStatus.Received;
 
     // ------------------------------------------------------------------ form tạo nhanh

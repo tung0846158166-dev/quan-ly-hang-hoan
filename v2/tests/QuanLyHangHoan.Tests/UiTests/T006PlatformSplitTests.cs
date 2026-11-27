@@ -97,6 +97,7 @@ public class T006PlatformSplitTests
             "shopee_return",
             "shopee_cancelled",
             "tiktok_return",
+            "off_platform",
             "scan_receive",
             "phone_sync",
             "return_watch",

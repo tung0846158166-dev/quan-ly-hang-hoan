@@ -191,7 +191,7 @@ public class ReturnOrdersViewModelTests
     {
         var mainVm = new MainViewModel(new FakeDataService(() => FixedNow));
 
-        Assert.Equal(17, mainVm.NavigationItems.Count);   // 4 đường nạp đơn đã chuyển vào Cài đặt; + Khiếu nại (26/11/2026)
+        Assert.Equal(18, mainVm.NavigationItems.Count);   // 4 đường nạp đơn đã chuyển vào Cài đặt; + Khiếu nại (26/11/2026); + Đơn ngoài sàn (27/11/2026)
         Assert.IsType<HomeViewModel>(mainVm.CurrentPage);
 
         mainVm.NavigateByKey("return_watch");
@@ -225,6 +225,10 @@ public class ReturnOrdersViewModelTests
 
         mainVm.NavigateByKey("tiktok_return");
         Assert.IsType<ReturnOrdersViewModel>(mainVm.CurrentPage);
+
+        mainVm.NavigateByKey("off_platform");
+        Assert.Same(mainVm.OffPlatformVm, mainVm.CurrentPage);
+        Assert.True(mainVm.OffPlatformVm.ShowCreateButton);
 
         mainVm.NavigateByKey("archive");
         Assert.IsType<ArchivedOrdersViewModel>(mainVm.CurrentPage);

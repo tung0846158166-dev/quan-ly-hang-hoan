@@ -7,7 +7,7 @@ import Foundation
 public enum OffPlatform {
     public static let name = "Ngoài sàn"
     public static let orderTypes = ["Trả hàng/Hoàn tiền", "Đổi hàng", "Giao không thành công"]
-    public static let channels = ["Facebook", "Zalo", "Tại shop", "Website", "Instagram", "Khác"]
+    public static let channels = ["Salework", "Facebook", "Zalo", "Tại shop", "Website", "Instagram", "Khác"]
 
     public static func isOffPlatform(_ platform: String) -> Bool {
         platform.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == name.lowercased()
@@ -55,12 +55,13 @@ public struct NewOrderLine: Equatable, Identifiable {
 
 extension CloudOps {
     /// Tạo đơn ngoài sàn: mã trống thì cloud tự sinh mã "NS..."; KHÔNG có thông tin người mua.
-    public static func offPlatformOrder(code: String, lines: [NewOrderLine], price: Int, orderType: String, channel: String, note: String) -> [String: Any] {
+    public static func offPlatformOrder(code: String, orderId: String = "", lines: [NewOrderLine], price: Int, orderType: String, channel: String, note: String) -> [String: Any] {
         let items: [[String: Any]] = lines.filter { !$0.isBlank }.map {
             ["product": $0.product.trimmingCharacters(in: .whitespacesAndNewlines), "color": $0.color.trimmingCharacters(in: .whitespacesAndNewlines),
              "size": $0.size.trimmingCharacters(in: .whitespacesAndNewlines), "qty": max(1, min(9999, $0.qty))]
         }
         var op: [String: Any] = ["type": "newOrder", "code": code.trimmingCharacters(in: .whitespacesAndNewlines), "platform": OffPlatform.name,
+                                 "orderId": orderId.trimmingCharacters(in: .whitespacesAndNewlines),
                                  "origin": "phone", "items": items, "orderType": orderType, "channel": channel.trimmingCharacters(in: .whitespacesAndNewlines),
                                  "note": note.trimmingCharacters(in: .whitespacesAndNewlines)]
         if price > 0 { op["price"] = price }

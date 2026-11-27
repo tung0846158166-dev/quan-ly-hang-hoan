@@ -48,11 +48,13 @@
         <!-- Mã + kênh + loại đơn -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230" />
-                <ColumnDefinition Width="14" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="190" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="170" />
             </Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="Mã vận đơn (không bắt buộc)" Style="{StaticResource FieldLabel}" />
@@ -60,10 +62,15 @@
                          ToolTip="Để trống: tự sinh mã NS + ngày + 4 ký tự" />
             </StackPanel>
             <StackPanel Grid.Column="2">
+                <TextBlock Text="Mã đơn hàng (không bắt buộc)" Style="{StaticResource FieldLabel}" />
+                <TextBox Text="{Binding OrderId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FieldBox}" FontFamily="Consolas"
+                         ToolTip="Mã đơn trên Salework / hệ thống bán hàng. Để trống: dùng mã vận đơn" />
+            </StackPanel>
+            <StackPanel Grid.Column="4">
                 <TextBlock Text="Kênh bán" Style="{StaticResource FieldLabel}" />
                 <ComboBox IsEditable="True" Text="{Binding Channel, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding Channels}" Padding="8,6" FontSize="13" />
             </StackPanel>
-            <StackPanel Grid.Column="4">
+            <StackPanel Grid.Column="6">
                 <TextBlock Text="Loại đơn" Style="{StaticResource FieldLabel}" />
                 <ComboBox SelectedItem="{Binding OrderType}" ItemsSource="{Binding OrderTypes}" Padding="8,6" FontSize="13" />
             </StackPanel>

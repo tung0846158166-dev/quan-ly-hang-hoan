@@ -15,11 +15,13 @@ final class OffPlatformTests: XCTestCase {
     }
 
     func testOffPlatformOpCarriesItemsAndSkipsBlankLines() {
-        let op = CloudOps.offPlatformOrder(code: " ", lines: [NewOrderLine(product: " Áo thun ", color: "Đen", size: "L", qty: 2), NewOrderLine()],
+        let op = CloudOps.offPlatformOrder(code: " ", orderId: " SW-1 ", lines: [NewOrderLine(product: " Áo thun ", color: "Đen", size: "L", qty: 2), NewOrderLine()],
                                            price: 350000, orderType: "Đổi hàng", channel: "Zalo", note: " khách đổi ")
         XCTAssertEqual(op["type"] as? String, "newOrder")
         XCTAssertEqual(op["platform"] as? String, "Ngoài sàn")
         XCTAssertEqual(op["code"] as? String, "")
+        XCTAssertEqual(op["orderId"] as? String, "SW-1")
+        XCTAssertEqual(OffPlatform.channels.first, "Salework")
         XCTAssertEqual(op["price"] as? Int, 350000)
         XCTAssertEqual(op["channel"] as? String, "Zalo")
         XCTAssertEqual(op["orderType"] as? String, "Đổi hàng")

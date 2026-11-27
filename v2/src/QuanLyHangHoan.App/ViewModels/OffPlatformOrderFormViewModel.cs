@@ -72,6 +72,7 @@ public sealed partial class OffPlatformOrderFormViewModel : ObservableObject
     public ObservableCollection<OffPlatformItemRow> Items { get; } = new();
 
     [ObservableProperty] private string _code = "";
+    [ObservableProperty] private string _orderId = "";
     [ObservableProperty] private string _channel = OffPlatform.Channels[0];
     [ObservableProperty] private string _orderType = OffPlatform.OrderTypes[0];
     [ObservableProperty] private string _priceText = "";
@@ -182,7 +183,7 @@ public sealed partial class OffPlatformOrderFormViewModel : ObservableObject
         if (price is null) { Error = "Giá trị đơn không đọc được (ví dụ: 350000, 350.000, 350k, 1,2tr)."; return null; }
         var items = lines.Select(r => new NewOrderItem(r.Product.Trim(), (r.Color ?? "").Trim(), (r.Size ?? "").Trim(), r.Qty)).ToList();
         var first = items[0];
-        return new NewOrderInput((Code ?? "").Trim(), "", OffPlatform.Name, "", first.Product, first.Color, first.Size, first.Qty, (Note ?? "").Trim(), "manual")
+        return new NewOrderInput((Code ?? "").Trim(), (OrderId ?? "").Trim(), OffPlatform.Name, "", first.Product, first.Color, first.Size, first.Qty, (Note ?? "").Trim(), "manual")
         {
             Items = items,
             Price = price.Value,
@@ -228,7 +229,7 @@ public sealed partial class OffPlatformOrderFormViewModel : ObservableObject
     /// <summary>"Tạo & nhập đơn tiếp": xóa phần riêng của đơn, giữ kênh bán và loại đơn.</summary>
     public void ResetForNext()
     {
-        Code = ""; PriceText = ""; Note = ""; SearchText = ""; Error = "";
+        Code = ""; OrderId = ""; PriceText = ""; Note = ""; SearchText = ""; Error = "";
         Items.Clear();
         Items.Add(NewRow());
     }

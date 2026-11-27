@@ -16,7 +16,7 @@ public static class OffPlatform
     public static readonly IReadOnlyList<string> OrderTypes = ["Trả hàng/Hoàn tiền", "Đổi hàng", "Giao không thành công"];
 
     /// <summary>Kênh bán gợi ý (vẫn gõ được kênh khác).</summary>
-    public static readonly IReadOnlyList<string> Channels = ["Facebook", "Zalo", "Tại shop", "Website", "Instagram", "Khác"];
+    public static readonly IReadOnlyList<string> Channels = ["Salework", "Facebook", "Zalo", "Tại shop", "Website", "Instagram", "Khác"];
 
     public static bool Is(string? platform) => string.Equals((platform ?? "").Trim(), Name, StringComparison.OrdinalIgnoreCase);
     public static bool Is(Order o) => Is(o.Platform);

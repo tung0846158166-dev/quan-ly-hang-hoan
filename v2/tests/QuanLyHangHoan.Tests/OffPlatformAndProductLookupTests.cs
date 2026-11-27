@@ -160,6 +160,8 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
     public void Form_adds_products_from_search_prefills_single_options_and_builds_the_input()
     {
         var f = new OffPlatformOrderFormViewModel(Catalog());
+        Assert.Equal("Salework", f.Channel);                                          // kênh mặc định, đầu danh sách
+        Assert.Equal("Salework", f.Channels[0]);
         Assert.Equal(2, f.QuickProducts.Count);
         f.SearchText = "vay";
         Assert.Equal("Váy hoa nhí", Assert.Single(f.Suggestions).Name);
@@ -176,10 +178,11 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         f.AddFromSearch();
         Assert.Equal("Mũ len mới", f.Items[2].Product);
         Assert.Equal("3 sản phẩm • 4 cái", f.ItemsSummary);
-        f.Channel = "Zalo"; f.OrderType = "Đổi hàng"; f.PriceText = "1,2tr"; f.Code = " ns-abc ";
+        f.Channel = "Zalo"; f.OrderType = "Đổi hàng"; f.PriceText = "1,2tr"; f.Code = " ns-abc "; f.OrderId = " SW-001 ";
         var input = f.Build()!;
         Assert.Equal(("ns-abc", OffPlatform.Name, 1_200_000m, "Đổi hàng", "Zalo"), (input.Track, input.Platform, input.Price, input.OrderType, input.Channel));
         Assert.Equal(3, input.Items.Count);
+        Assert.Equal("SW-001", input.OrderId);
         Assert.Equal(2, input.Items[1].Qty);
     }
 

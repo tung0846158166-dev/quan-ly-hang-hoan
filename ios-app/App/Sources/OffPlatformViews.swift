@@ -122,6 +122,8 @@ struct OffPlatformCreateView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var code = ""
+    @State private var orderId = ""
+    @State private var showScan = false
     @State private var channel = OffPlatform.channels[0]
     @State private var orderType = OffPlatform.orderTypes[0]
     @State private var search = ""
@@ -145,7 +147,26 @@ struct OffPlatformCreateView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Mã vận đơn (để trống: tự sinh mã NS...)", text: $code)
+                    HStack {
+                        TextField("Mã vận đơn (để trống: tự sinh mã NS...)", text: $code)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .font(.system(.body, design: .monospaced))
+                        Button {
+                            Haptics.tap()
+                            showScan = true
+                        } label: {
+                            Label("Quét", systemImage: "barcode.viewfinder")
+                                .font(Theme.Typography.captionBold)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                                .background(Theme.accent)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Quét mã vận đơn")
+                    }
+                    TextField("Mã đơn hàng (không bắt buộc)", text: $orderId)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .font(.system(.body, design: .monospaced))
@@ -257,6 +278,12 @@ struct OffPlatformCreateView: View {
                     .disabled(busy)
                 }
             }
+            .sheet(isPresented: $showScan) {
+                ScanSearchSheet(onCode: { scanned in
+                    code = scanned
+                    error = ""
+                }, title: "Quét mã vận đơn", hint: "Đưa mã vạch hoặc QR trên kiện vào khung")
+            }
             .navigationTitle("Tạo đơn ngoài sàn")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -325,7 +352,7 @@ struct OffPlatformCreateView: View {
     private func submit(another: Bool) {
         if let e = CloudOps.offPlatformError(lines: lines, priceText: priceText) { error = e; return }
         guard engine.cloudActive else { error = "Cần kết nối cloud để tạo đơn."; return }
-        let op = CloudOps.offPlatformOrder(code: code, lines: lines, price: OffPlatform.parsePrice(priceText) ?? 0,
+        let op = CloudOps.offPlatformOrder(code: code, orderId: orderId, lines: lines, price: OffPlatform.parsePrice(priceText) ?? 0,
                                            orderType: orderType, channel: channel, note: note)
         busy = true
         error = ""
@@ -343,7 +370,7 @@ struct OffPlatformCreateView: View {
             lastCreated = "✅ Đã tạo đơn \(shown) (\(createdCount) đơn lượt này)"
             engine.banner = Banner(code: shown, text: "Đã tạo đơn ngoài sàn", color: Theme.success)
             if another {
-                code = ""; priceText = ""; note = ""; search = ""
+                code = ""; orderId = ""; priceText = ""; note = ""; search = ""
                 lines = [NewOrderLine()]
             } else {
                 dismiss()

@@ -187,6 +187,64 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         Assert.Contains("Không có hàng hoàn khớp", vm.SummaryText);
     }
 
+    // ------------------------------------------------------------------ gộp các kiểu tên của cùng một mẫu (28/11/2026)
+    [Theory]
+    [InlineData("Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex", "m:alpha:aopolo")]
+    [InlineData("ALPHA", "m:alpha")]
+    [InlineData("[ DEAL MỞ BÁN ] Áo Polo Len Lavi Studio / ALPHA Unisex", "m:alpha:aopolo")]
+    [InlineData("Áo Polo Len Khóa Zip Hàn Quốc 𝐋𝐚𝐯𝐢 𝐒𝐭𝐮𝐝𝐢𝐨/ BETA Unisex Nam Nữ", "m:beta:aopolo")]
+    [InlineData("Áo Polo Lavistudio/ GAMMA Unisex", "m:gamma:aopolo")]
+    [InlineData("Quần Kaki Ống Suông Lavi Studio Phong Cách Trẻ Trung/ DELTA", "m:delta:quankaki")]
+    [InlineData("Áo Cardigan Lavi Studio / Logo Thêu Unisex", "aocardiganlavistudiologotheuunisex")]
+    [InlineData("Áo Polo Lavi Studio / EPSI - Nhận may theo số đo/ thêu tên", "m:epsi:aopolo")]
+    [InlineData("Áo thun basic", "aothunbasic")]
+    [InlineData("Váy", "vay")]
+    public void Family_key_merges_short_long_and_prefixed_names(string name, string key) => Assert.Equal(key, ProductNames.FamilyKey(name));
+
+    [Fact]
+    public void Received_stock_shows_one_row_per_model_and_keeps_premium_apart()
+    {
+        var orders = new[]
+        {
+            O("1", "Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex", 1, "Xanh Than", "L", ReceivedStatus, "27/11/2026 09:00:00"),
+            O("2", "ALPHA", 2, "Xanh Than", "L", ReceivedStatus, "27/11/2026 10:00:00"),
+            O("3", "[ DEAL MỞ BÁN ] Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex", 1, "Xanh Than", "L", ReceivedStatus, "27/11/2026 11:00:00"),
+            O("4", "Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex - Premium Cao Cấp", 1, "Xanh Than", "L", ReceivedStatus, "27/11/2026 11:00:00"),
+            O("5", "Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex", 1, "Xanh Than", "L - Premium Cao Cấp", ReceivedStatus, "27/11/2026 11:00:00"),
+        };
+        var rows = ReceivedStock.Build(orders, Now.Date);
+        Assert.Equal(2, rows.Count);
+        var normal = rows.Single(r => !r.Premium);
+        Assert.Equal(("Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex", 4, "L"), (normal.Product, normal.Units, normal.Size));
+        var premium = rows.Single(r => r.Premium);
+        Assert.Equal((2, "L"), (premium.Units, premium.Size));
+        // gõ tên dài vẫn ra cả đơn chỉ ghi tên ngắn
+        Assert.Equal(6, ReceivedStock.Build(orders, Now.Date, "ao polo len tho").Sum(r => r.Units));
+        Assert.Equal(2, ReceivedStock.Build(orders, Now.Date, "alpha premium").Sum(r => r.Units));
+        // thống kê và tra nhanh cũng gộp
+        Assert.Single(ProductStatistics.Compute(orders).Products);
+        Assert.Equal(6, Assert.Single(ProductLookup.Search(orders, "polo len", Now)).Received.Total);
+    }
+
+    [Fact]
+    public void Same_model_code_on_two_product_types_is_not_merged_and_short_name_stays_apart()
+    {
+        var orders = new[]
+        {
+            O("1", "Áo Sweater Nỉ Lavi Studio / ZETA", 1), O("2", "Áo Hoodie Zip Lavi Studio/ ZETA", 1), O("3", "ZETA", 1),
+            O("4", "Áo Polo Len Lavi Studio/ OMEGA", 1), O("5", "OMEGA", 2), O("6", "Áo Polo Len Lavi Studio/ Omega", 1),
+        };
+        var f = ProductFamilies.Build(orders);
+        Assert.NotEqual(f.Key("Áo Sweater Nỉ Lavi Studio / ZETA"), f.Key("Áo Hoodie Zip Lavi Studio/ ZETA"));
+        Assert.Equal("m:zeta", f.Key("ZETA"));                                                  // không đoán gộp vào loại nào
+        Assert.Equal(f.Key("Áo Polo Len Lavi Studio/ OMEGA"), f.Key("OMEGA"));                 // chỉ một loại: gộp
+        Assert.Equal(f.Key("Áo Polo Len Lavi Studio/ OMEGA"), f.Key("Áo Polo Len Lavi Studio/ Omega"));   // viết thường (TikTok) cũng gộp
+        Assert.Equal("Áo Polo Len Lavi Studio/ OMEGA", f.Display(f.Key("OMEGA")));             // hiện tên đầy đủ
+        Assert.Equal(4, ProductStatistics.Compute(orders).Products.Count);
+    }
+
+    private const string ReceivedStatus = ReceiveStatus.Received;
+
     // ------------------------------------------------------------------ form tạo nhanh
     private static ProductCatalog Catalog() => ProductCatalog.Build(new[]
     {

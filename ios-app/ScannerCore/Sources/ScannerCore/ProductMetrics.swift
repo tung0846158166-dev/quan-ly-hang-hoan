@@ -498,6 +498,7 @@ public enum ProductMetrics {
 
     /// Tính thống kê sản phẩm thuần từ danh sách `OrderRow`.
     public static func compute(rows: [OrderRow]) -> ProductStatsSummary {
+        let families = ProductFamilies.build(rows: rows)   // gộp các kiểu tên của cùng một mẫu (28/11/2026)
         var groups: [String: Accumulator] = [:]
         var totalUnits = 0
         var unknownUnits = 0
@@ -544,7 +545,7 @@ public enum ProductMetrics {
                     continue
                 }
 
-                let key = groupKey(mergedName)
+                let key = families.key(mergedName)
                 if key.isEmpty {
                     unknownUnits += unitsPerItem
                     continue
@@ -572,7 +573,12 @@ public enum ProductMetrics {
         }
 
         let products = groups.values
-            .map { $0.toStat(totalUnits: totalUnits) }
+            .map { acc -> ProductStatItem in
+                var st = acc.toStat(totalUnits: totalUnits)
+                let shown = families.display(acc.key)
+                if !shown.isEmpty { st.name = shown }
+                return st
+            }
             .sorted { a, b in
                 if a.units != b.units { return a.units > b.units }
                 return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
@@ -589,6 +595,7 @@ public enum ProductMetrics {
     /// Lấy danh sách `OrderRow` đóng góp vào một nhóm sản phẩm (`key`), giữ nguyên thứ tự gốc.
     public static func orders(forProductKey key: String, in rows: [OrderRow]) -> [OrderRow] {
         guard !key.isEmpty else { return [] }
+        let families = ProductFamilies.build(rows: rows)
         return rows.filter { row in
             let names = splitPipe(row.n).filter { !$0.isEmpty }
             guard !names.isEmpty else { return false }
@@ -600,7 +607,7 @@ public enum ProductMetrics {
                 if isPartial && !returnedKeys.contains(groupKey(rawName)) { continue }
                 let mergedName = stripPremium(rawName)
                 if isUnknownProduct(mergedName) { continue }
-                let k = groupKey(mergedName)
+                let k = families.key(mergedName)
                 if k == key { return true }
             }
             return false

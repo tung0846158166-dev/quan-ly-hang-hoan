@@ -530,6 +530,7 @@ struct ReceivedStockView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(it.product).font(Theme.Typography.primaryBold).foregroundColor(.primary).lineLimit(2)
                 HStack(spacing: 6) {
+                    if it.premium { StatusPill(text: "Premium", color: Theme.warning) }
                     if !it.color.isEmpty { StatusPill(text: it.color, color: Theme.info) }
                     if !it.size.isEmpty { StatusPill(text: "Size \(it.size)", color: Theme.purple) }
                 }

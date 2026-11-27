@@ -105,6 +105,18 @@
                                 <Style TargetType="TextBlock"><Setter Property="FontWeight" Value="SemiBold" /><Setter Property="TextWrapping" Value="Wrap" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
+                        <DataGridTextColumn Header="Loại" Binding="{Binding Kind}" Width="80">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPremium}" Value="True">
+                                            <Setter Property="FontWeight" Value="Bold" /><Setter Property="Foreground" Value="#B45309" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
                         <DataGridTextColumn Header="Màu" Binding="{Binding Color}" Width="120" />
                         <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="90" />
                         <DataGridTextColumn Header="SL sẵn" Binding="{Binding Units}" Width="70">

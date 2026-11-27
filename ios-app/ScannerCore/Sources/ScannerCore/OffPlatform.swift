@@ -116,6 +116,8 @@ public struct CatalogProduct: Identifiable, Equatable, Hashable {
     public var units: Int
     public var colors: [String]
     public var sizes: [String]
+    /// Mọi kiểu tên của mẫu (bỏ dấu) để tìm.
+    public var searchKey: String = ""
     public var id: String { key }
 }
 
@@ -124,13 +126,14 @@ public enum ProductCatalog {
     public static func build(rows: [OrderRow]) -> [CatalogProduct] {
         struct Acc { var names: [String: Int] = [:]; var colors: [String: Int] = [:]; var sizes: [String: Int] = [:]; var units = 0 }
         var map: [String: Acc] = [:]
+        let families = ProductFamilies.build(rows: rows)
         for r in rows {
             let lines = ProductMetrics.productLines(for: r)
             let unitsPer = lines.count == 1 ? max(1, r.q) : 1
             for l in lines {
                 let name = ProductMetrics.clean(l.name)
                 if ProductMetrics.isUnknownProduct(name) || name.hasPrefix("Sản phẩm mới (") { continue }
-                let key = ProductMetrics.groupKey(name)
+                let key = families.key(name)   // gộp các kiểu tên của cùng một mẫu (28/11/2026)
                 if key.isEmpty { continue }
                 var a = map[key] ?? Acc()
                 a.names[name, default: 0] += 1
@@ -145,8 +148,9 @@ public enum ProductCatalog {
             Array(d.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map { $0.key }.prefix(30))
         }
         return map.map { key, a in
-            CatalogProduct(key: key, name: a.names.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.first?.key ?? key,
-                           units: a.units, colors: top(a.colors), sizes: top(a.sizes))
+            let shown = families.display(key)
+            return CatalogProduct(key: key, name: shown.isEmpty ? ProductNames.pickDisplay(a.names) : shown,
+                                  units: a.units, colors: top(a.colors), sizes: top(a.sizes), searchKey: families.searchText(key))
         }.sorted { $0.units != $1.units ? $0.units > $1.units : $0.name < $1.name }
     }
 
@@ -162,9 +166,9 @@ public enum ProductCatalog {
         let t = terms(query)
         if t.isEmpty { return Array(products.prefix(limit)) }
         let whole = ProductMetrics.groupKey(query)
-        let hits = products.filter { matches($0.key, t) }
+        let hits = products.filter { matches($0.searchKey.isEmpty ? $0.key : $0.searchKey, t) }
         let sorted = hits.enumerated().sorted { a, b in
-            let pa = a.element.key.hasPrefix(whole) ? 0 : 1, pb = b.element.key.hasPrefix(whole) ? 0 : 1
+            let pa = ProductMetrics.groupKey(a.element.name).hasPrefix(whole) ? 0 : 1, pb = ProductMetrics.groupKey(b.element.name).hasPrefix(whole) ? 0 : 1
             if pa != pb { return pa < pb }
             if a.element.units != b.element.units { return a.element.units > b.element.units }
             return a.offset < b.offset
@@ -173,8 +177,10 @@ public enum ProductCatalog {
     }
 
     public static func find(_ products: [CatalogProduct], name: String) -> CatalogProduct? {
-        let k = ProductMetrics.groupKey(name)
-        return k.isEmpty ? nil : products.first { $0.key == k }
+        let g = ProductMetrics.groupKey(ProductNames.tidy(ProductMetrics.stripPremium(name)))
+        if g.isEmpty { return nil }
+        // tên đang hiện của mẫu, hoặc một kiểu tên đã gặp của mẫu
+        return products.first { ProductMetrics.groupKey($0.name) == g } ?? products.first { $0.searchKey.split(separator: "|").contains(Substring(g)) }
     }
 }
 
@@ -198,7 +204,7 @@ public struct ProductLookupItem: Identifiable, Equatable {
 
 extension ProductMetrics {
     /// Các dòng sản phẩm ĐƯỢC TÍNH của một đơn (cùng quy tắc `compute`): hoàn một phần chỉ tính sản phẩm đã hoàn; bỏ đuôi Premium; bỏ "Chưa rõ".
-    public static func countedItems(_ row: OrderRow) -> [(key: String, name: String, units: Int)] {
+    public static func countedItems(_ row: OrderRow, families: ProductFamilies? = nil) -> [(key: String, name: String, units: Int)] {
         let names = splitPipe(row.n).filter { !$0.isEmpty }
         if names.isEmpty { return [] }
         let returnedRaw = splitPipe(row.rn).filter { !$0.isEmpty }
@@ -209,7 +215,7 @@ extension ProductMetrics {
             if !returnedRaw.isEmpty && !returnedKeys.contains(groupKey(raw)) { continue }
             let name = stripPremium(raw)
             if isUnknownProduct(name) { continue }
-            let key = groupKey(name)
+            let key = families?.key(name) ?? groupKey(name)
             if key.isEmpty { continue }
             out.append((key, name, unitsPer))
         }
@@ -232,6 +238,7 @@ extension ProductMetrics {
         let month = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
         struct Acc { var names: [String: Int] = [:]; var orders = Set<String>(); var rec = PeriodUnits(); var ret = PeriodUnits() }
         var map: [String: Acc] = [:]
+        let families = ProductFamilies.build(rows: rows)
         func add(_ p: inout PeriodUnits, _ d: Date?, _ units: Int, countTotal: Bool) {
             if countTotal { p.total += units }
             guard let d else { return }
@@ -242,7 +249,7 @@ extension ProductMetrics {
             if day >= month { p.month += units }
         }
         for r in rows {
-            let items = countedItems(r).filter { ProductCatalog.matches($0.key, t) }
+            let items = countedItems(r, families: families).filter { ProductCatalog.matches(families.searchText($0.key), t) }
             if items.isEmpty { continue }
             let recv = r.rv ? OrderStats.parseDate(r.rcd, calendar: calendar) : nil
             let ret = OrderStats.parseDate(r.rd, calendar: calendar)
@@ -256,7 +263,7 @@ extension ProductMetrics {
             }
         }
         let items = map.map { key, a in
-            ProductLookupItem(key: key, name: a.names.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.first?.key ?? key,
+            ProductLookupItem(key: key, name: { let s = families.display(key); return s.isEmpty ? ProductNames.pickDisplay(a.names) : s }(),
                               received: a.rec, returned: a.ret, orders: a.orders.count)
         }.sorted {
             if $0.received.month != $1.received.month { return $0.received.month > $1.received.month }
@@ -280,6 +287,8 @@ public struct ReceivedStockItem: Identifiable, Equatable {
     public var lastReceived: Date
     /// (kiện, số cái, lúc nhận) — mới nhận trước.
     public var parcels: [ReceivedStockParcel]
+    /// Bản Premium (đóng đơn phải lấy đúng loại).
+    public var premium: Bool = false
     public var id: String { key }
 }
 
@@ -291,34 +300,56 @@ public struct ReceivedStockParcel: Equatable, Identifiable {
 }
 
 public enum ReceivedStock {
-    /// Sản phẩm của các kiện hoàn ĐÃ NHẬN tại kho từ `since`, gom theo sản phẩm + màu + size. Có đơn mới trùng sản phẩm thì lấy luôn
-    /// hàng hoàn đóng đơn, khỏi cất kệ. Tìm theo tên, màu, size (không dấu cũng được).
+    private static let premiumWords = try? NSRegularExpression(pattern: #"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*"#, options: [.caseInsensitive])
+
+    /// "XL - Premium Cao Cấp" -> "XL".
+    public static func stripPremiumWords(_ s: String) -> String {
+        guard let re = premiumWords else { return ProductMetrics.clean(s) }
+        return ProductMetrics.clean(re.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: " "))
+    }
+
+    /// Sản phẩm của các kiện hoàn ĐÃ NHẬN tại kho từ `since`, gom theo mẫu + Premium/thường + màu + size. Có đơn mới trùng sản phẩm thì lấy
+    /// luôn hàng hoàn đóng đơn, khỏi cất kệ. 28/11/2026: các kiểu tên của cùng một mẫu gộp một dòng (`ProductFamilies`); bản Premium tách riêng.
+    /// Tìm theo mọi kiểu tên của mẫu, màu, size, "premium" (không dấu cũng được).
     public static func build(rows: [OrderRow], since: Date, query: String = "", calendar: Calendar = ProductMetrics.vietnamCalendar) -> [ReceivedStockItem] {
         let terms = ProductCatalog.terms(query)
+        let families = ProductFamilies.build(rows: rows)
         var map: [String: ReceivedStockItem] = [:]
+        var names: [String: [String: Int]] = [:]
         for r in rows where r.rv {
             guard let at = OrderStats.parseDate(r.rcd, calendar: calendar), at >= since else { continue }
             let lines = ProductMetrics.productLines(for: r)
             let unitsPer = lines.count == 1 ? max(1, r.q) : 1
             for l in lines where l.isReturned {
-                let name = ProductMetrics.clean(l.name)
-                if ProductMetrics.isUnknownProduct(name) { continue }
-                let nk = ProductMetrics.groupKey(name), ck = ProductMetrics.groupKey(l.color), sk = ProductMetrics.groupKey(l.size)
-                if nk.isEmpty { continue }
-                if !terms.isEmpty && !terms.allSatisfy({ (nk + ck + "|" + sk).contains($0) }) { continue }
-                let key = "\(nk)|\(ck)|\(sk)"
-                var item = map[key] ?? ReceivedStockItem(key: key, product: name, color: ProductMetrics.clean(l.color), size: ProductMetrics.clean(l.size),
-                                                         units: 0, lastReceived: at, parcels: [])
+                let raw = ProductMetrics.clean(l.name)
+                if ProductMetrics.isUnknownProduct(raw) { continue }
+                let premium = ProductMetrics.isPremium(name: raw, color: l.color, size: l.size)
+                let name = ProductMetrics.stripPremium(raw)
+                let fk = families.key(name)
+                if fk.isEmpty { continue }
+                let color = stripPremiumWords(l.color), size = stripPremiumWords(l.size)
+                let ck = ProductMetrics.groupKey(color), sk = ProductMetrics.groupKey(size)
+                if !terms.isEmpty {
+                    let hay = families.searchText(fk) + "|" + ck + "|" + sk + (premium ? "|premium" : "")
+                    if !terms.allSatisfy({ hay.contains($0) }) { continue }
+                }
+                let key = "\(fk)|\(premium ? 1 : 0)|\(ck)|\(sk)"
+                var item = map[key] ?? ReceivedStockItem(key: key, product: name, color: color, size: size,
+                                                         units: 0, lastReceived: at, parcels: [], premium: premium)
                 item.units += unitsPer
                 if let i = item.parcels.firstIndex(where: { $0.row.id == r.id }) { item.parcels[i].units += unitsPer }
                 else { item.parcels.append(ReceivedStockParcel(row: r, units: unitsPer, receivedAt: at)) }
                 if at > item.lastReceived { item.lastReceived = at }
                 map[key] = item
+                names[key, default: [:]][name, default: 0] += unitsPer
+                let shown = families.display(fk)
+                if !shown.isEmpty { map[key]?.product = shown }
             }
         }
         return map.values.map { var x = $0; x.parcels.sort { $0.receivedAt > $1.receivedAt }; return x }
             .sorted { a, b in
                 if a.product.lowercased() != b.product.lowercased() { return a.product.lowercased() < b.product.lowercased() }
+                if a.premium != b.premium { return !a.premium }
                 if a.color != b.color { return a.color < b.color }
                 return a.size < b.size
             }

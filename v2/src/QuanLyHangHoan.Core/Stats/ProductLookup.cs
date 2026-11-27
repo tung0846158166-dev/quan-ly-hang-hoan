@@ -53,14 +53,16 @@ public static class ProductLookup
         var week = WeekStart(now);
         var month = new DateTime(now.Year, now.Month, 1);
         var acc = new Dictionary<string, Acc>(StringComparer.Ordinal);
+        var list = orders as IReadOnlyList<Order> ?? orders.ToList();
+        var families = ProductFamilies.Build(list);   // mọi kiểu tên của cùng một mẫu
 
-        foreach (var o in orders)
+        foreach (var o in list)
         {
             DateTime? recv = null, ret = null;
             var datesRead = false;
-            foreach (var (key, name, units) in ProductStatistics.CountedItems(o))
+            foreach (var (key, name, units) in ProductStatistics.CountedItems(o, families))
             {
-                if (!Matches(key, terms)) continue;
+                if (!Matches(families.SearchText(key), terms)) continue;
                 if (!datesRead)
                 {
                     recv = IsReceived(o) ? parse(o.RecvDate) : null;
@@ -72,7 +74,7 @@ public static class ProductLookup
             }
         }
 
-        return acc.Values.Select(a => a.ToRow())
+        return acc.Select(kv => kv.Value.ToRow() is var r && families.Display(kv.Key) is { Length: > 0 } shown ? r with { Name = shown } : kv.Value.ToRow())
             .OrderByDescending(r => r.Received.Month).ThenByDescending(r => r.Returned.Month)
             .ThenByDescending(r => r.Received.Total + r.Returned.Total).ThenBy(r => r.Name, StringComparer.CurrentCultureIgnoreCase)
             .Take(Math.Max(1, limit)).ToList();
@@ -105,13 +107,13 @@ public static class ProductLookup
         }
 
         public ProductLookupRow ToRow() => new(
-            _spellings.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key,
+            ProductNames.PickDisplay(_spellings),
             new PeriodUnits(_rT, _rW, _rM, _rAll), new PeriodUnits(_tT, _tW, _tM, _tAll), _orders.Count);
     }
 }
 
 /// <summary>Một sản phẩm đã từng có trong dữ liệu đơn: tên hay dùng nhất + màu / size đã gặp (nhiều nhất trước).</summary>
-public sealed record CatalogProduct(string Key, string Name, int Units, IReadOnlyList<string> Colors, IReadOnlyList<string> Sizes);
+public sealed record CatalogProduct(string Key, string Name, int Units, IReadOnlyList<string> Colors, IReadOnlyList<string> Sizes, string SearchKey = "");
 
 /// <summary>
 /// Danh mục sản phẩm dựng từ dữ liệu đơn sẵn có (chủ dự án 27/11/2026: tạo đơn ngoài sàn tận dụng dữ liệu sản phẩm).
@@ -121,27 +123,34 @@ public sealed class ProductCatalog
 {
     public IReadOnlyList<CatalogProduct> Products { get; }
 
-    private ProductCatalog(IReadOnlyList<CatalogProduct> products) => Products = products;
+    private readonly ProductFamilies _families;
+    private ProductCatalog(IReadOnlyList<CatalogProduct> products, ProductFamilies families) { Products = products; _families = families; }
 
-    public static readonly ProductCatalog Empty = new(Array.Empty<CatalogProduct>());
+    public static readonly ProductCatalog Empty = new(Array.Empty<CatalogProduct>(), ProductFamilies.Empty);
 
     public static ProductCatalog Build(IEnumerable<Order> orders)
     {
         var map = new Dictionary<string, Acc>(StringComparer.Ordinal);
-        foreach (var o in orders)
+        var list = orders as IReadOnlyList<Order> ?? orders.ToList();
+        var families = ProductFamilies.Build(list);
+        foreach (var o in list)
         {
             foreach (var item in o.Items)
             {
                 var name = Clean(item.Product);
                 if (name.Length == 0 || name.StartsWith("Chưa rõ sản phẩm", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Sản phẩm mới (", StringComparison.Ordinal)) continue;
-                var key = LegacyText.Key(name);
+                var key = families.Key(name);   // gộp các kiểu tên của cùng một mẫu
                 if (key.Length == 0) continue;
                 if (!map.TryGetValue(key, out var a)) map[key] = a = new Acc();
                 a.Add(name, Clean(item.Color), Clean(item.Size), item.Qty > 0 ? item.Qty : 1);
             }
         }
-        return new ProductCatalog(map.Select(kv => kv.Value.ToProduct(kv.Key))
-            .OrderByDescending(p => p.Units).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList());
+        return new ProductCatalog(map.Select(kv => kv.Value.ToProduct(kv.Key) with
+            {
+                Name = families.Display(kv.Key) is { Length: > 0 } shown ? shown : kv.Value.ToProduct(kv.Key).Name,
+                SearchKey = families.SearchText(kv.Key),
+            })
+            .OrderByDescending(p => p.Units).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToList(), families);
     }
 
     /// <summary>Sản phẩm khớp câu tìm (mọi từ, không phân biệt dấu), nhiều đơn nhất trước; tên BẮT ĐẦU bằng câu tìm được ưu tiên.</summary>
@@ -150,15 +159,15 @@ public sealed class ProductCatalog
         var terms = ProductLookup.Terms(query);
         if (terms.Length == 0) return Products.Take(limit).ToList();
         var whole = LegacyText.Key(query);
-        return Products.Where(p => ProductLookup.Matches(p.Key, terms))
-            .OrderBy(p => p.Key.StartsWith(whole, StringComparison.Ordinal) ? 0 : 1)
+        return Products.Where(p => ProductLookup.Matches(p.SearchKey.Length > 0 ? p.SearchKey : p.Key, terms))
+            .OrderBy(p => LegacyText.Key(p.Name).StartsWith(whole, StringComparison.Ordinal) ? 0 : 1)
             .ThenByDescending(p => p.Units)
             .Take(limit).ToList();
     }
 
     public CatalogProduct? Find(string? name)
     {
-        var key = LegacyText.Key(name);
+        var key = _families.Key(ProductNames.Tidy(name));
         return key.Length == 0 ? null : Products.FirstOrDefault(p => p.Key == key);
     }
 
@@ -182,7 +191,7 @@ public sealed class ProductCatalog
         private static IReadOnlyList<string> Top(Dictionary<string, int> d) =>
             d.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.CurrentCultureIgnoreCase).Select(kv => kv.Key).Take(30).ToList();
 
-        public CatalogProduct ToProduct(string key) => new(key,
-            _names.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key, _units, Top(_colors), Top(_sizes));
+        public CatalogProduct ToProduct(string key) => new(key, ProductNames.PickDisplay(_names), _units, Top(_colors), Top(_sizes),
+            string.Join("|", _names.Keys.Select(n => LegacyText.Key(ProductNames.Tidy(n))).Distinct()) + "|" + key);
     }
 }

@@ -103,3 +103,34 @@ extension OffPlatformTests {
         XCTAssertTrue(ReceivedStock.build(rows: rows, since: since, query: "quan", calendar: cal).isEmpty)
     }
 }
+
+extension OffPlatformTests {
+    // Chủ dự án 28/11/2026: các kiểu tên của cùng một mẫu gộp một dòng (giống máy tính)
+    func testFamilyKeysMergeShortLongPrefixedAndLowercaseNames() {
+        XCTAssertEqual(ProductNames.familyKey("Áo Polo LEN THỎ Local Brand Lavi Studio/ ALPHA Nam Nữ Unisex"), "m:alpha:aopolo")
+        XCTAssertEqual(ProductNames.familyKey("ALPHA"), "m:alpha")
+        XCTAssertEqual(ProductNames.familyKey("[ DEAL MỞ BÁN ] Áo Polo Len Lavi Studio / ALPHA Unisex"), "m:alpha:aopolo")
+        XCTAssertEqual(ProductNames.familyKey("Áo Polo Len Khóa Zip 𝐋𝐚𝐯𝐢 𝐒𝐭𝐮𝐝𝐢𝐨/ BETA Unisex"), "m:beta:aopolo")
+        XCTAssertEqual(ProductNames.familyKey("Quần Kaki Ống Suông Lavi Studio Trẻ Trung/ DELTA"), "m:delta:quankaki")
+        XCTAssertEqual(ProductNames.familyKey("Áo Cardigan Lavi Studio / Logo Thêu Unisex"), "aocardiganlavistudiologotheuunisex")
+        let rows = [
+            row("1", "Áo Polo Len Lavi Studio/ OMEGA Unisex", color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 09:00:00"),
+            row("2", "OMEGA", qty: 2, color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 10:00:00"),
+            row("3", "Áo Polo Len Lavi Studio/ Omega Unisex", color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 11:00:00"),
+            row("4", "Áo Polo Len Lavi Studio/ OMEGA Unisex - Premium Cao Cấp", color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 11:00:00"),
+            row("5", "Áo Sweater Nỉ Lavi Studio / ZETA", status: "Hàng đã trả", recv: "27/11/2026 11:00:00"),
+            row("6", "Áo Hoodie Lavi Studio/ ZETA", status: "Hàng đã trả", recv: "27/11/2026 11:00:00"),
+            row("7", "ZETA", status: "Hàng đã trả", recv: "27/11/2026 11:00:00"),
+        ]
+        let since = cal.date(from: DateComponents(year: 2026, month: 11, day: 27))!
+        let items = ReceivedStock.build(rows: rows, since: since, calendar: cal)
+        let omega = items.filter { $0.key.hasPrefix("m:omega") }
+        XCTAssertEqual(omega.count, 2)                                         // thường + Premium
+        XCTAssertEqual(omega.first { !$0.premium }?.units, 4)
+        XCTAssertEqual(omega.first { !$0.premium }?.product, "Áo Polo Len Lavi Studio/ OMEGA Unisex")
+        XCTAssertEqual(omega.first { $0.premium }?.units, 1)
+        XCTAssertEqual(items.filter { $0.key.hasPrefix("m:zeta") }.count, 3)   // cùng mã khác loại: không gộp, tên ngắn để riêng
+        XCTAssertEqual(ReceivedStock.build(rows: rows, since: since, query: "ao polo len", calendar: cal).reduce(0) { $0 + $1.units }, 5)
+        XCTAssertEqual(ProductMetrics.compute(rows: rows).products.filter { $0.key.hasPrefix("m:omega") }.count, 1)
+    }
+}

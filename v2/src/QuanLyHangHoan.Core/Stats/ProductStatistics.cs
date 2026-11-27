@@ -37,8 +37,10 @@ public static class ProductStatistics
         var totalUnits = 0;
         var unknown = 0;
         var ordersWithItems = 0;
+        var list = orders as IReadOnlyList<Order> ?? orders.ToList();
+        var families = ProductFamilies.Build(list);   // gộp các kiểu tên của cùng một mẫu (28/11/2026)
 
-        foreach (var order in orders)
+        foreach (var order in list)
         {
             if (order.Items.Count == 0) continue;
             var mixed = order.Items.Any(i => i.ReturnedQty > 0) && order.Items.Any(i => i.ReturnedQty <= 0);
@@ -53,7 +55,7 @@ public static class ProductStatistics
                 var name = StripPremium(rawName);
                 if (name.Length == 0 || name.StartsWith("Chưa rõ sản phẩm", StringComparison.OrdinalIgnoreCase)) { unknown += units; continue; }
 
-                var key = LegacyText.Key(name);
+                var key = families.Key(name);
                 if (key.Length == 0) { unknown += units; continue; }
                 if (!groups.TryGetValue(key, out var acc)) groups[key] = acc = new Acc(name);
                 acc.Add(name, units, order, item, premium);
@@ -63,8 +65,8 @@ public static class ProductStatistics
             if (counted) ordersWithItems++;
         }
 
-        var products = groups.Values
-            .Select(a => a.ToStat(totalUnits))
+        var products = groups
+            .Select(kv => kv.Value.ToStat(totalUnits) is var st && families.Display(kv.Key) is { Length: > 0 } shown ? st with { Name = shown } : kv.Value.ToStat(totalUnits))
             .OrderByDescending(p => p.Units).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
         return new ProductStatsResult(products, totalUnits, ordersWithItems, unknown);
@@ -74,7 +76,7 @@ public static class ProductStatistics
     /// Các dòng sản phẩm ĐƯỢC TÍNH của một đơn theo đúng quy tắc của <see cref="Compute"/> (hoàn một phần: chỉ sản phẩm đã hoàn;
     /// bỏ đuôi Premium; bỏ "Chưa rõ sản phẩm"). Key = khóa gộp tên (bỏ dấu, chữ thường).
     /// </summary>
-    public static IEnumerable<(string Key, string Name, int Units)> CountedItems(Order order)
+    public static IEnumerable<(string Key, string Name, int Units)> CountedItems(Order order, ProductFamilies? families = null)
     {
         if (order.Items.Count == 0) yield break;
         var mixed = order.Items.Any(i => i.ReturnedQty > 0) && order.Items.Any(i => i.ReturnedQty <= 0);
@@ -84,7 +86,7 @@ public static class ProductStatistics
             var units = mixed ? item.ReturnedQty : (item.Qty > 0 ? item.Qty : 1);
             var name = StripPremium(Clean(item.Product));
             if (name.Length == 0 || name.StartsWith("Chưa rõ sản phẩm", StringComparison.OrdinalIgnoreCase)) continue;
-            var key = LegacyText.Key(name);
+            var key = families?.Key(name) ?? ProductNames.FamilyKey(name);
             if (key.Length == 0) continue;
             yield return (key, name, units);
         }
@@ -93,13 +95,13 @@ public static class ProductStatistics
     private static readonly Regex PremiumTail = new(@"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <summary>Premium = có chữ "Premium" ở tên, màu hoặc size. Chỉ là phân loại BÊN TRONG cùng một mẫu, không phải mẫu khác.</summary>
-    private static bool IsPremium(string name, OrderItem item) =>
+    public static bool IsPremium(string name, OrderItem item) =>
         name.Contains("premium", StringComparison.OrdinalIgnoreCase)
         || (item.Size ?? "").Contains("premium", StringComparison.OrdinalIgnoreCase)
         || (item.Color ?? "").Contains("premium", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Bỏ đuôi "- Premium Cao Cấp" để hai bản của cùng một mẫu gộp thành một dòng.</summary>
-    private static string StripPremium(string name)
+    public static string StripPremium(string name)
     {
         var stripped = PremiumTail.Replace(name, "").Trim();
         return stripped.Length == 0 ? name : stripped;
@@ -133,7 +135,7 @@ public static class ProductStatistics
 
         public ProductStat ToStat(int totalUnits)
         {
-            var name = _spellings.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).First().Key;
+            var name = ProductNames.PickDisplay(_spellings);
             var reason = _reasons.Count == 0 ? "" : _reasons.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).First().Key;
             var variants = _variants
                 .OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key.Item1, StringComparer.CurrentCultureIgnoreCase).ThenBy(kv => kv.Key.Item2, StringComparer.CurrentCultureIgnoreCase)

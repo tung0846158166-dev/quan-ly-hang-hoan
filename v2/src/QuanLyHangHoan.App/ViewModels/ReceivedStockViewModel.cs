@@ -23,6 +23,9 @@ public sealed class ReceivedStockRowViewModel
     public string Product => Source.Product;
     public string Color => Source.Color.Length == 0 ? "—" : Source.Color;
     public string Size => Source.Size.Length == 0 ? "—" : Source.Size;
+    /// <summary>Premium / Thường (đóng đơn phải lấy đúng loại).</summary>
+    public string Kind => Source.Premium ? "Premium" : "Thường";
+    public bool IsPremium => Source.Premium;
     public int Units => Source.Units;
     public int ParcelCount => Source.Parcels.Count;
     public string LastReceived => Source.LastReceived.ToString("dd/MM HH:mm", CultureInfo.InvariantCulture);
@@ -95,13 +98,13 @@ public sealed partial class ReceivedStockViewModel : ObservableObject
 
     private void Recompute()
     {
-        var keep = SelectedRow?.Source.Key + "|" + SelectedRow?.Source.Color + "|" + SelectedRow?.Source.Size;
+        var keep = SelectedRow?.Source.Key + "|" + SelectedRow?.Source.Premium + "|" + SelectedRow?.Source.Color + "|" + SelectedRow?.Source.Size;
         var rows = ReceivedStock.Build(_orders, Since, SearchText).Select(r => new ReceivedStockRowViewModel(r)).ToList();
         Rows = rows;
-        SelectedRow = rows.FirstOrDefault(r => r.Source.Key + "|" + r.Source.Color + "|" + r.Source.Size == keep);
+        SelectedRow = rows.FirstOrDefault(r => r.Source.Key + "|" + r.Source.Premium + "|" + r.Source.Color + "|" + r.Source.Size == keep);
         var range = RangeKey switch { "today" => "hôm nay", "7d" => "7 ngày qua", "30d" => "30 ngày qua", _ => "3 ngày qua" };
         SummaryText = rows.Count == 0
             ? (string.IsNullOrWhiteSpace(SearchText) ? $"Chưa có hàng hoàn nào nhận tại kho {range}." : $"Không có hàng hoàn khớp «{SearchText.Trim()}» nhận {range}.")
-            : $"{rows.Count:N0} mẫu (sản phẩm · màu · size) • {rows.Sum(r => r.Units):N0} cái • nhận tại kho {range} (từ {Since:dd/MM})";
+            : $"{rows.Count:N0} dòng (mẫu · loại · màu · size) • {rows.Sum(r => r.Units):N0} cái • nhận tại kho {range} (từ {Since:dd/MM})";
     }
 }

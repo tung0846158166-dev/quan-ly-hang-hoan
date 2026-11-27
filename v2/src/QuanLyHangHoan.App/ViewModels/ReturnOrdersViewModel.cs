@@ -49,8 +49,17 @@ public sealed partial class OrderTypeChipItem : ObservableObject
     }
 }
 
-public sealed partial class ReturnOrdersViewModel : ObservableObject
+public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisibilityAware
 {
+    // trang ẩn: giữ trang đơn mới nhất, mở ra mới đưa lên bảng (27/11/2026: hết lag khi cập nhật)
+    private bool _pageVisible = true;
+    private IReadOnlyList<ReturnOrderRowViewModel>? _pendingVisible;
+    public void SetPageVisible(bool visible)
+    {
+        _pageVisible = visible;
+        if (visible && _pendingVisible is { } p) { _pendingVisible = null; VisibleOrders = p; }
+    }
+
     private readonly IReturnOrderProvider _provider;
     private readonly AlertPolicy _alertPolicy;
     private readonly Action<string, string, string>? _onOpenPhoto;
@@ -1019,7 +1028,11 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         ResetScrollOnNextVisibleChange = scrollTop;
         var skip = (_currentPage - 1) * PageSize;
         var page = _filtered.Count <= PageSize ? _filtered : _filtered.Skip(skip).Take(PageSize).ToList();
-        if (!SameRows(page, VisibleOrders)) VisibleOrders = page;
+        if (!SameRows(page, _pendingVisible ?? VisibleOrders))
+        {
+            if (_pageVisible) { _pendingVisible = null; VisibleOrders = page; }
+            else _pendingVisible = page;
+        }
         else ResetScrollOnNextVisibleChange = false;
         PageInput = _currentPage.ToString();
         OnPropertyChanged(nameof(CurrentPage));

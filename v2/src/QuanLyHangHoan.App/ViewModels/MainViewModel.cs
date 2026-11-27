@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly NavigationItem _phoneSyncNavItem;
     private readonly bool _cloudMode;
     private readonly NavigationItem _returnWatchNavItem;
+    private readonly NavigationItem _receivedStockNavItem;
     private readonly NavigationItem _newOrdersNavItem;
     private readonly NavigationItem _offPlatformNavItem;
     private readonly NavigationItem _watchlistNavItem;
@@ -378,6 +379,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             onNotify: ShowToast,
             onOpenDetail: OpenOrderDetail,
             writeGate: _writeGate);
+        ReceivedStockVm = new ReceivedStockViewModel(onOpenDetail: OpenOrderDetail);
         ArchivedOrdersVm = new ArchivedOrdersViewModel(
             archivedOrderProvider,
             onOpenPhoto: OpenOrderPhoto,
@@ -453,6 +455,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["google_sheet"] = googleSheetPage;
         _pageCache["salework"] = SaleworkVm;
         _pageCache["return_watch"] = ReturnWatchVm;
+        _pageCache["received_stock"] = ReceivedStockVm;
         _pageCache["new_orders"] = NewCreatedVm;
         _pageCache["off_platform"] = OffPlatformVm;
         _pageCache["watchlist"] = WatchlistVm;
@@ -482,6 +485,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             "phone_sync", "📱", "Đồng bộ điện thoại", "CHUNG", () => PhoneSyncVm);
         _returnWatchNavItem = new NavigationItem(
             "return_watch", "🚚", "Hàng hoàn về", "CHUNG", () => ReturnWatchVm, ReturnWatchVm.TrackingCount.ToString("N0"));
+        _receivedStockNavItem = new NavigationItem(
+            "received_stock", "🧺", "Hàng hoàn sẵn kho", "CHUNG", () => ReceivedStockVm);
         _newOrdersNavItem = new NavigationItem(
             "new_orders", "📥", "Bảng đơn mới", "CHUNG", () => NewCreatedVm, NewCreatedVm.TotalCount.ToString("N0"));
         _watchlistNavItem = new NavigationItem(
@@ -513,6 +518,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _scanReceiveNavItem,
             .. (_cloudMode ? Array.Empty<NavigationItem>() : new[] { _phoneSyncNavItem }),
             _returnWatchNavItem,
+            _receivedStockNavItem,
             _newOrdersNavItem,
             _watchlistNavItem,
             _complaintsNavItem,
@@ -572,6 +578,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             HomeVm.LoadData(_searchActiveOrders, initialNow);
             WatchlistVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
             ComplaintsVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
+            ReceivedStockVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
             var rwEntries = _returnWatchService.LoadAsync(initialNow).GetAwaiter().GetResult();
             ReturnWatchVm.LoadEntries(rwEntries, initialNow);
             HomeVm.ReturnWatchOnTheWayCount = ReturnWatchVm.Stage2Count;
@@ -590,6 +597,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public ReturnOrdersViewModel ShopeeCancelledVm { get; }
     public ReturnOrdersViewModel TikTokReturnVm { get; }
     public ReturnWatchViewModel ReturnWatchVm { get; }
+    public ReceivedStockViewModel ReceivedStockVm { get; }
     public NewOrdersViewModel NewOrdersVm { get; }
     public WatchlistViewModel WatchlistVm { get; }
     public ComplaintsViewModel ComplaintsVm { get; }
@@ -969,13 +977,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         CurrentPage = vm;
         if (ReferenceEquals(vm, StatisticsVm)) FlushPendingStats();
+        if (ReferenceEquals(vm, HomeVm) && _pendingHome is { } ph) { _pendingHome = null; HomeVm.ApplyComputed(ph.Computed, ph.Orders, ph.Now); }
         UpdateNavigationVisibilityAndGroupBadges();
 
         if (persistLastPage)
         {
             if (item.Key.Equals("return_watch", StringComparison.OrdinalIgnoreCase))
             {
-                _ = ReturnWatchVm.RefreshAsync();
+                _ = ReturnWatchVm.RefreshIfStaleAsync(TimeSpan.FromMinutes(1));
             }
             if (item.Key.Equals("activity", StringComparison.OrdinalIgnoreCase))
             {
@@ -1389,6 +1398,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StatisticsVm.LoadData(p.Main, p.Archived, p.Now);
     }
 
+    private (HomeViewModel.HomeComputed? Computed, IReadOnlyList<Core.Models.Order> Orders, DateTime Now)? _pendingHome;
+
     public async Task ReloadAllDataAsync()
     {
         _syncController.NotifyDataChanged();   // nạp Sheet/Excel/thư mục xong: điện thoại nhận phần thay đổi ngay
@@ -1426,7 +1437,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         await Task.WhenAll(homeTask, shopeeRowsTask, cancelledRowsTask, tiktokRowsTask, archivedRowsTask);
 
         ReturnWatchVm.LoadEntries(returnWatchEntries, now);
-        HomeVm.ApplyComputed(homeTask.Result, returnOrders, now);
+        // trang chủ vẽ nhiều thẻ: chỉ áp khi đang mở, còn lại hoãn tới lúc mở (27/11/2026)
+        if (ReferenceEquals(CurrentPage, HomeVm)) { _pendingHome = null; HomeVm.ApplyComputed(homeTask.Result, returnOrders, now); }
+        else _pendingHome = (homeTask.Result, returnOrders, now);
         HomeVm.ReturnWatchOnTheWayCount = ReturnWatchVm.Stage2Count;
         HomeVm.MissingPhotoCount = missingCount;
         ShopeeReturnVm.LoadRows(shopeeRowsTask.Result);
@@ -1434,6 +1447,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TikTokReturnVm.LoadRows(tiktokRowsTask.Result);
         WatchlistVm.LoadOrders(returnOrders, archivedOrders, now);
         ComplaintsVm.LoadOrders(returnOrders, archivedOrders, now);
+        ReceivedStockVm.LoadOrders(returnOrders, archivedOrders, now);
         ArchivedOrdersVm.LoadRows(archivedRowsTask.Result);
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);

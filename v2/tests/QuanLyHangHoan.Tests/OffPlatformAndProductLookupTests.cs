@@ -150,6 +150,43 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         Assert.Contains("Không có sản phẩm", vm.ProductLookupHint);
     }
 
+    // ------------------------------------------------------------------ hàng hoàn sẵn kho (27/11/2026)
+    [Fact]
+    public void Received_stock_groups_recently_received_items_by_product_color_size_newest_parcel_first()
+    {
+        var partial = new Order
+        {
+            Id = "p", OrderId = "p", Track = "TP", Platform = "TikTok", Status = ReceiveStatus.Received, RecvDate = "27/11/2026 10:00:00",
+            Items = { new OrderItem { Product = "Áo thun", Color = "Đen", Size = "L", Qty = 2, ReturnedQty = 1 }, new OrderItem { Product = "Quần B", Qty = 1 } },
+        };
+        var orders = new[]
+        {
+            O("a", "Áo thun", 2, "Đen", "L", ReceiveStatus.Received, "27/11/2026 09:00:00"),
+            O("b", "ao thun", 1, "đen", "L", ReceiveStatus.Received, "25/11/2026 09:00:00"),
+            O("c", "Áo thun", 1, "Đen", "M", ReceiveStatus.Received, "26/11/2026 09:00:00"),
+            O("d", "Áo thun", 4, "Đen", "L", ReceiveStatus.Received, "20/11/2026 09:00:00"),   // quá 3 ngày
+            O("e", "Áo thun", 5, "Đen", "L", ReceiveStatus.NotReturned, "27/11/2026 09:00:00"), // chưa nhận
+            partial,
+        };
+        var since = Now.Date.AddDays(-2);
+        var rows = ReceivedStock.Build(orders, since);
+        Assert.Equal(2, rows.Count);                                              // Áo thun Đen L, Áo thun Đen M (Quần B không hoàn)
+        var l = rows.Single(r => r.Size == "L");
+        Assert.Equal(4, l.Units);                                                 // a 2 + b 1 + p 1 (đã hoàn)
+        Assert.Equal(new[] { "p", "a", "b" }, l.Parcels.Select(p => p.Order.Id));  // mới nhận trước
+        Assert.Equal("L", Assert.Single(ReceivedStock.Build(orders, since, "ao den l")).Size);
+        Assert.Empty(ReceivedStock.Build(orders, since, "quan"));
+        var vm = new ReceivedStockViewModel();
+        vm.LoadOrders(orders, Array.Empty<Order>(), Now);
+        Assert.Equal(2, vm.Rows.Count);
+        vm.SetRangeCommand.Execute("today");
+        Assert.Equal(3, Assert.Single(vm.Rows).Units);
+        Assert.Contains("TP", vm.Rows[0].Codes);
+        vm.SearchText = "vay";
+        Assert.True(vm.IsEmpty);
+        Assert.Contains("Không có hàng hoàn khớp", vm.SummaryText);
+    }
+
     // ------------------------------------------------------------------ form tạo nhanh
     private static ProductCatalog Catalog() => ProductCatalog.Build(new[]
     {

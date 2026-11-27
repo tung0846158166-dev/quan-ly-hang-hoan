@@ -39,6 +39,9 @@
         <DataTemplate DataType="{x:Type vm:WatchlistViewModel}">
             <views:WatchlistView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ReceivedStockViewModel}">
+            <views:ReceivedStockView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ComplaintsViewModel}">
             <views:ComplaintsView />
         </DataTemplate>
@@ -534,7 +537,8 @@
                 </DockPanel>
             </Border>
 
-            <ContentControl Grid.Row="2" Content="{Binding CurrentPage}" />
+            <!-- giữ sẵn giao diện các trang nặng, đổi tab chỉ ẩn/hiện (27/11/2026: hết lag khi đổi tab) -->
+            <views:PageHost Grid.Row="2" />
 
             <!-- Trợ lý AI: cửa sổ chat dạng popup (mở bằng nút ✨ nổi ở góc phải dưới, có ở mọi màn hình) -->
             <Border x:Name="AiChatPanel" Grid.Row="2" Panel.ZIndex="115" HorizontalAlignment="Right" VerticalAlignment="Bottom"

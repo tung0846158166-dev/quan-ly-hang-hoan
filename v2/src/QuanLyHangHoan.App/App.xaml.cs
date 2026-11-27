@@ -307,6 +307,7 @@ public partial class App : Application
         }
 
         _mainViewModel = mainViewModel;
+        Views.PageHost.PrewarmEnabled = true;   // dựng sẵn ngầm các bảng chính lúc rảnh tay (27/11/2026: đỡ lag lần đầu mở tab)
         var mainWindow = new MainWindow
         {
             DataContext = mainViewModel

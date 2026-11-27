@@ -67,8 +67,11 @@ public sealed class ArchivedOrderRowViewModel
     }
 }
 
-public sealed partial class ArchivedOrdersViewModel : ObservableObject
+public sealed partial class ArchivedOrdersViewModel : ObservableObject, IPageVisibilityAware
 {
+    private readonly PageGate<ArchivedOrderRowViewModel> _pageGate;
+    public void SetPageVisible(bool visible) => _pageGate.SetVisible(visible);
+
     private static readonly CultureInfo ViCulture = CultureInfo.GetCultureInfo("vi-VN");
     private readonly IArchivedOrderProvider _provider;
     private readonly Action<string, string, string>? _onOpenPhoto;
@@ -141,7 +144,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
             new SortOptionItem("price_desc", "Giá trị (Cao → Thấp)")
         ];
         _selectedSortOption = SortOptions[0];
-        Pager = new Pager<ArchivedOrderRowViewModel>(p => VisibleOrders = p);
+        _pageGate = new PageGate<ArchivedOrderRowViewModel>(p => VisibleOrders = p);   // trang ẩn: giữ danh sách, mở ra mới đưa lên bảng (27/11/2026)
+        Pager = new Pager<ArchivedOrderRowViewModel>(_pageGate.Push);
         Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
         if (loadInitialData) LoadOrders(_provider.GetArchivedOrders());

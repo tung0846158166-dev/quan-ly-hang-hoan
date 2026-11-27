@@ -153,8 +153,11 @@ public sealed class ReturnWatchRowViewModel
     }
 }
 
-public sealed partial class ReturnWatchViewModel : ObservableObject
+public sealed partial class ReturnWatchViewModel : ObservableObject, IPageVisibilityAware
 {
+    private readonly PageGate<ReturnWatchRowViewModel> _pageGate;
+    public void SetPageVisible(bool visible) => _pageGate.SetVisible(visible);
+
     public const int MaxDisplayRows = 1500;
 
     private readonly IReturnWatchService _service;
@@ -200,7 +203,8 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
             _writeGate.Changed += OnWriteGateChanged;
         }
         _lastNow = _clock();
-        Pager = new Pager<ReturnWatchRowViewModel>(p => VisibleOrders = p);
+        _pageGate = new PageGate<ReturnWatchRowViewModel>(p => VisibleOrders = p);   // trang ẩn: giữ danh sách, mở ra mới đưa lên bảng (27/11/2026)
+        Pager = new Pager<ReturnWatchRowViewModel>(_pageGate.Push);
     }
 
     public bool CanWrite => _writeGate.CanWrite;
@@ -304,6 +308,12 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
         OnPropertyChanged(nameof(HasMultiSelection));
     }
 
+    private DateTime _lastLoadedUtc = DateTime.MinValue;
+
+    /// <summary>Mở tab: chỉ đọc lại khi dữ liệu đã cũ hơn <paramref name="maxAge"/> (dữ liệu vẫn được nạp lại sau mỗi thay đổi; 27/11/2026: đỡ lag khi đổi tab).</summary>
+    public Task RefreshIfStaleAsync(TimeSpan maxAge) =>
+        DateTime.UtcNow - _lastLoadedUtc < maxAge ? Task.CompletedTask : RefreshAsync();
+
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         IsLoading = true;
@@ -321,6 +331,7 @@ public sealed partial class ReturnWatchViewModel : ObservableObject
 
     public void LoadEntries(IReadOnlyList<ReturnWatchEntry> entries, DateTime? nowOverride = null)
     {
+        _lastLoadedUtc = DateTime.UtcNow;
         _entries = entries ?? Array.Empty<ReturnWatchEntry>();
         _lastNow = nowOverride ?? _clock();
         RebuildRows();

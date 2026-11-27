@@ -44,8 +44,11 @@ public sealed class DeletedOrderRowViewModel
     }
 }
 
-public sealed partial class DeletedOrdersViewModel : ObservableObject
+public sealed partial class DeletedOrdersViewModel : ObservableObject, IPageVisibilityAware
 {
+    private readonly PageGate<DeletedOrderRowViewModel> _pageGate;
+    public void SetPageVisible(bool visible) => _pageGate.SetVisible(visible);
+
     private readonly IDeletedOrderProvider _provider;
     private readonly IOrderEditService? _editService;
     private readonly IOrderActionDialogService? _dialogService;
@@ -85,7 +88,8 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject
             new SortOptionItem("source_asc", "Nguồn xóa (A → Z)")
         ];
         _selectedSortOption = SortOptions[0];
-        Pager = new Pager<DeletedOrderRowViewModel>(p => VisibleOrders = p);
+        _pageGate = new PageGate<DeletedOrderRowViewModel>(p => VisibleOrders = p);   // trang ẩn: giữ danh sách, mở ra mới đưa lên bảng (27/11/2026)
+        Pager = new Pager<DeletedOrderRowViewModel>(_pageGate.Push);
         Filters.Changed += () => { if (!_suppressRefresh) ApplyFiltersAndSort(); };
 
         if (loadInitialData) LoadOrders(_provider.GetDeletedOrders());

@@ -101,6 +101,7 @@ public class T006PlatformSplitTests
             "scan_receive",
             "phone_sync",
             "return_watch",
+            "received_stock",
             "new_orders",
             "watchlist",
             "complaints",

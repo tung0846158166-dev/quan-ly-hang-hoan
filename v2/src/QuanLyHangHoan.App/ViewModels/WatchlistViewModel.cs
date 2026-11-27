@@ -131,8 +131,11 @@ public sealed class WatchlistRowViewModel
     }
 }
 
-public sealed partial class WatchlistViewModel : ObservableObject
+public sealed partial class WatchlistViewModel : ObservableObject, IPageVisibilityAware
 {
+    private readonly PageGate<WatchlistRowViewModel> _pageGate;
+    public void SetPageVisible(bool visible) => _pageGate.SetVisible(visible);
+
     private readonly IOrderEditService? _editService;
     private readonly IOrderActionDialogService? _dialogService;
     private readonly Func<Task>? _onDataChangedAsync;
@@ -166,7 +169,8 @@ public sealed partial class WatchlistViewModel : ObservableObject
         {
             _writeGate.Changed += OnWriteGateChanged;
         }
-        Pager = new Pager<WatchlistRowViewModel>(p => VisibleOrders = p);
+        _pageGate = new PageGate<WatchlistRowViewModel>(p => VisibleOrders = p);   // trang ẩn: giữ danh sách, mở ra mới đưa lên bảng (27/11/2026)
+        Pager = new Pager<WatchlistRowViewModel>(_pageGate.Push);
     }
 
     public bool CanWrite => _writeGate.CanWrite;

@@ -62,8 +62,17 @@ public sealed class ComplaintRowViewModel
 /// Bảng Khiếu nại (chủ dự án 26/11/2026): đơn đã bấm "Khiếu nại" ở bảng đơn. Mỗi đơn chọn trạng thái Đang xử lý / Thành công / Thất bại,
 /// ghi chú khiếu nại, bỏ khiếu nại. Lọc theo trạng thái (mặc định: đang khiếu nại) + tìm kiếm. Dữ liệu lưu trên cloud (mọi máy thấy như nhau).
 /// </summary>
-public sealed partial class ComplaintsViewModel : ObservableObject
+public sealed partial class ComplaintsViewModel : ObservableObject, IPageVisibilityAware
 {
+    // trang ẩn: giữ danh sách mới nhất, mở ra mới đưa lên bảng (27/11/2026: hết lag khi cập nhật)
+    private bool _pageVisible = true;
+    private List<ComplaintRowViewModel>? _pendingRows;
+    public void SetPageVisible(bool visible)
+    {
+        _pageVisible = visible;
+        if (visible && _pendingRows is { } p) { _pendingRows = null; VisibleRows = p; }
+    }
+
     private readonly IOrderEditService? _editService;
     private readonly IOrderActionDialogService? _dialogService;
     private readonly Func<Task>? _onDataChangedAsync;
@@ -166,10 +175,11 @@ public sealed partial class ComplaintsViewModel : ObservableObject
             _ => ComplaintStatuses.Processing,
         };
         var previous = SelectedRow?.Source.Id;
-        VisibleRows = _allRows.Where(r => (want is null || r.ComplaintStatus == want) && (kw.Length == 0 || r.SearchBlob.Contains(kw, StringComparison.Ordinal))).ToList();
-        SelectedRow = previous is null ? null : VisibleRows.FirstOrDefault(r => r.Source.Id == previous);
-        IsEmpty = VisibleRows.Count == 0;
-        StatusBarText = $"Đang hiển thị {VisibleRows.Count:N0} / {TotalCount:N0} đơn khiếu nại  •  Đang xử lý {ProcessingCount:N0} • Thành công {SuccessCount:N0} • Thất bại {FailedCount:N0}";
+        var rows = _allRows.Where(r => (want is null || r.ComplaintStatus == want) && (kw.Length == 0 || r.SearchBlob.Contains(kw, StringComparison.Ordinal))).ToList();
+        if (_pageVisible) { _pendingRows = null; VisibleRows = rows; } else _pendingRows = rows;
+        SelectedRow = previous is null ? null : rows.FirstOrDefault(r => r.Source.Id == previous);
+        IsEmpty = rows.Count == 0;
+        StatusBarText = $"Đang hiển thị {rows.Count:N0} / {TotalCount:N0} đơn khiếu nại  •  Đang xử lý {ProcessingCount:N0} • Thành công {SuccessCount:N0} • Thất bại {FailedCount:N0}";
     }
 
     /// <summary>

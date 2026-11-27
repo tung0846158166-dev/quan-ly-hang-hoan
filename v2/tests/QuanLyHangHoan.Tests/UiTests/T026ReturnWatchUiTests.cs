@@ -404,7 +404,8 @@ public sealed class T026ReturnWatchUiTests : IDisposable
         var rwIdx = navKeys.IndexOf("return_watch");
         var newOrdersIdx = navKeys.IndexOf("new_orders");
         Assert.True(rwIdx >= 0);
-        Assert.Equal(newOrdersIdx - 1, rwIdx);
+        Assert.Equal(newOrdersIdx - 2, rwIdx);   // giữa là "Hàng hoàn sẵn kho" (27/11/2026)
+        Assert.Equal("received_stock", navKeys[rwIdx + 1]);
         Assert.Equal("CHUNG", mainVm.NavigationItems[rwIdx].Section);
 
         // Demo mode has all 4 stages

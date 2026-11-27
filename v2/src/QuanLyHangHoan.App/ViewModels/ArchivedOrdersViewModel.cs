@@ -136,8 +136,8 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         SortOptions =
         [
             new SortOptionItem("default", "Mặc định (STT)"),
-            new SortOptionItem("recv_desc", "Ngày về kho (Mới → Cũ)"),
-            new SortOptionItem("recv_asc", "Ngày về kho (Cũ → Mới)"),
+            new SortOptionItem("recv_desc", "Nhận tại kho (Mới → Cũ)"),
+            new SortOptionItem("recv_asc", "Nhận tại kho (Cũ → Mới)"),
             new SortOptionItem("price_desc", "Giá trị (Cao → Thấp)")
         ];
         _selectedSortOption = SortOptions[0];
@@ -147,7 +147,7 @@ public sealed partial class ArchivedOrdersViewModel : ObservableObject
         if (loadInitialData) LoadOrders(_provider.GetArchivedOrders());
     }
 
-    public TableFilterState Filters { get; } = new("Ngày về kho");
+    public TableFilterState Filters { get; } = new("Nhận tại kho");
 
     public IReadOnlyList<SortOptionItem> SortOptions { get; }
 

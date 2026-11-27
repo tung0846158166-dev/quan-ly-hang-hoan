@@ -40,6 +40,7 @@ public sealed class ReturnOrderRowViewModel
         ArrivedAtDate = AlertThresholds.TryParseVietnamDateTime(source.ReturnedAt);
         ShipDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ShipDate);
         ReturnDateParsed = AlertThresholds.TryParseVietnamDateTime(source.ReturnDate);
+        RecvDateParsed = AlertThresholds.TryParseVietnamDateTime(source.RecvDate);
         ImportedAtParsed = AlertThresholds.TryParseVietnamDateTime(source.ImportedAt);
         AlertLevel = AlertThresholds.EvaluateOrder(source, now, policy);
 
@@ -141,6 +142,8 @@ public sealed class ReturnOrderRowViewModel
     public DateTime? ArrivedAtDate { get; }
     public DateTime? ShipDateParsed { get; }
     public DateTime? ReturnDateParsed { get; }
+    /// <summary>Ngày nhận tại kho (cột RecvDate), dùng cho bộ lọc "Nhận kho từ/đến".</summary>
+    public DateTime? RecvDateParsed { get; }
     /// <summary>Giờ nạp đơn (ISO của dữ liệu cũ hoặc giờ Việt Nam của đơn tạo mới).</summary>
     public DateTime? ImportedAtParsed { get; }
     /// <summary>Khóa "mới nạp": giờ nạp; đơn cũ không có giờ nạp thì dùng ngày hoàn, rồi ngày giao.</summary>

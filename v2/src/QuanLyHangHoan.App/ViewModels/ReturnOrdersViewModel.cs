@@ -322,6 +322,9 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     [ObservableProperty] private string _photoFilter = "all"; // all | with | without
     [ObservableProperty] private DateTime? _dateFrom;
     [ObservableProperty] private DateTime? _dateTo;
+    // lọc theo ngày nhận tại kho (chủ dự án 27/11/2026)
+    [ObservableProperty] private DateTime? _recvDateFrom;
+    [ObservableProperty] private DateTime? _recvDateTo;
     [ObservableProperty] private ObservableCollection<string> _carrierOptions = [AllCarriers];
 
     public const string AllCarriers = "Tất cả ĐVVC";
@@ -354,7 +357,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         + (CarrierFilter != AllCarriers ? 1 : 0)
         + (PlatformStatusFilter != AllPlatformStatuses ? 1 : 0)
         + (PhotoFilter != "all" ? 1 : 0)
-        + (DateFrom.HasValue || DateTo.HasValue ? 1 : 0);
+        + (DateFrom.HasValue || DateTo.HasValue ? 1 : 0)
+        + (RecvDateFrom.HasValue || RecvDateTo.HasValue ? 1 : 0);
 
     public string AdvancedFilterButtonText => AdvancedFilterCount == 0 ? "🔎 Bộ lọc" : $"🔎 Bộ lọc ({AdvancedFilterCount})";
 
@@ -370,6 +374,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     partial void OnPhotoFilterChanged(string value) => AdvancedFilterChanged();
     partial void OnDateFromChanged(DateTime? value) => AdvancedFilterChanged();
     partial void OnDateToChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnRecvDateFromChanged(DateTime? value) => AdvancedFilterChanged();
+    partial void OnRecvDateToChanged(DateTime? value) => AdvancedFilterChanged();
     partial void OnPhotoOptionChanged(string value)
         => PhotoFilter = value == "Có ảnh" ? "with" : value == "Chưa có ảnh" ? "without" : "all";
 
@@ -393,6 +399,13 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             if (d is null) return false;
             if (DateFrom.HasValue && d.Value.Date < DateFrom.Value.Date) return false;
             if (DateTo.HasValue && d.Value.Date > DateTo.Value.Date) return false;
+        }
+        if (RecvDateFrom.HasValue || RecvDateTo.HasValue)
+        {
+            var r = row.RecvDateParsed;
+            if (r is null) return false;
+            if (RecvDateFrom.HasValue && r.Value.Date < RecvDateFrom.Value.Date) return false;
+            if (RecvDateTo.HasValue && r.Value.Date > RecvDateTo.Value.Date) return false;
         }
         return true;
     }
@@ -702,6 +715,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             PhotoOption = "Ảnh: tất cả";
             DateFrom = null;
             DateTo = null;
+            RecvDateFrom = null;
+            RecvDateTo = null;
             _colSortMember = null;
             SelectedSortOption = SortOptions[0];
         }

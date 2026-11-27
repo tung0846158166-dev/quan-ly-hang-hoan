@@ -341,7 +341,11 @@
                     <TextBlock Text="Ngày hoàn từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <DatePicker SelectedDate="{Binding DateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" />
                     <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding DateTo}" Width="120" Height="30" FontSize="12" />
+                    <DatePicker SelectedDate="{Binding DateTo}" Width="120" Height="30" FontSize="12" Margin="0,0,14,0" />
+                    <TextBlock Text="Nhận tại kho từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding RecvDateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" ToolTip="Lọc đơn theo ngày nhận tại kho (đơn chưa nhận sẽ bị ẩn)" />
+                    <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <DatePicker SelectedDate="{Binding RecvDateTo}" Width="120" Height="30" FontSize="12" ToolTip="Lọc đơn theo ngày nhận tại kho (đơn chưa nhận sẽ bị ẩn)" />
                 </WrapPanel>
             </StackPanel>
         </Border>

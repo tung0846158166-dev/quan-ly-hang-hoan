@@ -52,6 +52,33 @@ public class T037TableFiltersTests
     }
 
     [Fact]
+    public void RecvDateFilter_UsesWarehouseReceiveDate_AndResets()
+    {
+        // chủ dự án 27/11/2026: lọc theo "ngày nhận tại kho" (khác ngày hoàn)
+        var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now));
+        Order R(string id, string ret, string status, string recv) => new()
+        {
+            OrderId = id, Track = "T" + id, Platform = "Shopee", Status = status, RecvDate = recv, ReturnDate = ret,
+            Items = [new OrderItem { Product = "Áo", Qty = 1 }]
+        };
+        vm.LoadOrders(
+        [
+            R("N1", "20/11/2026 10:00", ReceiveStatus.Received, "23/11/2026 08:00"),
+            R("N2", "23/11/2026 10:00", ReceiveStatus.Received, "22/11/2026 15:00"),
+            R("N3", "23/11/2026 10:00", ReceiveStatus.NotReturned, "")
+        ], Now);
+        vm.RecvDateFrom = new DateTime(2026, 11, 23);
+        Assert.Equal("N1", vm.VisibleOrders.Single().OrderId);
+        Assert.Equal(1, vm.AdvancedFilterCount);
+        vm.RecvDateFrom = null;
+        vm.RecvDateTo = new DateTime(2026, 11, 22);
+        Assert.Equal("N2", vm.VisibleOrders.Single().OrderId);
+        vm.ResetAllFiltersCommand.Execute(null);
+        Assert.Null(vm.RecvDateTo);
+        Assert.Equal(3, vm.VisibleOrders.Count);
+    }
+
+    [Fact]
     public void ResetAllFilters_ClearsAdvanced()
     {
         var vm = Make();

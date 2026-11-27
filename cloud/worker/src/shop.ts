@@ -348,7 +348,8 @@ export class ShopDO extends DurableObject<Env> {
     return s;
   }
   private cleanKind(v: unknown): string {
-    if (v !== "pc" && v !== "phone") fail(422, "invalid", "Loại thiết bị phải là pc hoặc phone.");
+    // "web": trang web (thử trên máy / sau này trên claude.ai), vai trò nhân viên như điện thoại
+    if (v !== "pc" && v !== "phone" && v !== "web") fail(422, "invalid", "Loại thiết bị phải là pc, phone hoặc web.");
     return v as string;
   }
 

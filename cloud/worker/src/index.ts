@@ -27,10 +27,39 @@ export interface Env {
 
 const shop = (env: Env) => env.SHOP.get(env.SHOP.idFromName("main"));
 
+/**
+ * Trang web thử chạy trên máy (27/11/2026): trình duyệt chỉ gọi được cloud khi cloud cho phép nguồn đó (CORS).
+ * Chỉ mở cho trang cục bộ trên chính máy (localhost / 127.0.0.1); mọi nguồn khác giữ nguyên như cũ (trình duyệt chặn).
+ * Vẫn bắt buộc token thiết bị như mọi máy khác.
+ */
+export function corsOrigin(origin: string | null): string | null {
+  if (!origin) return null;
+  return /^http:\/\/(localhost|127\.0\.0\.1):\d{2,5}$/.test(origin) ? origin : null;
+}
+
+function withCors(res: Response, origin: string): Response {
+  if (res.status === 101) return res; // WebSocket: giữ nguyên
+  const out = new Response(res.body, res);
+  out.headers.set("Access-Control-Allow-Origin", origin);
+  out.headers.append("Vary", "Origin");
+  return out;
+}
+
 export default {
   /** Mọi yêu cầu đi vào MỘT Durable Object duy nhất (một cửa hàng): ghi tuần tự nên quét nhận nguyên tử. */
-  fetch(req: Request, env: Env): Promise<Response> {
-    return shop(env).fetch(req);
+  async fetch(req: Request, env: Env): Promise<Response> {
+    const origin = corsOrigin(req.headers.get("Origin"));
+    if (req.method === "OPTIONS") {
+      if (!origin) return new Response(null, { status: 204 });
+      return new Response(null, { status: 204, headers: {
+        "Access-Control-Allow-Origin": origin, "Vary": "Origin",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        "Access-Control-Max-Age": "86400",
+      } });
+    }
+    const res = await shop(env).fetch(req);
+    return origin ? withCors(res, origin) : res;
   },
 
   /**

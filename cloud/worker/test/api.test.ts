@@ -1198,3 +1198,25 @@ describe("ngày khiếu nại xong (27/11/2026)", () => {
     expect((await get("d1")).complaintDoneAt).toBeUndefined();
   }, 30_000);
 });
+
+describe("trang web thử trên máy (27/11/2026): CORS + thiết bị loại web", () => {
+  const ORIGIN = "http://localhost:5178";
+  it("trả lời preflight cho trang cục bộ, từ chối nguồn lạ", async () => {
+    const ok = await SELF.fetch(BASE + "/sync", { method: "OPTIONS", headers: { Origin: ORIGIN, "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization" } });
+    expect(ok.status).toBe(204);
+    expect(ok.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
+    expect((ok.headers.get("Access-Control-Allow-Headers") ?? "").toLowerCase()).toContain("authorization");
+    const bad = await SELF.fetch(BASE + "/sync", { method: "OPTIONS", headers: { Origin: "https://evil.example", "Access-Control-Request-Method": "GET" } });
+    expect(bad.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  }, 30_000);
+  it("gắn CORS vào trả lời thật (kể cả lỗi) và ghép được thiết bị loại web", async () => {
+    const r = await SELF.fetch(BASE + "/me", { headers: { Origin: ORIGIN } });
+    expect(r.status).toBe(401);
+    expect(r.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
+    const start = await call("POST", "/pair/start", {}, owner);
+    const done = await call("POST", "/pair/complete", { code: start.data.code, deviceName: "Web thử", kind: "web" });
+    expect(done.status).toBe(200);
+    const me = await call("GET", "/me", undefined, done.data.token);
+    expect(me.data.role).toBe("staff");
+  }, 30_000);
+});

@@ -424,7 +424,7 @@ final class CloudTests: XCTestCase {
         let plain = CloudRowMapper.row(parcel(#"{"id":"z","track":"TZ"}"#), now: now)!
         let rows = [r("a", "Đang xử lý", "20/11/2026 10:00:00"), plain, r("b", "Thất bại", "25/11/2026 10:00:00"),
                     r("c", "Thành công", "27/11/2026 08:00:00"), r("d", "Đang xử lý", "26/11/2026 10:00:00")]
-        XCTAssertEqual(CloudOps.recentComplaints(rows).map { $0.id }, ["c", "d", "b"])
+        XCTAssertEqual(CloudOps.recentComplaints(rows).map { $0.c }, ["Tc", "Td", "Tb"])
         XCTAssertEqual(CloudOps.lastComplaintLine("27/11/2026 09:00 · Đang xử lý: thiếu áo\n27/11/2026 10:00 · Thất bại: sàn từ chối\n"), "27/11/2026 10:00 · Thất bại: sàn từ chối")
         let long = String(repeating: "x", count: 700) + "\nMỚI"
         XCTAssertTrue(CloudRowMapper.row(parcel("{\"id\":\"l\",\"track\":\"TL\",\"complaintStatus\":\"Đang xử lý\",\"complaintNote\":\"\(long.replacingOccurrences(of: "\n", with: "\\n"))\"}"), now: now)!.knn.hasSuffix("MỚI"))

@@ -32,13 +32,24 @@ public static class CloudReplica
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// TĂNG số này mỗi khi bản sao đọc thêm trường mới từ cloud (cột mới). Bản sao ghi bằng phiên bản khác thì mốc coi như 0:
+    /// tải lại toàn bộ một lần để các đơn chép về từ trước có đủ trường mới (lỗi 27/11/2026). 8 = có khiếu nại + ngày khiếu nại xong.
+    /// </summary>
+    public const int FieldsVersion = 8;
+
     public static long GetRev(string dbPath)
     {
         if (!File.Exists(dbPath)) return 0;
         using var c = Open(dbPath);
         using var cmd = c.CreateCommand();
-        cmd.CommandText = MetaSql + "; SELECT v FROM cloud_meta WHERE k = 'rev'";
-        return long.TryParse(cmd.ExecuteScalar()?.ToString(), out var r) ? r : 0;
+        cmd.CommandText = MetaSql + "; SELECT (SELECT v FROM cloud_meta WHERE k = 'rev'), (SELECT v FROM cloud_meta WHERE k = 'fields')";
+        using var rd = cmd.ExecuteReader();
+        if (!rd.Read()) return 0;
+        var rev = rd.IsDBNull(0) ? "" : rd.GetString(0);
+        var fields = rd.IsDBNull(1) ? "" : rd.GetString(1);
+        if (fields != FieldsVersion.ToString()) return 0;   // bản sao từ app cũ hơn: tải lại toàn bộ
+        return long.TryParse(rev, out var r) ? r : 0;
     }
 
     /// <summary>Giờ vào Bảng Hàng Hoàn Về (ms) của một đơn trong bản sao; 0 nếu chưa có dấu.</summary>
@@ -128,8 +139,10 @@ public static class CloudReplica
         {
             using var m = c.CreateCommand();
             m.Transaction = tx;
-            m.CommandText = "INSERT INTO cloud_meta(k, v) VALUES ('rev', $v) ON CONFLICT(k) DO UPDATE SET v = excluded.v";
+            m.CommandText = "INSERT INTO cloud_meta(k, v) VALUES ('rev', $v) ON CONFLICT(k) DO UPDATE SET v = excluded.v;"
+                + "INSERT INTO cloud_meta(k, v) VALUES ('fields', $f) ON CONFLICT(k) DO UPDATE SET v = excluded.v";
             m.Parameters.AddWithValue("$v", rev.ToString());
+            m.Parameters.AddWithValue("$f", FieldsVersion.ToString());
             m.ExecuteNonQuery();
         }
         tx.Commit();

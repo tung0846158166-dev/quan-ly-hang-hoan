@@ -46,6 +46,27 @@ public sealed class ComplaintDataTests : IDisposable
         Assert.Equal("", OrderRepository.Load(Db).Single(s => s.Order.Id == "a").Order.ComplaintStatus);
     }
 
+    /// <summary>
+    /// Lỗi 27/11/2026 (thấy trên điện thoại): đơn chép về từ bản app CHƯA biết trường mới không bao giờ được tải lại, vì đồng bộ theo mốc.
+    /// Bản sao ghi bằng phiên bản trường cũ (hoặc không ghi phiên bản) phải trả mốc 0 để tải lại toàn bộ một lần; ghi đúng phiên bản thì giữ mốc.
+    /// </summary>
+    [Fact]
+    public void Replica_written_by_older_field_version_resyncs_from_zero_once()
+    {
+        CloudReplica.Apply(Db, new[] { Parcel("a") }, 50);
+        Assert.Equal(50, CloudReplica.GetRev(Db));
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Db}"))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM cloud_meta WHERE k = 'fields'";   // giống bản sao do app cũ ghi
+            cmd.ExecuteNonQuery();
+        }
+        Assert.Equal(0, CloudReplica.GetRev(Db));
+        CloudReplica.Apply(Db, new[] { Parcel("a", "Đang xử lý") }, 60);
+        Assert.Equal(60, CloudReplica.GetRev(Db));
+    }
+
     [Fact]
     public void Local_mode_complaint_edit_stamps_the_date_and_clearing_removes_everything()
     {

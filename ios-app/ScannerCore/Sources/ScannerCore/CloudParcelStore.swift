@@ -7,7 +7,13 @@ public final class CloudParcelStore {
         var rev: Int
         var parcels: [CloudParcel]
         var watch: [CloudWatchChange]?     // bản lưu cũ chưa có trường này
+        var fields: Int?                   // phiên bản các trường của CloudParcel lúc lưu (bản cũ: không có)
     }
+
+    /// TĂNG số này mỗi khi CloudParcel đọc thêm trường mới từ cloud. Bộ nhớ đệm lưu bằng phiên bản khác sẽ được tải lại toàn bộ một lần
+    /// (đơn đã lưu từ bản app chưa biết trường mới thì thiếu dữ liệu đó, mà đồng bộ theo mốc không bao giờ tải lại chúng — lỗi 27/11/2026:
+    /// bảng Khiếu nại trên điện thoại chỉ có đơn vừa sửa gần đây). 3 = có khiếu nại + ngày khiếu nại xong.
+    public static let fieldsVersion = 3
 
     private let lock = NSLock()
     private var map: [String: CloudParcel] = [:]
@@ -69,7 +75,7 @@ public final class CloudParcelStore {
     public func save() {
         guard let url = fileURL else { return }
         lock.lock()
-        let disk = Disk(rev: revValue, parcels: order.compactMap { map[$0] }, watch: Array(watchMap.values))
+        let disk = Disk(rev: revValue, parcels: order.compactMap { map[$0] }, watch: Array(watchMap.values), fields: Self.fieldsVersion)
         lock.unlock()
         guard let data = try? JSONEncoder().encode(disk) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -90,6 +96,7 @@ public final class CloudParcelStore {
         guard let url = fileURL, let data = try? Data(contentsOf: url), let disk = try? JSONDecoder().decode(Disk.self, from: data) else { return }
         for p in disk.parcels { put(p) }
         for w in disk.watch ?? [] { watchMap[w.key] = w }
-        revValue = disk.rev
+        // lưu từ bản app cũ hơn (thiếu trường): giữ đơn để xem khi mất mạng, nhưng mốc = 0 để lần đồng bộ tới tải lại toàn bộ và ghi đè
+        revValue = disk.fields == Self.fieldsVersion ? disk.rev : 0
     }
 }

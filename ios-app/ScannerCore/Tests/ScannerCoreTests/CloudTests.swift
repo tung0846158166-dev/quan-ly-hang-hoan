@@ -134,6 +134,27 @@ final class CloudTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    /// Lỗi 27/11/2026: đơn lưu trong máy từ bản app CHƯA có trường khiếu nại không bao giờ được tải lại -> bảng Khiếu nại thiếu đơn.
+    /// Bộ nhớ đệm của bản cũ (không có số phiên bản) phải bị coi là cũ: giữ đơn để xem khi mất mạng nhưng đặt mốc về 0 để tải lại toàn bộ.
+    func testOldCacheWithoutFieldVersionForcesFullResync() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("qlhh-cloud-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("parcels.json")
+        // tệp do bản app cũ ghi: không có "fields", đơn thiếu complaintStatus
+        try Data(#"{"rev":120,"parcels":[{"id":"a","track":"A","status":"Chưa trả"}],"watch":[]}"#.utf8).write(to: url)
+        let s = CloudParcelStore(fileURL: url)
+        XCTAssertEqual(s.count, 1)                 // vẫn xem được khi mất mạng
+        XCTAssertEqual(s.rev, 0)                   // lần đồng bộ tới tải lại từ đầu
+        // tải lại: cùng kiện nay có khiếu nại -> phải được ghi đè
+        s.apply([parcel(#"{"id":"a","track":"A","status":"Chưa trả","complaintStatus":"Đang xử lý","rev":50}"#)], rev: 130)
+        XCTAssertEqual(s.rows(now: Date()).first?.kn, "Đang xử lý")
+        s.save()
+        let again = CloudParcelStore(fileURL: url)
+        XCTAssertEqual(again.rev, 130)             // bản lưu đúng phiên bản: giữ mốc, không tải lại nữa
+        XCTAssertEqual(again.parcel(id: "a")?.complaintStatus, "Đang xử lý")
+    }
+
     // MARK: API
 
     private final class FakeTransport: CloudHTTPTransport {

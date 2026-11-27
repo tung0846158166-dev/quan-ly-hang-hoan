@@ -8,6 +8,7 @@ public partial class OrderDetailWindow : Window
     public OrderDetailWindow()
     {
         InitializeComponent();
+        OwnerFocus.ReturnToOwnerOnClose(this);   // đóng thì quay về cửa sổ cha, không nhảy sang phần mềm khác
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();

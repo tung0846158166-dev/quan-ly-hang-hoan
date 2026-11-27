@@ -8,6 +8,7 @@ public partial class PhotoViewerWindow : Window
     public PhotoViewerWindow()
     {
         InitializeComponent();
+        OwnerFocus.ReturnToOwnerOnClose(this);   // đóng thì quay về cửa sổ cha, không nhảy sang phần mềm khác
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

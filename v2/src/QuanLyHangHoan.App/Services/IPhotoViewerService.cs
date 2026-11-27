@@ -24,7 +24,8 @@ public sealed class WindowsPhotoViewerService : IPhotoViewerService
         var window = new PhotoViewerWindow
         {
             DataContext = vm,
-            Owner = Application.Current?.MainWindow
+            // gắn vào cửa sổ đang mở (thường là Chi tiết đơn): đóng ảnh thì quay lại đúng cửa sổ đó
+            Owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive && w.IsVisible) ?? Application.Current?.MainWindow
         };
         window.Show();
         _ = vm.LoadAsync(photoId, orderId, tracking);

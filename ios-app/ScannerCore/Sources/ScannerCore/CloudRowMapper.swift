@@ -112,7 +112,8 @@ public enum CloudRowMapper {
         }
         let nt = join([p.note, p.userNote].map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, 200)
         if !nt.isEmpty { row.nt = nt }
-        if !p.complaintStatus.isEmpty { row.kn = p.complaintStatus; row.kna = p.complaintAt; row.knn = p.complaintNote.count <= 600 ? p.complaintNote : String(p.complaintNote.suffix(600))   // nhật ký lý do: giữ phần MỚI nhất; row.knd = p.complaintDoneAt }
+        // ghi chú khiếu nại là nhật ký lý do (27/11/2026): quá dài thì giữ phần MỚI nhất
+        if !p.complaintStatus.isEmpty { row.kn = p.complaintStatus; row.kna = p.complaintAt; row.knn = p.complaintNote.count <= 600 ? p.complaintNote : String(p.complaintNote.suffix(600)); row.knd = p.complaintDoneAt }
         if k == "c" { row.ci = p.id }
         row.pid = p.id
         return row

@@ -256,12 +256,18 @@ final class SaleworkRunner: NSObject, ObservableObject {
       }
       if (action === 'state') {
         const body = norm(document.body ? document.body.innerText : '');
+        // ô chọn kênh (ảnh 30, 27/11/2026): Safari/WebKit trên iPhone KHÔNG đưa chữ trong ô chọn vào innerText -> đọc thêm
+        // lựa chọn đang chọn của <select> và chữ hiển thị của ô chọn (bỏ phần tử chứa <select> để không dính cả danh sách lựa chọn)
+        const picked = norm(Array.from(document.querySelectorAll('select')).map(s => s.selectedIndex >= 0 && s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : '').join(' '));
+        const shown = norm(Array.from(document.querySelectorAll('[class*=select],[role=combobox],[title]'))
+          .filter(e => e.tagName !== 'SELECT' && !(e.querySelector && e.querySelector('select')) && visible(e))
+          .map(e => (e.getAttribute('title') || '') + ' ' + (e.textContent || '') + ' ' + (e.value || '')).join(' '));
         return {
           url: location.href,
           hasPassword: !!document.querySelector('input[type=password]'),
           hasExport: find('xuất excel', 'exact').length > 0,
           hasTab: find('đang chờ hoàn', 'prefix').length > 0,
-          channelTiktok: /k[eê]nh\\s*tiktok/.test(body) || /tiktok/.test(body.slice(0, 4000)),
+          channelTiktok: /k[eê]nh\\s*tiktok/.test(body) || /tiktok/.test(body.slice(0, 4000)) || /tiktok/.test(picked) || /k[eê]nh\\s*tiktok/.test(shown),
           title: document.title
         };
       }

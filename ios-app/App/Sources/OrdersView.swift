@@ -173,7 +173,7 @@ struct OrdersView: View {
                 shortcutRow
                 if store.hasData {
                     filterBar
-                    if !platform.isEmpty {
+                    if hasExtraFilter {
                         activePlatformStrip
                     }
                 }
@@ -264,15 +264,6 @@ struct OrdersView: View {
                     }
                     .accessibilityLabel("Quét mã để tìm đơn")
 
-                    Menu {
-                        Button("Tất cả sàn") { platform = "" }
-                        ForEach(platforms, id: \.self) { p in Button(p) { platform = p } }
-                    } label: {
-                        Image(systemName: platform.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-                            .foregroundColor(platform.isEmpty ? .primary : Theme.accent)
-                    }
-                    .accessibilityLabel("Lọc theo sàn")
-
                     if !store.isDemoMode {
                         Button {
                             Haptics.tap()
@@ -302,101 +293,181 @@ struct OrdersView: View {
         }
     }
 
-    // MARK: - Hàng chip lối tắt nhỏ gọn (Hoàn về / Sản phẩm / Đơn hủy / Sau CB)
+    // MARK: - Bảng phụ: 5 ô chia đều một hàng, không cuộn (chủ dự án 27/11/2026: gọn lại phần lựa chọn)
     private var shortcutRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                NavigationLink { ReturnWatchView() } label: {
-                    shortcutChip(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink { ProductStatsView() } label: {
-                    shortcutChip(icon: "tshirt.fill", title: "Sản phẩm", count: productCount, color: Theme.accent, alwaysTint: true)
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink { CancelledTableView() } label: {
-                    shortcutChip(icon: "xmark", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink { CancelAfterPrepView() } label: {
-                    shortcutChip(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
-                }
-                .buttonStyle(.plain)
-
-                // Đơn ngoài sàn (27/11/2026): bảng riêng + tạo nhanh
-                NavigationLink { OffPlatformView() } label: {
-                    shortcutChip(icon: "storefront.fill", title: "Ngoài sàn", count: offPlatformPending, color: Theme.success, alwaysTint: true)
-                }
-                .buttonStyle(.plain)
+        HStack(spacing: 6) {
+            NavigationLink { ReturnWatchView() } label: {
+                tableTile(icon: "arrow.uturn.backward", title: "Hoàn về", count: returnWatchActive, color: Theme.teal)
             }
-            .padding(.horizontal, Theme.screenPadding)
+            NavigationLink { CancelledTableView() } label: {
+                tableTile(icon: "xmark.circle.fill", title: "Đơn hủy", count: cancelledPending, color: Theme.danger)
+            }
+            NavigationLink { CancelAfterPrepView() } label: {
+                tableTile(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
+            }
+            NavigationLink { OffPlatformView() } label: {
+                tableTile(icon: "storefront.fill", title: "Ngoài sàn", count: offPlatformPending, color: Theme.success)
+            }
+            NavigationLink { ProductStatsView() } label: {
+                tableTile(icon: "tshirt.fill", title: "Sản phẩm", count: nil, color: Theme.accent)
+            }
         }
+        .buttonStyle(.plain)
+        .padding(.horizontal, Theme.screenPadding)
+        .padding(.top, 2)
     }
 
-    private func shortcutChip(icon: String, title: String, count: Int, color: Color, alwaysTint: Bool = false) -> some View {
-        let active = count > 0 || alwaysTint
-        return HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(active ? color : .secondary)
+    /// Ô bảng: biểu tượng + số cần xử lý (góc), tên bên dưới; ô chia đều chiều ngang.
+    private func tableTile(icon: String, title: String, count: Int?, color: Color) -> some View {
+        let active = (count ?? 1) > 0
+        return VStack(spacing: 3) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(active ? color : .secondary)
+                    .frame(width: 30, height: 24)
+                if let c = count, c > 0 {
+                    Text(c > 999 ? "999+" : "\(c)")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(color)
+                        .clipShape(Capsule())
+                        .offset(x: 10, y: -5)
+                }
+            }
             Text(title)
-                .font(Theme.Typography.captionBold)
+                .font(Theme.Typography.microBold)
                 .foregroundColor(.primary)
                 .lineLimit(1)
-            Text("\(count)")
-                .font(.system(.caption2, design: .rounded).bold())
-                .monospacedDigit()
-                .foregroundColor(active ? color : .secondary)
+                .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(active ? color.opacity(0.11) : Theme.cardBackground)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(active ? color.opacity(0.26) : Color.primary.opacity(0.08), lineWidth: 0.7)
-        )
-        .frame(minHeight: Theme.minTapTarget)
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .background(Theme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07), lineWidth: 0.7))
         .contentShape(Rectangle())
+        .accessibilityLabel(count.map { "\(title), \($0) cần xử lý" } ?? title)
     }
 
-    // MARK: - Hàng ô lọc cuộn ngang có số đếm
+    // MARK: - Lọc: 4 lựa chọn chính dạng thanh chia đều + nút "Lọc" gom phần còn lại và lọc sàn
+    private static let primaryFilters: [OrderFilter] = [.main, .pending, .overdue, .received]
+    private static let moreFilters: [OrderFilter] = [.soon, .watch, .complaint, .partialReturn, .pre, .cancelled, .archived, .all]
+
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(OrderFilter.allCases, id: \.self) { f in
-                    FilterTile(
-                        title: f.rawValue,
-                        count: counts[f] ?? 0,
-                        selected: filter == f,
-                        accent: f.accentColor
-                    ) {
+        HStack(spacing: 6) {
+            HStack(spacing: 2) {
+                ForEach(Self.primaryFilters, id: \.self) { f in
+                    let on = filter == f
+                    Button {
+                        Haptics.tap()
                         filter = f
+                    } label: {
+                        VStack(spacing: 0) {
+                            Text(f == .main ? "Tất cả" : f.rawValue)
+                                .font(on ? Theme.Typography.captionBold : Theme.Typography.caption.weight(.medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Text("\(counts[f] ?? 0)")
+                                .font(.system(.caption2, design: .rounded).bold())
+                                .monospacedDigit()
+                                .foregroundColor(on ? .white.opacity(0.9) : (f == .overdue && (counts[f] ?? 0) > 0 ? Theme.danger : .secondary))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(on ? f.accentColor : Color.clear)
+                        .foregroundColor(on ? .white : .primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3)
+            .background(Theme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07), lineWidth: 0.7))
+
+            moreFilterMenu
+        }
+        .padding(.horizontal, Theme.screenPadding)
+    }
+
+    private var hasExtraFilter: Bool { Self.moreFilters.contains(filter) || !platform.isEmpty }
+
+    private var moreFilterMenu: some View {
+        Menu {
+            Section("Lọc thêm") {
+                ForEach(Self.moreFilters, id: \.self) { f in
+                    Button {
+                        filter = f
+                    } label: {
+                        if filter == f { Label("\(f.rawValue) (\(counts[f] ?? 0))", systemImage: "checkmark") }
+                        else { Text("\(f.rawValue) (\(counts[f] ?? 0))") }
                     }
                 }
             }
-            .padding(.horizontal, Theme.screenPadding)
+            if !platforms.isEmpty {
+                Section("Sàn") {
+                    Button { platform = "" } label: {
+                        if platform.isEmpty { Label("Tất cả sàn", systemImage: "checkmark") } else { Text("Tất cả sàn") }
+                    }
+                    ForEach(platforms, id: \.self) { p in
+                        Button { platform = p } label: {
+                            if platform == p { Label(p, systemImage: "checkmark") } else { Text(p) }
+                        }
+                    }
+                }
+            }
+        } label: {
+            VStack(spacing: 0) {
+                Image(systemName: hasExtraFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 17, weight: .semibold))
+                Text("Lọc").font(Theme.Typography.microBold)
+            }
+            .foregroundColor(hasExtraFilter ? .white : Theme.accent)
+            .frame(width: 52, height: 46)
+            .background(hasExtraFilter ? Theme.accent : Theme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.07), lineWidth: 0.7))
         }
+        .accessibilityLabel("Lọc thêm và lọc theo sàn")
     }
 
+    /// Dòng nhỏ báo đang lọc thêm (bấm ✕ để bỏ) — chỉ hiện khi có lọc phụ hoặc lọc sàn.
     private var activePlatformStrip: some View {
-        HStack(spacing: 8) {
-            Text("Đang lọc sàn:")
+        HStack(spacing: 6) {
+            Text("Đang lọc:")
                 .font(Theme.Typography.caption)
                 .foregroundStyle(.secondary)
-            PlatformBadge(platform: platform)
-            Spacer()
-            Button("Bỏ lọc") {
-                Haptics.tap()
-                platform = ""
+            if Self.moreFilters.contains(filter) {
+                removableChip(text: "\(filter.rawValue) (\(counts[filter] ?? 0))", color: filter.accentColor) { filter = .main }
             }
-            .font(Theme.Typography.captionBold)
-            .foregroundColor(Theme.accent)
+            if !platform.isEmpty {
+                removableChip(text: platform, color: Theme.platformColor(platform)) { platform = "" }
+            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.screenPadding)
+    }
+
+    private func removableChip(text: String, color: Color, remove: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.tap()
+            remove()
+        } label: {
+            HStack(spacing: 4) {
+                Text(text).font(Theme.Typography.captionBold).lineLimit(1)
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.14))
+            .foregroundColor(color == .secondary ? .primary : color)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Hàng đơn gọn 3 dòng

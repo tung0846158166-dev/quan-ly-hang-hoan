@@ -575,6 +575,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _searchActiveOrders = returnOrderProvider.GetReturnOrders(40);
             _searchArchivedOrders = archivedOrderProvider.GetArchivedOrders();
             _searchDeletedOrders = deletedOrderProvider.GetDeletedOrders();
+            HomeVm.SetArchivedForProducts(_searchArchivedOrders);
             HomeVm.LoadData(_searchActiveOrders, initialNow);
             WatchlistVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
             ComplaintsVm.LoadOrders(_searchActiveOrders, _searchArchivedOrders, initialNow);
@@ -1429,7 +1430,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         // Phần NẶNG (dựng dòng bảng, tính số liệu trang chủ) chạy song song ở luồng nền: nhiều nghìn/chục nghìn đơn cũng không làm đứng giao diện.
         // Luồng giao diện chỉ áp kết quả đã tính (nhanh).
-        var homeTask = Task.Run(() => HomeVm.Compute(returnOrders, now));
+        HomeVm.SetArchivedForProducts(archivedOrders);
+        var homeTask = Task.Run(() => HomeVm.Compute(returnOrders, now, archivedOrders));
         var shopeeRowsTask = Task.Run(() => ShopeeReturnVm.BuildRows(returnOrders, now));
         var cancelledRowsTask = Task.Run(() => ShopeeCancelledVm.BuildRows(returnOrders, now));
         var tiktokRowsTask = Task.Run(() => TikTokReturnVm.BuildRows(returnOrders, now));

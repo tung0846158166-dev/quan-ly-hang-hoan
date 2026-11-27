@@ -374,6 +374,40 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
     public const string ArrivedNo = "Chưa về shop";
     public IReadOnlyList<string> ArrivedOptions { get; } = [ArrivedAll, ArrivedYes, ArrivedNo];
     [ObservableProperty] private string _arrivedOption = ArrivedAll;
+    // ---- Bộ lọc gọn (chủ dự án 28/11/2026): MỘT ô chọn loại ngày + MỘT ô lịch chọn khoảng ngày
+    public const string DateByReturn = "Ngày hoàn / hủy";
+    public const string DateByArrived = "Giờ hàng về shop";
+    public const string DateByRecv = "Ngày nhận kho";
+    public IReadOnlyList<string> DateFieldOptions { get; } = [DateByReturn, DateByArrived, DateByRecv];
+    [ObservableProperty] private string _dateField = DateByReturn;
+    [ObservableProperty] private DateTime? _rangeFrom;
+    [ObservableProperty] private DateTime? _rangeTo;
+    partial void OnDateFieldChanged(string value) => ApplyDateRange();
+    partial void OnRangeFromChanged(DateTime? value) => ApplyDateRange();
+    partial void OnRangeToChanged(DateTime? value) => ApplyDateRange();
+
+    /// <summary>Đưa khoảng ngày vào đúng cột theo loại ngày đang chọn; hai cột còn lại bỏ lọc.</summary>
+    private void ApplyDateRange()
+    {
+        var was = _suppressFilterRefresh;
+        _suppressFilterRefresh = true;
+        try
+        {
+            DateFrom = DateField == DateByReturn ? RangeFrom : null;
+            DateTo = DateField == DateByReturn ? RangeTo : null;
+            ArrivedFrom = DateField == DateByArrived ? RangeFrom : null;
+            ArrivedTo = DateField == DateByArrived ? RangeTo : null;
+            RecvDateFrom = DateField == DateByRecv ? RangeFrom : null;
+            RecvDateTo = DateField == DateByRecv ? RangeTo : null;
+        }
+        finally { _suppressFilterRefresh = was; }
+        AdvancedFilterChanged();
+    }
+
+    /// <summary>Hai lựa chọn "đã về / chưa về shop" nằm chung ô Trạng thái kiện (bộ lọc gọn 28/11/2026).</summary>
+    public const string StatusArrivedYes = "📦 Đã về shop (có giờ hàng về)";
+    public const string StatusArrivedNo = "🚚 Chưa về shop";
+
     partial void OnArrivedFromChanged(DateTime? value) => AdvancedFilterChanged();
     partial void OnArrivedToChanged(DateTime? value) => AdvancedFilterChanged();
     partial void OnArrivedOptionChanged(string value) => AdvancedFilterChanged();
@@ -395,8 +429,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
             .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase).ToList();
         if (all.Any(c => c.Length == 0)) set.Add(EmptyPlatformStatus);
         var keep = PlatformStatusFilter;
-        if (PlatformStatusOptions.SequenceEqual([AllPlatformStatuses, .. set])) return;
-        PlatformStatusOptions = new ObservableCollection<string>([AllPlatformStatuses, .. set]);
+        if (PlatformStatusOptions.SequenceEqual([AllPlatformStatuses, StatusArrivedYes, StatusArrivedNo, .. set])) return;
+        PlatformStatusOptions = new ObservableCollection<string>([AllPlatformStatuses, StatusArrivedYes, StatusArrivedNo, .. set]);
         PlatformStatusFilter = PlatformStatusOptions.Contains(keep) ? keep : AllPlatformStatuses;
     }
     public IReadOnlyList<string> PhotoOptions { get; } = ["Ảnh: tất cả", "Có ảnh", "Chưa có ảnh"];
@@ -438,7 +472,9 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
     private bool MatchesAdvanced(ReturnOrderRowViewModel row)
     {
         if (CarrierFilter != AllCarriers && !row.Carrier.Equals(CarrierFilter, StringComparison.OrdinalIgnoreCase)) return false;
-        if (PlatformStatusFilter != AllPlatformStatuses)
+        if (PlatformStatusFilter == StatusArrivedYes) { if (row.ArrivedAtDate is null) return false; }
+        else if (PlatformStatusFilter == StatusArrivedNo) { if (row.ArrivedAtDate is not null) return false; }
+        else if (PlatformStatusFilter != AllPlatformStatuses)
         {
             var ps = row.PlatformStatus?.Trim() ?? string.Empty;
             if (PlatformStatusFilter == EmptyPlatformStatus ? ps.Length > 0 : !ps.Equals(PlatformStatusFilter, StringComparison.OrdinalIgnoreCase)) return false;
@@ -783,6 +819,9 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject, IPageVisib
             ArrivedFrom = null;
             ArrivedTo = null;
             ArrivedOption = ArrivedAll;
+            RangeFrom = null;
+            RangeTo = null;
+            DateField = DateByReturn;
             _colSortMember = null;
             SelectedSortOption = SortOptions[0];
         }

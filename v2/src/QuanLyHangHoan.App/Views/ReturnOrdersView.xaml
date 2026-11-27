@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:QuanLyHangHoan.App.ViewModels"
              xmlns:ctl="clr-namespace:QuanLyHangHoan.App.Controls"
+             xmlns:views="clr-namespace:QuanLyHangHoan.App.Views"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ReturnOrdersViewModel}"
              UseLayoutRounding="True"
@@ -338,21 +339,11 @@
                     <TextBlock Text="Trạng thái kiện:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <ComboBox ItemsSource="{Binding PlatformStatusOptions}" SelectedItem="{Binding PlatformStatusFilter}" Width="190" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
                     <ComboBox ItemsSource="{Binding PhotoOptions}" SelectedItem="{Binding PhotoOption}" Width="130" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,14,0" />
-                    <TextBlock Text="Ngày hoàn từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding DateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" />
-                    <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding DateTo}" Width="120" Height="30" FontSize="12" Margin="0,0,14,0" />
-                    <!-- lọc theo cột "Giờ hàng về shop" (chủ dự án 28/11/2026) -->
-                    <ComboBox ItemsSource="{Binding ArrivedOptions}" SelectedItem="{Binding ArrivedOption}" Width="125" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,8,0"
-                              ToolTip="Đã về shop = có giờ hàng về (hãng vận chuyển báo đã giao về shop); Chưa về shop = chưa có giờ hàng về" />
-                    <TextBlock Text="Hàng về shop từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding ArrivedFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" ToolTip="Lọc theo ngày ở cột Giờ hàng về shop (đơn chưa có giờ về sẽ bị ẩn)" />
-                    <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding ArrivedTo}" Width="120" Height="30" FontSize="12" Margin="0,0,14,0" ToolTip="Lọc theo ngày ở cột Giờ hàng về shop (đơn chưa có giờ về sẽ bị ẩn)" />
-                    <TextBlock Text="Nhận tại kho từ:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding RecvDateFrom}" Width="120" Height="30" FontSize="12" Margin="0,0,8,0" ToolTip="Lọc đơn theo ngày nhận tại kho (đơn chưa nhận sẽ bị ẩn)" />
-                    <TextBlock Text="đến:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
-                    <DatePicker SelectedDate="{Binding RecvDateTo}" Width="120" Height="30" FontSize="12" ToolTip="Lọc đơn theo ngày nhận tại kho (đơn chưa nhận sẽ bị ẩn)" />
+                    <!-- bộ lọc gọn (chủ dự án 28/11/2026): một ô chọn loại ngày + một ô lịch chọn khoảng ngày -->
+                    <TextBlock Text="Lọc ngày theo:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
+                    <ComboBox ItemsSource="{Binding DateFieldOptions}" SelectedItem="{Binding DateField}" Width="140" Height="30" VerticalContentAlignment="Center" FontSize="12" Margin="0,0,6,0"
+                              ToolTip="Chọn cột ngày để lọc: Ngày hoàn / hủy, Giờ hàng về shop hoặc Ngày nhận kho (đơn không có ngày đó sẽ bị ẩn)" />
+                    <views:DateRangePicker From="{Binding RangeFrom}" To="{Binding RangeTo}" Margin="0,0,14,0" />
                 </WrapPanel>
             </StackPanel>
         </Border>

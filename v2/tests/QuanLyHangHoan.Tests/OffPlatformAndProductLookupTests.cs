@@ -263,6 +263,47 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         Assert.Contains("(1)", vm.AdvancedFilterButtonText);
     }
 
+    // bộ lọc gọn (28/11/2026): một ô loại ngày + một ô lịch; "đã về / chưa về shop" nằm trong ô Trạng thái kiện
+    [Fact]
+    public void Compact_filter_one_date_box_and_arrival_inside_the_status_box()
+    {
+        Order A(string id, string arrived, string recv) { var o = O(id, "Áo", 1); o.ReturnedAt = arrived; o.RecvDate = recv; o.ReturnDate = "20/11/2026 08:00:00"; return o; }
+        var orders = new[] { A("a", "26/11/2026 09:00:00", "27/11/2026 09:00:00"), A("b", "", ""), A("c", "21/11/2026 09:00:00", "") };
+        var vm = new ReturnOrdersViewModel(new FakeDataService(() => Now), loadInitialData: false);
+        vm.LoadOrders(orders, Now);
+        Assert.Contains(ReturnOrdersViewModel.StatusArrivedYes, vm.PlatformStatusOptions);
+        vm.PlatformStatusFilter = ReturnOrdersViewModel.StatusArrivedNo;
+        Assert.Equal("b", Assert.Single(vm.VisibleOrders).Source.Id);
+        vm.PlatformStatusFilter = ReturnOrdersViewModel.StatusArrivedYes;
+        Assert.Equal(2, vm.VisibleOrders.Count);
+        vm.PlatformStatusFilter = ReturnOrdersViewModel.AllPlatformStatuses;
+        vm.DateField = ReturnOrdersViewModel.DateByArrived;
+        vm.RangeFrom = new DateTime(2026, 11, 25); vm.RangeTo = new DateTime(2026, 11, 27);
+        Assert.Equal("a", Assert.Single(vm.VisibleOrders).Source.Id);
+        vm.DateField = ReturnOrdersViewModel.DateByReturn;                       // cùng khoảng ngày, đổi sang ngày hoàn (20/11): không đơn nào
+        Assert.Empty(vm.VisibleOrders);
+        Assert.Null(vm.ArrivedFrom);
+        vm.DateField = ReturnOrdersViewModel.DateByRecv;
+        Assert.Equal("a", Assert.Single(vm.VisibleOrders).Source.Id);
+        Assert.Equal("📅 25/11 – 27/11/2026", QuanLyHangHoan.App.Views.DateRangePicker.Label(vm.RangeFrom, vm.RangeTo));
+    }
+
+    // chủ dự án 28/11/2026: "sản phẩm hoàn nhiều nhất" trang chủ = màn Thống kê (cả kho lưu trữ)
+    [Fact]
+    public void Home_top_products_count_archive_like_the_statistics_screen()
+    {
+        var active = new[] { O("1", "Áo A", 1) };
+        var archived = new[] { O("2", "Áo B", 5), O("3", "Áo B", 1) };
+        var home = new HomeViewModel(new FakeDataService(() => Now));
+        var c = home.Compute(active, Now, archived)!;
+        Assert.Equal("Áo B", c.Products[0].Name);
+        Assert.Equal(6, c.Products[0].Units);
+        var stats = new StatisticsViewModel(new FakeDataService(), new FakeDataService(), loadInitialData: false);
+        stats.LoadData(active, archived, Now);
+        Assert.Equal(stats.ProductRows[0].Name, c.Products[0].Name);
+        Assert.Equal(stats.ProductRows[0].Units, c.Products[0].Units);
+    }
+
     private const string ReceivedStatus = ReceiveStatus.Received;
 
     // ------------------------------------------------------------------ form tạo nhanh

@@ -68,6 +68,15 @@ public sealed partial class HomeViewModel : ObservableObject
     private readonly Action? _onNavigateLegacyImport;
 
     private IReadOnlyList<Order> _orders = [];
+    // "Sản phẩm hoàn nhiều nhất" tính trên bảng chính + KHO LƯU TRỮ, giống màn Thống kê (chủ dự án 28/11/2026: hai nơi lệch nhau
+    // vì đơn đã nhận tự vào lưu trữ). Danh sách lưu trữ do MainViewModel đưa vào.
+    private IReadOnlyList<Order> _archivedForProducts = [];
+    public void SetArchivedForProducts(IReadOnlyList<Order> archived) => _archivedForProducts = archived;
+    private IReadOnlyList<Order> ProductSource(IReadOnlyList<Order> active, IReadOnlyList<Order>? archived = null)
+    {
+        var a = archived ?? _archivedForProducts;
+        return a.Count == 0 ? active : active.Concat(a).ToList();
+    }
     private DateTime _snapshotTime;
 
     public HomeViewModel(
@@ -150,7 +159,7 @@ public sealed partial class HomeViewModel : ObservableObject
         OnPropertyChanged(nameof(ProductPeriodLabel));
         OnPropertyChanged(nameof(IsPeriodDay)); OnPropertyChanged(nameof(IsPeriodWeek)); OnPropertyChanged(nameof(IsPeriodMonth));
         OnPropertyChanged(nameof(IsPeriod7)); OnPropertyChanged(nameof(IsPeriod30)); OnPropertyChanged(nameof(IsPeriodAll));
-        BuildTopProducts(_orders);
+        BuildTopProducts(ProductSource(_orders));
     }
 
     public bool IsPeriodDay => ProductPeriod == "day";
@@ -218,10 +227,10 @@ public sealed partial class HomeViewModel : ObservableObject
         IReadOnlyList<UrgentOrderItem> Urgent, IReadOnlyList<HomeProductItem> Products, string ProductText);
 
     /// <summary>Tính mọi số liệu trang chủ KHÔNG đụng giao diện (gọi được từ luồng nền). Danh sách rỗng trả null (dùng <see cref="LoadData"/>).</summary>
-    public HomeComputed? Compute(IReadOnlyList<Order> orders, DateTime now)
+    public HomeComputed? Compute(IReadOnlyList<Order> orders, DateTime now, IReadOnlyList<Order>? archived = null)
     {
         if (orders.Count == 0) return null;
-        var (items, text) = ComputeTopProducts(orders, now);
+        var (items, text) = ComputeTopProducts(ProductSource(orders, archived), now);
         return new HomeComputed(orders, now,
             ComputeKpi("Tổng toàn shop", orders, now),
             ComputeKpi(PlatformNames.Shopee, orders.Where(o => o.Platform.Equals(PlatformNames.Shopee, StringComparison.OrdinalIgnoreCase)).ToList(), now),
@@ -398,7 +407,7 @@ public sealed partial class HomeViewModel : ObservableObject
             OrderTypeBars = Array.Empty<OrderTypeBarItem>();
             TopReasons = Array.Empty<ReasonBarItem>();
             UrgentItems = Array.Empty<UrgentOrderItem>();
-            BuildTopProducts(orders);
+            BuildTopProducts(ProductSource(orders));
             return;
         }
 
@@ -410,7 +419,7 @@ public sealed partial class HomeViewModel : ObservableObject
         OrderTypeBars = BuildOrderTypeBars(orders);
         TopReasons = BuildTopReasons(orders, topN: 5);
         UrgentItems = BuildUrgentItems(orders, now);
-        BuildTopProducts(orders);
+        BuildTopProducts(ProductSource(orders));
     }
 
     public string BuildCsvSummary()

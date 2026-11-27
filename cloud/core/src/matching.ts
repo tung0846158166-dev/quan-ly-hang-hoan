@@ -108,6 +108,18 @@ export function findAllMatchIndexes(orders: readonly MatchParcel[], incoming: Ma
  * Shopee (quyết định 26/11/2026, = ParcelMatching.FindShopeeTracklessSameOrderIndexes): kiện mới CÓ mã vận đơn, KHÔNG có mã yêu cầu trả;
  * các kiện Shopee cùng mã đơn chưa có mã vận đơn nào và không có mã yêu cầu trả. Đúng một -> điền; từ hai trở lên -> nhập nhằng.
  */
+/**
+ * Chủ dự án 28/11/2026 (ảnh 31, = ParcelMatching.IsCodelessShopeeOfKnownOrder): dòng Shopee KHÔNG có mã nào (không mã vận đơn, không mã yêu cầu
+ * trả — vd Google Sheet "Chưa gửi") mà đơn đó ĐÃ có kiện thì KHÔNG tạo kiện mới (trước đây tạo bản trùng "Chưa có MVĐ").
+ */
+export function isCodelessShopeeOfKnownOrder(known: readonly MatchParcel[], incoming: MatchParcel): boolean {
+  if (incoming.platform !== "Shopee" || returnParcelId(incoming)) return false;
+  if (clean(first(incoming.returnTrack, incoming.track, incoming.forwardTrack, incoming.altTrack))) return false;
+  if ((incoming.trackingCodes ?? []).some((c) => clean(c))) return false;
+  const oid = up(incoming.orderId);
+  return !!oid && known.some((o) => up(o.orderId) === oid && o.platform === "Shopee");
+}
+
 export function findShopeeTracklessSameOrderIndexes(orders: readonly MatchParcel[], incoming: MatchParcel): number[] {
   if (incoming.platform !== "Shopee" || returnParcelId(incoming)) return [];
   if (!clean(first(incoming.returnTrack, incoming.track, incoming.forwardTrack))) return [];

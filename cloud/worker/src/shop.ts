@@ -164,6 +164,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "GET" && path === "/ai/digests") return this.listDigests(url);
     if (m === "POST" && path === "/admin/ai-digest") { this.requireOwner(dev); return json(await this.runDigest()); }
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
+    if (m === "POST" && path === "/admin/dedupe-codeless") return this.dedupeCodeless(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     if (m === "PUT" && path === "/admin/ai-config") { this.requireOwner(dev); return this.putAiConfig(await this.body(req)); }
     if (path.startsWith("/admin/transfer/")) { this.requireOwner(dev); return this.transfer(req, url, path.slice("/admin/transfer/".length)); }
@@ -793,6 +794,41 @@ export class ShopDO extends DurableObject<Env> {
    * Dùng khi Sheet lỡ nạp lên cloud TRƯỚC khi chuyển dữ liệu cũ (tránh tạo bản trùng). Kiện đã bị đụng vào thì giữ nguyên và báo lại.
    * Bắt buộc confirm = "XOA_KIEN_SHEET_CHUA_DUNG"; dryRun = true chỉ đếm.
    */
+  /**
+   * Chỉ chủ cửa hàng (28/11/2026, ảnh 31). Dọn bản TRÙNG "Chưa có MVĐ": kiện Shopee KHÔNG có mã nào (không mã vận đơn, không mã yêu cầu trả)
+   * trong khi cùng mã đơn đã có kiện khác CÓ mã. Chỉ dọn kiện CHƯA ai đụng (không quét, không ảnh, không sửa/nhật ký, chưa nhận, không theo dõi,
+   * không khiếu nại, không ghi chú). Xóa MỀM (vào "Đã xóa", khôi phục được), ghi nhật ký "dedupe". Bắt buộc confirm = "DON_KIEN_TRUNG_KHONG_MA";
+   * dryRun = true chỉ đếm và trả danh sách mã đơn.
+   */
+  private async dedupeCodeless(b: Record<string, unknown>, dev: Device): Promise<Response> {
+    this.requireOwner(dev);
+    if (b.confirm !== "DON_KIEN_TRUNG_KHONG_MA") return fail(422, "invalid", "Thiếu xác nhận.");
+    const dryRun = b.dryRun === true;
+    const all = this.db.all<Row>("SELECT id, data FROM parcels WHERE is_deleted = 0").map((r) => JSON.parse(r.data as string) as Parcel);
+    const hasCode = (p: Parcel) => [p.track, p.returnTrack, p.altTrack, p.forwardTrack, p.returnOrderId, ...(p.trackingCodes ?? [])]
+      .some((c) => normalizeForLookup(c ?? "").length > 0);
+    const coded = new Set(all.filter(hasCode).map((p) => normalizeForLookup(p.orderId)).filter((k) => k.length > 0));
+    const touched = (id: string) => !!this.db.first<Row>(
+      "SELECT 1 AS x WHERE EXISTS(SELECT 1 FROM scans WHERE parcel_id = ?) OR EXISTS(SELECT 1 FROM photos WHERE parcel_id = ?) OR EXISTS(SELECT 1 FROM audit_log WHERE parcel_id = ?)",
+      id, id, id);
+    const targets = all.filter((p) => p.platform === "Shopee" && !hasCode(p) && coded.has(normalizeForLookup(p.orderId))
+      && p.status === "Chưa trả" && !p.isWatchlist && !p.userNote && !p.photoId
+      && !(p as unknown as { complaintStatus?: string }).complaintStatus && !touched(p.id));
+    if (!dryRun && targets.length) {
+      this.ctx.storage.transactionSync(() => {
+        const at = vnTime(Date.now());
+        for (const p of targets) {
+          const was = p.isArchived ? "Kho lưu trữ" : "Bảng chính";
+          p.isDeleted = true; p.deletedAt = at; p.deletedFrom = was;
+          this.writeParcel(p);
+          this.audit(dev.deviceId, "dedupe", p.id, {}, { isDeleted: true, reason: "Trùng: đơn đã có kiện có mã vận đơn" });
+        }
+      });
+      this.broadcast();
+    }
+    return json({ dryRun, removed: dryRun ? 0 : targets.length, wouldRemove: targets.length, orderIds: targets.map((p) => p.orderId).slice(0, 300) });
+  }
+
   private async purgeFreshSheet(b: Record<string, unknown>, dev: Device): Promise<Response> {
     this.requireOwner(dev);
     if (b.confirm !== "XOA_KIEN_SHEET_CHUA_DUNG") return fail(422, "invalid", "Thiếu xác nhận.");

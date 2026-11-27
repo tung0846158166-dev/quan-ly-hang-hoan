@@ -5,7 +5,7 @@
  * không đụng trường kho nhập tay (trạng thái nhận, ngày nhận, giờ về do quét, ảnh, ghi chú của tôi, theo dõi).
  * Kiểm chứng: cloud/golden/merge-vectors.json do CHÍNH bản C# sinh ra.
  */
-import { cleanTrackingCode, findAllMatchIndexes, findShopeeTracklessSameOrderIndexes, findTracklessSameOrderIndex, isSameReturnParcel } from "./matching";
+import { cleanTrackingCode, findAllMatchIndexes, findShopeeTracklessSameOrderIndexes, findTracklessSameOrderIndex, isCodelessShopeeOfKnownOrder, isSameReturnParcel } from "./matching";
 
 export interface MItem {
   product: string; color: string; size: string; qty: number; returnedQty: number;
@@ -46,6 +46,8 @@ export interface AmbiguousParcel { platform: string; orderId: string; track: str
 export interface MergeOutcome {
   added: MOrder[]; updated: MOrder[]; enrichedArchived: MOrder[]; ambiguous: AmbiguousParcel[];
   skippedArchivedUnchanged: number; skippedDeleted: number; enriched: number;
+  /** Dòng Shopee không có mã nào của đơn đã có kiện: bỏ qua, không tạo bản trùng (28/11/2026). */
+  skippedCodeless?: number;
 }
 export type ProductMode = "supplement" | "replace";
 
@@ -472,7 +474,7 @@ function enrichArchived(others: readonly OtherEntry[], incoming: MOrder): { entr
  */
 export function applyImport(main: MOrder[], others: readonly OtherEntry[], parcels: readonly Incoming[], mode: ProductMode,
   today: string, year: number, newId: () => string, kind: NewRowKind = "shopee"): MergeOutcome {
-  const out: MergeOutcome = { added: [], updated: [], enrichedArchived: [], ambiguous: [], skippedArchivedUnchanged: 0, skippedDeleted: 0, enriched: 0 };
+  const out: MergeOutcome = { added: [], updated: [], enrichedArchived: [], ambiguous: [], skippedArchivedUnchanged: 0, skippedDeleted: 0, enriched: 0, skippedCodeless: 0 };
   const index = buildIndex(others);
   for (const raw of parcels) {
     const incoming = toOrder(raw, "");
@@ -529,6 +531,7 @@ export function applyImport(main: MOrder[], others: readonly OtherEntry[], parce
       if (r.changed && r.entry) out.enrichedArchived.push(r.entry); else out.skippedArchivedUnchanged++;
       continue;
     }
+    if (isCodelessShopeeOfKnownOrder([...main, ...others.map((e) => e.order)], incoming)) { out.skippedCodeless = (out.skippedCodeless ?? 0) + 1; continue; }
     const row = newRow(raw, today, newId(), kind);
     main.push(row);
     out.added.push(row);

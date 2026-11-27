@@ -19,6 +19,8 @@ public sealed class MergeOutcome
     /// <summary>Đơn ở kho lưu trữ được làm giàu thông tin (không tạo dòng mới, không đụng trạng thái nhận/ảnh).</summary>
     public List<Order> EnrichedArchived { get; } = new();
     public int SkippedArchivedUnchanged { get; set; }
+    /// <summary>Dòng Shopee không có mã nào của đơn đã có kiện: bỏ qua, không tạo bản trùng (28/11/2026).</summary>
+    public int SkippedCodeless { get; set; }
     public int SkippedDeleted { get; set; }
     /// <summary>v2 KHÁC app cũ: khớp NHIỀU kiện thì báo và không đổi gì (app cũ tạo thêm một dòng mới rồi dọn trùng sau).</summary>
     public List<AmbiguousParcel> Ambiguous { get; } = new();
@@ -216,6 +218,8 @@ public static class TikTokMerger
                 if (changed && entry is not null) outcome.EnrichedArchived.Add(entry); else outcome.SkippedArchivedUnchanged++;
                 continue;
             }
+
+            if (ParcelMatching.IsCodelessShopeeOfKnownOrder(main.Concat(others.Select(e => e.Order)), incoming)) { outcome.SkippedCodeless++; continue; }
 
             var row = ParcelMerge.NewRow(raw, today, forNewRow);
             main.Add(row);

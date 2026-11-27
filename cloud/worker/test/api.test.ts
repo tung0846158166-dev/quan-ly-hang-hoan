@@ -476,6 +476,31 @@ describe("nhập từ Google Sheet (cloud tự đối chiếu, cùng bộ gộp 
     expect(ps[0]).toMatchObject({ id: "p1", track: "SPXVN000000777" });
   });
 
+  // chủ dự án 28/11/2026 (ảnh 31): Sheet gửi dòng Shopee "Chưa gửi" KHÔNG có mã cho đơn đã có kiện -> không tạo bản trùng; bản trùng cũ dọn được
+  it("dòng không mã của đơn đã có kiện không tạo bản trùng; chủ shop dọn bản trùng cũ chưa ai đụng (xóa mềm)", async () => {
+    await importParcels([
+      parcel("p1", { orderId: "SPD1", track: "SPXVN000000501B", forwardTrack: "SPXVN000000501B", platform: "Shopee", platformStatus: "Đang về" }),
+      parcel("d1", { orderId: "SPD1", track: "", platform: "Shopee", platformStatus: "Chưa gửi" }),        // bản trùng cũ
+      parcel("p2", { orderId: "SPD2", track: "SPXVN000000502B", platform: "Shopee" }),
+      parcel("d2", { orderId: "SPD2", track: "", platform: "Shopee", userNote: "đã gọi" }),                // có ghi chú: giữ
+      parcel("d3", { orderId: "SPD3", track: "", platform: "Shopee" }),                                    // đơn chỉ có dòng chờ: giữ
+    ]);
+    const r = await sendSheet([sheetParcel({ orderId: "SPD1", returnOrderId: "", track: "" }), sheetParcel({ orderId: "SPD4", returnOrderId: "", track: "" })]);
+    expect(r.data).toMatchObject({ added: 1 });                                                            // chỉ SPD4 (đơn mới)
+    const body = { confirm: "DON_KIEN_TRUNG_KHONG_MA" };
+    expect((await call("POST", "/admin/dedupe-codeless", body, phoneA)).status).toBe(403);
+    expect((await call("POST", "/admin/dedupe-codeless", {}, owner)).status).toBe(422);
+    const dry = await call("POST", "/admin/dedupe-codeless", { ...body, dryRun: true }, owner);
+    expect(dry.data).toMatchObject({ dryRun: true, removed: 0, wouldRemove: 1, orderIds: ["SPD1"] });
+    const done = await call("POST", "/admin/dedupe-codeless", body, owner);
+    expect(done.data).toMatchObject({ removed: 1 });
+    const left = (await all()).filter((p) => !p.isDeleted).map((p) => p.id).sort();
+    expect(left).toEqual(expect.arrayContaining(["p1", "p2", "d2", "d3"]));
+    expect(left).not.toContain("d1");
+    const d1 = (await all()).find((p) => p.id === "d1");
+    expect(d1).toMatchObject({ isDeleted: true, deletedFrom: "Bảng chính" });                                // xóa mềm: khôi phục được
+  });
+
   it("chủ shop xóa hẳn kiện Sheet CHƯA ai đụng; kiện đã quét/sửa/dữ liệu cũ giữ nguyên; nhân viên không làm được", async () => {
     await importParcels([parcel("p1")]);                               // dữ liệu cũ (không phải s_)
     await sendSheet([

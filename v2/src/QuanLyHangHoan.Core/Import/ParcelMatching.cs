@@ -85,6 +85,19 @@ public static class ParcelMatching
     /// Shopee (quyết định 26/11/2026): kiện mới CÓ mã vận đơn, KHÔNG có mã yêu cầu trả; các kiện Shopee cùng mã đơn chưa có mã vận đơn nào và
     /// cũng không có mã yêu cầu trả. Đúng một -> điền mã vào kiện đó; từ hai trở lên -> nhập nhằng (không đoán).
     /// </summary>
+    /// <summary>
+    /// Chủ dự án 28/11/2026 (ảnh 31): dòng Shopee KHÔNG có mã nào (không mã vận đơn, không mã yêu cầu trả — vd Google Sheet "Chưa gửi")
+    /// mà đơn đó ĐÃ có kiện thì KHÔNG tạo kiện mới (trước đây tạo thành bản trùng "Chưa có MVĐ"). Dòng chờ chỉ tạo khi đơn chưa có kiện nào.
+    /// </summary>
+    public static bool IsCodelessShopeeOfKnownOrder(IEnumerable<Order> known, Order incoming)
+    {
+        if (incoming.Platform != "Shopee" || ReturnParcelId(incoming).Length > 0) return false;
+        if (Clean(First(incoming.ReturnTrack, incoming.Track, incoming.ForwardTrack, incoming.AltTrack)).Length > 0) return false;
+        if (incoming.TrackingCodes.Any(c => Clean(c).Length > 0)) return false;
+        var oid = Up(incoming.OrderId);
+        return oid.Length > 0 && known.Any(o => Up(o.OrderId) == oid && o.Platform == "Shopee");
+    }
+
     public static IReadOnlyList<int> FindShopeeTracklessSameOrderIndexes(IReadOnlyList<Order> orders, Order incoming)
     {
         if (incoming.Platform != "Shopee" || ReturnParcelId(incoming).Length > 0) return Array.Empty<int>();

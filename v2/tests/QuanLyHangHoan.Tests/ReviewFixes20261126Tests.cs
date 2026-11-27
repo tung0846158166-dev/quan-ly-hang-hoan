@@ -45,6 +45,31 @@ public sealed class ReviewFixes20261126Tests : IDisposable
         Assert.Equal(2, main.Count);
     }
 
+    // chủ dự án 28/11/2026 (ảnh 31): Sheet gửi dòng Shopee "Chưa gửi" không có mã nào cho đơn ĐÃ có kiện -> trước đây tạo bản trùng "Chưa có MVĐ"
+    [Fact]
+    public void Codeless_shopee_row_of_an_order_that_already_has_a_parcel_does_not_create_a_duplicate()
+    {
+        var existing = new Order { Id = "a", OrderId = "SPO1", Platform = "Shopee", Track = "SPXVN0000000001B", ForwardTrack = "SPXVN0000000001B", PlatformStatus = "Đang về", Items = { new OrderItem { Product = "Áo", Qty = 1 } } };
+        var main = new List<Order> { existing };
+        ImportedParcel Codeless(string oid) => new() { Platform = "Shopee", OrderId = oid, OrderType = "Trả hàng/Hoàn tiền", PlatformStatus = "Chưa gửi", Items = new() { new ImportedItem { Product = "Áo", Qty = 1 } } };
+        var r = TikTokMerger.Apply(main, new List<OtherEntry>(), new[] { Codeless("SPO1") }, ImportProductMode.Supplement, Now, ShopeeMapper.ForNewRow);
+        Assert.Single(main);
+        Assert.Empty(r.Added);
+        Assert.Equal(1, r.SkippedCodeless);
+        Assert.Equal("Đang về", existing.PlatformStatus);                  // không bị dòng "Chưa gửi" ghi đè
+        // đơn chỉ có kiện đã lưu trữ: cũng không tạo bản trùng
+        var arch = new List<OtherEntry> { new(new Order { Id = "z", OrderId = "SPO2", Platform = "Shopee", Track = "SPXVN0000000002B", Items = { new OrderItem { Product = "Áo", Qty = 1 } } }, OtherWhere.Archive) };
+        var r2 = TikTokMerger.Apply(main, arch, new[] { Codeless("SPO2") }, ImportProductMode.Supplement, Now, ShopeeMapper.ForNewRow);
+        Assert.Empty(r2.Added);
+        // đơn CHƯA có kiện nào: vẫn tạo dòng chờ như cũ; sau đó có mã thì điền vào chính dòng đó
+        var r3 = TikTokMerger.Apply(main, new List<OtherEntry>(), new[] { Codeless("SPO3") }, ImportProductMode.Supplement, Now, ShopeeMapper.ForNewRow);
+        Assert.Single(r3.Added);
+        var tracked = Codeless("SPO3"); tracked.Track = "SPXVN0000000003"; tracked.ReturnTrack = "SPXVN0000000003"; tracked.TrackingCodes = new() { "SPXVN0000000003" };
+        var r4 = TikTokMerger.Apply(main, new List<OtherEntry>(), new[] { tracked }, ImportProductMode.Supplement, Now, ShopeeMapper.ForNewRow);
+        Assert.Empty(r4.Added);
+        Assert.Equal(2, main.Count);                                       // SPO1 + SPO3 (đã điền mã), không thêm dòng
+    }
+
     [Theory]
     // quyết định chủ dự án 26/11/2026: đơn "Hủy sau chuẩn bị" có hàng về -> có mã vận đơn thì chờ nhận (máy tính phải LƯU trạng thái này để đẩy lên cloud)
     [InlineData("Không cần nhận", "Đơn hủy", true, "Chưa trả")]

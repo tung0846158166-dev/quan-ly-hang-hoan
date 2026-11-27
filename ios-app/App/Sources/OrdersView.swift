@@ -308,6 +308,9 @@ struct OrdersView: View {
             NavigationLink { OffPlatformView() } label: {
                 tableTile(icon: "storefront.fill", title: "Ngoài sàn", count: offPlatformPending, color: Theme.success)
             }
+            NavigationLink { ReceivedStockView() } label: {
+                tableTile(icon: "archivebox.fill", title: "Sẵn kho", count: nil, color: Theme.teal)
+            }
             NavigationLink { ProductStatsView() } label: {
                 tableTile(icon: "tshirt.fill", title: "Sản phẩm", count: nil, color: Theme.accent)
             }

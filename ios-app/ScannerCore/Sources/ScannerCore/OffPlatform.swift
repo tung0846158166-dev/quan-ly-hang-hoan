@@ -267,3 +267,60 @@ extension ProductMetrics {
         return Array(items.prefix(max(1, limit)))
     }
 }
+
+// MARK: - Hàng hoàn sẵn kho (chủ dự án 27/11/2026)
+
+/// Một dòng hàng sẵn kho: sản phẩm + màu + size, tổng số cái, các kiện chứa nó (mới nhận trước).
+public struct ReceivedStockItem: Identifiable, Equatable {
+    public var key: String
+    public var product: String
+    public var color: String
+    public var size: String
+    public var units: Int
+    public var lastReceived: Date
+    /// (kiện, số cái, lúc nhận) — mới nhận trước.
+    public var parcels: [ReceivedStockParcel]
+    public var id: String { key }
+}
+
+public struct ReceivedStockParcel: Equatable, Identifiable {
+    public var row: OrderRow
+    public var units: Int
+    public var receivedAt: Date
+    public var id: String { row.id }
+}
+
+public enum ReceivedStock {
+    /// Sản phẩm của các kiện hoàn ĐÃ NHẬN tại kho từ `since`, gom theo sản phẩm + màu + size. Có đơn mới trùng sản phẩm thì lấy luôn
+    /// hàng hoàn đóng đơn, khỏi cất kệ. Tìm theo tên, màu, size (không dấu cũng được).
+    public static func build(rows: [OrderRow], since: Date, query: String = "", calendar: Calendar = ProductMetrics.vietnamCalendar) -> [ReceivedStockItem] {
+        let terms = ProductCatalog.terms(query)
+        var map: [String: ReceivedStockItem] = [:]
+        for r in rows where r.rv {
+            guard let at = OrderStats.parseDate(r.rcd, calendar: calendar), at >= since else { continue }
+            let lines = ProductMetrics.productLines(for: r)
+            let unitsPer = lines.count == 1 ? max(1, r.q) : 1
+            for l in lines where l.isReturned {
+                let name = ProductMetrics.clean(l.name)
+                if ProductMetrics.isUnknownProduct(name) { continue }
+                let nk = ProductMetrics.groupKey(name), ck = ProductMetrics.groupKey(l.color), sk = ProductMetrics.groupKey(l.size)
+                if nk.isEmpty { continue }
+                if !terms.isEmpty && !terms.allSatisfy({ (nk + ck + "|" + sk).contains($0) }) { continue }
+                let key = "\(nk)|\(ck)|\(sk)"
+                var item = map[key] ?? ReceivedStockItem(key: key, product: name, color: ProductMetrics.clean(l.color), size: ProductMetrics.clean(l.size),
+                                                         units: 0, lastReceived: at, parcels: [])
+                item.units += unitsPer
+                if let i = item.parcels.firstIndex(where: { $0.row.id == r.id }) { item.parcels[i].units += unitsPer }
+                else { item.parcels.append(ReceivedStockParcel(row: r, units: unitsPer, receivedAt: at)) }
+                if at > item.lastReceived { item.lastReceived = at }
+                map[key] = item
+            }
+        }
+        return map.values.map { var x = $0; x.parcels.sort { $0.receivedAt > $1.receivedAt }; return x }
+            .sorted { a, b in
+                if a.product.lowercased() != b.product.lowercased() { return a.product.lowercased() < b.product.lowercased() }
+                if a.color != b.color { return a.color < b.color }
+                return a.size < b.size
+            }
+    }
+}

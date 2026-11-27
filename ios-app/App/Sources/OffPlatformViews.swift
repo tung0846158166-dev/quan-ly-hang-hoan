@@ -460,3 +460,93 @@ struct ProductLookupCard: View {
             .foregroundColor(strong ? .primary : .secondary)
     }
 }
+
+/// HÀNG HOÀN SẴN KHO (chủ dự án 27/11/2026): sản phẩm của các kiện hoàn đã nhận tại kho gần đây. Có đơn mới trùng sản phẩm thì
+/// tra ở đây, lấy luôn hàng hoàn đóng đơn, khỏi cất lên kệ. Bấm một dòng để xem kiện mới nhận nhất.
+struct ReceivedStockView: View {
+    @EnvironmentObject var store: SnapshotStore
+    private enum Range: String, CaseIterable { case today = "Hôm nay", d3 = "3 ngày", d7 = "7 ngày", d30 = "30 ngày" }
+    @State private var range: Range = .d3
+    @State private var query = ""
+    @State private var items: [ReceivedStockItem] = []
+    @State private var selected: OrderRow?
+
+    private var since: Date {
+        let cal = ProductMetrics.vietnamCalendar
+        let today = cal.startOfDay(for: Date())
+        let back: Int
+        switch range { case .today: back = 0; case .d3: back = 2; case .d7: back = 6; case .d30: back = 29 }
+        return cal.date(byAdding: .day, value: -back, to: today) ?? today
+    }
+    private var token: String { "\(range.rawValue)|\(query)|\(store.revision)|\(store.rows.count)" }
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Picker("", selection: $range) {
+                ForEach(Range.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 14)
+            .padding(.top, 6)
+
+            Text(items.isEmpty ? "Chưa có hàng hoàn khớp, nhận tại kho \(range.rawValue.lowercased())."
+                               : "\(items.count) mẫu • \(items.reduce(0) { $0 + $1.units }) cái đã nhận tại kho \(range.rawValue.lowercased())")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+
+            List(items) { it in
+                Button {
+                    Haptics.tap()
+                    selected = it.parcels.first?.row
+                } label: {
+                    card(it)
+                }
+                .buttonStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+        .background(Theme.pageBackground.ignoresSafeArea())
+        .searchable(text: $query, prompt: "Tên sản phẩm, màu, size (vd: ao thun den L)")
+        .navigationTitle("Hàng hoàn sẵn kho")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $selected) { DetailView(row: $0) }
+        .task(id: token) {
+            if !query.isEmpty { try? await Task.sleep(nanoseconds: 150_000_000); guard !Task.isCancelled else { return } }
+            let rows = store.rows, s = since, q = query
+            let found = await Task.detached(priority: .userInitiated) { ReceivedStock.build(rows: rows, since: s, query: q) }.value
+            guard !Task.isCancelled else { return }
+            items = found
+        }
+    }
+
+    private func card(_ it: ReceivedStockItem) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(it.product).font(Theme.Typography.primaryBold).foregroundColor(.primary).lineLimit(2)
+                HStack(spacing: 6) {
+                    if !it.color.isEmpty { StatusPill(text: it.color, color: Theme.info) }
+                    if !it.size.isEmpty { StatusPill(text: "Size \(it.size)", color: Theme.purple) }
+                }
+                Text(it.parcels.prefix(3).map { p in "\(p.row.c)\(p.units > 1 ? " ×\(p.units)" : "")" }.joined(separator: " · ")
+                     + (it.parcels.count > 3 ? " · +\(it.parcels.count - 3) kiện" : ""))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text("Nhận gần nhất \(OrderRow.formatDisplayDate(it.lastReceived, includeTime: true))")
+                    .font(Theme.Typography.micro).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            VStack(spacing: 0) {
+                Text("\(it.units)").font(Theme.Typography.heroNumber).foregroundColor(Theme.success).monospacedDigit()
+                Text("cái").font(Theme.Typography.micro).foregroundStyle(.secondary)
+            }
+        }
+        .card(padding: 12, radius: 16)
+    }
+}

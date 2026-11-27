@@ -83,3 +83,23 @@ final class OffPlatformTests: XCTestCase {
         XCTAssertEqual(ProductMetrics.weekStart(now, calendar: cal), cal.date(from: DateComponents(year: 2026, month: 11, day: 23))!)
     }
 }
+
+extension OffPlatformTests {
+    func testReceivedStockGroupsRecentReceivedItemsNewestFirst() {
+        let rows = [
+            row("a", "Áo thun", qty: 2, color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 09:00:00"),
+            row("b", "ao thun", color: "đen", size: "L", status: "Hàng đã trả", recv: "25/11/2026 09:00:00"),
+            row("c", "Áo thun", color: "Đen", size: "M", status: "Hàng đã trả", recv: "26/11/2026 09:00:00"),
+            row("d", "Áo thun", qty: 4, color: "Đen", size: "L", status: "Hàng đã trả", recv: "20/11/2026 09:00:00"),
+            row("e", "Áo thun", qty: 5, color: "Đen", size: "L", recv: "27/11/2026 09:00:00"),
+        ]
+        let since = cal.date(from: DateComponents(year: 2026, month: 11, day: 25))!
+        let items = ReceivedStock.build(rows: rows, since: since, calendar: cal)
+        XCTAssertEqual(items.count, 2)
+        let l = items.first { $0.size == "L" }!
+        XCTAssertEqual(l.units, 3)
+        XCTAssertEqual(l.parcels.map { $0.row.c }, ["Ta", "Tb"])
+        XCTAssertEqual(ReceivedStock.build(rows: rows, since: since, query: "ao den l", calendar: cal).map { $0.size }, ["L"])
+        XCTAssertTrue(ReceivedStock.build(rows: rows, since: since, query: "quan", calendar: cal).isEmpty)
+    }
+}

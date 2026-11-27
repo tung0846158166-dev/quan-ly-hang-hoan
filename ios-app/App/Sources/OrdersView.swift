@@ -44,6 +44,7 @@ struct OrdersView: View {
     @State private var returnWatchActive = 0
     @State private var cancelledPending = 0
     @State private var afterPrepPending = 0
+    @State private var offPlatformPending = 0
     @State private var productCount = 0
     @State private var listNowMs = Int(Date().timeIntervalSince1970 * 1000)
 
@@ -58,6 +59,7 @@ struct OrdersView: View {
         var returnWatchActive: Int
         var cancelledPending: Int
         var afterPrepPending: Int
+        var offPlatformPending: Int
         var productCount: Int
     }
 
@@ -126,7 +128,9 @@ struct OrdersView: View {
         var rwActive = 0
         var cxlPending = 0
         var prepPending = 0
+        var offPending = 0
         for r in rows {
+            if r.k == "m" && !r.rv && OffPlatform.isOffPlatform(r) { offPending += 1 }
             let p = DashboardMetrics.normalizedPlatform(r.p)
             if !p.isEmpty && p != "Khác" { platSet.insert(p) }
             if r.inReturnWatch && r.returnWatchStage < 4 { rwActive += 1 }
@@ -139,6 +143,7 @@ struct OrdersView: View {
             returnWatchActive: rwActive,
             cancelledPending: cxlPending,
             afterPrepPending: prepPending,
+            offPlatformPending: offPending,
             productCount: prodCount
         )
     }
@@ -226,6 +231,7 @@ struct OrdersView: View {
                 returnWatchActive = summary.returnWatchActive
                 cancelledPending = summary.cancelledPending
                 afterPrepPending = summary.afterPrepPending
+                offPlatformPending = summary.offPlatformPending
                 productCount = summary.productCount
             }
             // Lọc 5.000 đơn trên luồng nền + debounce nhẹ khi gõ tìm kiếm để cuộn/gõ mượt 60fps.
@@ -317,6 +323,12 @@ struct OrdersView: View {
 
                 NavigationLink { CancelAfterPrepView() } label: {
                     shortcutChip(icon: "shippingbox.fill", title: "Sau CB", count: afterPrepPending, color: Theme.purple)
+                }
+                .buttonStyle(.plain)
+
+                // Đơn ngoài sàn (27/11/2026): bảng riêng + tạo nhanh
+                NavigationLink { OffPlatformView() } label: {
+                    shortcutChip(icon: "storefront.fill", title: "Ngoài sàn", count: offPlatformPending, color: Theme.success, alwaysTint: true)
                 }
                 .buttonStyle(.plain)
             }

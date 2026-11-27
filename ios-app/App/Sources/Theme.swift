@@ -75,6 +75,7 @@ enum Theme {
         case "Shopee": return accent
         case "TikTok": return Color(.label)
         case "Lazada": return info
+        case "Ngoài sàn": return success
         default: return .secondary
         }
     }

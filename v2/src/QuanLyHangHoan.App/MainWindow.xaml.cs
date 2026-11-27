@@ -84,6 +84,16 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Ctrl+N: tạo đơn ở bảng đang mở (Bảng đơn mới / Đơn ngoài sàn)
+        if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control
+            && vm.CurrentPage is ViewModels.ReturnOrdersViewModel { ShowCreateButton: true } table
+            && table.CreateNewOrderCommand.CanExecute(null))
+        {
+            e.Handled = true;
+            table.CreateNewOrderCommand.Execute(null);
+            return;
+        }
+
         if (e.Key == Key.N && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             vm.NotificationsVm.ToggleCommand.Execute(null);

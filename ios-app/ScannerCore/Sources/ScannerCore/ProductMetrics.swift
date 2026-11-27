@@ -104,6 +104,7 @@ public enum ProductPlatformFilter: String, CaseIterable, Identifiable {
     case shopee = "Shopee"
     case tiktok = "TikTok"
     case lazada = "Lazada"
+    case offPlatform = "Ngoài sàn"
 
     public var id: String { rawValue }
 }

@@ -39,7 +39,7 @@
                 </StackPanel>
 
                 <!-- Chỉ ở Bảng đơn mới: tạo một đơn mới thẳng vào bảng chính -->
-                <Button DockPanel.Dock="Right" Content="➕ Tạo đơn mới"
+                <Button DockPanel.Dock="Right" Content="{Binding CreateButtonText}"
                         Command="{Binding CreateNewOrderCommand}"
                         Style="{StaticResource PrimaryActionButtonStyle}"
                         Background="#16A34A"

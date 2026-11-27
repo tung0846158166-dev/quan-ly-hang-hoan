@@ -1,5 +1,5 @@
 import { fromWorkersAi, toWorkersAi, workersAiErrorStatus } from "./workersai";
-import { buildNewParcel, ownCodes, parseNewOrder } from "./neworder";
+import { buildNewParcel, isOffPlatform, offPlatformCode, ownCodes, parseNewOrder } from "./neworder";
 import { answerText, buildStats, digestMessages, ruleText } from "./digest";
 import { DEFAULT_AI_CONFIG, parseAiConfig, type AiConfig } from "./aiconfig";
 import { DurableObject } from "cloudflare:workers";
@@ -703,6 +703,13 @@ export class ShopDO extends DurableObject<Env> {
    */
   private opNewOrder(op: Record<string, unknown>, dev: Device): Record<string, unknown> {
     const input = parseNewOrder(op);
+    // đơn ngoài sàn chưa có mã vận đơn: cloud tự sinh mã "NS..." chưa dùng ở đâu (ghi lên kiện để quét nhận)
+    if (!normalizeForLookup(input.code) && isOffPlatform(input.platform)) {
+      for (let i = 0; i < 20; i++) {
+        const c = offPlatformCode(vnTime(Date.now()));
+        if (!this.db.first<Row>("SELECT 1 AS x FROM parcel_codes WHERE code = ? LIMIT 1", c)) { input.code = c; break; }
+      }
+    }
     const code = normalizeForLookup(input.code);
     if (!code) return { outcome: "invalid", message: "Mã vận đơn trống", code: input.code };
     const oid = normalizeForLookup(input.orderId);

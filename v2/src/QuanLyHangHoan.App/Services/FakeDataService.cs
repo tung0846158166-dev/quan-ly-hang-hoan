@@ -108,6 +108,8 @@ public sealed class FakeDataService :
     internal QuanLyHangHoan.Data.NewOrderResult AddDemoNewOrder(QuanLyHangHoan.Data.NewOrderInput input)
     {
         var code = QuanLyHangHoan.Core.Tracking.TrackingResolver.Normalize(input.Track ?? "");
+        var off = OffPlatform.Is(input.Platform);
+        if (code.Length == 0 && off) code = OffPlatform.NewCode(_clock());
         if (code.Length == 0) return new QuanLyHangHoan.Data.NewOrderResult(false, "invalid", "Mã vận đơn trống", "", "", "");
         lock (_storeLock)
         {
@@ -120,17 +122,22 @@ public sealed class FakeDataService :
                 return new QuanLyHangHoan.Data.NewOrderResult(false, "duplicate", $"ĐƠN ĐÃ CÓ Ở {where.ToUpperInvariant()}, KHÔNG TẠO LẠI", code, "", dup.Order.OrderId);
             }
             var platformIn = (input.Platform ?? "").Trim();
-            var platform = platformIn.Length > 0 ? platformIn : QuanLyHangHoan.Data.Sync.PhoneActions.DetectPlatform(code);
+            var platform = off ? OffPlatform.Name : platformIn.Length > 0 ? platformIn : QuanLyHangHoan.Data.Sync.PhoneActions.DetectPlatform(code);
             var stamp = _clock().ToString("dd/MM/yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
             var o = new Order
             {
                 OrderId = string.IsNullOrWhiteSpace(input.OrderId) ? code : input.OrderId.Trim(), Track = code, Platform = platform,
                 Carrier = string.IsNullOrWhiteSpace(input.Carrier) ? "J&T Express" : input.Carrier.Trim(),
-                OrderType = "Trả hàng/Hoàn tiền", PlatformStatus = "Đang chuyển hoàn", PreOrder = "Đơn thường",
-                Status = ReceiveStatus.NotReturned, ShipDate = stamp, ReturnDate = stamp, ImportedAt = stamp, ImportWeek = NewOrderMarker.Week,
-                Note = string.IsNullOrWhiteSpace(input.Note) ? "Đơn tạo tay trên máy tính" : input.Note.Trim(),
-                Items = { new OrderItem { Product = string.IsNullOrWhiteSpace(input.Product) ? "Sản phẩm mới (nhập tay)" : input.Product.Trim(), Color = input.Color ?? "", Size = input.Size ?? "", Qty = input.Qty > 0 ? input.Qty : 1 } },
+                OrderType = off ? OffPlatform.NormalizeOrderType(input.OrderType) : "Trả hàng/Hoàn tiền",
+                PlatformStatus = off ? OffPlatform.ChannelStatus(input.Channel) : "Đang chuyển hoàn", PreOrder = "Đơn thường",
+                Status = ReceiveStatus.NotReturned, ShipDate = stamp, ReturnDate = stamp, ImportedAt = stamp, ImportWeek = off ? OffPlatform.Week : NewOrderMarker.Week,
+                Price = input.Price,
+                Note = string.IsNullOrWhiteSpace(input.Note) ? (off ? OffPlatform.DefaultNote : "Đơn tạo tay trên máy tính") : input.Note.Trim(),
             };
+            if (input.Items.Count > 0)
+                foreach (var x in input.Items) o.Items.Add(new OrderItem { Product = x.Product, Color = x.Color, Size = x.Size, Qty = x.Qty > 0 ? x.Qty : 1 });
+            else
+                o.Items.Add(new OrderItem { Product = string.IsNullOrWhiteSpace(input.Product) ? "Sản phẩm mới (nhập tay)" : input.Product.Trim(), Color = input.Color ?? "", Size = input.Size ?? "", Qty = input.Qty > 0 ? input.Qty : 1 });
             store.Add(new DemoOrderEntry { Order = o });
             return new QuanLyHangHoan.Data.NewOrderResult(true, "success", $"ĐÃ TẠO ĐƠN MỚI Ở BẢNG CHÍNH ({platform})", code, platform, o.OrderId);
         }

@@ -117,6 +117,9 @@ struct ProductStatsView: View {
                 if !store.hasData {
                     emptyNoDataCard
                 } else {
+                    // tra nhanh: gõ tên sản phẩm -> số cái về kho / bị hoàn hôm nay, tuần này, tháng này (27/11/2026)
+                    ProductLookupCard()
+
                     filterControls
 
                     if let day = selectedDay {

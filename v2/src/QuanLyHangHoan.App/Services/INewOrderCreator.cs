@@ -36,6 +36,9 @@ public sealed class FakeNewOrderCreator : INewOrderCreator
 public interface INewOrderDialogService
 {
     NewOrderInput? Ask();
+
+    /// <summary>Mở form tạo đơn ngoài sàn (form tự gọi <c>form.Create</c>; đóng khi xong). Mặc định: không làm gì.</summary>
+    Task RunOffPlatformAsync(ViewModels.OffPlatformOrderFormViewModel form) => Task.CompletedTask;
 }
 
 public sealed class FakeNewOrderDialogService : INewOrderDialogService
@@ -43,4 +46,13 @@ public sealed class FakeNewOrderDialogService : INewOrderDialogService
     public NewOrderInput? Next { get; set; }
     public int AskCount { get; private set; }
     public NewOrderInput? Ask() { AskCount++; return Next; }
+
+    /// <summary>Test: kịch bản điều khiển form đơn ngoài sàn (thay cho người bấm).</summary>
+    public Func<ViewModels.OffPlatformOrderFormViewModel, Task>? OffPlatformScript { get; set; }
+    public ViewModels.OffPlatformOrderFormViewModel? LastOffPlatformForm { get; private set; }
+    public Task RunOffPlatformAsync(ViewModels.OffPlatformOrderFormViewModel form)
+    {
+        LastOffPlatformForm = form;
+        return OffPlatformScript?.Invoke(form) ?? Task.CompletedTask;
+    }
 }

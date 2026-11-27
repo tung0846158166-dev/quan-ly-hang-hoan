@@ -76,8 +76,10 @@ public struct CloudNewOrderResult: Equatable {
     public let message: String
     public let platform: String
     public let orderId: String
-    public init(outcome: String, message: String, platform: String = "", orderId: String = "") {
-        self.outcome = outcome; self.message = message; self.platform = platform; self.orderId = orderId
+    /// Mã của đơn vừa tạo (đơn ngoài sàn không mã: cloud tự sinh "NS...").
+    public let code: String
+    public init(outcome: String, message: String, platform: String = "", orderId: String = "", code: String = "") {
+        self.outcome = outcome; self.message = message; self.platform = platform; self.orderId = orderId; self.code = code
     }
     /// Lượt quét: thành công = đã tạo; đã có = trùng (không tạo lại); còn lại = lỗi cần kiểm tra.
     public var status: ScanStatus { outcome == "success" ? .success : outcome == "duplicate" ? .duplicate : .error }

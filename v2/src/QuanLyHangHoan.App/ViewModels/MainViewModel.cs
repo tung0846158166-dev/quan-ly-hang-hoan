@@ -55,6 +55,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly bool _cloudMode;
     private readonly NavigationItem _returnWatchNavItem;
     private readonly NavigationItem _newOrdersNavItem;
+    private readonly NavigationItem _offPlatformNavItem;
     private readonly NavigationItem _watchlistNavItem;
     private readonly NavigationItem _complaintsNavItem;
     private readonly NavigationItem _archiveNavItem;
@@ -324,6 +325,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService(),
             loadInitialData: !deferInitialLoad,
             writeGate: _writeGate) { IsDemoMode = isDemoMode };
+        // Đơn ngoài sàn (chủ dự án 27/11/2026): bảng riêng + form tạo nhanh dùng dữ liệu sản phẩm sẵn có (bảng chính + lưu trữ)
+        OffPlatformVm = new ReturnOrdersViewModel(
+            returnOrderProvider,
+            ReturnTableScope.OffPlatform,
+            onOpenPhoto: OpenOrderPhoto,
+            editService: _orderEditService,
+            dialogService: dialogSvc,
+            onDataChangedAsync: ReloadAllDataAsync,
+            onOrdersDeleted: ShowDeletedUndoToast,
+            onNotify: ShowToast,
+            onOpenDetail: OpenOrderDetail,
+            exportService: _orderExportService,
+            newOrderCreator: resolvedCreator,
+            newOrderDialog: newOrderDialogService ?? new FakeNewOrderDialogService(),
+            loadInitialData: !deferInitialLoad,
+            writeGate: _writeGate,
+            productCatalog: () => Core.Stats.ProductCatalog.Build(_searchActiveOrders.Concat(_searchArchivedOrders))) { IsDemoMode = isDemoMode };
         Func<string, string, bool> returnWatchConfirm = confirmationService is not null
             ? confirmationService.Confirm
             : (title, message) =>
@@ -436,6 +454,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _pageCache["salework"] = SaleworkVm;
         _pageCache["return_watch"] = ReturnWatchVm;
         _pageCache["new_orders"] = NewCreatedVm;
+        _pageCache["off_platform"] = OffPlatformVm;
         _pageCache["watchlist"] = WatchlistVm;
         _pageCache["complaints"] = ComplaintsVm;
         _pageCache["archive"] = ArchivedOrdersVm;
@@ -455,6 +474,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             "shopee_cancelled", "🚫", "Đơn hủy", "SHOPEE", () => ShopeeCancelledVm, ShopeeCancelledVm.TotalCount.ToString("N0"));
         _tiktokReturnNavItem = new NavigationItem(
             "tiktok_return", "⚫", "Hoàn hàng", "TIKTOK", () => TikTokReturnVm, TikTokReturnVm.TotalCount.ToString("N0"), showSectionHeader: true);
+        _offPlatformNavItem = new NavigationItem(
+            "off_platform", "🏪", "Đơn ngoài sàn", "NGOÀI SÀN", () => OffPlatformVm, OffPlatformVm.TotalCount.ToString("N0"), showSectionHeader: true);
         _scanReceiveNavItem = new NavigationItem(
             "scan_receive", "📷", "Quét nhận hàng", "CHUNG", () => ScanReceiveVm, showSectionHeader: true);
         _phoneSyncNavItem = new NavigationItem(
@@ -488,6 +509,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _shopeeReturnNavItem,
             _shopeeCancelledNavItem,
             _tiktokReturnNavItem,
+            _offPlatformNavItem,
             _scanReceiveNavItem,
             .. (_cloudMode ? Array.Empty<NavigationItem>() : new[] { _phoneSyncNavItem }),
             _returnWatchNavItem,
@@ -507,6 +529,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ShopeeReturnVm.CountsUpdated += SyncSidebarKpis;
         ShopeeCancelledVm.CountsUpdated += SyncSidebarKpis;
         TikTokReturnVm.CountsUpdated += SyncSidebarKpis;
+        OffPlatformVm.CountsUpdated += SyncSidebarKpis;
         WatchlistVm.CountsUpdated += SyncSidebarKpis;
         ComplaintsVm.CountsUpdated += SyncSidebarKpis;
         // trang chủ: 3 khiếu nại gần nhất (27/11/2026)
@@ -579,6 +602,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public HelpViewModel HelpVm { get; }
     public AiChatViewModel AiChatVm { get; }
     public ReturnOrdersViewModel NewCreatedVm { get; }
+    public ReturnOrdersViewModel OffPlatformVm { get; }
     public NotificationCenterViewModel NotificationsVm { get; }
 
     /// <summary>Thanh bên mặc định thu gọn (chỉ biểu tượng); rê chuột vào thì mở rộng đè lên nội dung.</summary>
@@ -1414,6 +1438,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         DeletedOrdersVm.LoadOrders(deletedOrders);
         NewOrdersVm.LoadOrders(newOrders);
         NewCreatedVm.LoadOrders(returnOrders, now);
+        OffPlatformVm.LoadOrders(returnOrders, now);
         // Thống kê tính nặng nhất: chỉ tính ngay khi đang mở màn đó, còn lại hoãn tới lúc mở (luôn dùng dữ liệu mới nhất).
         _pendingStats = (returnOrders, archivedOrders, now);
         if (ReferenceEquals(CurrentPage, StatisticsVm)) FlushPendingStats();
@@ -1616,7 +1641,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var tables = new (string Key, ReturnOrdersViewModel Vm)[]
         {
             ("shopee_return", ShopeeReturnVm), ("shopee_cancelled", ShopeeCancelledVm),
-            ("tiktok_return", TikTokReturnVm), ("new_orders", NewCreatedVm),
+            ("tiktok_return", TikTokReturnVm), ("new_orders", NewCreatedVm), ("off_platform", OffPlatformVm),
         };
         foreach (var t in tables.OrderBy(t => t.Key == preferredKey ? 0 : 1))
         {
@@ -1642,6 +1667,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _shopeeReturnNavItem.Badge = ShopeeReturnVm.TotalCount.ToString("N0");
         _shopeeCancelledNavItem.Badge = ShopeeCancelledVm.TotalCount.ToString("N0");
         _tiktokReturnNavItem.Badge = TikTokReturnVm.TotalCount.ToString("N0");
+        _offPlatformNavItem.Badge = OffPlatformVm.TotalCount.ToString("N0");
         _returnWatchNavItem.Badge = ReturnWatchVm.TrackingCount.ToString("N0");
         _newOrdersNavItem.Badge = NewCreatedVm.TotalCount.ToString("N0");
         _watchlistNavItem.Badge = WatchlistVm.ActiveWatchlistCount.ToString("N0");
@@ -1649,10 +1675,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _archiveNavItem.Badge = ArchivedOrdersVm.TotalCount.ToString("N0");
         _deletedNavItem.Badge = DeletedOrdersVm.TotalCount.ToString("N0");
 
-        SidebarPendingCount = ShopeeReturnVm.PendingCount + ShopeeCancelledVm.PendingCount + TikTokReturnVm.PendingCount;
-        SidebarRedCount = ShopeeReturnVm.RedAlertCount + ShopeeCancelledVm.RedAlertCount + TikTokReturnVm.RedAlertCount;
-        SidebarYellowCount = ShopeeReturnVm.YellowAlertCount + ShopeeCancelledVm.YellowAlertCount + TikTokReturnVm.YellowAlertCount;
-        SidebarReceivedCount = ShopeeReturnVm.ReceivedCount + ShopeeCancelledVm.ReceivedCount + TikTokReturnVm.ReceivedCount;
+        SidebarPendingCount = ShopeeReturnVm.PendingCount + ShopeeCancelledVm.PendingCount + TikTokReturnVm.PendingCount + OffPlatformVm.PendingCount;
+        SidebarRedCount = ShopeeReturnVm.RedAlertCount + ShopeeCancelledVm.RedAlertCount + TikTokReturnVm.RedAlertCount + OffPlatformVm.RedAlertCount;
+        SidebarYellowCount = ShopeeReturnVm.YellowAlertCount + ShopeeCancelledVm.YellowAlertCount + TikTokReturnVm.YellowAlertCount + OffPlatformVm.YellowAlertCount;
+        SidebarReceivedCount = ShopeeReturnVm.ReceivedCount + ShopeeCancelledVm.ReceivedCount + TikTokReturnVm.ReceivedCount + OffPlatformVm.ReceivedCount;
         _trayService.SetRedAlertState(SidebarRedCount > 0);
 
         UpdateNavigationVisibilityAndGroupBadges();
@@ -1664,7 +1690,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                            + ShopeeCancelledVm.RedAlertCount + ShopeeCancelledVm.YellowAlertCount;
         var shopeeTotal = ShopeeReturnVm.TotalCount + ShopeeCancelledVm.TotalCount;
 
-        var tiktokAlerts = TikTokReturnVm.RedAlertCount + TikTokReturnVm.YellowAlertCount;
+        var tiktokAlerts = TikTokReturnVm.RedAlertCount + TikTokReturnVm.YellowAlertCount + OffPlatformVm.YellowAlertCount;
         var tiktokTotal = TikTokReturnVm.TotalCount;
 
         var chungTotal = ReturnWatchVm.TrackingCount + NewCreatedVm.TotalCount + WatchlistVm.ActiveWatchlistCount + ArchivedOrdersVm.TotalCount + DeletedOrdersVm.TotalCount;
@@ -1690,6 +1716,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 {
                     "SHOPEE" => shopeeAlerts > 0 ? $"⚠ {shopeeAlerts:N0}" : $"{shopeeTotal:N0}",
                     "TIKTOK" => tiktokAlerts > 0 ? $"⚠ {tiktokAlerts:N0}" : $"{tiktokTotal:N0}",
+                    "NGOÀI SÀN" => OffPlatformVm.RedAlertCount + OffPlatformVm.YellowAlertCount > 0 ? $"⚠ {OffPlatformVm.RedAlertCount + OffPlatformVm.YellowAlertCount:N0}" : $"{OffPlatformVm.TotalCount:N0}",
                     "NẠP ĐƠN TỰ ĐỘNG" => (_folderWatchController.Enabled || _sheetSyncController.Enabled) ? "Bật" : string.Empty,
                     "CHUNG" => chungTotal > 0 ? $"{chungTotal:N0}" : string.Empty,
                     _ => string.Empty
@@ -1829,6 +1856,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             case "shopee_return":
             case "shopee_cancelled":
             case "tiktok_return":
+            case "off_platform":
                 RevealInTables(target.OrderId, tracking, target.TargetNavKey, target.Source);
                 break;
             case "archive":

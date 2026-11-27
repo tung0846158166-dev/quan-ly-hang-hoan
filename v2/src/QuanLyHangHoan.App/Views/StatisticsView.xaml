@@ -131,6 +131,20 @@
                         </Button.Style>
                         <TextBlock Text="⚫ TikTok" />
                     </Button>
+                    <Button Command="{Binding SetPlatformFilterCommand}" CommandParameter="Ngoài sàn" Margin="6,0,0,0">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlatformOff}" Value="True">
+                                        <Setter Property="Background" Value="#16A34A" />
+                                        <Setter Property="Foreground" Value="#FFFFFF" />
+                                        <Setter Property="BorderBrush" Value="#16A34A" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock Text="🏪 Ngoài sàn" />
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,14,2">
@@ -199,6 +213,73 @@
                         </StackPanel>
                     </Border>
                 </UniformGrid>
+
+                <!-- Tra nhanh sản phẩm (chủ dự án 27/11/2026): gõ tên -> số cái về kho / bị hoàn hôm nay, tuần này, tháng này -->
+                <TextBlock Text="🔎 TRA NHANH SẢN PHẨM" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,4,0,4" />
+                <Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,0,14">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Xóa" Command="{Binding ClearProductLookupCommand}" Padding="10,4" Margin="8,0,0,0" />
+                            <TextBox Text="{Binding ProductLookupText, UpdateSourceTrigger=PropertyChanged, Delay=200}" Padding="8,6" FontSize="13"
+                                     AutomationProperties.Name="Tra nhanh sản phẩm" ToolTip="Gõ tên sản phẩm (không dấu cũng được)" />
+                        </DockPanel>
+                        <TextBlock Text="{Binding ProductLookupHint}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="2,5,0,0" TextWrapping="Wrap" />
+                        <StackPanel Visibility="{Binding HasProductLookupRows, Converter={StaticResource BoolToVis}}" Margin="0,8,0,0">
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Sản phẩm" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" />
+                                <TextBlock Grid.Column="1" Text="" />
+                                <TextBlock Grid.Column="2" Text="Hôm nay" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" TextAlignment="Right" />
+                                <TextBlock Grid.Column="3" Text="{Binding WeekLabel}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" TextAlignment="Right" />
+                                <TextBlock Grid.Column="4" Text="{Binding MonthLabel}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" TextAlignment="Right" />
+                                <TextBlock Grid.Column="5" Text="Tất cả" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource InkMutedBrush}" TextAlignment="Right" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding ProductLookupRows}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,1,0,0" Padding="0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="90" />
+                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="90" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <StackPanel Grid.RowSpan="2" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource InkPrimaryBrush}" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Orders, StringFormat='{}{0:N0} đơn có sản phẩm này'}" FontSize="11" Foreground="{DynamicResource InkMutedBrush}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="✅ Về kho (đã nhận)" FontSize="11.5" Foreground="{DynamicResource AlertGreenTextBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Received.Today, StringFormat='{}{0:N0}'}" FontSize="14" FontWeight="Bold" TextAlignment="Right" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Received.Week, StringFormat='{}{0:N0}'}" FontSize="14" FontWeight="Bold" TextAlignment="Right" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                                <TextBlock Grid.Column="4" Text="{Binding Received.Month, StringFormat='{}{0:N0}'}" FontSize="14" FontWeight="Bold" TextAlignment="Right" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                                <TextBlock Grid.Column="5" Text="{Binding Received.Total, StringFormat='{}{0:N0}'}" FontSize="14" FontWeight="Bold" TextAlignment="Right" Foreground="{DynamicResource InkSecondaryBrush}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1" Text="↩️ Bị hoàn (ngày hoàn)" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Returned.Today, StringFormat='{}{0:N0}'}" FontSize="12.5" TextAlignment="Right" Foreground="{DynamicResource InkSecondaryBrush}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding Returned.Week, StringFormat='{}{0:N0}'}" FontSize="12.5" TextAlignment="Right" Foreground="{DynamicResource InkSecondaryBrush}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="4" Text="{Binding Returned.Month, StringFormat='{}{0:N0}'}" FontSize="12.5" TextAlignment="Right" Foreground="{DynamicResource InkSecondaryBrush}" />
+                                                <TextBlock Grid.Row="1" Grid.Column="5" Text="{Binding Returned.Total, StringFormat='{}{0:N0}'}" FontSize="12.5" TextAlignment="Right" Foreground="{DynamicResource InkMutedBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                 <!-- Thống kê SẢN PHẨM bị hoàn (cùng bộ lọc ở trên) -->
                 <TextBlock Text="SẢN PHẨM BỊ HOÀN NHIỀU NHẤT" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,4,0,4" />

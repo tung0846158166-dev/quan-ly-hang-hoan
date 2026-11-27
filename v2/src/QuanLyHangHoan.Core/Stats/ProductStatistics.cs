@@ -70,6 +70,26 @@ public static class ProductStatistics
         return new ProductStatsResult(products, totalUnits, ordersWithItems, unknown);
     }
 
+    /// <summary>
+    /// Các dòng sản phẩm ĐƯỢC TÍNH của một đơn theo đúng quy tắc của <see cref="Compute"/> (hoàn một phần: chỉ sản phẩm đã hoàn;
+    /// bỏ đuôi Premium; bỏ "Chưa rõ sản phẩm"). Key = khóa gộp tên (bỏ dấu, chữ thường).
+    /// </summary>
+    public static IEnumerable<(string Key, string Name, int Units)> CountedItems(Order order)
+    {
+        if (order.Items.Count == 0) yield break;
+        var mixed = order.Items.Any(i => i.ReturnedQty > 0) && order.Items.Any(i => i.ReturnedQty <= 0);
+        foreach (var item in order.Items)
+        {
+            if (mixed && item.ReturnedQty <= 0) continue;
+            var units = mixed ? item.ReturnedQty : (item.Qty > 0 ? item.Qty : 1);
+            var name = StripPremium(Clean(item.Product));
+            if (name.Length == 0 || name.StartsWith("Chưa rõ sản phẩm", StringComparison.OrdinalIgnoreCase)) continue;
+            var key = LegacyText.Key(name);
+            if (key.Length == 0) continue;
+            yield return (key, name, units);
+        }
+    }
+
     private static readonly Regex PremiumTail = new(@"\s*[-–—]?\s*premium(\s+cao\s+c[aấ]p)?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <summary>Premium = có chữ "Premium" ở tên, màu hoặc size. Chỉ là phân loại BÊN TRONG cùng một mẫu, không phải mẫu khác.</summary>

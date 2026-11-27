@@ -25,6 +25,12 @@ public sealed class CloudNewOrderCreator : INewOrderCreator
             ["product"] = input.Product ?? "", ["color"] = input.Color ?? "", ["size"] = input.Size ?? "", ["qty"] = input.Qty > 0 ? input.Qty : 1,
             ["note"] = input.Note ?? "", ["origin"] = string.Equals(input.Origin, "phone", StringComparison.OrdinalIgnoreCase) ? "phone" : "manual",
         };
+        // đơn ngoài sàn (27/11/2026): nhiều sản phẩm, giá trị, loại đơn, kênh bán; mã trống thì cloud tự sinh mã "NS..."
+        if (input.Items.Count > 0)
+            op["items"] = new JsonArray(input.Items.Select(x => (JsonNode)new JsonObject { ["product"] = x.Product ?? "", ["color"] = x.Color ?? "", ["size"] = x.Size ?? "", ["qty"] = x.Qty > 0 ? x.Qty : 1 }).ToArray());
+        if (input.Price > 0) op["price"] = input.Price;
+        if (input.OrderType.Length > 0) op["orderType"] = input.OrderType;
+        if (input.Channel.Length > 0) op["channel"] = input.Channel;
         try
         {
             var res = await _op(op, default).ConfigureAwait(false);

@@ -176,6 +176,8 @@ public static class GlobalSearchService
             return ("TikTok - Hoàn hàng", "tiktok_return");
         }
 
+        if (Core.Models.OffPlatform.Is(order)) return ("Đơn ngoài sàn", "off_platform");
+
         return ("Bảng chính", "shopee_return");
     }
 

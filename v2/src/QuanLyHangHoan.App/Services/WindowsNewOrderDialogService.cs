@@ -12,4 +12,11 @@ public sealed class WindowsNewOrderDialogService : INewOrderDialogService
         var win = new NewOrderWindow { Owner = owner };
         return win.ShowDialog() == true ? win.Result : null;
     }
+
+    public Task RunOffPlatformAsync(ViewModels.OffPlatformOrderFormViewModel form)
+    {
+        var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Application.Current?.MainWindow;
+        new OffPlatformOrderWindow(form) { Owner = owner }.ShowDialog();
+        return Task.CompletedTask;
+    }
 }

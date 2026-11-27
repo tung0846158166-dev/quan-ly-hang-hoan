@@ -750,6 +750,26 @@ describe("tạo đơn mới qua cloud (máy tính nhập tay, điện thoại qu
     expect((await op(phoneA, { code: "840000000001" })).data.results[0].result).toMatchObject({ outcome: "duplicate", where: "mục Đã xóa" });
     expect((await op(phoneA, { code: "  " })).data.results[0].result.outcome).toBe("invalid");
   });
+
+  // chủ dự án 27/11/2026: bảng Đơn ngoài sàn — nhiều sản phẩm, giá trị, kênh bán, loại đơn; không có mã thì cloud tự sinh mã NS...
+  it("đơn ngoài sàn: nhiều sản phẩm + tự sinh mã khi để trống, quét nhận được bằng mã đó", async () => {
+    const r = (await op(owner, { code: "", platform: "Ngoài sàn", channel: "Facebook", orderType: "Đổi hàng", price: 350000.4, note: "khách đổi size",
+      items: [{ product: "Áo thun", color: "Đen", size: "L", qty: 2 }, { product: "Quần jean", color: "", size: "30", qty: "1" }, { product: "", color: "", size: "" }] })).data.results[0].result;
+    expect(r.outcome).toBe("success");
+    expect(r.code).toMatch(/^NS\d{6}[2-9A-HJ-NP-Z]{4}$/);
+    expect(r.parcel).toMatchObject({ platform: "Ngoài sàn", orderType: "Đổi hàng", platformStatus: "Kênh: Facebook", price: 350000, carrier: "",
+      importWeek: "Đơn ngoài sàn", note: "khách đổi size", track: r.code, orderId: r.code });
+    expect(r.parcel.items).toEqual([
+      { product: "Áo thun", color: "Đen", size: "L", qty: 2, returnedQty: 0 },
+      { product: "Quần jean", color: "", size: "30", qty: 1, returnedQty: 0 }]);
+    const scan = await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "scan", code: r.code.toLowerCase() }] }, phoneB);
+    expect(scan.data.results[0].result.outcome).toBe("received");
+    // có mã thật thì dùng mã đó; loại đơn lạ -> mặc định "Trả hàng/Hoàn tiền"; kênh trống -> "Khác"
+    const b = (await op(phoneA, { code: "GHN12345AB", platform: "Ngoài sàn", orderType: "linh tinh", product: "Váy" })).data.results[0].result;
+    expect(b.parcel).toMatchObject({ track: "GHN12345AB", platform: "Ngoài sàn", orderType: "Trả hàng/Hoàn tiền", platformStatus: "Kênh: Khác" });
+    // sàn thường không tự sinh mã
+    expect((await op(owner, { code: "", platform: "Shopee" })).data.results[0].result.outcome).toBe("invalid");
+  });
 });
 
 describe("gợi ý AI theo khung giờ", () => {

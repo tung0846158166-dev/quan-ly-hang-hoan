@@ -8,6 +8,8 @@ public static class PlatformNames
     public const string Shopee = "Shopee";
     public const string TikTok = "TikTok";
     public const string Lazada = "Lazada";
+    /// <summary>Đơn bán ngoài sàn do chủ shop tự tạo (Core.Models.OffPlatform).</summary>
+    public const string OffPlatform = "Ngoài sàn";
 }
 
 /// <summary>

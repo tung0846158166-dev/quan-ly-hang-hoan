@@ -19,7 +19,9 @@ public enum ReturnTableScope
     ShopeeCancelled,
     TikTokReturn,
     /// <summary>Bảng đơn mới: các đơn tạo tay / quét tạo từ điện thoại (đánh dấu NewOrderMarker), nằm sẵn ở bảng chính.</summary>
-    NewCreated
+    NewCreated,
+    /// <summary>Đơn ngoài sàn (Facebook, Zalo, tại shop...): chủ shop tự tạo bằng form tạo nhanh (27/11/2026).</summary>
+    OffPlatform
 }
 
 public sealed partial class OrderTypeChipItem : ObservableObject
@@ -62,6 +64,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private readonly Services.INewOrderCreator? _newOrderCreator;
     private readonly Services.INewOrderDialogService? _newOrderDialog;
     private readonly WriteGate _writeGate;
+    private readonly Func<Core.Stats.ProductCatalog>? _productCatalog;
     private List<ReturnOrderRowViewModel> _allRows = [];
     private IReadOnlyList<ReturnOrderRowViewModel> _selectedRows = Array.Empty<ReturnOrderRowViewModel>();
     private long _lastLoadMs;
@@ -82,9 +85,11 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         Services.INewOrderCreator? newOrderCreator = null,
         Services.INewOrderDialogService? newOrderDialog = null,
         bool loadInitialData = true,
-        WriteGate? writeGate = null)
+        WriteGate? writeGate = null,
+        Func<Core.Stats.ProductCatalog>? productCatalog = null)
     {
         _provider = provider;
+        _productCatalog = productCatalog;
         _newOrderCreator = newOrderCreator;
         _newOrderDialog = newOrderDialog;
         _exportService = exportService;
@@ -188,7 +193,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     private bool _isDemoMode;
 
     public bool ShowPlatformFilter => Scope is ReturnTableScope.All or ReturnTableScope.NewCreated;
-    public bool ShowCreateButton => Scope == ReturnTableScope.NewCreated;
+    public bool ShowCreateButton => Scope is ReturnTableScope.NewCreated or ReturnTableScope.OffPlatform;
+    public string CreateButtonText => Scope == ReturnTableScope.OffPlatform ? "➕ Tạo đơn ngoài sàn (Ctrl+N)" : "➕ Tạo đơn mới";
     public bool ShowOrderTypeFilter => Scope is ReturnTableScope.TikTokReturn or ReturnTableScope.ShopeeReturn;
 
     public string ScreenTitle => Scope switch
@@ -197,6 +203,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         ReturnTableScope.ShopeeCancelled => "🚫 Shopee — Đơn hủy",
         ReturnTableScope.TikTokReturn => "⚫ TikTok — Hoàn hàng",
         ReturnTableScope.NewCreated => "📥 Bảng đơn mới",
+        ReturnTableScope.OffPlatform => "🏪 Đơn ngoài sàn",
         _ => "🚚 Bảng Hàng Hoàn Về"
     };
 
@@ -210,6 +217,8 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             $"Hiển thị tất cả loại đơn TikTok (THẤT THOÁT, Trả hàng/Hoàn tiền, Giao không thành công, Chỉ hoàn tiền) • {AlertRuleDescription}",
         ReturnTableScope.NewCreated =>
             $"Đơn tạo tay hoặc quét tạo từ điện thoại, nằm sẵn ở bảng chính. Bấm \"➕ Tạo đơn mới\" để thêm • {AlertRuleDescription}",
+        ReturnTableScope.OffPlatform =>
+            $"Đơn bán qua Facebook, Zalo, tại shop... (không có trên sàn). Tạo nhanh từ dữ liệu sản phẩm sẵn có; không mã vận đơn thì tự sinh mã NS... để quét nhận • {AlertRuleDescription}",
         _ => AlertRuleDescription
     };
 
@@ -265,6 +274,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         ReturnTableScope.ShopeeCancelled => "Shopee - Đơn hủy",
         ReturnTableScope.TikTokReturn => "TikTok - Hoàn hàng",
         ReturnTableScope.NewCreated => "Bảng đơn mới",
+        ReturnTableScope.OffPlatform => "Đơn ngoài sàn",
         _ => "Bảng chính"
     };
 
@@ -274,6 +284,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
     {
         if (!CanWrite) return;
         if (_newOrderCreator is null || _newOrderDialog is null) { _onNotify?.Invoke("Chưa sẵn sàng tạo đơn.", true); return; }
+        if (Scope == ReturnTableScope.OffPlatform) { await CreateOffPlatformAsync(); return; }
         var input = _newOrderDialog.Ask();
         if (input is null) return;                                   // hủy: không làm gì
         Data.NewOrderResult result;
@@ -287,6 +298,24 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
         if (_onDataChangedAsync is not null) await _onDataChangedAsync();
         SelectOrder(result.OrderId, result.Code);
         _onNotify?.Invoke($"✅ Đã tạo đơn {result.Code} ({result.Platform}) ở Bảng đơn mới", false);
+    }
+
+    /// <summary>
+    /// Đơn ngoài sàn: mở form tạo nhanh (gợi ý sản phẩm từ dữ liệu sẵn có). Form tự gửi tạo từng đơn (có "Tạo & nhập đơn tiếp");
+    /// đóng form thì tải lại một lần và chọn đơn vừa tạo cuối cùng.
+    /// </summary>
+    private async Task CreateOffPlatformAsync()
+    {
+        Core.Stats.ProductCatalog catalog;
+        try { catalog = _productCatalog?.Invoke() ?? Core.Stats.ProductCatalog.Build(_allRows.Select(r => r.Source)); }
+        catch { catalog = Core.Stats.ProductCatalog.Empty; }
+        var form = new OffPlatformOrderFormViewModel(catalog) { Create = _newOrderCreator!.CreateAsync };
+        await _newOrderDialog!.RunOffPlatformAsync(form);
+        if (form.Created.Count == 0) return;
+        if (_onDataChangedAsync is not null) await _onDataChangedAsync();
+        var last = form.Created[^1];
+        SelectOrder(last.OrderId, last.Code);
+        _onNotify?.Invoke(form.Created.Count == 1 ? $"✅ Đã tạo đơn ngoài sàn {last.Code}" : $"✅ Đã tạo {form.Created.Count:N0} đơn ngoài sàn", false);
     }
 
     /// <summary>Giao diện nghe sự kiện này để bỏ chọn mọi dòng trên lưới (nút "Bỏ chọn", phím Esc).</summary>
@@ -540,6 +569,7 @@ public sealed partial class ReturnOrdersViewModel : ObservableObject
             ReturnTableScope.TikTokReturn =>
                 order.Platform.Equals(PlatformNames.TikTok, StringComparison.OrdinalIgnoreCase),
             ReturnTableScope.NewCreated => NewOrderMarker.IsNewlyCreated(order),
+            ReturnTableScope.OffPlatform => Core.Models.OffPlatform.Is(order),
             _ => true
         };
     }

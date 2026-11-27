@@ -156,6 +156,8 @@ public sealed class PlatformToBrushConverter : IValueConverter
     private static readonly SolidColorBrush TikTokBg = CreateFrozen("#0F172A");
     private static readonly SolidColorBrush TikTokFg = CreateFrozen("#FFFFFF");
     private static readonly SolidColorBrush OtherBg = CreateFrozen("#DBEAFE");
+    private static readonly SolidColorBrush OffBg = CreateFrozen("#DCFCE7");
+    private static readonly SolidColorBrush OffFg = CreateFrozen("#15803D");
     private static readonly SolidColorBrush OtherFg = CreateFrozen("#1D4ED8");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -171,6 +173,11 @@ public sealed class PlatformToBrushConverter : IValueConverter
         if (platform.Equals(PlatformNames.TikTok, StringComparison.OrdinalIgnoreCase))
         {
             return isForeground ? Resolve("TikTokBadgeFgBrush", TikTokFg) : Resolve("TikTokBadgeBgBrush", TikTokBg);
+        }
+
+        if (platform.Equals(PlatformNames.OffPlatform, StringComparison.OrdinalIgnoreCase))
+        {
+            return isForeground ? Resolve("AlertGreenTextBrush", OffFg) : Resolve("AlertGreenCardBgBrush", OffBg);
         }
 
         return isForeground ? Resolve("InfoBlueTextBrush", OtherFg) : Resolve("InfoBlueBadgeBgBrush", OtherBg);

@@ -156,6 +156,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
     public bool IsPlatformAll => PlatformFilter == "all";
     public bool IsPlatformShopee => PlatformFilter == PlatformNames.Shopee;
     public bool IsPlatformTikTok => PlatformFilter == PlatformNames.TikTok;
+    public bool IsPlatformOff => PlatformFilter == PlatformNames.OffPlatform;
 
     partial void OnScopeFilterChanged(string value)
     {
@@ -169,6 +170,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPlatformAll));
         OnPropertyChanged(nameof(IsPlatformShopee));
         OnPropertyChanged(nameof(IsPlatformTikTok));
+        OnPropertyChanged(nameof(IsPlatformOff));
         Recalculate();
     }
 
@@ -228,6 +230,38 @@ public sealed partial class StatisticsViewModel : ObservableObject
         _archivedOrders = archivedOrders;
         _snapshotTime = now;
         Recalculate();
+        RunProductLookup();
+    }
+
+    // ---- Tra nhanh sản phẩm (chủ dự án 27/11/2026): gõ tên -> số cái về kho / bị hoàn hôm nay, tuần này, tháng này.
+    // Luôn tính trên bảng chính + kho lưu trữ, mọi sàn (không theo bộ lọc phía trên) để con số là "toàn bộ".
+    [ObservableProperty] private string _productLookupText = "";
+    [ObservableProperty] private IReadOnlyList<ProductLookupRow> _productLookupRows = Array.Empty<ProductLookupRow>();
+    [ObservableProperty] private string _productLookupHint = "Gõ tên sản phẩm (không dấu cũng được), ví dụ: «ao thun den».";
+    public bool HasProductLookupRows => ProductLookupRows.Count > 0;
+    public string WeekLabel => $"Tuần này (từ {ProductLookup.WeekStart(_snapshotTime == default ? DateTime.Now : _snapshotTime):dd/MM})";
+    public string MonthLabel => $"Tháng {(_snapshotTime == default ? DateTime.Now : _snapshotTime):MM/yyyy}";
+    partial void OnProductLookupRowsChanged(IReadOnlyList<ProductLookupRow> value) => OnPropertyChanged(nameof(HasProductLookupRows));
+    partial void OnProductLookupTextChanged(string value) => RunProductLookup();
+
+    [RelayCommand]
+    private void ClearProductLookup() => ProductLookupText = "";
+
+    private void RunProductLookup()
+    {
+        var now = _snapshotTime == default ? DateTime.Now : _snapshotTime;
+        OnPropertyChanged(nameof(WeekLabel));
+        OnPropertyChanged(nameof(MonthLabel));
+        if (ProductLookup.Terms(ProductLookupText).Length == 0)
+        {
+            ProductLookupRows = Array.Empty<ProductLookupRow>();
+            ProductLookupHint = "Gõ tên sản phẩm (không dấu cũng được), ví dụ: «ao thun den».";
+            return;
+        }
+        ProductLookupRows = ProductLookup.Search(_mainOrders.Concat(_archivedOrders), ProductLookupText, now, limit: 8);
+        ProductLookupHint = ProductLookupRows.Count == 0
+            ? $"Không có sản phẩm nào khớp «{ProductLookupText.Trim()}»."
+            : $"{ProductLookupRows.Count:N0} sản phẩm khớp (tối đa 8, nhiều nhất tháng này trước) • bảng chính + kho lưu trữ, mọi sàn";
     }
 
     // ---- Thống kê sản phẩm (cùng bộ lọc: phạm vi, sàn, loại đơn, ngày) ----
@@ -252,6 +286,19 @@ public sealed partial class StatisticsViewModel : ObservableObject
             value.Units == 0 ? 0 : 100.0 * v.Units / value.Units)).ToList();
     }
 
+    /// <summary>Các sàn có sản phẩm này: "Shopee 3 • TikTok 2 • Khác 1" (Khác = ngoài sàn / sàn khác); chỉ một nơi thì ghi tên nơi đó.</summary>
+    private static string PlatformLabel(ProductStat p)
+    {
+        var other = p.Units - p.ShopeeUnits - p.TikTokUnits;
+        var parts = new List<string>();
+        if (p.ShopeeUnits > 0) parts.Add($"Shopee {p.ShopeeUnits:N0}");
+        if (p.TikTokUnits > 0) parts.Add($"TikTok {p.TikTokUnits:N0}");
+        if (other > 0) parts.Add($"Khác {other:N0}");
+        if (parts.Count == 0) return "—";
+        if (parts.Count == 1) return p.ShopeeUnits > 0 ? "Shopee" : p.TikTokUnits > 0 ? "TikTok" : "Ngoài sàn / khác";
+        return string.Join(" • ", parts);
+    }
+
     /// <summary>"Premium 76 • Thường 76"; để trống khi sản phẩm không có bản Premium nào.</summary>
     private static string PremiumLabel(ProductStat p) => p.PremiumUnits == 0 ? "" : $"Premium {p.PremiumUnits:N0} • Thường {p.StandardUnits:N0}";
 
@@ -268,7 +315,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
         var rows = result.Products.Take(100).Select((p, i) => new ProductRowVm(
             i + 1, p.Name, p.Units, p.Orders,
             p.Share.ToString("P1", ViCulture), p.Share * 100, string.IsNullOrWhiteSpace(p.TopReason) ? "—" : p.TopReason,
-            p.ShopeeUnits > 0 && p.TikTokUnits > 0 ? $"Shopee {p.ShopeeUnits:N0} • TikTok {p.TikTokUnits:N0}" : p.ShopeeUnits > 0 ? "Shopee" : p.TikTokUnits > 0 ? "TikTok" : "—",
+            PlatformLabel(p),
             string.Join(" · ", p.Variants.Take(3).Select(v => $"{VariantLabel(v)} ×{v.Units:N0}")),
             PremiumLabel(p),
             p)).ToList();

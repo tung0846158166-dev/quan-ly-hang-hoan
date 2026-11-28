@@ -202,6 +202,23 @@ public sealed class CloudApi
         return res.Count > 0 ? res[0] : new(op["opId"]!.GetValue<string>(), false, 0, null, "invalid_response", "Cloud không trả kết quả.");
     }
 
+    // ---- sao lưu toàn bộ cloud về máy (28/11/2026): chỉ ĐỌC, chỉ chủ cửa hàng
+    public async Task<(JsonArray Rows, bool More)> TransferExportAsync(string table, int offset, CancellationToken ct = default)
+    {
+        var n = await JsonAsync(HttpMethod.Get, $"/admin/transfer/export?table={Uri.EscapeDataString(table)}&offset={offset}&limit=500", null, ct).ConfigureAwait(false);
+        return (n["rows"] as JsonArray ?? new JsonArray(), n["more"] is JsonValue v && v.TryGetValue<bool>(out var more) && more);
+    }
+
+    public async Task<JsonObject> TransferCountsAsync(CancellationToken ct = default) =>
+        (await JsonAsync(HttpMethod.Get, "/admin/transfer/counts", null, ct).ConfigureAwait(false))["counts"]?.DeepClone() as JsonObject ?? new JsonObject();
+
+    /// <summary>Một tệp ảnh trong kho ảnh ("p/..." ảnh gốc, "t/..." ảnh nhỏ); không có thì null.</summary>
+    public async Task<byte[]?> TransferBlobAsync(string key, CancellationToken ct = default)
+    {
+        try { return (await SendRawAsync(HttpMethod.Get, "/admin/transfer/blob?key=" + Uri.EscapeDataString(key), null, null, ct).ConfigureAwait(false)).Body; }
+        catch (CloudApiException e) when (e.Status == 404) { return null; }
+    }
+
     public async Task<JsonArray> HistoryAsync(string parcelId, CancellationToken ct = default) =>
         (await JsonAsync(HttpMethod.Get, $"/parcels/{Uri.EscapeDataString(parcelId)}/history", null, ct)) as JsonArray ?? new JsonArray();
 

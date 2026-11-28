@@ -111,6 +111,8 @@ async function restore(o) {
   const c = client(o.url, o["token-env"]);
   const dir = o.dir; if (!dir) throw new Error("Thiếu --dir");
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
+  // bản sao lưu hằng ngày của máy tính để ảnh ở thư mục chung (manifest.blobDir = "../blobs")
+  const blobRoot = manifest.blobDir ? path.resolve(dir, manifest.blobDir, "..") : dir;
   await c.json("POST", "/admin/transfer/begin", { confirm: "CHEP_DU_LIEU_CLOUD" });
   for (const t of TABLES) {
     const rows = JSON.parse(fs.readFileSync(path.join(dir, "tables", `${t}.json`), "utf8"));
@@ -119,7 +121,7 @@ async function restore(o) {
   }
   let n = 0;
   for (const [k, hash] of Object.entries(manifest.blobs)) {
-    const b = fs.readFileSync(blobFile(dir, k));
+    const b = fs.readFileSync(blobFile(blobRoot, k));
     if (sha(b) !== hash) throw new Error(`Tệp ảnh ${k} trên máy bị hỏng (băm lệch)`);
     await c.putBlob(k, b);
     if (++n % 200 === 0) console.log(`  ảnh: ${n}/${Object.keys(manifest.blobs).length}`);

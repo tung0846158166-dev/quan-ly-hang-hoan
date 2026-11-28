@@ -12,6 +12,8 @@ public partial class App : Application
     private CloudMode? _cloud;
     private ISingleInstanceGuard? _singleInstanceGuard;
     private System.Threading.Timer? _digestTimer;
+    private System.Threading.Timer? _cloudBackupTimer;
+    private int _cloudBackupRunning;
     private ITrayService? _trayService;
 
     /// <summary>Ghi lỗi khởi động/lỗi không bắt được vào thư mục dữ liệu để biết vì sao app không hiện (không có nhật ký thì chỉ thấy "mở lên rồi mất").</summary>
@@ -287,6 +289,26 @@ public partial class App : Application
                 // AI dùng khóa trên cloud (token thiết bị); khóa trên máy không dùng nữa
                 aiStore.UseCloud(() => cloud.AiAccess);
                 cloud.AiAccessChanged += () => Dispatcher.BeginInvoke(() => vmForCloud.AiChatVm.RefreshKeyState());
+                // SAO LƯU TOÀN BỘ CLOUD VỀ MÁY mỗi ngày một lần (chủ dự án 28/11/2026): mọi bảng + nhật ký + ảnh, đúng định dạng
+                // cloud-transfer.mjs (khôi phục bằng "restore --dir"). Chỉ máy chủ shop làm được (máy khác bị từ chối thì thôi).
+                var backupRoot = System.IO.Path.Combine(AppPaths.BaseFolder, "backups", "cloud");
+                _cloudBackupTimer = new System.Threading.Timer(async _ =>
+                {
+                    if (System.Threading.Interlocked.Exchange(ref _cloudBackupRunning, 1) == 1) return;
+                    try
+                    {
+                        var now = DateTime.Now;
+                        if (QuanLyHangHoan.Data.Cloud.CloudFullBackup.DoneFor(backupRoot, now) || cloud.Link.Api is not { } api) return;
+                        var r = await QuanLyHangHoan.Data.Cloud.CloudFullBackup.RunAsync(backupRoot, now,
+                            (t, off, ct) => api.TransferExportAsync(t, off, ct), (k, ct) => api.TransferBlobAsync(k, ct), ct => api.TransferCountsAsync(ct));
+                        _ = Dispatcher.BeginInvoke(() => notifCenter?.Add(NotificationLevel.Info, "backup", "💾 Đã sao lưu cloud về máy",
+                            $"{r.Rows:N0} dòng dữ liệu, {r.Photos:N0} tệp ảnh ({r.NewPhotos:N0} ảnh mới) -> {r.Folder}"));
+                    }
+                    catch (QuanLyHangHoan.Data.Cloud.CloudApiException e) when (e.Status == 403) { _cloudBackupTimer?.Dispose(); }   // không phải máy chủ shop
+                    catch (Exception) { /* mất mạng / lỗi ghi: lần sau (30 phút) thử lại */ }
+                    finally { System.Threading.Interlocked.Exchange(ref _cloudBackupRunning, 0); }
+                }, null, TimeSpan.FromMinutes(3), TimeSpan.FromMinutes(30));
+
                 // gợi ý AI theo khung giờ (cloud viết lúc 8:00, 10:30, 13:30, 16:30, 19:00, 21:00): hỏi mỗi 10 phút, đưa vào chuông thông báo
                 if (notifCenter is not null)
                 {

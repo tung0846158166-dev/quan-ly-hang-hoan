@@ -94,6 +94,7 @@ struct ScanView: View {
         }
         .sheet(item: $detail) { ScanDetailView(requestId: $0.requestId) }
         .onAppear {
+            ScanFeedback.prepare()   // tạo sẵn tiếng bíp + cho rung khi camera chạy
             isVisible = true
             syncCameraLifecycle()
         }

@@ -632,19 +632,8 @@ final class SyncEngine: ObservableObject {
     private func showResult(_ it: ScanItem) {
         let d = describe(it)
         banner = Banner(code: it.code, text: d.0, color: d.1)
-        let gen = UINotificationFeedbackGenerator()
-        let haptic = Self.pref("hapticOn"), sound = Self.pref("soundOn")
-        switch it.status {
-        case .success:
-            if haptic { gen.notificationOccurred(.success) }
-            if sound { AudioServicesPlaySystemSound(1057) }
-        case .duplicate:
-            if haptic { gen.notificationOccurred(.warning) }
-            if sound { AudioServicesPlaySystemSound(1053) }
-        default:
-            if haptic { gen.notificationOccurred(.error) }
-            if sound { AudioServicesPlaySystemSound(1053) }
-        }
+        // âm thanh + rung (28/11/2026): ScanFeedback kêu cả khi gạt im lặng, rung được cả khi camera đang chạy
+        ScanFeedback.play(it.status == .success ? .success : it.status == .duplicate ? .warning : .error)
     }
 
     // MARK: quét
@@ -731,7 +720,7 @@ final class SyncEngine: ObservableObject {
                 banner = Banner(code: code, text: "Chưa thấy mã này trong dữ liệu mẫu", color: Theme.danger, sub: "Thử quét hoặc nhập mã bắt đầu bằng DEMO-")
             }
             items.insert(item, at: 0)
-            if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+            ScanFeedback.tick()
             return true
         }
 
@@ -747,7 +736,7 @@ final class SyncEngine: ObservableObject {
         if kind != .returnScan, snapshot.hasData, let r = snapshot.lookup(code) {
             let where_ = r.k == "a" ? "Kho lưu trữ" : (r.k == "c" ? "Bảng đơn hủy" : "Bảng chính")
             banner = Banner(code: code, text: "Đã tạo rồi: đơn đã có ở \(where_), không tạo lại", color: Theme.danger, sub: r.n)
-            if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
+            ScanFeedback.play(.warning)
             return false
         }
 
@@ -785,7 +774,7 @@ final class SyncEngine: ObservableObject {
         } else {
             banner = Banner(code: code, text: "Không có trên điện thoại, chờ PC xác nhận", color: Theme.warning, sub: hint)
         }
-        if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        ScanFeedback.tick()
         // T040: Chỉ gửi LỆNH QUÉT sang PC; giữ ảnh TẠM trong hàng đợi cho tới khi PC trả ACK (đúng -> gắn vào đơn, sai -> xóa ngay).
         transmit(rid)
         return true
@@ -1330,8 +1319,7 @@ extension SyncEngine {
         guard cloud.canWrite else {
             banner = Banner(code: code, text: "MẤT KẾT NỐI CLOUD: chưa quét được", color: Theme.danger,
                             sub: CloudStatusText.lockReason(cloud.state) ?? "Kiểm tra mạng rồi thử lại")
-            if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(.error) }
-            if Self.pref("soundOn") { AudioServicesPlaySystemSound(1053) }
+            ScanFeedback.play(.error)
             return false
         }
         let rid = nextRequestId(prefix: "sc")
@@ -1348,7 +1336,7 @@ extension SyncEngine {
         trimHistory()
         flushPersist()
         banner = Banner(code: code, text: "Đang gửi lên cloud...", color: Theme.info)
-        if Self.pref("hapticOn") { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+        ScanFeedback.tick()
 
         let fullPhoto = photoData
         if kind != .returnScan {
@@ -1364,7 +1352,7 @@ extension SyncEngine {
                     if !r.orderId.isEmpty { self.items[i].orderNum = r.orderId }
                 }
                 self.banner = Banner(code: code, text: r.message.isEmpty ? "Không tạo được đơn" : r.message, color: Self.color(r.tone), sub: r.platform)
-                if Self.pref("hapticOn") { UINotificationFeedbackGenerator().notificationOccurred(r.status == .success ? .success : .error) }
+                ScanFeedback.play(r.status == .success ? .success : r.status == .duplicate ? .warning : .error)   // chế độ cloud: có cả âm thanh (28/11/2026)
                 self.persist()
             }
             return true
@@ -1381,9 +1369,7 @@ extension SyncEngine {
                 if let p = r.parcel { self.items[i].orderNum = p.orderId }
             }
             self.banner = Banner(code: code, text: v.text, color: Self.color(v.tone), sub: r.parcel?.orderId ?? "")
-            if Self.pref("hapticOn") {
-                UINotificationFeedbackGenerator().notificationOccurred(v.tone == .success ? .success : (v.tone == .danger ? .error : .warning))
-            }
+            ScanFeedback.play(v.tone == .success ? .success : (v.tone == .danger ? .error : .warning))   // chế độ cloud: có cả âm thanh (28/11/2026)
             // ảnh chỉ lên cloud khi cloud xác nhận đúng MỘT kiện (quy tắc 6)
             if CloudPhotoRules.shouldUpload(r), let data = fullPhoto, !data.isEmpty, let parcel = r.parcel,
                data.count <= CloudPhotoRules.hardMaxBytes {

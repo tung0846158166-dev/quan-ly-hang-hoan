@@ -747,6 +747,18 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
   });
 });
 
+describe("đổi trạng thái nhận kho (28/11/2026)", () => {
+  it("đánh dấu đã nhận ghi ngày nhận; đổi về Chưa trả thì bỏ ngày nhận", async () => {
+    await importParcels([parcel("r1")]);
+    const set = (status: string) => call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "setStatus", id: "r1", status }] }, owner);
+    const get = async () => ((await call("GET", "/sync?since=0", undefined, owner)).data.changes as any[]).find((c) => c.type === "parcel" && c.parcel.id === "r1").parcel;
+    await set("Hàng đã trả");
+    expect((await get()).recvDate).not.toBe("");
+    await set("Chưa trả");
+    expect(await get()).toMatchObject({ status: "Chưa trả", recvDate: "" });
+  });
+});
+
 describe("tạo đơn mới qua cloud (máy tính nhập tay, điện thoại quét Đơn mới)", () => {
   const op = (token: string, o: Record<string, unknown>) => call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "newOrder", ...o }] }, token);
 

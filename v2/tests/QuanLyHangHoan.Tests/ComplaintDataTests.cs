@@ -68,6 +68,18 @@ public sealed class ComplaintDataTests : IDisposable
     }
 
     /// <summary>Chủ dự án 27/11/2026: lý do khiếu nại / đổi trạng thái thêm một dòng có ngày giờ vào ghi chú khiếu nại (giống cloud).</summary>
+    // 28/11/2026 (đơn 2610300U6NUPAA): đổi về "Chưa trả" thì bỏ ngày nhận kho
+    [Fact]
+    public void Setting_status_back_to_not_returned_clears_the_receive_date()
+    {
+        CloudReplica.Apply(Db, new[] { Parcel("a") }, 1);
+        var now = new DateTime(2026, 11, 27, 13, 34, 32);
+        Assert.Equal(EditKind.Saved, OrderEditor.SetField(Db, "a", EditField.Status, ReceiveStatus.Received, now).Kind);
+        Assert.Equal("27/11/2026 13:34:32", OrderRepository.Load(Db).Single().Order.RecvDate);
+        Assert.Equal(EditKind.Saved, OrderEditor.SetField(Db, "a", EditField.Status, ReceiveStatus.NotReturned, now.AddMinutes(1)).Kind);
+        Assert.Equal("", OrderRepository.Load(Db).Single().Order.RecvDate);
+    }
+
     [Fact]
     public void Local_mode_reason_appends_a_dated_line_to_the_complaint_note()
     {

@@ -107,6 +107,13 @@ public static class OrderEditor
                 AddHistory(conn, tx, orderId, "recvDate", "Ngày nhận", "", Stamp(now), now);
             }
 
+            // 28/11/2026 (đơn 2610300U6NUPAA): đổi về "Chưa trả" / "Chưa về" = chưa nhận -> bỏ ngày nhận kho (giống cloud)
+            if (field == EditField.Status && newValue is ReceiveStatus.NotReturned or ReceiveStatus.NotYetArrived && !string.IsNullOrEmpty(row.Value.RecvDate))
+            {
+                Exec(conn, tx, "UPDATE orders SET recv_date='', v2_modified=1 WHERE id=$id", ("$id", orderId));
+                AddHistory(conn, tx, orderId, "recvDate", "Ngày nhận", row.Value.RecvDate, "", now);
+            }
+
             AddAudit(conn, tx, "edit", $"{label}: \"{old}\" -> \"{newValue}\" (đơn {row.Value.Track})", now);
             return new(EditKind.Saved, "Đã lưu.");
         });

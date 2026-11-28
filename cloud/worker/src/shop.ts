@@ -630,6 +630,9 @@ export class ShopDO extends DurableObject<Env> {
         fail(409, "conflict", `Trạng thái hiện tại là "${p.status}", không phải "${op.expectedStatus}". Tải lại rồi thử lại.`);
       p.status = status;
       if (status === ReceiveStatus.received && p.recvDate === "") p.recvDate = vnTime(Date.now());
+      // chủ dự án 28/11/2026 (đơn 2610300U6NUPAA): đổi về "Chưa trả" / "Chưa về" = CHƯA nhận -> bỏ ngày nhận kho
+      // (trước đây giữ lại nên đơn chưa nhận vẫn hiện ngày nhập kho)
+      if (status === ReceiveStatus.notReturned || status === ReceiveStatus.notYetArrived) p.recvDate = "";
     });
   }
 

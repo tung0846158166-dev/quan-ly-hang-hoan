@@ -56,9 +56,14 @@ public sealed class OrderEditorTests : IDisposable
         OrderEditor.SetField(Db, id, EditField.Status, ReceiveStatus.Received, Now);
         Assert.Equal("23/11/2026 12:00:00", Get("A").Order.RecvDate);
 
+        OrderEditor.SetField(Db, id, EditField.Status, ReceiveStatus.Received, Now.AddHours(1));
+        Assert.Equal("23/11/2026 12:00:00", Get("A").Order.RecvDate);           // đã nhận: bấm lại không ghi đè giờ nhận
+
+        // chủ dự án 28/11/2026: đổi về "Chưa trả" = chưa nhận -> bỏ ngày nhận; nhận lại thì ghi giờ mới
         OrderEditor.SetField(Db, id, EditField.Status, ReceiveStatus.NotReturned, Now.AddHours(1));
+        Assert.Equal("", Get("A").Order.RecvDate);
         OrderEditor.SetField(Db, id, EditField.Status, ReceiveStatus.Received, Now.AddHours(2));
-        Assert.Equal("23/11/2026 12:00:00", Get("A").Order.RecvDate);           // giờ nhận đầu tiên được giữ, không ghi đè
+        Assert.Equal("23/11/2026 14:00:00", Get("A").Order.RecvDate);
     }
 
     [Fact]

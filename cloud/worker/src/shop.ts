@@ -165,6 +165,7 @@ export class ShopDO extends DurableObject<Env> {
     if (m === "POST" && path === "/admin/ai-digest") { this.requireOwner(dev); return json(await this.runDigest()); }
     if (m === "POST" && path === "/admin/purge-fresh-sheet") return this.purgeFreshSheet(await this.body(req), dev);
     if (m === "POST" && path === "/admin/dedupe-codeless") return this.dedupeCodeless(await this.body(req), dev);
+    if (m === "POST" && path === "/admin/fix-tiktok-platform") return this.fixTiktokPlatform(await this.body(req), dev);
     if (m === "GET" && path === "/ai/status") return this.aiStatus();
     if (m === "PUT" && path === "/admin/ai-config") { this.requireOwner(dev); return this.putAiConfig(await this.body(req)); }
     if (path.startsWith("/admin/transfer/")) { this.requireOwner(dev); return this.transfer(req, url, path.slice("/admin/transfer/".length)); }
@@ -830,6 +831,29 @@ export class ShopDO extends DurableObject<Env> {
       this.broadcast();
     }
     return json({ dryRun, removed: dryRun ? 0 : targets.length, wouldRemove: targets.length, orderIds: targets.map((p) => p.orderId).slice(0, 300) });
+  }
+
+  /**
+   * Chỉ chủ cửa hàng (28/11/2026, ảnh 32). Sửa kiện ghi nhầm sàn "Shopee" nhưng mã đơn là dãy 15–20 chữ số (mã đơn TikTok; mã Shopee có chữ cái)
+   * -> sàn "TikTok". Dữ liệu chuyển từ app cũ (nhập 15/11/2026). Ghi nhật ký "fixPlatform". confirm = "SUA_SAN_TIKTOK"; dryRun = true chỉ đếm.
+   */
+  private async fixTiktokPlatform(b: Record<string, unknown>, dev: Device): Promise<Response> {
+    this.requireOwner(dev);
+    if (b.confirm !== "SUA_SAN_TIKTOK") return fail(422, "invalid", "Thiếu xác nhận.");
+    const dryRun = b.dryRun === true;
+    const targets = this.db.all<Row>("SELECT data FROM parcels WHERE is_deleted = 0").map((r) => JSON.parse(r.data as string) as Parcel)
+      .filter((p) => p.platform === "Shopee" && /^\d{15,20}$/.test((p.orderId ?? "").trim()));
+    if (!dryRun && targets.length) {
+      this.ctx.storage.transactionSync(() => {
+        for (const p of targets) {
+          p.platform = "TikTok";
+          this.writeParcel(p);
+          this.audit(dev.deviceId, "fixPlatform", p.id, { platform: "Shopee" }, { platform: "TikTok" });
+        }
+      });
+      this.broadcast();
+    }
+    return json({ dryRun, fixed: dryRun ? 0 : targets.length, wouldFix: targets.length, orderIds: targets.map((p) => p.orderId).slice(0, 300) });
   }
 
   private async purgeFreshSheet(b: Record<string, unknown>, dev: Device): Promise<Response> {

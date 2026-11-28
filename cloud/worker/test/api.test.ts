@@ -747,6 +747,19 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
   });
 });
 
+describe("sửa sàn ghi nhầm (28/11/2026, ảnh 32)", () => {
+  it("kiện Shopee có mã đơn dạng TikTok (dãy số) đổi sang TikTok; chỉ chủ shop; mã Shopee giữ nguyên", async () => {
+    await importParcels([parcel("t1", { orderId: "586975967229543726", platform: "Shopee" }), parcel("s1", { orderId: "2611110XFUC9UB", platform: "Shopee" })]);
+    const body = { confirm: "SUA_SAN_TIKTOK" };
+    expect((await call("POST", "/admin/fix-tiktok-platform", body, phoneA)).status).toBe(403);
+    expect((await call("POST", "/admin/fix-tiktok-platform", { ...body, dryRun: true }, owner)).data).toMatchObject({ wouldFix: 1, fixed: 0 });
+    expect((await call("POST", "/admin/fix-tiktok-platform", body, owner)).data).toMatchObject({ fixed: 1 });
+    const ps = ((await call("GET", "/sync?since=0", undefined, owner)).data.changes as any[]).filter((c) => c.type === "parcel").map((c) => c.parcel);
+    expect(ps.find((p) => p.id === "t1").platform).toBe("TikTok");
+    expect(ps.find((p) => p.id === "s1").platform).toBe("Shopee");
+  });
+});
+
 describe("đổi trạng thái nhận kho (28/11/2026)", () => {
   it("đánh dấu đã nhận ghi ngày nhận; đổi về Chưa trả thì bỏ ngày nhận", async () => {
     await importParcels([parcel("r1")]);

@@ -100,8 +100,9 @@ public enum CloudRowMapper {
         if k == "m", let w = watch, !w.off, w.since > 0, p.status != "Không cần nhận", p.status != "Bị mất" {
             row.rw = w.since
             row.rws = stage(p, calendar: calendar)
-            if let a = arrived { row.ar = ms(a) }
         }
+        // 28/11/2026: giờ hàng về shop cho mọi đơn (lọc "đã về / chưa về shop" ở tab Đơn hàng, giống máy tính)
+        if let a = arrived { row.ar = ms(a) }
 
         if p.preOrder == "Hàng đặt trước" { row.pre = true }
         if !pending { row.pd = false }

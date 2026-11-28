@@ -10,6 +10,8 @@ enum OrderFilter: String, CaseIterable {
     case partialReturn = "Hoàn 1 phần"
     case watch = "Theo dõi"
     case complaint = "Khiếu nại"
+    case arrived = "Đã về shop"
+    case notArrived = "Chưa về shop"
     case received = "Đã nhận"
     case cancelled = "Đơn hủy"
     case archived = "Lưu trữ"
@@ -20,7 +22,9 @@ enum OrderFilter: String, CaseIterable {
         switch self {
         case .overdue: return Theme.danger
         case .soon, .watch: return Theme.warning
-        case .complaint: return Theme.purple
+        case .complaint: return Theme.warning
+        case .arrived: return Theme.teal
+        case .notArrived: return Theme.info
         case .received: return Theme.success
         case .partialReturn: return Theme.purple
         default: return Theme.accent
@@ -47,6 +51,45 @@ struct OrdersView: View {
     @State private var offPlatformPending = 0
     @State private var productCount = 0
     @State private var listNowMs = Int(Date().timeIntervalSince1970 * 1000)
+    // lọc ngày (28/11/2026, giống máy tính): loại ngày + khoảng ngày
+    @State private var dateField: DateField = .returnDate
+    @State private var dateRange: DateRangeChoice = .all
+    @State private var customFrom = Calendar.current.date(byAdding: .day, value: -6, to: Date()) ?? Date()
+    @State private var customTo = Date()
+    @State private var showDateSheet = false
+
+    enum DateField: String, CaseIterable { case returnDate = "Ngày hoàn / hủy", arrived = "Giờ hàng về shop", received = "Ngày nhận kho" }
+    enum DateRangeChoice: String, CaseIterable { case all = "Mọi ngày", today = "Hôm nay", yesterday = "Hôm qua", d7 = "7 ngày", d30 = "30 ngày", month = "Tháng này", custom = "Chọn ngày…" }
+
+    /// Khoảng ngày [from, to] (đầu ngày) theo lựa chọn; nil = không lọc ngày.
+    private static func bounds(_ c: DateRangeChoice, from: Date, to: Date) -> (Date, Date)? {
+        let cal = CloudRowMapper.vietnamCalendar
+        let today = cal.startOfDay(for: Date())
+        func back(_ d: Int) -> Date { cal.date(byAdding: .day, value: -d, to: today) ?? today }
+        switch c {
+        case .all: return nil
+        case .today: return (today, today)
+        case .yesterday: return (back(1), back(1))
+        case .d7: return (back(6), today)
+        case .d30: return (back(29), today)
+        case .month: return (cal.date(from: cal.dateComponents([.year, .month], from: today)) ?? today, today)
+        case .custom:
+            let a = cal.startOfDay(for: min(from, to)), b = cal.startOfDay(for: max(from, to))
+            return (a, b)
+        }
+    }
+
+    /// Ngày của đơn theo loại ngày đang lọc (đầu ngày, giờ Việt Nam); nil = đơn không có ngày đó.
+    private static func day(of r: OrderRow, _ f: DateField) -> Date? {
+        let cal = CloudRowMapper.vietnamCalendar
+        let d: Date?
+        switch f {
+        case .returnDate: d = OrderStats.parseDate(r.rd, calendar: cal)
+        case .arrived: d = r.ar > 0 ? Date(timeIntervalSince1970: Double(r.ar) / 1000) : nil
+        case .received: d = r.rv ? OrderStats.parseDate(r.rcd, calendar: cal) : nil
+        }
+        return d.map { cal.startOfDay(for: $0) }
+    }
 
     private struct FilterOutput {
         var shown: [OrderRow]
@@ -82,6 +125,8 @@ struct OrdersView: View {
         case .partialReturn: return DashboardMetrics.isPartialReturn(r)
         case .watch: return r.wl && r.k == "m"
         case .complaint: return r.isComplaint
+        case .arrived: return r.k == "m" && r.ar > 0
+        case .notArrived: return r.k == "m" && r.pd && r.ar == 0
         case .received: return r.rv && r.k == "m"
         case .cancelled: return r.isCancelled
         case .pre: return r.pre
@@ -89,7 +134,8 @@ struct OrdersView: View {
         }
     }
 
-    private static func computeFilter(rows: [OrderRow], query: String, platform: String, filter: OrderFilter) -> FilterOutput {
+    private static func computeFilter(rows: [OrderRow], query: String, platform: String, filter: OrderFilter,
+                                      dateField: DateField = .returnDate, range: (Date, Date)? = nil) -> FilterOutput {
         let now = Int(Date().timeIntervalSince1970 * 1000)
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let qc = q.isEmpty ? "" : TrackingCode.clean(q)
@@ -100,6 +146,9 @@ struct OrdersView: View {
         for r in rows {
             if !targetPlat.isEmpty && DashboardMetrics.normalizedPlatform(r.p) != targetPlat { continue }
             if !matches(r, q, qc) { continue }
+            if let rg = range {
+                guard let d = day(of: r, dateField), d >= rg.0, d <= rg.1 else { continue }
+            }
             let isMain = r.k == "m"
             let alert: DeadlineLevel = (isMain && r.pd) ? r.alertLevel(now: now) : .unknown
             counts[.all, default: 0] += 1
@@ -117,6 +166,8 @@ struct OrdersView: View {
             if r.isCancelled { counts[.cancelled, default: 0] += 1 }
             if r.isArchived { counts[.archived, default: 0] += 1 }
             if r.isComplaint { counts[.complaint, default: 0] += 1 }
+            if isMain && r.ar > 0 { counts[.arrived, default: 0] += 1 }
+            if isMain && r.pd && r.ar == 0 { counts[.notArrived, default: 0] += 1 }
             if r.pre { counts[.pre, default: 0] += 1 }
             if belongs(r, filter, now: now) { shown.append(r) }
         }
@@ -153,7 +204,7 @@ struct OrdersView: View {
     }
 
     private var filterToken: String {
-        "\(dataToken)|\(filter.rawValue)|\(platform)|\(query)|\(engine.items.count)"
+        "\(dataToken)|\(filter.rawValue)|\(platform)|\(query)|\(engine.items.count)|\(dateField.rawValue)|\(dateRange.rawValue)|\(customFrom.timeIntervalSince1970)|\(customTo.timeIntervalSince1970)"
     }
 
     private func applyPendingNavigation() {
@@ -244,9 +295,11 @@ struct OrdersView: View {
                 let rowsSnapshot = store.rows
                 let plat = platform
                 let activeFilter = filter
+                let field = dateField
+                let rng = Self.bounds(dateRange, from: customFrom, to: customTo)
                 let scannedNow = engine.scannedReturnCodes
                 let result = await Task.detached(priority: .userInitiated) {
-                    Self.computeFilter(rows: rowsSnapshot, query: q, platform: plat, filter: activeFilter)
+                    Self.computeFilter(rows: rowsSnapshot, query: q, platform: plat, filter: activeFilter, dateField: field, range: rng)
                 }.value
                 guard !Task.isCancelled else { return }
                 shown = result.shown
@@ -276,6 +329,24 @@ struct OrdersView: View {
                 }
             }
             .sheet(item: $selected) { DetailView(row: $0) }
+            .sheet(isPresented: $showDateSheet) {
+                NavigationStack {
+                    Form {
+                        Picker("Loại ngày", selection: $dateField) {
+                            ForEach(DateField.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        DatePicker("Từ ngày", selection: $customFrom, displayedComponents: .date)
+                        DatePicker("Đến ngày", selection: $customTo, displayedComponents: .date)
+                    }
+                    .navigationTitle("Chọn khoảng ngày")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) { Button("Lọc") { dateRange = .custom; showDateSheet = false } }
+                        ToolbarItem(placement: .cancellationAction) { Button("Đóng") { showDateSheet = false } }
+                    }
+                }
+                .presentationDetents([.medium])
+            }
             .sheet(isPresented: $showScanner) {
                 ScanSearchSheet { cleanedCode in
                     query = cleanedCode
@@ -357,7 +428,7 @@ struct OrdersView: View {
 
     // MARK: - Lọc: 4 lựa chọn chính dạng thanh chia đều + nút "Lọc" gom phần còn lại và lọc sàn
     private static let primaryFilters: [OrderFilter] = [.main, .pending, .overdue, .received]
-    private static let moreFilters: [OrderFilter] = [.soon, .watch, .complaint, .partialReturn, .pre, .cancelled, .archived, .all]
+    private static let moreFilters: [OrderFilter] = [.arrived, .notArrived, .soon, .watch, .complaint, .partialReturn, .pre, .cancelled, .archived, .all]
 
     private var filterBar: some View {
         HStack(spacing: 6) {
@@ -397,7 +468,14 @@ struct OrdersView: View {
         .padding(.horizontal, Theme.screenPadding)
     }
 
-    private var hasExtraFilter: Bool { Self.moreFilters.contains(filter) || !platform.isEmpty }
+    private var hasExtraFilter: Bool { Self.moreFilters.contains(filter) || !platform.isEmpty || dateRange != .all }
+
+    private var rangeLabel: String {
+        guard let rg = Self.bounds(dateRange, from: customFrom, to: customTo) else { return "Mọi ngày" }
+        let (a, b) = rg
+        let f = DateFormatter(); f.dateFormat = "dd/MM"; f.timeZone = CloudRowMapper.vietnamCalendar.timeZone
+        return a == b ? f.string(from: a) : "\(f.string(from: a)) – \(f.string(from: b))"
+    }
 
     private var moreFilterMenu: some View {
         Menu {
@@ -408,6 +486,18 @@ struct OrdersView: View {
                     } label: {
                         if filter == f { Label("\(f.rawValue) (\(counts[f] ?? 0))", systemImage: "checkmark") }
                         else { Text("\(f.rawValue) (\(counts[f] ?? 0))") }
+                    }
+                }
+            }
+            Section("Lọc ngày theo") {
+                Picker("Loại ngày", selection: $dateField) {
+                    ForEach(DateField.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                ForEach(DateRangeChoice.allCases, id: \.self) { c in
+                    Button {
+                        if c == .custom { showDateSheet = true } else { dateRange = c }
+                    } label: {
+                        if dateRange == c { Label(c == .custom ? rangeLabel : c.rawValue, systemImage: "checkmark") } else { Text(c.rawValue) }
                     }
                 }
             }
@@ -449,6 +539,9 @@ struct OrdersView: View {
             }
             if !platform.isEmpty {
                 removableChip(text: platform, color: Theme.platformColor(platform)) { platform = "" }
+            }
+            if dateRange != .all {
+                removableChip(text: "\(dateField == .returnDate ? "Hoàn" : dateField == .arrived ? "Về shop" : "Nhận kho"): \(rangeLabel)", color: Theme.accent) { dateRange = .all }
             }
             Spacer(minLength: 0)
         }
@@ -495,7 +588,7 @@ struct OrdersView: View {
                 if r.isComplaint {
                     Text("⚖️ \(r.kn)")
                         .font(Theme.Typography.microBold)
-                        .foregroundColor(Theme.purple)
+                        .foregroundColor(Theme.complaintColor(r.kn))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 4)

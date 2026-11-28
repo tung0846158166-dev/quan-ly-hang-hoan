@@ -1238,7 +1238,7 @@ struct DetailView: View {
             if live.isComplaint {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        StatusPill(text: live.kn, color: live.kn == "Thành công" ? Theme.success : (live.kn == "Thất bại" ? Theme.danger : Theme.purple))
+                        StatusPill(text: live.kn, color: Theme.complaintColor(live.kn))
                         if !live.kna.isEmpty { Text("từ \(live.kna)").font(.caption2).foregroundStyle(.secondary) }
                     }
                     if !live.knd.isEmpty {

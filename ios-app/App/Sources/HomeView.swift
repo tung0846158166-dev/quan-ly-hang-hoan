@@ -684,7 +684,7 @@ struct HomeView: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: 4)
-                            StatusPill(text: r.kn, color: r.kn == "Thành công" ? Theme.success : (r.kn == "Thất bại" ? Theme.danger : Theme.purple))
+                            StatusPill(text: r.kn, color: Theme.complaintColor(r.kn))
                             Image(systemName: "chevron.right")
                                 .font(.caption2.bold())
                                 .foregroundStyle(.tertiary)

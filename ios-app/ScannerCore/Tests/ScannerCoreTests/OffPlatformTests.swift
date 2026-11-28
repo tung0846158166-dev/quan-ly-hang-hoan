@@ -145,3 +145,16 @@ extension OffPlatformTests {
         XCTAssertEqual(ProductMetrics.compute(rows: rows).products.filter { $0.key.hasPrefix("m:omega") }.count, 1)
     }
 }
+
+extension OffPlatformTests {
+    // 28/11/2026: mọi đơn có giờ hàng về shop (lọc "đã về / chưa về shop" trên điện thoại)
+    func testArrivalTimeIsSetForEveryRowNotOnlyReturnWatch() {
+        let json = #"{"id":"v1","track":"TV1","platform":"Shopee","status":"Chưa trả","returnedAt":"27/11/2026 09:30:00","items":[{"product":"Áo","qty":1}]}"#
+        let p = try! JSONDecoder().decode(CloudParcel.self, from: Data(json.utf8))
+        let r = CloudRowMapper.row(p, now: now)!
+        XCTAssertGreaterThan(r.ar, 0)
+        XCTAssertEqual(r.rw, 0)                      // không nằm trong bảng Hàng hoàn về
+        let none = CloudRowMapper.row(try! JSONDecoder().decode(CloudParcel.self, from: Data(#"{"id":"v2","track":"TV2"}"#.utf8)), now: now)!
+        XCTAssertEqual(none.ar, 0)
+    }
+}

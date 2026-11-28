@@ -69,6 +69,11 @@ enum Theme {
         }
     }
 
+    /// Màu trạng thái khiếu nại (28/11/2026, giống máy tính): Đang xử lý vàng cam, Thành công xanh lá, Thất bại đỏ.
+    static func complaintColor(_ kn: String) -> Color {
+        kn == "Thành công" ? success : (kn == "Thất bại" ? danger : warning)
+    }
+
     static func platformColor(_ raw: String) -> Color {
         let name = DashboardMetrics.normalizedPlatform(raw)
         switch name {

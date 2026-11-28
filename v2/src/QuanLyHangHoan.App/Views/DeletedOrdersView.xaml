@@ -150,6 +150,10 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- xóa vĩnh viễn (28/11/2026) -->
+                    <Button Content="🗑 Xóa vĩnh viễn các đơn đang hiện" Command="{Binding PurgeAllShownCommand}"
+                            Style="{StaticResource PrimaryActionButtonStyle}" Background="#DC2626" Padding="10,4" FontSize="12" Margin="0,0,14,0"
+                            ToolTip="{Binding WriteDisabledTooltip, TargetNullValue='Xóa vĩnh viễn mọi đơn đang hiển thị theo bộ lọc (hỏi xác nhận; không khôi phục được từ phần mềm)'}" />
                     <TextBlock Text="Sắp xếp:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,6,0" />
                     <ComboBox ItemsSource="{Binding SortOptions}"
                               SelectedItem="{Binding SelectedSortOption}"
@@ -283,7 +287,7 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTemplateColumn Header="Thao tác" Width="160">
+                        <DataGridTemplateColumn Header="Thao tác" Width="200">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -296,6 +300,15 @@
                                                 FontSize="11.5"
                                                 Margin="0,0,6,0"
                                                 ToolTip="{Binding DataContext.WriteDisabledTooltip, RelativeSource={RelativeSource AncestorType=UserControl}, TargetNullValue='Khôi phục đơn về bảng trước khi xóa'}" />
+                                        <Button Content="🗑"
+                                                Command="{Binding DataContext.PurgeRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource PrimaryActionButtonStyle}"
+                                                Background="#DC2626"
+                                                Padding="8,3"
+                                                FontSize="11.5"
+                                                Margin="0,0,6,0"
+                                                ToolTip="Xóa vĩnh viễn đơn này (hỏi xác nhận; không khôi phục được)" />
                                         <Button Content="•••"
                                                 Click="RowActionButton_Click"
                                                 Style="{StaticResource FilterPillButtonStyle}"

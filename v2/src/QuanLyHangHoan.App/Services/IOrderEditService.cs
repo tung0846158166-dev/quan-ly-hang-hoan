@@ -18,6 +18,10 @@ public interface IOrderEditService
     Task<EditResult> SetComplaintAsync(string orderId, string status, string reason, string? expectedOld = null, CancellationToken cancellationToken = default)
         => SetFieldAsync(orderId, EditField.ComplaintStatus, status, expectedOld, cancellationToken);
 
+    /// <summary>Xóa vĩnh viễn một đơn ĐÃ ở mục Đã xóa (chỉ chế độ cloud, chỉ máy chủ shop). Mặc định: không hỗ trợ.</summary>
+    Task<EditResult> PurgeAsync(string orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new EditResult(EditKind.Invalid, "Xóa vĩnh viễn chỉ dùng được khi kết nối cloud."));
+
     Task<EditResult> DeleteAsync(
         string orderId,
         string from,

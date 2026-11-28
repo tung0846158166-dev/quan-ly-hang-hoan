@@ -121,6 +121,8 @@ public sealed class CloudOrderEditService : IOrderEditService
         RunAsync(new JsonObject { ["type"] = "delete", ["id"] = orderId }, cancellationToken);
     public Task<EditResult> RestoreAsync(string orderId, CancellationToken cancellationToken = default) =>
         RunAsync(new JsonObject { ["type"] = "restore", ["id"] = orderId }, cancellationToken);
+    public Task<EditResult> PurgeAsync(string orderId, CancellationToken cancellationToken = default) =>
+        RunAsync(new JsonObject { ["type"] = "purge", ["id"] = orderId }, cancellationToken);
     public Task<EditResult> ArchiveAsync(string orderId, CancellationToken cancellationToken = default) =>
         RunAsync(new JsonObject { ["type"] = "archive", ["id"] = orderId }, cancellationToken);
     public Task<EditResult> UnarchiveAsync(string orderId, CancellationToken cancellationToken = default) =>

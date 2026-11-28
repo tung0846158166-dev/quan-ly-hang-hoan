@@ -108,6 +108,8 @@ public static class ParcelMapper
         foreach (var k in TopKeys) if (extra[k] is JsonValue v && v.ToString().Length > 0) obj[k] = JsonValue.Create(v.ToString());
         if (extra["priceNeedsReview"] is JsonValue pn && pn.TryGetValue<bool>(out var pnb)) obj["priceNeedsReview"] = pnb;
         if (extra["priceHasValue"] is JsonValue ph && ph.TryGetValue<bool>(out var phb)) obj["priceHasValue"] = phb;
+        // xóa vĩnh viễn (28/11/2026): đơn không còn hiện ở đâu
+        if (extra["purged"] is JsonValue pg && pg.ToString().Length > 0) obj["purged"] = pg.ToString(); else obj.Remove("purged");
         return obj.Count == 0 ? "" : obj.ToJsonString();
     }
 

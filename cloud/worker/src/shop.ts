@@ -468,6 +468,7 @@ export class ShopDO extends DurableObject<Env> {
   }
 
   private refreshCodes(p: Parcel): void {
+    if (p.extra?.purged) { this.db.run("DELETE FROM parcel_codes WHERE parcel_id = ?", p.id); return; }   // đã xóa vĩnh viễn: mã không còn khớp
     const want = codesOf(p).map((c) => `${c.kind}|${c.code}`).sort();
     const have = this.db.all<Row>("SELECT kind, code FROM parcel_codes WHERE parcel_id = ?", p.id).map((r) => `${r.kind}|${r.code}`).sort();
     if (want.length === have.length && want.every((v, i) => v === have[i])) return;
@@ -559,7 +560,19 @@ export class ShopDO extends DurableObject<Env> {
       case "archive": return this.opMutate(op, dev, "archive", (p) => { p.isArchived = true; p.archivedAt = vnTime(Date.now()); });
       case "unarchive": return this.opMutate(op, dev, "unarchive", (p) => { p.isArchived = false; p.archivedAt = ""; });
       case "delete": return this.opMutate(op, dev, "delete", (p) => { p.deletedFrom = p.isArchived ? "Kho lưu trữ" : "Bảng chính"; p.isDeleted = true; p.deletedAt = vnTime(Date.now()); });
-      case "restore": return this.opMutate(op, dev, "restore", (p) => { p.isDeleted = false; p.deletedAt = ""; p.deletedFrom = ""; });
+      case "restore": return this.opMutate(op, dev, "restore", (p) => {
+        if (p.extra?.purged) fail(409, "conflict", "Đơn đã bị xóa vĩnh viễn, không khôi phục được.");
+        p.isDeleted = false; p.deletedAt = ""; p.deletedFrom = "";
+      });
+      case "purge": {
+        // XÓA VĨNH VIỄN (chủ dự án 28/11/2026): chỉ chủ cửa hàng, chỉ đơn ĐÃ ở mục Đã xóa. Đánh dấu extra.purged (không còn hiện ở đâu,
+        // không khôi phục từ app), gỡ mã khỏi bảng tra (quét / nạp lại = như chưa từng có). Dữ liệu vẫn còn trong bản sao lưu hằng ngày.
+        this.requireOwner(dev);
+        return this.opMutate(op, dev, "purge", (p) => {
+          if (!p.isDeleted) fail(409, "conflict", "Chỉ xóa vĩnh viễn đơn đang ở mục Đã xóa.");
+          p.extra = { ...(p.extra ?? {}), purged: vnTime(Date.now()) };
+        });
+      }
       case "editCell": return this.opEditCell(op, dev);
       case "newOrder": return this.opNewOrder(op, dev);
       case "rwRemove": return this.opReturnWatch(op, dev, true);

@@ -16,6 +16,8 @@ export const PARCEL_KEYS = new Set([
 export const EXTRA_KEYS = new Set([
   "returnReason", "returnStatus", "returnShippingStatus", "returnSuccessTime", "cancelType",
   "forwardCarrier", "returnCarrier", "priceNeedsReview", "priceHasValue",
+  // xóa vĩnh viễn từ mục Đã xóa (28/11/2026): giờ xóa; kiện không còn hiện ở đâu, mã không còn khớp
+  "purged",
 ]);
 const ITEM_KEYS = new Set(["product", "color", "size", "qty", "returnedQty", "sku", "skuId"]);
 

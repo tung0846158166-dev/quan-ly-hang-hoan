@@ -38,7 +38,7 @@ public sealed class SqliteOrderProvider :
 
     public IReadOnlyList<DeletedOrderRecord> GetDeletedOrders()
         => LoadAllShortLived()
-            .Where(s => s.IsDeleted)
+            .Where(s => s.IsDeleted && !IsPurged(s.Order))   // đã xóa vĩnh viễn: không hiện nữa (28/11/2026)
             .Select(MapDeletedOrder)
             .ToList();
 
@@ -73,6 +73,8 @@ public sealed class SqliteOrderProvider :
         }
         return F(_dbPath) + "|" + F(_dbPath + "-wal");
     }
+
+    public static bool IsPurged(Order o) => (o.ExtraJson ?? "").Contains("\"purged\"", StringComparison.Ordinal);
 
     public IReadOnlyList<NewOrderRecord> GetNewOrders()
         => Array.Empty<NewOrderRecord>();

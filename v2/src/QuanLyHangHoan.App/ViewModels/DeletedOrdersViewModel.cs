@@ -359,6 +359,45 @@ public sealed partial class DeletedOrdersViewModel : ObservableObject, IPageVisi
         OnPropertyChanged(nameof(CanWrite));
         OnPropertyChanged(nameof(WriteDisabledTooltip));
         RestoreRowCommand.NotifyCanExecuteChanged();
+        PurgeRowCommand.NotifyCanExecuteChanged();
+        PurgeAllShownCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// XÓA VĨNH VIỄN một đơn (chủ dự án 28/11/2026): không còn hiện ở đâu, không khôi phục từ phần mềm, mã quét / nạp lại như chưa từng có.
+    /// Chỉ máy chủ shop (cloud kiểm). Dữ liệu vẫn nằm trong bản sao lưu cloud hằng ngày.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public async Task PurgeRowAsync(DeletedOrderRowViewModel? row = null)
+    {
+        var target = row ?? SelectedRow;
+        if (!CanWrite || target is null || _editService is null) return;
+        if (_dialogService is not null && !_dialogService.ConfirmBulkAction("Xóa vĩnh viễn", 1,
+                $"Xóa vĩnh viễn đơn {target.DisplayTracking} (mã đơn {target.OrderId}). Đơn sẽ không còn hiện ở đâu và KHÔNG khôi phục được từ phần mềm."))
+            return;
+        var r = await _editService.PurgeAsync(target.Source.Id);
+        if (r.Kind == QuanLyHangHoan.Data.EditKind.Saved) _onNotify?.Invoke($"Đã xóa vĩnh viễn đơn {target.DisplayTracking}.", false);
+        await OrderEditHelper.HandleResultAsync(r, _onDataChangedAsync, _onNotify);
+    }
+
+    /// <summary>Xóa vĩnh viễn MỌI đơn đang hiển thị theo bộ lọc hiện tại (hỏi xác nhận, có số lượng).</summary>
+    [RelayCommand(CanExecute = nameof(CanWrite))]
+    public async Task PurgeAllShownAsync()
+    {
+        var targets = Pager.All.ToList();
+        if (!CanWrite || targets.Count == 0 || _editService is null) return;
+        if (_dialogService is not null && !_dialogService.ConfirmBulkAction("Xóa vĩnh viễn", targets.Count,
+                $"Xóa vĩnh viễn {targets.Count:N0} đơn đang hiển thị ở mục Đã xóa. Các đơn này sẽ không còn hiện ở đâu và KHÔNG khôi phục được từ phần mềm."))
+            return;
+        int ok = 0, fail = 0;
+        string? lastError = null;
+        foreach (var t in targets)
+        {
+            var r = await _editService.PurgeAsync(t.Source.Id);
+            if (r.Kind == QuanLyHangHoan.Data.EditKind.Saved) ok++; else { fail++; lastError = r.Message; }
+        }
+        _onNotify?.Invoke(fail == 0 ? $"Đã xóa vĩnh viễn {ok:N0} đơn." : $"Đã xóa vĩnh viễn {ok:N0} đơn, {fail:N0} đơn không xóa được: {lastError}", fail > 0);
+        if (_onDataChangedAsync is not null) await _onDataChangedAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanWrite))]

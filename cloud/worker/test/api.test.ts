@@ -747,6 +747,22 @@ describe("cổng AI (khóa chỉ nằm trên cloud)", () => {
   });
 });
 
+describe("xóa vĩnh viễn từ mục Đã xóa (28/11/2026)", () => {
+  it("chỉ chủ shop, chỉ đơn đã xóa; sau đó không khôi phục được, mã không còn khớp, tạo lại được", async () => {
+    await importParcels([parcel("x1", { track: "SPXVN000000771" })]);
+    const op = (type: string, token = owner) => call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type, id: "x1" }] }, token);
+    expect((await op("purge")).data.results[0].ok).toBe(false);                    // chưa ở mục Đã xóa
+    await op("delete");
+    expect((await op("purge", phoneA)).data.results[0].ok).toBe(false);          // nhân viên không được
+    expect((await op("purge")).data.results[0].ok).toBe(true);
+    expect((await op("restore")).data.results[0].ok).toBe(false);
+    const p = ((await call("GET", "/sync?since=0", undefined, owner)).data.changes as any[]).find((c) => c.type === "parcel" && c.parcel.id === "x1").parcel;
+    expect(p.extra.purged).toBeTruthy();
+    const nw = await call("POST", "/ops", { ops: [{ opId: crypto.randomUUID(), type: "newOrder", code: "SPXVN000000771" }] }, owner);
+    expect(nw.data.results[0].result.outcome).toBe("success");                     // mã không còn bị coi là "đã có ở mục Đã xóa"
+  });
+});
+
 describe("sửa sàn ghi nhầm (28/11/2026, ảnh 32)", () => {
   it("kiện Shopee có mã đơn dạng TikTok (dãy số) đổi sang TikTok; chỉ chủ shop; mã Shopee giữ nguyên", async () => {
     await importParcels([parcel("t1", { orderId: "586975967229543726", platform: "Shopee" }), parcel("s1", { orderId: "2611110XFUC9UB", platform: "Shopee" })]);

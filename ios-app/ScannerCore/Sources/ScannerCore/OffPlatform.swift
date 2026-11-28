@@ -205,6 +205,7 @@ public struct ProductLookupItem: Identifiable, Equatable {
 extension ProductMetrics {
     /// Các dòng sản phẩm ĐƯỢC TÍNH của một đơn (cùng quy tắc `compute`): hoàn một phần chỉ tính sản phẩm đã hoàn; bỏ đuôi Premium; bỏ "Chưa rõ".
     public static func countedItems(_ row: OrderRow, families: ProductFamilies? = nil) -> [(key: String, name: String, units: Int)] {
+        if row.st == "Không cần nhận" { return [] }   // hủy trước khi giao: không có hàng về (28/11/2026)
         let names = splitPipe(row.n).filter { !$0.isEmpty }
         if names.isEmpty { return [] }
         let returnedRaw = splitPipe(row.rn).filter { !$0.isEmpty }

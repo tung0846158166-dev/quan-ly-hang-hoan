@@ -307,6 +307,23 @@ public sealed class OffPlatformAndProductLookupTests : IDisposable
         Assert.Equal(stats.ProductRows[0].Units, c.Products[0].Units);
     }
 
+    // chủ dự án 28/11/2026: "Đã nhận" không gồm "Không cần nhận"; sản phẩm của đơn "Không cần nhận" không tính là bị hoàn
+    [Fact]
+    public void Statistics_count_not_needed_separately_and_exclude_it_from_returned_products()
+    {
+        var orders = new[]
+        {
+            O("1", "Áo A", 2, status: ReceiveStatus.Received, recv: "27/11/2026 09:00:00"),
+            O("2", "Áo A", 5, status: ReceiveStatus.NotNeeded),
+            O("3", "Áo A", 1),
+        };
+        var vm = new StatisticsViewModel(new FakeDataService(), new FakeDataService(), loadInitialData: false);
+        vm.LoadData(orders, Array.Empty<Order>(), Now);
+        Assert.Equal((3, 1, 1, 1), (vm.TotalOrders, vm.ReceivedCount, vm.UnneededCount, vm.PendingCount));
+        Assert.Equal(3, Assert.Single(vm.ProductRows).Units);                   // 2 + 1, không tính 5 cái của đơn hủy trước khi giao
+        Assert.Equal(new PeriodUnits(1 * 2, 2, 2, 2), Assert.Single(ProductLookup.Search(orders, "ao a", Now)).Received);
+    }
+
     private const string ReceivedStatus = ReceiveStatus.Received;
 
     // ------------------------------------------------------------------ form tạo nhanh

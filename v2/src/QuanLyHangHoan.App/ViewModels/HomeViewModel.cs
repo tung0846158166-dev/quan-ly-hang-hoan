@@ -497,8 +497,9 @@ public sealed partial class HomeViewModel : ObservableObject
         {
             if (AlertThresholds.IsOrderReceivedOrDone(o.Status))
             {
+                // "nhận hôm nay": chỉ hàng ĐÃ NHẬN về kho (không tính "Không cần nhận"), 28/11/2026
                 var recvDt = AlertThresholds.TryParseVietnamDateTime(o.RecvDate);
-                if (recvDt.HasValue && recvDt.Value.Date == now.Date)
+                if (o.Status != ReceiveStatus.NotNeeded && recvDt.HasValue && recvDt.Value.Date == now.Date)
                 {
                     receivedToday++;
                 }

@@ -505,6 +505,8 @@ public enum ProductMetrics {
         var ordersWithItems = 0
 
         for row in rows {
+            // 28/11/2026 (= máy tính): đơn "Không cần nhận" (hủy trước khi giao) không có hàng quay về -> không tính
+            if row.st == "Không cần nhận" { continue }
             let names = splitPipe(row.n).filter { !$0.isEmpty }
             let rowQty = row.q > 0 ? row.q : 1
             if names.isEmpty {

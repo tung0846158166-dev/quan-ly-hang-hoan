@@ -291,9 +291,9 @@ public sealed partial class StatisticsViewModel : ObservableObject
     {
         var other = p.Units - p.ShopeeUnits - p.TikTokUnits;
         var parts = new List<string>();
-        if (p.ShopeeUnits > 0) parts.Add($"Shopee {p.ShopeeUnits:N0}");
-        if (p.TikTokUnits > 0) parts.Add($"TikTok {p.TikTokUnits:N0}");
-        if (other > 0) parts.Add($"Khác {other:N0}");
+        if (p.ShopeeUnits > 0) parts.Add("Shopee " + p.ShopeeUnits.ToString("N0", ViCulture));
+        if (p.TikTokUnits > 0) parts.Add("TikTok " + p.TikTokUnits.ToString("N0", ViCulture));
+        if (other > 0) parts.Add("Khác " + other.ToString("N0", ViCulture));
         if (parts.Count == 0) return "—";
         if (parts.Count == 1) return p.ShopeeUnits > 0 ? "Shopee" : p.TikTokUnits > 0 ? "TikTok" : "Ngoài sàn / khác";
         return string.Join(" • ", parts);
@@ -566,7 +566,10 @@ public sealed partial class StatisticsViewModel : ObservableObject
         ];
     }
 
-    private static bool IsReceived(string? status) => AlertThresholds.IsOrderReceivedOrDone(status);
+    // chủ dự án 28/11/2026: "Đã nhận" CHỈ là hàng đã nhận về kho. Trước đây dùng IsOrderReceivedOrDone (gồm cả "Không cần nhận")
+    // nên 574 đơn hủy trước khi giao bị cộng vào Đã nhận, còn ô Không cần nhận luôn = 0.
+    private static bool IsReceived(string? status) =>
+        !string.IsNullOrWhiteSpace(status) && (status.Equals(ReceiveStatus.Received, StringComparison.OrdinalIgnoreCase) || status.Equals("Đã nhận", StringComparison.OrdinalIgnoreCase));
     private static bool IsNotNeeded(string? status) =>
         !string.IsNullOrWhiteSpace(status) && status.Equals(ReceiveStatus.NotNeeded, StringComparison.OrdinalIgnoreCase);
     private static bool IsLost(string? status) =>

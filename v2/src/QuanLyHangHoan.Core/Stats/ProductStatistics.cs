@@ -43,6 +43,8 @@ public static class ProductStatistics
         foreach (var order in list)
         {
             if (order.Items.Count == 0) continue;
+            // chủ dự án 28/11/2026: đơn "Không cần nhận" (hủy trước khi giao) không có hàng quay về -> không tính là sản phẩm bị hoàn
+            if (order.Status == ReceiveStatus.NotNeeded) continue;
             var mixed = order.Items.Any(i => i.ReturnedQty > 0) && order.Items.Any(i => i.ReturnedQty <= 0);
             var counted = false;
 
@@ -78,7 +80,7 @@ public static class ProductStatistics
     /// </summary>
     public static IEnumerable<(string Key, string Name, int Units)> CountedItems(Order order, ProductFamilies? families = null)
     {
-        if (order.Items.Count == 0) yield break;
+        if (order.Items.Count == 0 || order.Status == ReceiveStatus.NotNeeded) yield break;   // hủy trước khi giao: không có hàng về
         var mixed = order.Items.Any(i => i.ReturnedQty > 0) && order.Items.Any(i => i.ReturnedQty <= 0);
         foreach (var item in order.Items)
         {

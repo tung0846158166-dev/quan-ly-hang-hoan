@@ -10,6 +10,8 @@ struct OffPlatformView: View {
     @State private var all: [OrderRow] = []
     @State private var selected: OrderRow?
     @State private var showCreate = false
+    // danh mục gợi ý dựng ở luồng nền khi dữ liệu đổi (29/11/2026: trước đây dựng lại trên luồng giao diện mỗi lần vẽ -> đơ sau khi tạo đơn)
+    @State private var catalog: [CatalogProduct] = []
 
     private var list: [OrderRow] {
         switch show {
@@ -80,13 +82,16 @@ struct OffPlatformView: View {
         }
         .sheet(item: $selected) { DetailView(row: $0) }
         .sheet(isPresented: $showCreate) {
-            OffPlatformCreateView(catalog: ProductCatalog.build(rows: store.rows))
+            OffPlatformCreateView(catalog: catalog)
         }
         .task(id: dataToken) {
             let rows = store.rows
-            all = await Task.detached(priority: .userInitiated) {
-                rows.filter { OffPlatform.isOffPlatform($0) && !$0.isArchived && !$0.isCancelled }
+            let (list, cat) = await Task.detached(priority: .userInitiated) {
+                (rows.filter { OffPlatform.isOffPlatform($0) && !$0.isArchived && !$0.isCancelled }, ProductCatalog.build(rows: rows))
             }.value
+            guard !Task.isCancelled else { return }
+            all = list
+            catalog = cat
         }
     }
 
@@ -357,7 +362,8 @@ struct OffPlatformCreateView: View {
         busy = true
         error = ""
         Task { @MainActor in
-            let r = await engine.cloud.createOrder(op)
+            let r = await engine.cloud.createOrder(op, refresh: false)   // báo xong ngay; tải thay đổi về chạy ngầm
+            if r.outcome == "success" { Task { await engine.cloud.syncNow() } }
             busy = false
             guard r.outcome == "success" else {
                 error = r.outcome == "duplicate" ? "⚠️ \(r.message)" : (r.message.isEmpty ? "Không tạo được đơn." : r.message)

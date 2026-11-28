@@ -81,8 +81,9 @@ extension CloudOps {
 
 extension CloudSyncClient {
     /// Gửi một lệnh tạo đơn bất kỳ (đơn ngoài sàn). Mất kết nối thì từ chối ngay.
-    public func createOrder(_ op: [String: Any]) async -> CloudNewOrderResult {
+    public func createOrder(_ op: [String: Any], refresh: Bool = true) async -> CloudNewOrderResult {
         guard canWrite, let a = currentAPI else { return CloudNewOrderResult(outcome: "error", message: "Mất kết nối cloud: chưa tạo được đơn. Kiểm tra mạng rồi thử lại.") }
+        if !refresh { return await CloudSyncClient.performCreateOrder(op, api: a, refresh: {}) }
         return await CloudSyncClient.performCreateOrder(op, api: a, refresh: { [weak self] in
             guard let self else { return }
             try await self.pull(a)

@@ -20,7 +20,8 @@ internal static class DataGridRowHelper
             {
                 return row.Item as T;
             }
-            current = VisualTreeHelper.GetParent(current);
+            // 28/11/2026: nhấp đúp trúng chữ dạng Run (không phải Visual) làm app tắt -> đi theo cây logic cho phần tử không phải Visual
+            current = current is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current);
         }
         return null;
     }

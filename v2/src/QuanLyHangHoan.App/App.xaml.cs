@@ -31,7 +31,16 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        DispatcherUnhandledException += (_, args) => LogCrash("Lỗi không bắt được (giao diện)", args.Exception);
+        DispatcherUnhandledException += (_, args) =>
+        {
+            LogCrash("Lỗi không bắt được (giao diện)", args.Exception);
+            // 28/11/2026: lỗi giao diện lặt vặt (vd nhấp đúp trúng chữ) KHÔNG được làm tắt cả phần mềm: ghi lại, báo nhỏ, chạy tiếp
+            if (_mainViewModel is { } vm)
+            {
+                args.Handled = true;
+                try { vm.ShowToast("Có lỗi nhỏ ở thao tác vừa rồi, phần mềm vẫn chạy bình thường (đã ghi lại để sửa).", true); } catch { }
+            }
+        };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => { if (args.ExceptionObject is Exception ex) LogCrash("Lỗi không bắt được (nền)", ex); };
         ApplyAppIconToAllWindows();
         try

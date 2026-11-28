@@ -32,11 +32,12 @@
                     <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="processing">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFilterProcessing}" Value="True">
-                                        <Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="Background" Value="#D97706" />
                                         <Setter Property="Foreground" Value="#FFFFFF" />
-                                        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="#D97706" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -46,6 +47,7 @@
                     <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="success">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFilterSuccess}" Value="True">
                                         <Setter Property="Background" Value="#16A34A" />
@@ -60,6 +62,7 @@
                     <Button Command="{Binding SetStatusFilterCommand}" CommandParameter="failed">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}">
+                                <Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsFilterFailed}" Value="True">
                                         <Setter Property="Background" Value="#DC2626" />
@@ -124,14 +127,42 @@
                     </DataGrid.RowStyle>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="STT" Binding="{Binding Stt}" Width="50" />
-                        <DataGridTemplateColumn Header="Khiếu nại" Width="140" SortMemberPath="ComplaintStatus">
+                        <DataGridTemplateColumn Header="Khiếu nại" Width="170" MinWidth="170" SortMemberPath="ComplaintStatus">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <ComboBox ItemsSource="{Binding DataContext.StatusChoices, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                               SelectedItem="{Binding ComplaintStatus, Mode=OneWay}"
                                               IsEnabled="{Binding DataContext.CanWrite, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                               DropDownClosed="StatusCombo_DropDownClosed"
-                                              Margin="2,4" Padding="6,3" FontWeight="SemiBold" />
+                                              Margin="2,4" Padding="2,1" MinWidth="148" HorizontalContentAlignment="Stretch" FontWeight="SemiBold">
+                                        <!-- màu theo trạng thái (chủ dự án 28/11/2026): Đang xử lý vàng, Thành công xanh, Thất bại đỏ -->
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="5" Padding="6,2" HorizontalAlignment="Stretch">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{DynamicResource AlertYellowCardBgBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding}" Value="Thành công"><Setter Property="Background" Value="{DynamicResource AlertGreenCardBgBrush}" /></DataTrigger>
+                                                                <DataTrigger Binding="{Binding}" Value="Thất bại"><Setter Property="Background" Value="{DynamicResource AlertRedCardBgBrush}" /></DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding}" FontWeight="Bold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{DynamicResource AlertYellowTextBrush}" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding}" Value="Thành công"><Setter Property="Foreground" Value="{DynamicResource AlertGreenTextBrush}" /></DataTrigger>
+                                                                    <DataTrigger Binding="{Binding}" Value="Thất bại"><Setter Property="Foreground" Value="{DynamicResource AlertRedTextBrush}" /></DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>

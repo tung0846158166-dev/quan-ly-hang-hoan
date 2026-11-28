@@ -322,8 +322,45 @@ public sealed partial class StatisticsViewModel : ObservableObject
         ProductRows = rows;
         ProductSummaryText = result.TotalUnits == 0
             ? "Chưa có sản phẩm nào trong bộ lọc hiện tại."
-            : $"{result.Products.Count:N0} sản phẩm • {result.TotalUnits:N0} cái bị hoàn trong {result.OrdersWithItems:N0} đơn" + (result.UnknownUnits > 0 ? $" • {result.UnknownUnits:N0} cái chưa rõ sản phẩm (không tính)" : "") + (result.Products.Count > rows.Count ? $" • đang hiện {rows.Count} sản phẩm đầu" : "");
+            : $"{result.Products.Count:N0} sản phẩm • {result.TotalUnits:N0} cái {(IsProductReceived ? "đã nhận tại kho" : "bị hoàn")} trong {result.OrdersWithItems:N0} đơn" + (result.UnknownUnits > 0 ? $" • {result.UnknownUnits:N0} cái chưa rõ sản phẩm (không tính)" : "") + (result.Products.Count > rows.Count ? $" • đang hiện {rows.Count} sản phẩm đầu" : "");
         SelectedProduct = keep is null ? null : rows.FirstOrDefault(r => r.Name == keep);
+    }
+
+    // ---- Sản phẩm: "Bị hoàn" (mọi đơn hoàn, theo ngày hoàn) hoặc "Đã nhận tại kho" (chỉ hàng đã nhận, theo NGÀY NHẬN KHO) — 29/11/2026
+    [ObservableProperty] private string _productMode = "returned";   // returned | received
+    public bool IsProductReturned => ProductMode != "received";
+    public bool IsProductReceived => ProductMode == "received";
+    public string ProductSectionTitle => IsProductReceived ? "SẢN PHẨM ĐÃ NHẬN TẠI KHO" : "SẢN PHẨM BỊ HOÀN NHIỀU NHẤT";
+    public string ProductSectionHint => IsProductReceived
+        ? "Đếm sản phẩm của các đơn ĐÃ quét nhận về kho. Lọc ngày ở trên áp theo NGÀY NHẬN KHO. Cùng bộ lọc phạm vi, sàn, loại đơn."
+        : "Đếm sản phẩm của mọi đơn bị hoàn (đã về hoặc đang về; không tính đơn \"Không cần nhận\" vì hàng không quay về). Lọc ngày ở trên áp theo ngày hoàn.";
+    partial void OnProductModeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsProductReturned)); OnPropertyChanged(nameof(IsProductReceived));
+        OnPropertyChanged(nameof(ProductSectionTitle)); OnPropertyChanged(nameof(ProductSectionHint));
+        Recalculate();
+    }
+    [RelayCommand] private void SetProductMode(string? mode) => ProductMode = mode == "received" ? "received" : "returned";
+
+    /// <summary>Đơn đã nhận kho theo cùng bộ lọc phạm vi / sàn / loại đơn; lọc ngày theo ngày nhận kho.</summary>
+    private List<Order> ReceivedProductSource(IReadOnlyList<Order> scope)
+    {
+        var list = new List<Order>();
+        foreach (var o in scope)
+        {
+            if (!IsReceived(o.Status)) continue;
+            if (PlatformFilter != "all" && !o.Platform.Equals(PlatformFilter, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.IsNullOrWhiteSpace(SelectedOrderType) && SelectedOrderType != OrderTypeOptions[0]
+                && !o.OrderType.Equals(SelectedOrderType, StringComparison.OrdinalIgnoreCase)) continue;
+            if (FromDate.HasValue || ToDate.HasValue)
+            {
+                if (AlertThresholds.TryParseVietnamDateTime(o.RecvDate) is not { } d) continue;
+                if (FromDate.HasValue && d.Date < FromDate.Value.Date) continue;
+                if (ToDate.HasValue && d.Date > ToDate.Value.Date) continue;
+            }
+            list.Add(o);
+        }
+        return list;
     }
 
     public void Recalculate()
@@ -431,7 +468,7 @@ public sealed partial class StatisticsViewModel : ObservableObject
             lost, lostVal,
             unneeded, unneededVal);
 
-        BuildProductStatistics(filtered);
+        BuildProductStatistics(IsProductReceived ? ReceivedProductSource(active) : filtered);
 
         var scopeLabel = IsScopeIncludeArchive ? "Bảng chính + Kho lưu trữ" : "Chỉ bảng chính";
         var platLabel = PlatformFilter == "all" ? "Tất cả sàn" : PlatformFilter;

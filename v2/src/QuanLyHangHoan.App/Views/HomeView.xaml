@@ -221,7 +221,10 @@
                                     <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource TikTokBarBrush}" Margin="0,0,4,0" />
                                     <TextBlock Text="TikTok" FontSize="11" Foreground="{DynamicResource InkSecondaryBrush}" />
                                 </StackPanel>
-                                <TextBlock Text="📈 Xu hướng 7 ngày gần nhất" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                <StackPanel>
+                                    <TextBlock Text="📈 Số đơn bị hoàn mỗi ngày (7 ngày gần nhất)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                    <TextBlock Text="Mỗi cột = số đơn có ngày hoàn / hủy rơi vào ngày đó (đơn đang ở bảng chính), tách Shopee và TikTok. Cột cao = hôm đó nhiều đơn bị hoàn." FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                </StackPanel>
                             </DockPanel>
 
                             <ItemsControl ItemsSource="{Binding DailyTrendPoints}" Height="155">

@@ -282,7 +282,15 @@
                 </Border>
 
                 <!-- Thống kê SẢN PHẨM bị hoàn (cùng bộ lọc ở trên) -->
-                <TextBlock Text="SẢN PHẨM BỊ HOÀN NHIỀU NHẤT" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" Margin="2,4,0,4" />
+                <DockPanel Margin="2,4,0,2">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock Text="Thống kê sản phẩm:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,8,0" />
+                        <Button Command="{Binding SetProductModeCommand}" CommandParameter="returned" Content="↩️ Bị hoàn" Margin="0,0,6,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}"><Style.Triggers><DataTrigger Binding="{Binding IsProductReturned}" Value="True"><Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" /><Setter Property="Foreground" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" /></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+                        <Button Command="{Binding SetProductModeCommand}" CommandParameter="received" Content="✅ Đã nhận tại kho" Margin="0,0,6,0"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource FilterPillButtonStyle}"><Style.Triggers><DataTrigger Binding="{Binding IsProductReceived}" Value="True"><Setter Property="Background" Value="{DynamicResource PrimaryBtnBgBrush}" /><Setter Property="Foreground" Value="#FFFFFF" /><Setter Property="BorderBrush" Value="{DynamicResource PrimaryBtnBgBrush}" /></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+                    </StackPanel>
+                    <TextBlock Text="{Binding ProductSectionTitle}" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource InkMutedBrush}" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock Text="{Binding ProductSectionHint}" FontSize="11.5" Foreground="{DynamicResource InkMutedBrush}" Margin="2,0,0,2" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding ProductSummaryText}" FontSize="12" Foreground="{DynamicResource InkSecondaryBrush}" Margin="2,0,0,8" TextWrapping="Wrap" />
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>

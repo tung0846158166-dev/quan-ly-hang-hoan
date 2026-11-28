@@ -18,6 +18,8 @@ public static class GridReveal
         grid.UpdateLayout();
         if (grid.Columns.Count > 0) grid.CurrentCell = new DataGridCellInfo(row, grid.Columns[0]);
         grid.Focus();
+        // 28/11/2026: trang vừa hiện ra (khung giữ sẵn trang) có thể chưa nhận tiêu điểm ngay -> giành lại sau khi dựng xong
+        grid.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => { if (!grid.IsKeyboardFocusWithin) { grid.Focus(); System.Windows.Input.Keyboard.Focus(grid); } }));
         // Dòng chỉ có container sau khi bảng dựng xong; thử lại một nhịp nếu chưa có.
         if (!Flash(grid, row))
             grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Flash(grid, row)));

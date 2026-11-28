@@ -239,6 +239,13 @@ public sealed partial class HomeViewModel : ObservableObject
             items, text);
     }
 
+    /// <summary>Chỉ áp các ô số liệu (KPI) khi trang chủ đang ẩn: nhẹ, để số luôn đúng; biểu đồ / danh sách áp khi mở trang chủ.</summary>
+    public void ApplyKpis(HomeComputed? c)
+    {
+        if (c is null) return;
+        OverallKpi = c.Overall; ShopeeKpi = c.Shopee; TikTokKpi = c.TikTok;
+    }
+
     /// <summary>Áp kết quả <see cref="Compute"/> lên giao diện (nhanh, chạy ở luồng giao diện). null = danh sách rỗng.</summary>
     public void ApplyComputed(HomeComputed? c, IReadOnlyList<Order> orders, DateTime now)
     {

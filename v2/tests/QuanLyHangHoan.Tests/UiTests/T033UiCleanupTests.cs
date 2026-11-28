@@ -160,14 +160,24 @@ public sealed class T033UiCleanupTests
                 var item = new UrgentOrderItem(target.OrderId, target.Source.Track, "Shopee", "Trả hàng/Hoàn tiền", "shopee_return",
                     QuanLyHangHoan.Core.Alerts.AlertLevel.Red, "Quá 24h", "100.000 đ", "", 30);
                 vm.HomeVm.OpenUrgentOrderCommand.Execute(item);
-                for (var i = 0; i < 5; i++) WpfTestHost.PumpDispatcher();
+                // chờ tới khi bảng ổn định (máy bận thì chậm hơn): tối đa 5 giây, không chờ cố định số nhịp
+                System.Windows.Controls.DataGrid? grid = null;
+                var until = DateTime.UtcNow.AddSeconds(5);
+                do
+                {
+                    WpfTestHost.PumpDispatcher();
+                    grid = FindByName<System.Windows.Controls.DataGrid>(window, "OrdersGrid");
+                    if (grid is not null && (grid.SelectedItem as ReturnOrderRowViewModel)?.OrderId == target.OrderId && grid.IsKeyboardFocusWithin) break;
+                    System.Threading.Thread.Sleep(50);
+                } while (DateTime.UtcNow < until);
 
-                var grid = FindByName<System.Windows.Controls.DataGrid>(window, "OrdersGrid");
                 Assert.NotNull(grid);
-                Assert.Same(target, grid!.SelectedItem);                               // đúng đơn được chọn
-                Assert.Same(target, vm.ShopeeReturnVm.SelectedRow);
+                // so theo MÃ ĐƠN: lượt nạp lại chạy nền lúc khởi động có thể dựng lại dòng thành đối tượng mới (28/11/2026)
+                var selected = grid!.SelectedItem as ReturnOrderRowViewModel;
+                Assert.Equal(target.OrderId, selected?.OrderId);                       // đúng đơn được chọn
+                Assert.Equal(target.OrderId, vm.ShopeeReturnVm.SelectedRow?.OrderId);
                 Assert.Equal(4, vm.ShopeeReturnVm.CurrentPage);                        // đơn thứ 301 nằm ở trang 4: bảng tự nhảy tới đúng trang
-                var container = grid.ItemContainerGenerator.ContainerFromItem(target);
+                var container = grid.ItemContainerGenerator.ContainerFromItem(selected!);
                 Assert.NotNull(container);                                             // đã cuộn tới nên dòng được dựng (không còn ngoài màn hình)
                 Assert.True(grid.IsKeyboardFocusWithin);                               // bảng có tiêu điểm: dòng chọn hiện màu chọn rõ
             }

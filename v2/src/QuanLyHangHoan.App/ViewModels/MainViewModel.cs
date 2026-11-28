@@ -1444,7 +1444,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ReturnWatchVm.LoadEntries(returnWatchEntries, now);
         // trang chủ vẽ nhiều thẻ: chỉ áp khi đang mở, còn lại hoãn tới lúc mở (27/11/2026)
         if (ReferenceEquals(CurrentPage, HomeVm)) { _pendingHome = null; HomeVm.ApplyComputed(homeTask.Result, returnOrders, now); }
-        else _pendingHome = (homeTask.Result, returnOrders, now);
+        else { _pendingHome = (homeTask.Result, returnOrders, now); HomeVm.ApplyKpis(homeTask.Result); }   // số liệu luôn đúng ngay
         HomeVm.ReturnWatchOnTheWayCount = ReturnWatchVm.Stage2Count;
         HomeVm.MissingPhotoCount = missingCount;
         ShopeeReturnVm.LoadRows(shopeeRowsTask.Result);

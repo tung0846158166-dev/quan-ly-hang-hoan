@@ -46,6 +46,16 @@ public static class ProductNames
     private static bool IsCode(string w) =>
         w.Count(char.IsLetter) >= 3 && w.All(char.IsLetterOrDigit) && w.Where(char.IsLetter).All(char.IsUpper);
 
+    private static readonly Regex MadeToOrderTail = new(@"\s+[-–—]\s+nh[aậ]n\s+may\b.*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex Filler = new(@"(?<!\p{L})(local\s+brand|lavi\s*studio|unisex|nam\s+n[uữ]|n[uữ]\s+nam)(?!\p{L})", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Bỏ phần chung chung khi so tên KHÔNG có mã mẫu (chủ dự án 28/11/2026, mục 6): "Local Brand", "Lavi Studio", "Unisex", "Nam Nữ" và đuôi
+    /// "- Nhận may theo số đo/ thêu tên ..." -> ba cách ghi "Áo Cardigan Len Dệt Kim Hàn Quốc ... / Logo Thêu" thành một mẫu.
+    /// </summary>
+    public static string StripFiller(string tidy) =>
+        string.Join(' ', Filler.Replace(MadeToOrderTail.Replace(tidy, ""), " ").Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
     /// <summary>Chữ đầu tiên sau dấu "/" (mọi kiểu hoa/thường), hoặc "".</summary>
     public static string LooseCode(string? name)
     {
@@ -67,7 +77,7 @@ public static class ProductNames
     public static string FamilyKey(string? name)
     {
         var code = LegacyText.Key(ModelCode(name));
-        if (code.Length == 0) return LegacyText.Key(Tidy(name));
+        if (code.Length == 0) return LegacyText.Key(StripFiller(Tidy(name)));
         return IsCodeOnly(name) ? "m:" + code : "m:" + code + ":" + TypeKey(name);
     }
 

@@ -27,6 +27,18 @@ public enum ProductNames {
         return String(rest.prefix { !$0.isWhitespace && $0 != "/" && $0 != "-" && $0 != "–" && $0 != "—" })
     }
 
+    private static let madeToOrderTail = try? NSRegularExpression(pattern: #"\s+[-–—]\s+nh[aậ]n\s+may\b.*$"#, options: [.caseInsensitive])
+    private static let filler = try? NSRegularExpression(pattern: #"(?<!\p{L})(local\s+brand|lavi\s*studio|unisex|nam\s+n[uữ]|n[uữ]\s+nam)(?!\p{L})"#, options: [.caseInsensitive])
+
+    /// Bỏ phần chung chung khi so tên KHÔNG có mã mẫu (28/11/2026, = máy tính ProductNames.StripFiller): "Local Brand", "Lavi Studio",
+    /// "Unisex", "Nam Nữ", đuôi "- Nhận may theo số đo...".
+    public static func stripFiller(_ t: String) -> String {
+        var s = t
+        if let re = madeToOrderTail { s = re.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: "") }
+        if let re = filler { s = re.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: " ") }
+        return s.split(separator: " ").joined(separator: " ")
+    }
+
     /// Mã mẫu viết hoa ("STRIPES") hoặc "".
     public static func modelCode(_ name: String) -> String {
         let t = tidy(name)
@@ -49,7 +61,7 @@ public enum ProductNames {
 
     public static func familyKey(_ name: String) -> String {
         let code = ProductMetrics.groupKey(modelCode(name))
-        if code.isEmpty { return ProductMetrics.groupKey(tidy(name)) }
+        if code.isEmpty { return ProductMetrics.groupKey(stripFiller(tidy(name))) }
         return isCodeOnly(name) ? "m:\(code)" : "m:\(code):\(typeKey(name))"
     }
 

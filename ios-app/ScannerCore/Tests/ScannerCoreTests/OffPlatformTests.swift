@@ -121,7 +121,9 @@ extension OffPlatformTests {
         XCTAssertEqual(ProductNames.familyKey("[ DEAL MỞ BÁN ] Áo Polo Len Lavi Studio / ALPHA Unisex"), "m:alpha:aopolo")
         XCTAssertEqual(ProductNames.familyKey("Áo Polo Len Khóa Zip 𝐋𝐚𝐯𝐢 𝐒𝐭𝐮𝐝𝐢𝐨/ BETA Unisex"), "m:beta:aopolo")
         XCTAssertEqual(ProductNames.familyKey("Quần Kaki Ống Suông Lavi Studio Trẻ Trung/ DELTA"), "m:delta:quankaki")
-        XCTAssertEqual(ProductNames.familyKey("Áo Cardigan Lavi Studio / Logo Thêu Unisex"), "aocardiganlavistudiologotheuunisex")
+        XCTAssertEqual(ProductNames.familyKey("Áo Cardigan Lavi Studio / Logo Thêu Unisex"), "aocardiganlogotheu")
+        XCTAssertEqual(ProductNames.familyKey("Áo Cardigan Len Dệt Kim Hàn Quốc Local Brand Lavi Studio / Logo Thêu Unisex Nam Nữ"), "aocardiganlendetkimhanquoclogotheu")
+        XCTAssertEqual(ProductNames.familyKey("Áo Cardigan Len Dệt Kim Hàn Quốc Lavi Studio / Logo Thêu Unisex Nam Nữ - Nhận may theo số đo/ thêu tên"), "aocardiganlendetkimhanquoclogotheu")
         let rows = [
             row("1", "Áo Polo Len Lavi Studio/ OMEGA Unisex", color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 09:00:00"),
             row("2", "OMEGA", qty: 2, color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 10:00:00"),

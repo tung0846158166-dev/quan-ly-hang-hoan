@@ -103,9 +103,10 @@ public sealed class PageHost : Grid
         if (UserActivity.SinceLast < TimeSpan.FromSeconds(2)) return;
         var hasData = vm.ShopeeReturnVm.TotalCount + vm.TikTokReturnVm.TotalCount + vm.ArchivedOrdersVm.TotalCount > 0;
         if (!hasData && DateTime.UtcNow - _attachedAt < TimeSpan.FromSeconds(30)) return;
-        object? next = new object[] { vm.ShopeeReturnVm, vm.TikTokReturnVm, vm.ShopeeCancelledVm, vm.ArchivedOrdersVm, vm.OffPlatformVm, vm.WatchlistVm }
+        object? next = new object[] { vm.ShopeeReturnVm, vm.TikTokReturnVm, vm.ShopeeCancelledVm, vm.ArchivedOrdersVm, vm.StatisticsVm, vm.OffPlatformVm, vm.WatchlistVm, vm.ComplaintsVm }
             .FirstOrDefault(p => IsCacheable(p) && !_cached.ContainsKey(p));
-        if (next is null) { _prewarmTimer?.Stop(); return; }
+        if (next is null) { vm.PrepareStatistics(); return; }   // đã dựng hết: lúc rảnh tay tính sẵn Thống kê sau mỗi lần dữ liệu đổi
+        if (ReferenceEquals(next, vm.StatisticsVm)) vm.PrepareStatistics();   // tính số liệu trước, rồi mới dựng giao diện
         var host = NewHost(next);
         host.Visibility = Visibility.Hidden;        // Hidden: được đo và dựng dòng nhưng không vẽ, không nhận chuột
         host.IsHitTestVisible = false;

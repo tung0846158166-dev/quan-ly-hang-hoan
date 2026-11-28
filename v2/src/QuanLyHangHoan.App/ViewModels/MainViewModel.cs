@@ -1392,6 +1392,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private (IReadOnlyList<Core.Models.Order> Main, IReadOnlyList<Core.Models.Order> Archived, DateTime Now)? _pendingStats;
 
+    /// <summary>Tính sẵn số liệu Thống kê (dựng sẵn ngầm lúc rảnh tay, 28/11/2026: Thống kê mở lần đầu còn chậm).</summary>
+    public void PrepareStatistics() => FlushPendingStats();
+
     private void FlushPendingStats()
     {
         if (_pendingStats is not { } p) return;

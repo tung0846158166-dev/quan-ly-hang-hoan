@@ -85,6 +85,15 @@ final class OffPlatformTests: XCTestCase {
 }
 
 extension OffPlatformTests {
+    // ảnh 31 (28/11/2026): kiểm kênh Salework bằng mã đơn trong file
+    func testSaleworkFileChannelIsCheckedFromOrderIds() {
+        XCTAssertEqual(SaleworkImport.looksLikeTikTok(orderIds: ["579123456789012345", "579123456789012346"]), true)
+        XCTAssertEqual(SaleworkImport.looksLikeTikTok(orderIds: ["261120ABCDEF12", "2611110XFUC9UB", "579123456789012345"]), false)
+        XCTAssertNil(SaleworkImport.looksLikeTikTok(orderIds: []))
+        XCTAssertNil(SaleworkImport.looksLikeTikTok(orderIds: ["ABC"]))
+        XCTAssertEqual(SaleworkImport.channelCounts(orderIds: ["2611110XFUC9UB"]).shopee, 1)
+    }
+
     func testReceivedStockGroupsRecentReceivedItemsNewestFirst() {
         let rows = [
             row("a", "Áo thun", qty: 2, color: "Đen", size: "L", status: "Hàng đã trả", recv: "27/11/2026 09:00:00"),

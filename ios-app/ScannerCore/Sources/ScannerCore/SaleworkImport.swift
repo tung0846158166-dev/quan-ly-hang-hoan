@@ -170,6 +170,26 @@ public enum SaleworkImport {
         return SaleworkPrepared(clean: clean, duplicateCount: prep.duplicateCount, groups: groups, orderIds: orderIds(clean))
     }
 
+    /// Ảnh 31 (28/11/2026): kiểm kênh bằng mã đơn trong file (không phụ thuộc đọc được ô kênh trên trang).
+    /// TikTok: dãy 15–20 chữ số; Shopee: 6 số ngày + 8 ký tự có chữ cái (vd "261120ABCDEF"). Trả số mã mỗi loại.
+    public static func channelCounts(orderIds: [String]) -> (tiktok: Int, shopee: Int) {
+        var t = 0, s = 0
+        for raw in orderIds {
+            let v = raw.trimmingCharacters(in: .whitespaces).uppercased()
+            if v.count >= 15 && v.count <= 20 && v.allSatisfy({ $0.isASCII && $0.isNumber }) { t += 1 }
+            else if v.count == 14 && v.prefix(6).allSatisfy({ $0.isASCII && $0.isNumber }) && v.contains(where: { $0.isASCII && $0.isLetter })
+                        && v.allSatisfy({ $0.isASCII && ($0.isNumber || $0.isLetter) }) { s += 1 }
+        }
+        return (t, s)
+    }
+
+    /// File có phải đơn TikTok không: nil = không đủ mã để biết (cho qua), false = phần lớn là mã Shopee.
+    public static func looksLikeTikTok(orderIds: [String]) -> Bool? {
+        let c = channelCounts(orderIds: orderIds)
+        if c.tiktok + c.shopee == 0 { return nil }
+        return c.tiktok >= c.shopee
+    }
+
     /// First column whose key is "madonhang" / "orderid"; values trimmed + upper-cased, distinct, ordinal sort.
     public static func orderIds(_ clean: [SaleworkRow]) -> [String] {
         var idKey: String? = nil

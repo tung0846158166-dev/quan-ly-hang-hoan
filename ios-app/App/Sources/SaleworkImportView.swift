@@ -80,6 +80,12 @@ struct SaleworkImportView: View {
             runner.say("Đọc file…")
             let rows = try SaleworkImport.readRows(fileName: name, data: data)
             let prep = try SaleworkImport.prepare(rows: rows, today: Date())
+            // ảnh 31: kiểm kênh bằng mã đơn trong file trước khi nạp (lỡ trang đang ở kênh Shopee thì KHÔNG nạp nhầm)
+            if SaleworkImport.looksLikeTikTok(orderIds: prep.orderIds) == false {
+                let c = SaleworkImport.channelCounts(orderIds: prep.orderIds)
+                runner.say("⚠ File vừa xuất là đơn Shopee (\(c.shopee) mã Shopee, \(c.tiktok) mã TikTok) chứ không phải kênh Tiktok: CHƯA nạp. Chọn kênh Tiktok trong khung trên rồi thử lại.")
+                return
+            }
             let parcels = prep.incomingJSON
             let skipped = prep.groups.reduce(0) { $0 + $1.skipped }
             runner.say("\(rows.count) dòng → \(parcels.count) kiện\(skipped > 0 ? " (bỏ qua \(skipped) dòng không phải đơn hoàn)" : ""). Gửi lên cloud…")

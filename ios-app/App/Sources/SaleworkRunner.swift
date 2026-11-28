@@ -88,9 +88,26 @@ final class SaleworkRunner: NSObject, ObservableObject {
         say("Chọn tab \"Đang chờ hoàn\"…")
         try await act("Đang chờ hoàn", mode: "prefix")
         try await pause(0.8)
-        let s2 = try await page("state")
+        // ảnh 30 + 31 (27–28/11/2026): ô "Kênh Tiktok" của Salework là ô nhập chỉ đọc (chữ nằm trong value, không nằm trong chữ của trang)
+        // -> đọc cả value / placeholder / aria-label / title. Đang ở kênh KHÁC (Shopee, Lazada...) thì tự mở ô kênh và chọn Tiktok.
+        // Không đọc được tên kênh nào thì KHÔNG chặn nữa: vẫn xuất, rồi kiểm mã đơn trong file (TikTok = dãy số) trước khi nạp.
+        var s2 = try await page("state")
         if !s2.bool("channelTiktok") {
-            throw Stop(message: "Không thấy kênh Tiktok trên trang. Chọn kênh Tiktok trong khung trên, bấm \"Lưu trang này\" rồi thử lại.")
+            if s2.bool("channelOther") {
+                say("Trang đang ở kênh khác: chọn kênh Tiktok…")
+                _ = try? await page("openChannel")
+                try await pause(0.9)
+                if (try? await act("Kênh Tiktok", mode: "prefix", wait: 3)) == nil { _ = try? await act("Tiktok", mode: "prefix", wait: 3) }
+                try await pause(1.5)
+                s2 = try await page("state")
+                if !s2.bool("channelTiktok") {
+                    throw Stop(message: "Trang Salework đang ở kênh khác và không tự chọn được kênh Tiktok. Chọn kênh Tiktok trong khung trên, bấm \"Lưu trang này\" rồi thử lại.")
+                }
+                try await act("Đang chờ hoàn", mode: "prefix")
+                try await pause(0.8)
+            } else {
+                say("Không đọc được tên kênh trên trang: vẫn xuất, sẽ kiểm tra mã đơn trong file là TikTok trước khi nạp.")
+            }
         }
         say("Mở menu \"Xuất excel\"…")
         try await act("Xuất excel", hover: true)
@@ -262,12 +279,18 @@ final class SaleworkRunner: NSObject, ObservableObject {
         const shown = norm(Array.from(document.querySelectorAll('[class*=select],[role=combobox],[title]'))
           .filter(e => e.tagName !== 'SELECT' && !(e.querySelector && e.querySelector('select')) && visible(e))
           .map(e => (e.getAttribute('title') || '') + ' ' + (e.textContent || '') + ' ' + (e.value || '')).join(' '));
+        // ảnh 31 (28/11/2026): chữ của ô nhập chỉ đọc nằm trong value / placeholder, KHÔNG có trong innerText / textContent
+        const ctrl = norm(Array.from(document.querySelectorAll('input,textarea,[role=combobox],[aria-label],[aria-valuetext],[data-value]'))
+          .filter(visible)
+          .map(e => [e.value, e.getAttribute('placeholder'), e.getAttribute('aria-label'), e.getAttribute('aria-valuetext'), e.getAttribute('data-value')].filter(Boolean).join(' '))
+          .join(' '));
         return {
           url: location.href,
           hasPassword: !!document.querySelector('input[type=password]'),
           hasExport: find('xuất excel', 'exact').length > 0,
           hasTab: find('đang chờ hoàn', 'prefix').length > 0,
-          channelTiktok: /k[eê]nh\\s*tiktok/.test(body) || /tiktok/.test(body.slice(0, 4000)) || /tiktok/.test(picked) || /k[eê]nh\\s*tiktok/.test(shown),
+          channelTiktok: /k[eê]nh\\s*tiktok/.test(body) || /tiktok/.test(body.slice(0, 4000)) || /tiktok/.test(picked) || /k[eê]nh\\s*tiktok/.test(shown) || /tiktok/.test(ctrl),
+          channelOther: /k[eê]nh\\s*(shopee|lazada|tiki|sendo|lazmall)/.test(body.slice(0, 4000) + ' ' + picked + ' ' + shown + ' ' + ctrl),
           title: document.title
         };
       }
@@ -285,6 +308,17 @@ final class SaleworkRunner: NSObject, ObservableObject {
         const L = locate(arg);
         if (L.error) return { ok: false, error: L.error };
         ['mouseover', 'mouseenter', 'mousemove'].forEach(n => L.el.dispatchEvent(new MouseEvent(n, { bubbles: n !== 'mouseenter', cancelable: true, view: window })));
+        return { ok: true };
+      }
+      if (action === 'openChannel') {
+        // mở ô chọn kênh đang hiện kênh khác (để chọn Tiktok)
+        const re = /k[eê]nh\\s*(shopee|lazada|tiki|sendo|lazmall)/;
+        const cands = Array.from(document.querySelectorAll('input,[role=combobox],[class*=select],[class*=Select],button,span,div'))
+          .filter(visible).filter(e => re.test(norm(e.value || '')) || (re.test(norm(e.textContent)) && norm(e.textContent).length < 40));
+        cands.sort((a, b) => norm(a.textContent || a.value).length - norm(b.textContent || b.value).length);
+        if (!cands.length) return { ok: false, error: 'không thấy ô kênh' };
+        click(cands[0]);
+        if (cands[0].focus) cands[0].focus();
         return { ok: true };
       }
       if (action === 'exists') { const L = locate(arg); return L.error ? { ok: false, error: L.error } : { ok: true }; }

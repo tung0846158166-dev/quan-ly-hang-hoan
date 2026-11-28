@@ -219,11 +219,13 @@
                                     <Border Width="10" Height="10" CornerRadius="2" Background="#EE4D2D" Margin="0,0,4,0" />
                                     <TextBlock Text="Shopee" FontSize="11" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,10,0" />
                                     <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource TikTokBarBrush}" Margin="0,0,4,0" />
-                                    <TextBlock Text="TikTok" FontSize="11" Foreground="{DynamicResource InkSecondaryBrush}" />
+                                    <TextBlock Text="TikTok" FontSize="11" Foreground="{DynamicResource InkSecondaryBrush}" Margin="0,0,10,0" />
+                                    <Border Width="10" Height="10" CornerRadius="2" Background="#16A34A" Margin="0,0,4,0" />
+                                    <TextBlock Text="Nhận về kho" FontSize="11" Foreground="{DynamicResource InkSecondaryBrush}" />
                                 </StackPanel>
                                 <StackPanel>
-                                    <TextBlock Text="📈 Số đơn bị hoàn mỗi ngày (7 ngày gần nhất)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
-                                    <TextBlock Text="Mỗi cột = số đơn có ngày hoàn / hủy rơi vào ngày đó (đơn đang ở bảng chính), tách Shopee và TikTok. Cột cao = hôm đó nhiều đơn bị hoàn." FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    <TextBlock Text="📈 Bị hoàn và nhận về kho mỗi ngày (7 ngày gần nhất)" FontSize="13.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" />
+                                    <TextBlock Text="Cam / đen = số đơn bị hoàn trong ngày (theo ngày hoàn, Shopee / TikTok). Xanh = số đơn quét nhận về kho trong ngày. Số dưới cột: bị hoàn • nhận kho. Rê chuột vào cột để xem chi tiết." FontSize="11" Foreground="{DynamicResource InkMutedBrush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                 </StackPanel>
                             </DockPanel>
 
@@ -244,10 +246,12 @@
                                                 <Border Width="13" Height="{Binding ShopeeBarHeight}" Background="#EE4D2D" CornerRadius="3,3,0,0" Margin="0,0,3,0"
                                                         ToolTip="{Binding ShopeeCount, StringFormat='Shopee: {0} đơn'}" />
                                                 <Border Width="13" Height="{Binding TikTokBarHeight}" Background="{DynamicResource TikTokBarBrush}" CornerRadius="3,3,0,0"
-                                                        ToolTip="{Binding TikTokCount, StringFormat='TikTok: {0} đơn'}" />
+                                                        ToolTip="{Binding TikTokCount, StringFormat='TikTok: {0} đơn'}" Margin="0,0,3,0" />
+                                                <Border Width="13" Height="{Binding ReceivedBarHeight}" Background="#16A34A" CornerRadius="3,3,0,0"
+                                                        ToolTip="{Binding ReceivedCount, StringFormat='Nhận về kho: {0} đơn'}" />
                                             </StackPanel>
                                             <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,6,0,0">
-                                                <TextBlock Text="{Binding TotalCount}" FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" HorizontalAlignment="Center" />
+                                                <TextBlock FontSize="10.5" FontWeight="Bold" Foreground="{DynamicResource InkPrimaryBrush}" HorizontalAlignment="Center" ToolTip="{Binding TooltipText}"><Run Text="{Binding TotalCount, Mode=OneWay}" /><Run Text=" • " Foreground="{DynamicResource InkMutedBrush}" /><Run Text="{Binding ReceivedCount, Mode=OneWay}" Foreground="#16A34A" /></TextBlock>
                                                 <TextBlock Text="{Binding DateLabel}" FontSize="10.5" Foreground="{DynamicResource InkMutedBrush}" HorizontalAlignment="Center" />
                                             </StackPanel>
                                         </Grid>

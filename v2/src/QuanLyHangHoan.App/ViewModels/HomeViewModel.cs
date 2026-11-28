@@ -26,9 +26,12 @@ public sealed record DailyTrendPoint(
     int ShopeeCount,
     int TikTokCount,
     double ShopeeBarHeight,
-    double TikTokBarHeight)
+    double TikTokBarHeight,
+    int ReceivedCount = 0,
+    double ReceivedBarHeight = 2)
 {
     public int TotalCount => ShopeeCount + TikTokCount;
+    public string TooltipText => $"{DateLabel}: {TotalCount} đơn bị hoàn (Shopee {ShopeeCount}, TikTok {TikTokCount}) • {ReceivedCount} đơn nhận về kho";
 }
 
 public sealed record OrderTypeBarItem(
@@ -541,9 +544,18 @@ public sealed partial class HomeViewModel : ObservableObject
     {
         var start = now.Date.AddDays(-(days - 1));
         var counts = new Dictionary<DateTime, (int Shopee, int TikTok)>();
+        var received = new Dictionary<DateTime, int>();
         for (var i = 0; i < days; i++)
         {
             counts[start.AddDays(i)] = (0, 0);
+            received[start.AddDays(i)] = 0;
+        }
+        // số đơn quét nhận về kho mỗi ngày (theo ngày nhận kho) — 29/11/2026
+        foreach (var o in orders)
+        {
+            if (o.Status is not ("Hàng đã trả" or "Đã nhận")) continue;
+            if (AlertThresholds.TryParseVietnamDateTime(o.RecvDate) is not { } rd) continue;
+            if (received.ContainsKey(rd.Date)) received[rd.Date]++;
         }
 
         foreach (var o in orders)
@@ -564,7 +576,7 @@ public sealed partial class HomeViewModel : ObservableObject
             }
         }
 
-        var maxVal = Math.Max(1, counts.Values.Select(v => Math.Max(v.Shopee, v.TikTok)).DefaultIfEmpty(1).Max());
+        var maxVal = Math.Max(1, Math.Max(counts.Values.Select(v => Math.Max(v.Shopee, v.TikTok)).DefaultIfEmpty(1).Max(), received.Values.DefaultIfEmpty(0).Max()));
         const double maxBarHeight = 110.0;
 
         var result = new List<DailyTrendPoint>(days);
@@ -578,7 +590,9 @@ public sealed partial class HomeViewModel : ObservableObject
                 shp,
                 tt,
                 shp == 0 ? 2 : Math.Max(8, shp * maxBarHeight / maxVal),
-                tt == 0 ? 2 : Math.Max(8, tt * maxBarHeight / maxVal)));
+                tt == 0 ? 2 : Math.Max(8, tt * maxBarHeight / maxVal),
+                received[d],
+                received[d] == 0 ? 2 : Math.Max(8, received[d] * maxBarHeight / maxVal)));
         }
         return result;
     }
